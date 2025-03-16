@@ -1,0 +1,5 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M400 100 L600 300 L400 500 L200 300 Z" stroke="currentColor" stroke-width="2" fill="none"/>
+  <circle cx="400" cy="300" r="50" stroke="currentColor" stroke-width="2" fill="none"/>
+  <path d="M350 300 L450 300 M400 250 L400 350" stroke="currentColor" stroke-width="2"/>
+</svg>

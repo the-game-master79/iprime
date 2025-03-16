@@ -1,0 +1,203 @@
+/* Import the fonts */
+@font-face {
+  font-family: 'GT Med';
+  src: url('/fonts/gtmed.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GT Reg';
+  src: url('/fonts/gtreg.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 210 25% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 25% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 25% 9%;
+
+    --primary: 220 100% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 210 25% 9%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 20% 40%;
+
+    --accent: 210 20% 96%;
+    --accent-foreground: 210 25% 9%;
+
+    --destructive: 350 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 90%;
+    --input: 210 20% 90%;
+    --ring: 220 100% 55%;
+
+    --radius: 0.5rem;
+    
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 210 25% 9%;
+    --sidebar-primary: 220 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 20% 96%;
+    --sidebar-accent-foreground: 220 100% 55%;
+    --sidebar-border: 210 20% 90%;
+    --sidebar-ring: 220 100% 55%;
+  }
+
+  .dark {
+    --background: 210 25% 9%;
+    --foreground: 210 20% 98%;
+
+    --card: 210 25% 12%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 210 25% 12%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 220 100% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 25% 16%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 210 25% 16%;
+    --muted-foreground: 210 20% 60%;
+
+    --accent: 210 25% 16%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 350 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 25% 16%;
+    --input: 210 25% 16%;
+    --ring: 220 100% 55%;
+    
+    --sidebar-background: 210 25% 12%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 220 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 25% 16%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 210 25% 16%;
+    --sidebar-ring: 220 100% 55%;
+  }
+
+  /* Add heading styles */
+  h1, h2, h3, h4 {
+    font-family: 'GT Med', system-ui, sans-serif;
+  }
+
+  h5, h6, p {
+    font-family: 'GT Reg', system-ui, sans-serif;
+  }
+
+  /* Make text brighter */
+  .text-foreground {
+    @apply text-opacity-90;
+  }
+
+  /* Brighten muted text */
+  .text-muted-foreground {
+    @apply text-opacity-75;
+  }
+
+  /* Rounded corners for containers */
+  .rounded-container {
+    @apply rounded-xl;
+  }
+
+  /* Card styles */
+  .card {
+    @apply rounded-xl border bg-card text-card-foreground shadow-sm;
+  }
+
+  /* Table container */
+  .table-container {
+    @apply rounded-xl overflow-hidden border bg-background;
+  }
+
+  /* Tab animations */
+  @keyframes tab-move-right {
+    from { transform: translateX(-4%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes tab-move-left {
+    from { transform: translateX(4%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Tab transition classes */
+  .tab-content-enter {
+    animation: tab-move-right 0.2s ease-out;
+  }
+
+  .tab-content-exit {
+    animation: tab-move-left 0.2s ease-out;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border selection:bg-primary/10 selection:text-primary;
+  }
+  
+  html {
+    @apply scroll-smooth antialiased;
+    font-family: 'GT Reg', system-ui, sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
+  }
+  
+  .dark .glass-card {
+    @apply bg-black/30 border-white/10;
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .page-transition-enter {
+    @apply animate-fade-in;
+  }
+  
+  .page-transition-exit {
+    @apply animate-fade-out;
+  }
+}
