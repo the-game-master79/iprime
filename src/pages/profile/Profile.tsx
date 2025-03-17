@@ -557,10 +557,6 @@ const Profile = () => {
               <Lock className="h-4 w-4" />
               Security
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2">
-              <Bell className="h-4 w-4" />
-              Notifications
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="personal" className="space-y-6">
@@ -1008,28 +1004,6 @@ const Profile = () => {
                       <Input id="confirmPassword" type="password" />
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Two-Factor Authentication</h3>
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">Enable 2FA</div>
-                        <div className="text-sm text-muted-foreground">Add an extra layer of security to your account</div>
-                      </div>
-                      <Button variant="outline">Setup</Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Session Management</h3>
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div>
-                        <div className="font-medium">Active Sessions</div>
-                        <div className="text-sm text-muted-foreground">View and manage your active sessions</div>
-                      </div>
-                      <Button variant="outline">View</Button>
-                    </div>
-                  </div>
                 </CardContent>
                 <CardFooter>
                   <Button type="submit" disabled={isUpdatingSecurity}>
@@ -1044,94 +1018,6 @@ const Profile = () => {
                   </Button>
                 </CardFooter>
               </form>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Choose how you want to be notified about account activities
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b pb-4">
-                    <div>
-                      <h3 className="font-medium">Security Alerts</h3>
-                      <p className="text-sm text-muted-foreground">Login attempts, password changes, etc.</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" defaultChecked />
-                        <span className="text-sm">Email</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" defaultChecked />
-                        <span className="text-sm">SMS</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-b pb-4">
-                    <div>
-                      <h3 className="font-medium">Investment Updates</h3>
-                      <p className="text-sm text-muted-foreground">ROI payments, investment maturity, etc.</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" defaultChecked />
-                        <span className="text-sm">Email</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" />
-                        <span className="text-sm">SMS</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-b pb-4">
-                    <div>
-                      <h3 className="font-medium">Affiliate Activity</h3>
-                      <p className="text-sm text-muted-foreground">New referrals, commission payments, etc.</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" defaultChecked />
-                        <span className="text-sm">Email</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" />
-                        <span className="text-sm">SMS</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-b pb-4">
-                    <div>
-                      <h3 className="font-medium">Promotional Offers</h3>
-                      <p className="text-sm text-muted-foreground">New investment plans, special deals, etc.</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" />
-                        <span className="text-sm">Email</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" className="h-4 w-4" />
-                        <span className="text-sm">SMS</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Preferences
-                </Button>
-              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>

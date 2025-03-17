@@ -52,7 +52,7 @@ const Affiliate = () => {
   const [treeData, setTreeData] = useState<TeamTreeNode[]>([]);
   const [commissionStructure, setCommissionStructure] = useState<CommissionStructure[]>([]);
   const [totalCommissions, setTotalCommissions] = useState(0);
-  const [activeReferrers, setActiveReferrers] = useState(0);
+  const [activeMembers, setActiveMembers] = useState(0); // renamed from activeReferrers
   const [currentMonthCommissions, setCurrentMonthCommissions] = useState(0);
   const [totalBusiness, setTotalBusiness] = useState(0);
 
@@ -225,29 +225,34 @@ const Affiliate = () => {
   }, []);
 
   useEffect(() => {
-    const fetchActiveReferrers = async () => {
+    const fetchActiveMembers = async () => { // renamed from fetchActiveReferrers
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
 
-        // Get count of unique referrers who have at least one referral
+        // Get all team members with their investment amounts
         const { data, error } = await supabase
           .from('referral_relationships')
-          .select('referrer_id')
+          .select(`
+            referred:profiles!referral_relationships_referred_id_fkey (
+              id,
+              total_invested
+            )
+          `)
           .neq('referred_id', session.user.id);
 
         if (error) throw error;
 
-        // Count unique referrers
-        const uniqueReferrers = new Set(data.map(rel => rel.referrer_id));
-        setActiveReferrers(uniqueReferrers.size);
+        // Count members with active investments (total_invested > 0)
+        const activeCount = data.filter(rel => rel.referred?.total_invested > 0).length;
+        setActiveMembers(activeCount);
       } catch (error) {
-        console.error('Error fetching active referrers:', error);
-        setActiveReferrers(0);
+        console.error('Error fetching active members:', error);
+        setActiveMembers(0);
       }
     };
 
-    fetchActiveReferrers();
+    fetchActiveMembers();
   }, []);
 
   useEffect(() => {
@@ -382,17 +387,12 @@ const Affiliate = () => {
           icon={<Users className="h-4 w-4" />}
         />
         <StatCard
-          title="Active Team Members"
-          value={activeReferrers.toString()}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Total Commissions"
+          title="Commission Earned"
           value={`$${totalCommissions.toLocaleString()}`}
           icon={<LineChart className="h-4 w-4" />}
         />
         <StatCard
-          title="Total Business"
+          title="Business Volume"
           value={`$${totalBusiness.toLocaleString()}`}
           icon={<BarChart className="h-4 w-4" />}
         />
@@ -478,20 +478,6 @@ const Affiliate = () => {
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share via Email
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share on Twitter
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      <Share2 className="h-4 w-4" />
-                      Share on Facebook
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
