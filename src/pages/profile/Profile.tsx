@@ -689,7 +689,7 @@ const Profile = () => {
                           {referralCode && !isValidatingCode && !referrerName && (
                             <p className="text-sm text-red-600">
                               <AlertTriangle className="h-3 w-3 inline mr-1" />
-                              Invalid referral code
+                              Invalid referral code. Please check and try again.
                             </p>
                           )}
                         </div>

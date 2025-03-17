@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageTransition } from "@/components/ui-components";
-import { ArrowRight, Mail, Chrome } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { generateReferralCode } from "@/lib/utils";
 import { AuthGuard } from "@/components/AuthGuard";
 
@@ -107,21 +107,6 @@ const Register = () => {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google') => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      toast.error("Error with social login: " + (error as Error).message);
-    }
-  };
-  
   return (
     <AuthGuard authPage>
       <PageTransition>
@@ -239,29 +224,6 @@ const Register = () => {
                     {!isLoading && <ArrowRight className="ml-2 h-4 w-4" />}
                   </Button>
                 </form>
-                
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <Separator className="w-full" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">
-                        Or continue with
-                      </span>
-                    </div>
-                </div>
-                
-                <div className="w-full">
-                  <Button 
-                    variant="outline" 
-                    className="w-full" 
-                    type="button"
-                    onClick={() => handleSocialLogin('google')}
-                  >
-                    <Chrome className="mr-2 h-4 w-4 text-[#4285F4]" />
-                    Continue with Google
-                  </Button>
-                </div>
                 
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}

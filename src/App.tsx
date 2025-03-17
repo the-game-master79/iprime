@@ -19,6 +19,7 @@ import MyRank from "@/pages/dashboard/MyRank";
 import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
 import { TawkTo } from "@/components/TawkTo";
+import Callback from "./pages/auth/Callback";
 
 // Admin Routes
 import AdminLogin from "./pages/admin/Login";
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth/login" element={<AuthGuard authPage><Login /></AuthGuard>} />
               <Route path="/auth/register" element={<AuthGuard authPage><Register /></AuthGuard>} />
+              <Route path="/auth/callback" element={<Callback />} />
 
               {/* Protected User Routes - no need for individual AuthGuard since parent handles it */}
               <Route path="/dashboard" element={<Dashboard />} />
