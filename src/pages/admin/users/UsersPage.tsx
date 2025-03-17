@@ -452,7 +452,7 @@ const UsersPage = () => {
                   <TableCell>{new Date(user.date_joined).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      {user.kyc_status === 'pending' && (
+                      {(user.kyc_status === 'pending' || user.kyc_status === 'processing') && (
                         <>
                           <Button
                             variant="ghost"

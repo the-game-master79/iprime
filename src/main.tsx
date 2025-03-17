@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Console warning message
 console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold; text-shadow: 2px 2px #000;');
@@ -13,5 +14,6 @@ console.log(
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
+    <SpeedInsights />
   </React.StrictMode>,
 )

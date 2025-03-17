@@ -249,7 +249,7 @@ const MyRank = () => {
                             : currentRankData.nextRank?.id === rank.id
                             ? 'Next Rank'
                             : totalBusiness >= rank.business_amount
-                            ? 'Current Rank'
+                            ? 'Achieved'
                             : 'Locked'}
                         </span>
                       </TableCell>

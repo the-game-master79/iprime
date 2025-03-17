@@ -100,31 +100,59 @@ const Plans = () => {
       if (!userProfile) return;
       
       try {
-        const { data, error } = await supabase
+        // First get all active investments grouped by plan
+        const { data: investments, error: investmentsError } = await supabase
           .from('investments')
           .select(`
+            id,
+            amount,
             plan_id,
             plans (*)
           `)
           .eq('user_id', userProfile.id)
           .eq('status', 'active');
 
-        if (error) throw error;
-        
-        // Fetch earnings for each plan
-        const plansWithEarnings = await Promise.all(
-          data.map(async (item) => {
-            const { data: earnings } = await supabase
-              .from('transactions')
-              .select('amount')
-              .eq('user_id', userProfile.id)
-              .eq('type', 'investment_return')
-              .eq('reference_id', item.plan_id);
+        if (investmentsError) throw investmentsError;
 
-            const totalEarnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+        // Group investments by plan
+        const planMap = investments.reduce((acc, inv) => {
+          if (!acc[inv.plan_id]) {
+            acc[inv.plan_id] = {
+              ...inv.plans,
+              investments: []
+            };
+          }
+          acc[inv.plan_id].investments.push({
+            id: inv.id,
+            amount: inv.amount
+          });
+          return acc;
+        }, {});
+
+        // For each plan, fetch earnings for all its investments
+        const plansWithEarnings = await Promise.all(
+          Object.values(planMap).map(async (plan: any) => {
+            // Get earnings for each investment in this plan
+            const planEarnings = await Promise.all(
+              plan.investments.map(async (inv: any) => {
+                const { data: earnings } = await supabase
+                  .from('transactions')
+                  .select('amount')
+                  .eq('user_id', userProfile.id)
+                  .eq('type', 'investment_return')
+                  .eq('reference_id', inv.id); // Use investment ID as reference
+
+                return earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+              })
+            );
+
+            // Sum up all earnings for this plan's investments
+            const totalEarnings = planEarnings.reduce((sum, earning) => sum + earning, 0);
+            
             return {
-              ...item.plans,
-              total_earnings: totalEarnings
+              ...plan,
+              total_earnings: totalEarnings,
+              total_invested: plan.investments.reduce((sum: number, inv: any) => sum + inv.amount, 0)
             };
           })
         );
@@ -360,18 +388,6 @@ const Plans = () => {
                       <div>
                         <p className="text-sm font-medium">Duration</p>
                         <p className="text-sm text-muted-foreground">{plan.duration_days} days</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        <DollarSign className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">Total Earnings</p>
-                        <p className="text-sm text-muted-foreground">
-                          ${plan.total_earnings?.toLocaleString() || '0.00'}
-                        </p>
                       </div>
                     </div>
 

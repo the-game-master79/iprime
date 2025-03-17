@@ -13,4 +13,6 @@ export interface KycFormData {
   document_number: string;
   document_front: File | null;
   document_back: File | null;
+  occupation: string;
+  postal_code: string;
 }

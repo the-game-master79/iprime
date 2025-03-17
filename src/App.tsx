@@ -18,6 +18,7 @@ import Profile from "./pages/profile/Profile";
 import MyRank from "@/pages/dashboard/MyRank";
 import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
+import { TawkTo } from "@/components/TawkTo";
 
 // Admin Routes
 import AdminLogin from "./pages/admin/Login";
@@ -35,8 +36,6 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
         <AuthProvider>
           <AuthGuard>
@@ -79,6 +78,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthGuard>
+          <TawkTo />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
