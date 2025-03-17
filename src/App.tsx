@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { AuthProvider } from '@/contexts/AuthContext';
 import Index from "./pages/Index";
@@ -39,48 +39,54 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <AuthProvider>
-          <AuthGuard>
+          <AdminAuthProvider>
             <Routes>
               {/* Public Routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/auth/login" element={<AuthGuard authPage><Login /></AuthGuard>} />
-              <Route path="/auth/register" element={<AuthGuard authPage><Register /></AuthGuard>} />
+              <Route path="/" element={<Navigate to="/auth/login" replace />} />
+              <Route path="/auth/login" element={<Login />} />
+              <Route path="/auth/register" element={<Register />} />
               <Route path="/auth/callback" element={<Callback />} />
 
-              {/* Protected User Routes - no need for individual AuthGuard since parent handles it */}
-              <Route path="/dashboard" element={<Dashboard />} />
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={
+                <AuthGuard requireAuth>
+                  <Dashboard />
+                </AuthGuard>
+              } />
+              <Route path="/profile" element={
+                <AuthGuard requireAuth>
+                  <Profile />
+                </AuthGuard>
+              } />
               <Route path="/plans" element={<Plans />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/withdrawals" element={<Withdrawals />} />
-              <Route path="/profile" element={<Profile />} />
               <Route path="/rank" element={<MyRank />} />
               
               {/* Admin Routes */}
               <Route
                 path="/admin/*"
                 element={
-                  <AdminAuthProvider>
-                    <Routes>
-                      <Route path="login" element={<AdminLogin />} />
-                      <Route path="dashboard" element={<AdminDashboard />} />
-                      <Route path="users" element={<UsersPage />} />
-                      <Route path="settings" element={<SettingsPage />} />
-                      <Route path="payments" element={<PaymentsPage />} />
-                      <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                      <Route path="deposits" element={<DepositsPage />} />
-                      <Route path="affiliates" element={<AffiliatesPage />} />
-                      <Route path="plans" element={<AdminPlans />} />
-                      <Route path="promotions" element={<PromotionsPage />} />
-                    </Routes>
-                  </AdminAuthProvider>
+                  <Routes>
+                    <Route path="login" element={<AdminLogin />} />
+                    <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="users" element={<UsersPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="payments" element={<PaymentsPage />} />
+                    <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                    <Route path="deposits" element={<DepositsPage />} />
+                    <Route path="affiliates" element={<AffiliatesPage />} />
+                    <Route path="plans" element={<AdminPlans />} />
+                    <Route path="promotions" element={<PromotionsPage />} />
+                  </Routes>
                 }
               />
               
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthGuard>
-          <TawkTo />
+            <Toaster />
+          </AdminAuthProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

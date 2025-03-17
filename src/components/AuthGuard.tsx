@@ -16,19 +16,27 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
   useEffect(() => {
     if (loading) return;
 
-    const isPublicRoute = ['/auth/login', '/auth/register', '/'].includes(location.pathname);
+    const publicPaths = ['/auth/login', '/auth/register', '/', '/auth/callback'];
+    const isPublicRoute = publicPaths.includes(location.pathname);
 
-    if (!user && !isPublicRoute && !authPage) {
-      // Redirect to login for any non-public route when user is not authenticated
-      navigate('/auth/login', { state: { from: location.pathname } });
+    if (!user && requireAuth) {
+      // Save the attempted URL to redirect back after login
+      navigate('/auth/login', { 
+        state: { from: location.pathname },
+        replace: true 
+      });
     } else if (user && authPage) {
       // Redirect authenticated users away from auth pages
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }
-  }, [user, loading, authPage, navigate, location]);
+  }, [user, loading, requireAuth, authPage, navigate, location]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return <>{children}</>;
