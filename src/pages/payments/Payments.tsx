@@ -18,7 +18,7 @@ interface Transaction {
   method?: string;
   crypto_name?: string;
   crypto_symbol?: string;
-  type?: 'investment' | 'commission' | 'adjustment' | 'investment_return';
+  type?: 'investment' | 'commission' | 'adjustment' | 'investment_return' | 'rank_bonus';
   description?: string;
 }
 
@@ -34,6 +34,7 @@ const Payments = () => {
   const [adjustments, setAdjustments] = useState<Transaction[]>([]);
   const [investmentReturns, setInvestmentReturns] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [rankBonusData, setRankBonusData] = useState<Transaction[]>([]);
 
   useEffect(() => {
     fetchTransactions();
@@ -50,7 +51,7 @@ const Payments = () => {
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
-        .in('type', ['commission', 'adjustment', 'investment_return'])
+        .in('type', ['commission', 'adjustment', 'investment_return', 'rank_bonus'])
         .order('created_at', { ascending: false });
 
       if (transactionsError) throw transactionsError;
@@ -59,6 +60,7 @@ const Payments = () => {
       const commissionsData = transactionsData?.filter(tx => tx.type === 'commission') || [];
       const adjustmentsData = transactionsData?.filter(tx => tx.type === 'adjustment') || [];
       const investmentReturnsData = transactionsData?.filter(tx => tx.type === 'investment_return') || [];
+      const rankBonusData = transactionsData?.filter(tx => tx.type === 'rank_bonus') || [];
 
       // Rest of your existing fetch calls
       const { data: depositsData, error: depositsError } = await supabase
@@ -95,7 +97,8 @@ const Payments = () => {
       setWithdrawals(withdrawalsData || []);
       setInvestments(investmentTransactions);
       setCommissions(commissionsData);
-      setAdjustments(adjustmentsData);
+      setInvestmentReturns(investmentReturnsData);
+      setRankBonusData(rankBonusData);
       setInvestmentReturns(investmentReturnsData);
 
     } catch (error) {
@@ -111,18 +114,21 @@ const Payments = () => {
   };
 
   // Combine and filter transactions based on search and filters
-  const filteredTransactions = [...deposits, ...withdrawals, ...investments, ...commissions, ...adjustments, ...investmentReturns]
+  const filteredTransactions = [...deposits, ...withdrawals, ...investments, ...commissions, 
+    ...adjustments, ...investmentReturns, ...rankBonusData]
     .filter(tx => {
       const isDeposit = 'method' in tx && !tx.type; // Updated condition
       const isInvestment = tx.type === 'investment';
       const isCommission = tx.type === 'commission';
       const isAdjustment = tx.type === 'adjustment';
       const isInvestmentReturn = tx.type === 'investment_return';
+      const isRankBonus = tx.type === 'rank_bonus';
       const type = isDeposit ? 'Deposit' : 
                   isInvestment ? 'Investment' : 
                   isCommission ? 'Commission' :
                   isAdjustment ? 'Adjustment' :
-                  isInvestmentReturn ? 'Investment Return' : 'Withdrawal';
+                  isInvestmentReturn ? 'Investment Return' :
+                  isRankBonus ? 'Rank Bonus' : 'Withdrawal';
       
       const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === "all" || tx.status.toLowerCase() === statusFilter.toLowerCase();
@@ -163,6 +169,7 @@ const Payments = () => {
       case 'commission': return 'Commission';
       case 'adjustment': return 'Adjustment';
       case 'investment_return': return 'Investment Return';
+      case 'rank_bonus': return 'Rank Bonus';
       default: return 'Withdrawal';
     }
   };
@@ -237,6 +244,8 @@ const Payments = () => {
                 <option value="investment">Investments</option>
                 <option value="commission">Commissions</option>
                 <option value="adjustment">Adjustments</option>
+                <option value="rank_bonus">Rank Bonuses</option>
+                <option value="investment_return">Investment Returns</option>
               </select>
             </div>
           </div>

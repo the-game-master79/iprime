@@ -60,15 +60,11 @@ const Dashboard = () => {
   const [showQrCode, setShowQrCode] = useState(false);
   const { toast } = useToast();
   const [businessRank, setBusinessRank] = useState<{
-    currentRank: { title: string; bonus: number } | null;
+    currentRank: { title: string; bonus: number; business_amount: number } | null;
     nextRank: { title: string; bonus: number; business_amount: number } | null;
     progress: number;
-  }>({ currentRank: null, nextRank: null, progress: 0 });
-    const [currentRankData, setCurrentRankData] = useState<{
-      rank: Rank | null;
-      nextRank: Rank | null;
-      progress: number;
-    }>({ rank: null, nextRank: null, progress: 0 });
+    totalBusiness: number;
+  }>({ currentRank: null, nextRank: null, progress: 0, totalBusiness: 0 });
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [leaderboard, setLeaderboard] = useState<{
     businessVolume: LeaderboardEntry[];
@@ -236,34 +232,19 @@ const Dashboard = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Fetch profile with business volume and total invested
+        // Fetch profile with business volume and business rank
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('business_volume, business_rank, total_invested')
+          .select(`
+            id,
+            business_volume,
+            business_rank,
+            total_invested
+          `)
           .eq('id', user.id)
           .single();
 
         if (profileError) throw profileError;
-
-        // Fetch referral business volume
-        const { data: relationships, error: referralError } = await supabase
-          .from('referral_relationships')
-          .select(`
-            referred:profiles!referral_relationships_referred_id_fkey (
-              total_invested,
-              business_volume
-            )
-          `)
-          .eq('referrer_id', user.id);
-
-        if (referralError) throw referralError;
-
-        // Calculate total business volume including referrals
-        const referralBusiness = relationships?.reduce((sum, rel) => {
-          return sum + (rel.referred?.business_volume || 0) + (rel.referred?.total_invested || 0);
-        }, 0) || 0;
-
-        const totalBusinessVolume = (profile.business_volume || 0) + referralBusiness;
 
         // Fetch all ranks ordered by business amount
         const { data: ranks, error: ranksError } = await supabase
@@ -273,28 +254,33 @@ const Dashboard = () => {
 
         if (ranksError) throw ranksError;
 
-        // Calculate current and next rank based on total business volume
-        let currentRank = ranks.find(rank => rank.title === profile.business_rank);
-        if (!currentRank) {
-          currentRank = ranks[0];
-        }
-        
-        const nextRankIndex = ranks.findIndex(rank => rank.title === currentRank.title) + 1;
-        const nextRank = nextRankIndex < ranks.length ? ranks[nextRankIndex] : null;
+        // Calculate total business volume (personal)
+        const personalBusiness = (profile.business_volume || 0)
+        const totalBusinessVolume = personalBusiness;
 
-        // Calculate progress including referral volume
+        // Find current rank based on total business volume and profile's business_rank
+        let currentRank = ranks.find(rank => rank.title === profile.business_rank);
+        if (!currentRank && ranks.length > 0) {
+          currentRank = ranks[0]; // Set to first rank if no rank assigned
+        }
+
+        // Find next rank
+        const currentRankIndex = ranks.findIndex(rank => rank.title === profile?.business_rank);
+        const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
+
+        // Calculate progress
         let progress = 0;
         if (nextRank) {
-          if (currentRank === ranks[0] && totalBusinessVolume < currentRank.business_amount) {
-            // If user hasn't reached first rank yet
-            progress = (totalBusinessVolume / currentRank.business_amount) * 100;
+          if (!currentRank) {
+            // Progress towards first rank
+            progress = (totalBusinessVolume / nextRank.business_amount) * 100;
           } else {
-            // Calculate progress between current rank and next rank
-            const remainingBusiness = nextRank.business_amount - currentRank.business_amount;
-            const achievedBusiness = totalBusinessVolume - currentRank.business_amount;
-            progress = (achievedBusiness / remainingBusiness) * 100;
+            // Progress between current and next rank
+            const businessDifference = nextRank.business_amount - currentRank.business_amount;
+            const achievedDifference = totalBusinessVolume - currentRank.business_amount;
+            progress = (achievedDifference / businessDifference) * 100;
           }
-        } else {
+        } else if (currentRank) {
           progress = 100; // Max rank achieved
         }
 
@@ -304,7 +290,8 @@ const Dashboard = () => {
         setBusinessRank({
           currentRank,
           nextRank,
-          progress
+          progress,
+          totalBusiness: totalBusinessVolume
         });
 
       } catch (error) {
@@ -664,17 +651,24 @@ const Dashboard = () => {
                           {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
                         </div>
                         <div className="text-xs sm:text-sm text-muted-foreground">
-                          Business Volume Bonus: <span className="font-semibold text-primary">${businessRank.currentRank?.bonus?.toLocaleString() || '0'}</span>
+                          Total Business Volume: <span className="font-semibold text-primary">
+                            ${businessRank.totalBusiness?.toLocaleString() || '0'}
+                          </span>
+                        </div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">
+                          Current Rank Bonus: <span className="font-semibold text-primary">
+                            ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
+                          </span>
                         </div>
                       </div>
                       {businessRank.nextRank && (
                         <div className="space-y-2">
                           <div className="text-xs sm:text-sm text-muted-foreground">
-                            Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.bonus?.toLocaleString()} bonus)
+                            Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
                           </div>
                           <Progress value={businessRank.progress} className="h-2" />
                           <div className="text-xs text-muted-foreground">
-                            {Math.round(businessRank.progress)}% to next rank
+                            {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
                           </div>
                         </div>
                       )}

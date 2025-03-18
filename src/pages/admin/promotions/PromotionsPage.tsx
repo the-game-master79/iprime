@@ -44,7 +44,13 @@ interface DepositMethod {
   min_amount: number;
 }
 
-// Add available routes for banner links
+interface Rank {
+  id: string;
+  title: string;
+  business_amount: number;
+  bonus: number;
+}
+
 const availableRoutes = [
   { value: "/dashboard", label: "Dashboard" },
   { value: "/plans", label: "Investment Plans" },
@@ -85,11 +91,20 @@ const PromotionsPage = () => {
     is_active: true,
     min_amount: 0
   });
+  const [ranks, setRanks] = useState<Rank[]>([]);
+  const [isRankDialogOpen, setIsRankDialogOpen] = useState(false);
+  const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
+  const [rankFormData, setRankFormData] = useState({
+    title: "",
+    business_amount: 0,
+    bonus: 0
+  });
 
   useEffect(() => {
     fetchBanners();
     fetchLevels();
     fetchDepositMethods();
+    fetchRanks();
   }, []);
 
   const fetchBanners = async () => {
@@ -151,6 +166,25 @@ const PromotionsPage = () => {
     }
   };
 
+  const fetchRanks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ranks')
+        .select('*')
+        .order('business_amount', { ascending: true });
+
+      if (error) throw error;
+      setRanks(data || []);
+    } catch (error) {
+      console.error('Error fetching ranks:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load ranks",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase
@@ -199,7 +233,6 @@ const PromotionsPage = () => {
     e.preventDefault();
     try {
       if (editingBanner) {
-        // Update existing banner
         const { data, error } = await supabase
           .from('promotions')
           .update(formData)
@@ -217,7 +250,6 @@ const PromotionsPage = () => {
           description: "Banner updated successfully",
         });
       } else {
-        // Create new banner
         const { data, error } = await supabase
           .from('promotions')
           .insert([formData])
@@ -308,7 +340,6 @@ const PromotionsPage = () => {
 
       if (error) throw error;
 
-      // Update state directly instead of re-fetching
       setDepositMethods(methods => methods.filter(method => method.id !== id));
       
       toast({
@@ -392,6 +423,101 @@ const PromotionsPage = () => {
     }
   };
 
+  const handleEditRank = (rank: Rank) => {
+    setSelectedRank(rank);
+    setRankFormData({
+      title: rank.title,
+      business_amount: rank.business_amount,
+      bonus: rank.bonus
+    });
+    setIsRankDialogOpen(true);
+  };
+
+  const handleDeleteRank = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('ranks')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setRanks(ranks.filter(rank => rank.id !== id));
+      toast({
+        title: "Success",
+        description: "Rank deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting rank:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete rank",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdateRank = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRank) return;
+
+    try {
+      const { error } = await supabase
+        .from('ranks')
+        .update(rankFormData)
+        .eq('id', selectedRank.id);
+
+      if (error) throw error;
+
+      setRanks(ranks.map(rank =>
+        rank.id === selectedRank.id
+          ? { ...rank, ...rankFormData }
+          : rank
+      ));
+
+      setIsRankDialogOpen(false);
+      setSelectedRank(null);
+      toast({
+        title: "Success",
+        description: "Rank updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating rank:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update rank",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateNewRank = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { data, error } = await supabase
+        .from('ranks')
+        .insert([rankFormData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setRanks([...ranks, data]);
+      setIsRankDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Rank created successfully",
+      });
+    } catch (error) {
+      console.error('Error creating rank:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create rank",
+        variant: "destructive"
+      });
+    }
+  };
+
   const activeBanners = banners.filter(banner => banner.status === 'active').length;
 
   return (
@@ -414,10 +540,10 @@ const PromotionsPage = () => {
           <TabsTrigger value="banners">Promotional Banners</TabsTrigger>
           <TabsTrigger value="levels">Commission Levels</TabsTrigger>
           <TabsTrigger value="deposit-methods">Deposit Methods</TabsTrigger>
+          <TabsTrigger value="ranks">Ranks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="banners">
-          {/* Existing banner stats and grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
             <StatCard
               title="Total Banners"
@@ -608,9 +734,73 @@ const PromotionsPage = () => {
             </Table>
           </div>
         </TabsContent>
+
+        <TabsContent value="ranks">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Rank System</h2>
+            <Button onClick={() => {
+              setSelectedRank(null);
+              setRankFormData({
+                title: "",
+                business_amount: 0,
+                bonus: 0
+              });
+              setIsRankDialogOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Rank
+            </Button>
+          </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rank Name</TableHead>
+                  <TableHead>Business Amount</TableHead>
+                  <TableHead>Bonus</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ranks
+                  .sort((a, b) => a.business_amount - b.business_amount)
+                  .map((rank) => (
+                    <TableRow key={rank.id}>
+                      <TableCell>{rank.title}</TableCell>
+                      <TableCell>${rank.business_amount.toLocaleString()}</TableCell>
+                      <TableCell>${rank.bonus.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {rank.title !== "New Member" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditRank(rank)}
+                              >
+                                <Pencil className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteRank(rank.id)}
+                              >
+                                <Trash className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
       </Tabs>
 
-      {/* Add Banner Dialog */}
       <Dialog 
         open={isDialogOpen} 
         onOpenChange={(open) => {
@@ -699,7 +889,6 @@ const PromotionsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Level Edit Dialog */}
       <Dialog open={isLevelsDialogOpen} onOpenChange={setIsLevelsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -762,7 +951,6 @@ const PromotionsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Deposit Method Edit Dialog */}
       <Dialog open={isDepositDialogOpen} onOpenChange={setIsDepositDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -924,6 +1112,62 @@ const PromotionsPage = () => {
               </Button>
               <Button type="submit">
                 {selectedDepositMethod ? 'Save Changes' : 'Create Method'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRankDialogOpen} onOpenChange={setIsRankDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{selectedRank ? 'Edit Rank' : 'Add New Rank'}</DialogTitle>
+            <DialogDescription>
+              {selectedRank ? 'Update the rank details and requirements' : 'Create a new rank level'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={selectedRank ? handleUpdateRank : handleCreateNewRank} className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="title">Rank Name</Label>
+              <Input
+                id="title"
+                value={rankFormData.title}
+                onChange={(e) => setRankFormData({
+                  ...rankFormData,
+                  title: e.target.value
+                })}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="business_amount">Business Amount</Label>
+              <Input
+                id="business_amount"
+                type="number"
+                value={rankFormData.business_amount}
+                onChange={(e) => setRankFormData({
+                  ...rankFormData,
+                  business_amount: parseFloat(e.target.value)
+                })}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="bonus">Bonus</Label>
+              <Input
+                id="bonus"
+                type="number"
+                value={rankFormData.bonus}
+                onChange={(e) => setRankFormData({
+                  ...rankFormData,
+                  bonus: parseFloat(e.target.value)
+                })}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit">
+                {selectedRank ? 'Save Changes' : 'Create Rank'}
               </Button>
             </DialogFooter>
           </form>

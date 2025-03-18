@@ -91,7 +91,8 @@ const Register = () => {
             email: email,
             referred_by: providedReferralCode || null,
             referral_code: newReferralCode,
-            status: 'active'
+            status: 'active',
+            business_rank: 'New Member'  // Add this line
           });
 
         if (profileError) throw profileError;

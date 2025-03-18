@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
-import { Copy, Users, ChevronDown, ChevronUp, Share2, Download, LineChart, BarChart, GitBranchPlus, ChevronRight } from "lucide-react";
+import { Copy, Users, ChevronDown, ChevronUp, Share2, Download, LineChart, BarChart, GitBranchPlus, ChevronRight, Gift } from "lucide-react";
 import ShellLayout from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui-components";
 import { Label } from "@/components/ui/label";
+import { Tree, TreeNode as OrgTreeNode } from 'react-organizational-chart';
 
 // Marketing materials
 const marketingMaterials = [
@@ -28,7 +29,8 @@ interface TeamMember {
   status: string;
   commissions: number;
   referrerName: string;
-  totalInvested: number; // Add this line
+  totalInvested: number;
+  referralCode: string; // Add this line
 }
 
 interface TeamTreeNode extends TeamMember {
@@ -118,7 +120,8 @@ const Affiliate = () => {
               created_at,
               status,
               referred_by,
-              total_invested
+              total_invested,
+              referral_code
             ),
             referrer:profiles!referral_relationships_referrer_id_fkey (
               first_name,
@@ -161,7 +164,8 @@ const Affiliate = () => {
             totalInvested: rel.referred.total_invested || 0,
             referrerName: rel.referred.referred_by 
               ? referralCodeToName[rel.referred.referred_by] || 'Unknown'
-              : 'Direct'
+              : 'Direct',
+            referralCode: rel.referred.referral_code // Add this line
           }));
 
         setTeamData(processedData || []);
@@ -323,46 +327,28 @@ const Affiliate = () => {
     return (member.totalInvested * levelStructure.percentage) / 100;
   };
 
-  const TreeNode = ({ node, level = 0 }: { node: TeamTreeNode; level?: number }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
-    const hasChildren = node.children.length > 0;
-  
-    return (
-      <div className="relative">
-        <div className={`flex items-center ${level > 0 ? 'ml-8 mt-2' : 'mt-0'}`}>
-          {level > 0 && (
-            <div className="absolute left-0 top-0 h-full w-8">
-              <div className="absolute left-0 top-0 border-l-2 border-muted-foreground/20 h-1/2 w-full" />
-              <div className="absolute left-0 top-1/2 border-b-2 border-muted-foreground/20 w-full" />
-            </div>
-          )}
-          <div 
-            className="flex-1 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-            onClick={() => hasChildren && setIsExpanded(!isExpanded)}
-          >
-            <div className="flex items-center gap-2">
-              {hasChildren && (
-                <ChevronRight 
-                  className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
-                />
-              )}
-              <div>
-                <div className="font-medium">{node.name}</div>
-                <div className="text-sm text-muted-foreground">Level {node.level}</div>
-              </div>
-            </div>
-          </div>
+  const OrganizationalNode = ({ node }: { node: TeamTreeNode }) => (
+    <div className="relative p-4 min-w-[200px] rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
+      <div className="flex flex-col items-center gap-1 text-center">
+        <div className="font-medium">{node.name}</div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Level {node.level}</span>
+          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+            {node.referralCode}
+          </span>
         </div>
-        {hasChildren && isExpanded && (
-          <div className="ml-8">
-            {node.children.map((child, index) => (
-              <TreeNode key={child.id} node={child} level={level + 1} />
-            ))}
-          </div>
-        )}
+        <div className="text-xs text-muted-foreground mt-1">
+          ${node.totalInvested.toLocaleString()}
+        </div>
       </div>
-    );
-  };
+    </div>
+  );
+
+  const renderTree = (node: TeamTreeNode) => (
+    <OrgTreeNode label={<OrganizationalNode node={node} />}>
+      {node.children.map((child) => renderTree(child))}
+    </OrgTreeNode>
+  );
 
   return (
     <ShellLayout>
@@ -375,8 +361,9 @@ const Affiliate = () => {
         <h2 className="text-xl font-semibold mb-3">How to Earn</h2>
         <ul className="space-y-2 text-muted-foreground list-disc pl-5">
           <li>Users can earn across 10 levels</li>
-          <li>Receive Volume Bonus upon Rank completion</li>
-          <li>Get 1% Team Rewards on Sapphire Rank Achievement</li>
+          <li>Recieve Volume Bonus on Rank Achievement</li>
+          <li>Recieve Team Bonus on Rank Achievement</li>
+          <li>Get 0.18% Global Pool Bonus on Pearl Rank Achievement</li>
         </ul>
       </div>
 
@@ -432,11 +419,25 @@ const Affiliate = () => {
                 Commissions
               </TabsTrigger>
               <TabsTrigger 
+                value="bonuses" 
+                className="w-full justify-start gap-2 px-3"
+              >
+                <Gift className="h-4 w-4" />
+                Invite Bonus
+              </TabsTrigger>
+              <TabsTrigger 
                 value="materials" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <Download className="h-4 w-4" />
                 Marketing
+              </TabsTrigger>
+              <TabsTrigger 
+                value="globalPool" 
+                className="w-full justify-start gap-2 px-3"
+              >
+                <LineChart className="h-4 w-4" />
+                Global Pool Bonus
               </TabsTrigger>
             </TabsList>
           </div>
@@ -571,19 +572,26 @@ const Affiliate = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-6">
-                    {treeData.length > 0 ? (
-                      treeData.map((node) => (
-                        <TreeNode key={node.id} node={node} />
-                      ))
-                    ) : (
-                      <EmptyState
-                        icon={<Users />}
-                        title="No team members yet"
-                        description="Start sharing your referral link to build your team"
-                      />
-                    )}
-                  </div>
+                  {treeData.length > 0 ? (
+                    <div className="w-full overflow-auto">
+                      <div className="min-w-[800px] p-4">
+                        <Tree
+                          lineWidth="2px"
+                          lineColor="rgb(229 231 235)"
+                          lineBorderRadius="6px"
+                          label={<OrganizationalNode node={treeData[0]} />}
+                        >
+                          {treeData[0].children.map((node) => renderTree(node))}
+                        </Tree>
+                      </div>
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={<Users />}
+                      title="No team members yet"
+                      description="Start sharing your referral link to build your team"
+                    />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -604,9 +612,96 @@ const Affiliate = () => {
                           <div className="font-medium">Level {level.level}</div>
                           <div className="text-sm text-muted-foreground">{level.description}</div>
                         </div>
-                        <div className="text-xl font-bold">{level.percentage}%</div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="font-medium text-green-600">{level.percentage}%</div>
+                            <div className="text-xs text-muted-foreground">
+                              ${(1000 * level.percentage / 100).toFixed(2)} per $1,000 invested
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="globalPool" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Global Pool Bonus</CardTitle>
+                  <CardDescription>
+                    Earn a percentage of the global pool based on your rank
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {[
+                      { rank: 'Pearl Rank', percentage: 0.18 },
+                      { rank: 'Diamond Rank', percentage: 0.24 },
+                      { rank: 'Legend Rank', percentage: 0.31 },
+                      { rank: 'Kohinoor Rank', percentage: 0.39 }
+                    ].map((tier) => (
+                      <div key={tier.rank} className="flex justify-between p-4 border rounded-lg">
+                        <div className="font-medium">{tier.rank}</div>
+                        <div className="font-medium text-green-600">{tier.percentage}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="bonuses" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Invite Bonus Program</CardTitle>
+                  <CardDescription>
+                    Earn one-time bonuses for growing your referral network
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[
+                      { tier: 1, users: 8, bonus: 120 },
+                      { tier: 2, users: 30, bonus: 400 },
+                      { tier: 3, users: 80, bonus: 950 },
+                      { tier: 4, users: 140, bonus: 1550 }
+                    ].map((tier) => {
+                      const hasAchieved = teamData.length >= tier.users;
+                      return (
+                        <div key={tier.tier} className="flex items-center p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">Tier {tier.tier}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {teamData.length}/{tier.users} Users
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="font-medium text-green-600">${tier.bonus}</div>
+                              <div className="text-xs text-muted-foreground">Bonus</div>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={!hasAchieved}
+                              onClick={() => {
+                                toast({
+                                  title: hasAchieved ? "Processing claim..." : "Not eligible",
+                                  description: hasAchieved 
+                                    ? `Claiming $${tier.bonus} bonus for Tier ${tier.tier}`
+                                    : `Need ${tier.users - teamData.length} more referrals`,
+                                });
+                              }}
+                            >
+                              {hasAchieved ? 'Claim' : 'Locked'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>

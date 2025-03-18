@@ -171,7 +171,7 @@ const MyRank = () => {
       if (error) throw error;
 
       toast({
-        title: "Success", 
+        title: "Success",
         description: `Bonus claimed successfully for ${rank.title} rank!`,
         variant: "success",
       });

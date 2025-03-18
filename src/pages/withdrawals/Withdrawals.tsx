@@ -433,9 +433,9 @@ const Withdrawals = () => {
             <Card>
               <form onSubmit={handleSubmit}>
                 <CardHeader>
-                  <CardTitle>Request a Withdrawal</CardTitle>
+                  <CardTitle>Request a Payout</CardTitle>
                   <CardDescription>
-                    Withdraw your funds to your crypto wallet
+                    Request for a Payout of your earnings in various cryptocurrencies.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -526,11 +526,12 @@ const Withdrawals = () => {
                   <div className="rounded-lg border p-4 bg-muted/50">
                     <h3 className="font-medium mb-1">Withdrawal Policy</h3>
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>Minimum withdrawal amounts vary by payment method</li>
+                      <li>Payouts withdrawal amounts vary by payment method</li>
                       <li>Processing time: Instant or 3 business days</li>
-                      <li>Withdrawal fees may apply depending on the method</li>
+                      <li>Withdrawal fees may apply depending on the method and network congestion</li>
                       <li>Without Investments, cooling period for withdrawals is 48 hours</li>
-                      <li>Withdrawals are instant for Rounder Prestige and Sapphire Rank and above users </li>
+                      <li>Payouts are instant for SuperPlus Package</li>
+                      <li>Payouts are instant after Pearl Rank Achievement</li>
                     </ul>
                   </div>
                 </CardContent>

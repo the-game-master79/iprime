@@ -812,34 +812,44 @@ const Profile = () => {
 
                 {/* Show KYC form for rejected, pending or initial state */}
                 {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
-                  <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="full_name">Full Name (as per document)</Label>
-                        <Input
-                          id="full_name"
-                          value={kycFormData.full_name}
-                          onChange={handleNameChange}
-                          className={nameError ? "border-red-500" : ""}
-                        />
-                        {nameError && <p className="text-xs text-red-500">{nameError}</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="date_of_birth">Date of Birth</Label>
-                        <Input
-                          id="date_of_birth"
-                          type="date"
-                          max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
-                          value={kycFormData.date_of_birth}
-                          onChange={handleDobChange}
-                          className={dobError ? "border-red-500" : ""}
-                        />
-                        {dobError && <p className="text-xs text-red-500">{dobError}</p>}
-                      </div>
-                    </div>
-
-                    {/* Location Selection */}
+                  <div className="space-y-8">
+                    {/* Personal Details Section */}
                     <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">1. Personal Details</h3>
+                          <p className="text-sm text-muted-foreground">Provide your basic information</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="full_name">Full Name (as per document)</Label>
+                          <Input
+                            id="full_name"
+                            value={kycFormData.full_name}
+                            onChange={handleNameChange}
+                            className={nameError ? "border-red-500" : ""}
+                          />
+                          {nameError && <p className="text-xs text-red-500">{nameError}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="date_of_birth">Date of Birth</Label>
+                          <Input
+                            id="date_of_birth"
+                            type="date"
+                            max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
+                            value={kycFormData.date_of_birth}
+                            onChange={handleDobChange}
+                            className={dobError ? "border-red-500" : ""}
+                          />
+                          {dobError && <p className="text-xs text-red-500">{dobError}</p>}
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
                         <Label htmlFor="address">Residential Address</Label>
                         <Input
@@ -873,7 +883,19 @@ const Profile = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
+                        <div className="space-y-2">
+                          <Label htmlFor="state">State/Province</Label>
+                          <Input
+                            id="state"
+                            value={kycFormData.state}
+                            onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
+                            placeholder="Enter state or province"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="city">City</Label>
                           <Input
@@ -886,19 +908,6 @@ const Profile = () => {
                           />
                           {cityError && <p className="text-xs text-red-500">{cityError}</p>}
                         </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="occupation">Occupation</Label>
-                          <Input
-                            id="occupation"
-                            value={kycFormData.occupation}
-                            onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
-                            placeholder="Enter your occupation"
-                          />
-                        </div>
-                        
                         <div className="space-y-2">
                           <Label htmlFor="postal_code">Postal Code</Label>
                           <Input
@@ -913,49 +922,117 @@ const Profile = () => {
                       </div>
                     </div>
 
+                    {/* Document Identification Section */}
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <CreditCard className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">2. Document Identification</h3>
+                          <p className="text-sm text-muted-foreground">Provide your identification details</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="document_type">Document Type</Label>
+                          <Select 
+                            value={kycFormData.document_type}
+                            onValueChange={(value: DocumentType) => 
+                              setKycFormData(prev => ({...prev, document_type: value}))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select document type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="passport">Passport</SelectItem>
+                              <SelectItem value="national_id">National ID Card</SelectItem>
+                              <SelectItem value="driving_license">Driving License</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="document_number">Document Number</Label>
+                          <Input
+                            id="document_number"
+                            value={kycFormData.document_number}
+                            onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
+                            placeholder="Enter document number"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="occupation">Occupation</Label>
+                        <Input
+                          id="occupation"
+                          value={kycFormData.occupation}
+                          onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
+                          placeholder="Enter your occupation"
+                        />
+                      </div>
+                    </div>
+
                     {/* Document Upload Section */}
-                    <div className="space-y-4">
-                      <div className="rounded-lg border border-dashed p-4">
-                        <p className="text-sm text-muted-foreground mb-2">Document Upload Requirements:</p>
-                        <ul className="text-xs text-muted-foreground list-disc list-inside space-y-1">
+                    <div className="space-y-4 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Upload className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium">3. Document Upload</h3>
+                          <p className="text-sm text-muted-foreground">Upload your identification documents</p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-dashed p-4 bg-muted/50">
+                        <p className="font-medium text-sm mb-2">Document Upload Requirements:</p>
+                        <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
                           <li>File size must be less than 10MB</li>
                           <li>Accepted formats: JPG, PNG, SVG, PDF</li>
+                          <li>Images must be clear and legible</li>
+                          <li>All document edges must be visible</li>
                           <li>No videos or animated GIFs allowed</li>
                         </ul>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="idFront">Document Front</Label>
-                        <Input 
-                          id="idFront" 
-                          type="file" 
-                          accept=".jpg,.jpeg,.png,.svg,.pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file && handleFileValidation(file)) {
-                              handleFileSelect('front', file);
-                              setKycFormData(prev => ({...prev, document_front: file}));
-                            }
-                          }}
-                        />
-                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="idFront">Document Front</Label>
+                          <Input 
+                            id="idFront" 
+                            type="file" 
+                            accept=".jpg,.jpeg,.png,.svg,.pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file && handleFileValidation(file)) {
+                                handleFileSelect('front', file);
+                                setKycFormData(prev => ({...prev, document_front: file}));
+                              }
+                            }}
+                          />
+                        </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="idBack">Document Back</Label>
-                        <Input 
-                          id="idBack" 
-                          type="file" 
-                          accept=".jpg,.jpeg,.png,.svg,.pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file && handleFileValidation(file)) {
-                              handleFileSelect('back', file);
-                              setKycFormData(prev => ({...prev, document_back: file}));
-                            }
-                          }}
-                        />
-                        {fileError && <p className="text-xs text-red-500">{fileError}</p>}
+                        <div className="space-y-2">
+                          <Label htmlFor="idBack">Document Back</Label>
+                          <Input 
+                            id="idBack" 
+                            type="file" 
+                            accept=".jpg,.jpeg,.png,.svg,.pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              if (file && handleFileValidation(file)) {
+                                handleFileSelect('back', file);
+                                setKycFormData(prev => ({...prev, document_back: file}));
+                              }
+                            }}
+                          />
+                        </div>
                       </div>
+                      {fileError && <p className="text-xs text-red-500">{fileError}</p>}
                     </div>
                   </div>
                 )}
