@@ -39,11 +39,12 @@ interface Promotion {
 
 interface LeaderboardEntry {
   id: string;
-  first_name: string;
-  last_name: string;
-  business_volume: number;
-  referral_count: number;
-  business_rank: string;
+  serial_number: number;
+  name: string;
+  volume?: number;
+  referrals?: number;
+  income: number;
+  rank: string;
 }
 
 const Dashboard = () => {
@@ -381,27 +382,34 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Mock data for leaderboards
-    const mockBusinessVolume = [
-      { id: '1', first_name: 'John', last_name: 'Smith', business_volume: 250000, referral_count: 0, business_rank: 'Diamond' },
-      { id: '2', first_name: 'Sarah', last_name: 'Johnson', business_volume: 180000, referral_count: 0, business_rank: 'Platinum' },
-      { id: '3', first_name: 'Michael', last_name: 'Brown', business_volume: 150000, referral_count: 0, business_rank: 'Gold' },
-      { id: '4', first_name: 'Emily', last_name: 'Davis', business_volume: 120000, referral_count: 0, business_rank: 'Silver' },
-      { id: '5', first_name: 'David', last_name: 'Wilson', business_volume: 90000, referral_count: 0, business_rank: 'Bronze' },
-    ];
+    const fetchLeaderboards = async () => {
+      try {
+        // Fetch business volume leaderboard
+        const { data: businessVolumeData, error: businessVolumeError } = await supabase
+          .from('business_volume_display')
+          .select('*')
+          .order('serial_number', { ascending: true });
 
-    const mockReferrals = [
-      { id: '1', first_name: 'Emma', last_name: 'Taylor', business_volume: 0, referral_count: 85, business_rank: 'Diamond' },
-      { id: '2', first_name: 'James', last_name: 'Anderson', business_volume: 0, referral_count: 67, business_rank: 'Platinum' },
-      { id: '3', first_name: 'Sophia', last_name: 'Martinez', business_volume: 0, referral_count: 52, business_rank: 'Gold' },
-      { id: '4', first_name: 'William', last_name: 'Thomas', business_volume: 0, referral_count: 41, business_rank: 'Silver' },
-      { id: '5', first_name: 'Oliver', last_name: 'Garcia', business_volume: 0, referral_count: 34, business_rank: 'Bronze' },
-    ];
+        if (businessVolumeError) throw businessVolumeError;
 
-    setLeaderboard({
-      businessVolume: mockBusinessVolume,
-      referrals: mockReferrals
-    });
+        // Fetch top recruiters leaderboard
+        const { data: recruitersData, error: recruitersError } = await supabase
+          .from('top_recruiters_display')
+          .select('*')
+          .order('serial_number', { ascending: true });
+
+        if (recruitersError) throw recruitersError;
+
+        setLeaderboard({
+          businessVolume: businessVolumeData || [],
+          referrals: recruitersData || []
+        });
+      } catch (error) {
+        console.error('Error fetching leaderboards:', error);
+      }
+    };
+
+    fetchLeaderboards();
   }, []);
   
   useEffect(() => {
@@ -733,23 +741,27 @@ const Dashboard = () => {
                   <table className="w-full text-xs sm:text-sm">
                     <thead className="text-xs uppercase bg-muted/50">
                       <tr>
-                        <th scope="col" className="px-2 py-2 sm:px-4">#</th>
+                        <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
                         <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
                         <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Volume</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Status</th>
+                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
+                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {leaderboard.businessVolume.map((leader, index) => (
+                      {leaderboard.businessVolume.map((leader) => (
                         <tr key={leader.id} className="hover:bg-muted/50">
-                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{index + 1}</td>
+                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
                           <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                            {leader.first_name} {leader.last_name}
+                            {leader.name}
                           </td>
                           <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                            ${leader.business_volume.toLocaleString()}
+                            ${leader.volume?.toLocaleString()}
                           </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.business_rank}</td>
+                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
+                            ${leader.income.toLocaleString()}
+                          </td>
+                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -770,23 +782,27 @@ const Dashboard = () => {
                   <table className="w-full text-xs sm:text-sm">
                     <thead className="text-xs uppercase bg-muted/50">
                       <tr>
-                        <th scope="col" className="px-2 py-2 sm:px-4">#</th>
+                        <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
                         <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
                         <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Referrals</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Status</th>
+                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
+                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {leaderboard.referrals.map((leader, index) => (
+                      {leaderboard.referrals.map((leader) => (
                         <tr key={leader.id} className="hover:bg-muted/50">
-                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{index + 1}</td>
+                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
                           <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                            {leader.first_name} {leader.last_name}
+                            {leader.name}
                           </td>
                           <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                            {leader.referral_count}
+                            {leader.referrals}
                           </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.business_rank}</td>
+                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
+                            ${leader.income.toLocaleString()}
+                          </td>
+                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
                         </tr>
                       ))}
                     </tbody>

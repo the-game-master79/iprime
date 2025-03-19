@@ -21,6 +21,8 @@ const MyRank = () => {
   const { toast } = useToast();
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(true);
+  const [claimingRank, setClaimingRank] = useState<string | null>(null);
+  const [claimedRanks, setClaimedRanks] = useState<string[]>([]);
   const [totalBusiness, setTotalBusiness] = useState(0);
   const [totalBonusEarned, setTotalBonusEarned] = useState(0);
   const [userRank, setUserRank] = useState<string>(''); // Add this state
@@ -118,9 +120,10 @@ const MyRank = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Fetch both bonus transactions and their descriptions to know which ranks were claimed
       const { data, error } = await supabase
         .from('transactions')
-        .select('amount')
+        .select('amount, description')
         .eq('user_id', user.id)
         .eq('type', 'rank_bonus');
 
@@ -128,6 +131,14 @@ const MyRank = () => {
 
       const totalBonus = data?.reduce((sum, transaction) => sum + (transaction.amount || 0), 0) || 0;
       setTotalBonusEarned(totalBonus);
+
+      // Extract claimed rank titles from transaction descriptions
+      const claimed = data?.map(tx => {
+        const match = tx.description.match(/bonus for (.+)$/);
+        return match ? match[1] : null;
+      }).filter(Boolean) as string[];
+      
+      setClaimedRanks(claimed || []);
     } catch (error) {
       console.error('Error fetching total bonus:', error);
     }
@@ -159,6 +170,7 @@ const MyRank = () => {
   };
 
   const handleClaimBonus = async (rank: Rank) => {
+    setClaimingRank(rank.title);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -176,6 +188,9 @@ const MyRank = () => {
         variant: "success",
       });
 
+      // Add the newly claimed rank to claimedRanks
+      setClaimedRanks(prev => [...prev, rank.title]);
+
       // Refresh data
       await Promise.all([
         fetchTotalBusiness(),
@@ -190,6 +205,8 @@ const MyRank = () => {
         description: error.message || "Failed to claim bonus",
         variant: "destructive"
       });
+    } finally {
+      setClaimingRank(null);
     }
   };
 
@@ -386,14 +403,21 @@ const MyRank = () => {
                               ? 'Achieved'
                               : 'Locked'}
                           </span>
-                          {totalBusiness >= rank.business_amount && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleClaimBonus(rank)}
-                            >
-                              Claim
-                            </Button>
+                          {totalBusiness >= rank.business_amount && ranks.indexOf(rank) !== 0 && (
+                            claimedRanks.includes(rank.title) ? (
+                              <span className="text-sm text-muted-foreground">
+                                Claimed
+                              </span>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleClaimBonus(rank)}
+                                disabled={claimingRank === rank.title}
+                              >
+                                {claimingRank === rank.title ? 'Claiming...' : 'Claim'}
+                              </Button>
+                            )
                           )}
                         </div>
                       </TableCell>

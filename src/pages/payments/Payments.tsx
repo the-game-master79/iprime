@@ -289,6 +289,7 @@ const Payments = () => {
                                  isInvestmentReturn ? 
                                    tx.description?.replace(/Daily return from \$(\d+)\.?\d* investment at (\d+\.?\d*)% rate/, 
                                      'Daily credit on Basic Plan for $$$1 at $2% rate') || 'Investment Credit' :
+                                 tx.type === 'rank_bonus' ? tx.description || 'Rank Bonus' :
                                  `${tx.crypto_name} (${tx.crypto_symbol})`;
                     
                     return (
