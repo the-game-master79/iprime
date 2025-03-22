@@ -47,22 +47,20 @@ const App = () => (
               <Route path="/auth/register" element={<Register />} />
               <Route path="/auth/callback" element={<Callback />} />
 
-              {/* Protected Routes */}
-              <Route path="/dashboard" element={
-                <AuthGuard requireAuth>
-                  <Dashboard />
-                </AuthGuard>
-              } />
-              <Route path="/profile" element={
-                <AuthGuard requireAuth>
-                  <Profile />
-                </AuthGuard>
-              } />
+              {/* Routes that can be loaded before auth check */}
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/plans" element={<Plans />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/withdrawals" element={<Withdrawals />} />
               <Route path="/rank" element={<MyRank />} />
+              
+              {/* Strictly protected routes */}
+              <Route path="/profile" element={
+                <AuthGuard requireAuth>
+                  <Profile />
+                </AuthGuard>
+              } />
               <Route path="/support" element={
                 <AuthGuard requireAuth>
                   <SupportPage />

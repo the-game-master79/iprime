@@ -12,6 +12,8 @@ import QRCode from "qrcode";
 import { Progress } from "@/components/ui/progress";
 import Marquee from 'react-fast-marquee';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MarqueeUser {
   id: string;
@@ -57,8 +59,12 @@ interface Plan {
   status: 'active';
 }
 
-const Dashboard = () => {
-  const [loading, setLoading] = useState(true);
+interface DashboardContentProps {
+  loading: boolean;
+}
+
+const DashboardContent = ({ loading }: DashboardContentProps) => {
+  const [isLoading, setIsLoading] = useState(true);
   const [performanceData, setPerformanceData] = useState([]);
   const [totalInvested, setTotalInvested] = useState(0);
   const [totalReferrals, setTotalReferrals] = useState({ active: 0, total: 0 });
@@ -376,7 +382,7 @@ const Dashboard = () => {
   useEffect(() => {
     // Simulate data loading
     const timer = setTimeout(() => {
-      setLoading(false);
+      setIsLoading(false);
     }, 1000);
     
     return () => clearTimeout(timer);
@@ -840,7 +846,7 @@ const Dashboard = () => {
                   value={`$${totalInvested.toLocaleString()}`}
                   description="Active investments"
                   icon={<DollarSign className="h-4 w-4" />}
-                  loading={loading}
+                  loading={isLoading}
                   className="w-full"
                 />
                 <StatCard
@@ -1055,6 +1061,40 @@ const Dashboard = () => {
       </PageTransition>
     </ShellLayout>
   );
+};
+
+const Dashboard = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth/login', { 
+        state: { from: '/dashboard' },
+        replace: true 
+      });
+    }
+    
+    // Auto set loading to false after auth check
+    if (!loading) {
+      setIsLoading(false);
+    }
+  }, [user, loading, navigate]);
+
+  if (loading || isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <DashboardContent loading={loading} />;
 };
 
 export default Dashboard;
