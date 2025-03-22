@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and auth routes
+Disallow: /admin/
+Disallow: /auth/
+
+# Sitemap location
+Sitemap: https://www.cloudforex.club/sitemap.xml
