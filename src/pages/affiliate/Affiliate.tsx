@@ -211,14 +211,14 @@ const Affiliate = () => {
 
         const { data, error } = await supabase
           .from('transactions')
-          .select('amount')
+          .select('amount, type')
           .eq('user_id', session.user.id)
-          .eq('type', 'commission')
-          .eq('status', 'Completed');
+          .eq('status', 'Completed')
+          .or('type.eq.commission,type.eq.rank_bonus');
 
         if (error) throw error;
 
-        const total = (data || []).reduce((sum, tx) => sum + tx.amount, 0);
+        const total = (data || []).reduce((sum, tx) => sum + (tx.amount / 2), 0);
         setTotalCommissions(total);
       } catch (error) {
         console.error('Error fetching commissions:', error);

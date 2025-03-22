@@ -78,7 +78,7 @@ const DepositsPage = () => {
 
   const handleApprove = async (id: string) => {
     try {
-      // Get deposit details first
+      // Get deposit details first to verify it exists and isn't already completed
       const { data: deposit, error: fetchError } = await supabase
         .from('deposits')
         .select('*')
@@ -86,9 +86,17 @@ const DepositsPage = () => {
         .single();
 
       if (fetchError) throw fetchError;
+      if (deposit.status === 'Completed') {
+        toast({
+          title: "Already Processed",
+          description: "This deposit has already been approved",
+          variant: "default"
+        });
+        return;
+      }
 
-      // Update the deposit status only - the trigger will handle balance update
-      const { error: depositError } = await supabase
+      // Update the deposit status - the trigger will handle balance update
+      const { error: updateError } = await supabase
         .from('deposits')
         .update({ 
           status: 'Completed',
@@ -96,11 +104,11 @@ const DepositsPage = () => {
         })
         .eq('id', id);
 
-      if (depositError) throw depositError;
+      if (updateError) throw updateError;
 
       toast({
         title: "Success",
-        description: "Deposit approved successfully"
+        description: "Deposit approved and balance updated successfully"
       });
       
       fetchDeposits();

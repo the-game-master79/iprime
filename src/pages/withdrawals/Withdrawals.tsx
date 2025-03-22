@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader, StatCard } from "@/components/ui-components";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { checkWithdrawalLimit } from "@/lib/rateLimit";
 
 interface DepositMethod {
   id: string;
@@ -244,6 +245,18 @@ const Withdrawals = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Check rate limits
+      if (!checkWithdrawalLimit(user.id)) {
+        toast({
+          title: "Rate Limited",
+          description: "You have exceeded the maximum number of withdrawals allowed. Please try again later.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Temporarily comment out 48-hour waiting period check
+      /* 
       // Check 48-hour waiting period
       const canWithdraw = await checkLastDeposit(user.id);
       if (!canWithdraw) {
@@ -254,6 +267,7 @@ const Withdrawals = () => {
         });
         return;
       }
+      */
 
       const amountValue = parseFloat(formData.amount);
       if (!formData.cryptoId) {

@@ -2,6 +2,7 @@ create table if not exists public.new_users_marquee (
     id uuid default uuid_generate_v4() primary key,
     name text not null,
     country text not null,
+    plans text not null default 'Basic', -- Added new column
     joined_time timestamp with time zone default timezone('utc'::text, now()),
     created_at timestamp with time zone default timezone('utc'::text, now())
 );

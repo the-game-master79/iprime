@@ -1,6 +1,18 @@
-@keyframes scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+@keyframes slideAndFade {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
 }
 
 .marquee-container {
@@ -11,7 +23,12 @@
 
 .marquee-content {
   display: flex;
-  animation: scroll 25s linear infinite;
+  animation: slideAndFade 30s linear infinite;
   white-space: nowrap;
   width: max-content;
+}
+
+/* Add pause on hover */
+.marquee-content:hover {
+  animation-play-state: paused;
 }

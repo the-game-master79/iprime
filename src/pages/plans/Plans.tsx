@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { checkPlanLimit } from "@/lib/rateLimit";
 
 interface Plan {
   id: string;
@@ -22,6 +23,8 @@ interface Plan {
   status: 'active' | 'inactive';
   recommended?: boolean;
   total_earnings?: number;
+  total_invested?: number; // Add this property
+  investments?: { id: string; amount: number }[];
 }
 
 interface UserProfile {
@@ -45,6 +48,7 @@ const Plans = () => {
   const [investmentError, setInvestmentError] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [processingInvestment, setProcessingInvestment] = useState(false);
+  const [subscribedPlansCount, setSubscribedPlansCount] = useState(0);
 
   // Fetch plans from Supabase
   useEffect(() => {
@@ -54,7 +58,7 @@ const Plans = () => {
           .from('plans')
           .select('*')
           .eq('status', 'active')
-          .order('investment', { ascending: true });
+          .order('investment', { ascending: true }); // Removed .limit(4)
 
         if (error) throw error;
         setPlans(data || []);
@@ -100,63 +104,80 @@ const Plans = () => {
       if (!userProfile) return;
       
       try {
-        // First get all active investments grouped by plan
+        // First get all active investments with plan details
         const { data: investments, error: investmentsError } = await supabase
           .from('investments')
           .select(`
             id,
             amount,
-            plan_id,
-            plans (*)
+            status,
+            created_at,
+            plans (
+              id,
+              name,
+              description,
+              investment,
+              returns_percentage,
+              duration_days,
+              benefits,
+              status
+            )
           `)
           .eq('user_id', userProfile.id)
           .eq('status', 'active');
 
         if (investmentsError) throw investmentsError;
 
-        // Group investments by plan
-        const planMap = investments.reduce((acc, inv) => {
-          if (!acc[inv.plan_id]) {
-            acc[inv.plan_id] = {
-              ...inv.plans,
-              investments: []
-            };
+        // Transform and group investments by plan
+        const planMap = new Map<string, Plan>();
+        
+        investments?.forEach((inv) => {
+          if (!inv.plans) return; // Skip if no plan data
+          const plan = inv.plans as Plan;
+          
+          if (!planMap.has(plan.id)) {
+            planMap.set(plan.id, {
+              ...plan,
+              total_invested: 0,
+              investments: [],
+              total_earnings: 0
+            });
           }
-          acc[inv.plan_id].investments.push({
+          
+          const existingPlan = planMap.get(plan.id)!;
+          existingPlan.total_invested! += Number(inv.amount);
+          existingPlan.investments!.push({
             id: inv.id,
-            amount: inv.amount
+            amount: Number(inv.amount)
           });
-          return acc;
-        }, {});
+        });
 
-        // For each plan, fetch earnings for all its investments
+        // Get earnings for each investment
         const plansWithEarnings = await Promise.all(
-          Object.values(planMap).map(async (plan: any) => {
-            // Get earnings for each investment in this plan
-            const planEarnings = await Promise.all(
-              plan.investments.map(async (inv: any) => {
-                const { data: earnings } = await supabase
-                  .from('transactions')
-                  .select('amount')
-                  .eq('user_id', userProfile.id)
-                  .eq('type', 'investment_return')
-                  .eq('reference_id', inv.id); // Use investment ID as reference
-
-                return earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-              })
-            );
-
-            // Sum up all earnings for this plan's investments
-            const totalEarnings = planEarnings.reduce((sum, earning) => sum + earning, 0);
+          Array.from(planMap.values()).map(async (plan) => {
+            let totalEarnings = 0;
             
+            // Get earnings for each investment under this plan
+            for (const inv of plan.investments!) {
+              const { data: transactions } = await supabase
+                .from('transactions')
+                .select('amount')
+                .eq('user_id', userProfile.id)
+                .eq('type', 'investment_return')
+                .eq('reference_id', inv.id)
+                .eq('status', 'Completed');
+
+              const earnings = transactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+              totalEarnings += earnings;
+            }
+
             return {
               ...plan,
-              total_earnings: totalEarnings,
-              total_invested: plan.investments.reduce((sum: number, inv: any) => sum + inv.amount, 0)
+              total_earnings: totalEarnings
             };
           })
         );
-        
+
         setSubscribedPlans(plansWithEarnings);
       } catch (error) {
         console.error('Error fetching subscribed plans:', error);
@@ -285,6 +306,87 @@ const Plans = () => {
 
   const selectedPlanData = plans.find(p => p.id === selectedPlan);
 
+  // Add realtime subscription for investment returns
+  useEffect(() => {
+    if (!userProfile) return;
+
+    const channel = supabase
+      .channel('investment-returns')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${userProfile.id} AND type=eq.investment_return`,
+        },
+        async (payload) => {
+          // Refresh the subscribed plans to update earnings
+          if (activeTab === 'subscribed') {
+            await fetchSubscribedPlans();
+          }
+          // Update user profile to reflect new balance
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('id, balance, total_invested')
+            .eq('id', userProfile.id)
+            .single();
+            
+          if (profile) {
+            setUserProfile(profile);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile, activeTab]);
+
+  useEffect(() => {
+    const fetchSubscribedPlansCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { count, error } = await supabase
+          .from('user_plans')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+
+        if (error) throw error;
+        setSubscribedPlansCount(count || 0);
+      } catch (error) {
+        console.error('Error fetching subscribed plans count:', error);
+      }
+    };
+
+    fetchSubscribedPlansCount();
+  }, []);
+
+  const handleSubscribe = async (planId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Check rate limits
+      if (!checkPlanLimit(user.id)) {
+        toast({
+          title: "Rate Limited",
+          description: "You have exceeded the maximum number of plan subscriptions allowed. Please try again later.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // ...rest of existing subscription logic...
+    } catch (error) {
+      // ...existing error handling...
+    }
+  };
+
   return (
     <ShellLayout>
       <PageTransition>
@@ -296,13 +398,20 @@ const Plans = () => {
         <div className="grid gap-6">
           <Tabs defaultValue="active" className="w-full" onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-              <TabsTrigger value="active">Active Plans</TabsTrigger>
-              <TabsTrigger value="subscribed">Subscribed Plans</TabsTrigger>
+              <TabsTrigger value="active">All Plans</TabsTrigger>
+              <TabsTrigger value="subscribed" className="relative">
+                Subscribed Plans
+                {subscribedPlansCount > 0 && (
+                  <span className="absolute -top-2 -right-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-primary bg-primary/10 rounded-full">
+                    {subscribedPlansCount}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
           {/* Plans Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {loading ? (
               // Loading state
               Array.from({ length: 3 }).map((_, i) => (
@@ -548,3 +657,38 @@ const Plans = () => {
 };
 
 export default Plans;
+function toast({ title, description, variant }: { title: string; description: string; variant: string }) {
+  const toastContainer = document.createElement("div");
+  toastContainer.className = `toast toast-${variant}`;
+  toastContainer.style.position = "fixed";
+  toastContainer.style.bottom = "20px";
+  toastContainer.style.right = "20px";
+  toastContainer.style.padding = "16px";
+  toastContainer.style.backgroundColor = variant === "destructive" ? "#f44336" : "#4caf50";
+  toastContainer.style.color = "#fff";
+  toastContainer.style.borderRadius = "4px";
+  toastContainer.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
+  toastContainer.style.zIndex = "1000";
+
+  const toastTitle = document.createElement("strong");
+  toastTitle.textContent = title;
+  toastTitle.style.display = "block";
+  toastTitle.style.marginBottom = "8px";
+
+  const toastDescription = document.createElement("span");
+  toastDescription.textContent = description;
+
+  toastContainer.appendChild(toastTitle);
+  toastContainer.appendChild(toastDescription);
+
+  document.body.appendChild(toastContainer);
+
+  setTimeout(() => {
+    toastContainer.style.opacity = "0";
+    toastContainer.style.transition = "opacity 0.5s";
+    setTimeout(() => {
+      document.body.removeChild(toastContainer);
+    }, 500);
+  }, 3000);
+}
+

@@ -36,7 +36,7 @@ BEGIN
         NEW.user_id,
         NEW.amount,
         'investment',
-        'completed',
+        'Completed',  -- Changed from 'completed' to 'Completed'
         NEW.id,
         'Investment in plan'
     );
@@ -59,10 +59,11 @@ BEGIN
         IF commission_rate IS NOT NULL THEN
             commission_amount := (NEW.amount * commission_rate) / 100;
 
-            -- Update referrer's balances
+            -- Update referrer's commissions_balance only (not the main balance)
             UPDATE profiles 
-            SET balance = balance + commission_amount,
-                commissions_balance = COALESCE(commissions_balance, 0) + commission_amount
+            SET commissions_balance = COALESCE(commissions_balance, 0) + commission_amount,
+                -- Update business_volume to include downline's investment
+                business_volume = COALESCE(business_volume, 0) + NEW.amount
             WHERE id = current_referrer_id;
 
             -- Create commission transaction
@@ -77,7 +78,7 @@ BEGIN
                 current_referrer_id,
                 commission_amount,
                 'commission',
-                'completed',
+                'Completed',  -- Changed from 'completed' to 'Completed'
                 NEW.id,
                 format('Level %s commission from investment of $%s', current_level, NEW.amount)
             );
@@ -98,6 +99,9 @@ BEGIN
 END;
 $$;
 
+-- Drop existing investment trigger first
+DROP TRIGGER IF EXISTS handle_investment_trigger ON investments;
+
 -- Create single trigger for investments
 CREATE TRIGGER handle_investment_trigger
     AFTER INSERT ON investments
@@ -106,6 +110,6 @@ CREATE TRIGGER handle_investment_trigger
 
 -- Update any existing transactions to ensure consistent status casing
 UPDATE transactions
-SET status = LOWER(status)
-WHERE status != LOWER(status)
+SET status = 'Completed'  -- Changed from LOWER(status) to 'Completed'
+WHERE status != 'Completed'
 AND type IN ('investment', 'commission');

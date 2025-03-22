@@ -118,8 +118,7 @@ export default {
 				'pulse-opacity': 'pulse-opacity 2s ease-in-out infinite'
 			},
 			fontFamily: {
-				'gt-med': ['GT Med', 'system-ui', 'sans-serif'],
-				'gt-reg': ['GT Reg', 'system-ui', 'sans-serif'],
+				sans: ['Inter Tight', 'system-ui', 'sans-serif'],
 			},
 		}
 	},

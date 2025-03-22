@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { checkDepositLimit } from "@/lib/rateLimit";
 
 interface DepositMethod {
   id: string;
@@ -163,40 +164,60 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     setAmount(value);
   };
 
-  const handleDeposit = async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-    // Calculate the USD value before submitting
-    const totalUsdValue = calculateTotalUSD();
+      // Check rate limits
+      if (!checkDepositLimit(user.id)) {
+        toast({
+          title: "Rate Limited",
+          description: "You have exceeded the maximum number of deposits allowed. Please try again later.",
+          variant: "destructive"
+        });
+        return;
+      }
 
-    const { error } = await supabase.from('deposits').insert({
-      user_id: userData.user.id,
-      user_name: userData.user.email?.split('@')[0] || 'Unknown',
-      amount: totalUsdValue, // Store the USD value instead of crypto amount
-      method: paymentMethod === 'crypto' ? `${cryptoType} (${network})` : paymentMethod,
-      status: 'Pending'
-    });
+      // Calculate the USD value before submitting
+      const totalUsdValue = calculateTotalUSD();
 
-    if (error) {
+      const { error } = await supabase.from('deposits').insert({
+        user_id: user.id,
+        user_name: user.email?.split('@')[0] || 'Unknown',
+        amount: totalUsdValue, // Store the USD value instead of crypto amount
+        method: paymentMethod === 'crypto' ? `${cryptoType} (${network})` : paymentMethod,
+        status: 'Pending'
+      });
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to submit deposit request.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Deposit request submitted successfully."
+      });
+      
+      onOpenChange(false);
+      setAmount('');
+      setPaymentMethod('');
+      setCryptoType('');
+      setNetwork('');
+    } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to submit deposit request.",
+        description: "An error occurred while submitting the deposit request.",
         variant: "destructive"
       });
-      return;
     }
-
-    toast({
-      title: "Success",
-      description: "Deposit request submitted successfully."
-    });
-    
-    onOpenChange(false);
-    setAmount('');
-    setPaymentMethod('');
-    setCryptoType('');
-    setNetwork('');
   };
 
   return (
@@ -368,7 +389,7 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
           <Button 
             className="w-full mt-2" 
             disabled={!amount || (paymentMethod === "crypto" && (!cryptoType || !network))}
-            onClick={handleDeposit}
+            onClick={handleSubmit}
           >
             Submit Deposit
           </Button>

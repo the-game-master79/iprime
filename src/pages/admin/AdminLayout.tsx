@@ -3,7 +3,6 @@ import { Link, useLocation, Navigate } from "react-router-dom";
 import { 
   Users, 
   BarChart3, 
-  DollarSign, 
   ArrowDownToLine, 
   ArrowUpToLine,
   Settings, 
@@ -14,7 +13,9 @@ import {
   Shield,
   CreditCard,
   Briefcase, // Add this import
-  Image
+  Image,
+  HelpCircle, // Add this import
+  Bell // Add this import
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -115,7 +116,20 @@ const AdminLayout = ({ children, requireAuth = true }: AdminLayoutProps) => {
                   active={location.pathname === '/admin/plans'} 
                   collapsed={!sidebarOpen} 
                 />
-
+              <SidebarLink 
+                to="/admin/notices" 
+                icon={<Bell className="h-5 w-5" />} 
+                label="Notices" 
+                active={location.pathname === '/admin/notices'} 
+                collapsed={!sidebarOpen} 
+              />
+              <SidebarLink 
+                to="/admin/support" 
+                icon={<HelpCircle className="h-5 w-5" />} 
+                label="Support Tickets" 
+                active={location.pathname === '/admin/support'} 
+                collapsed={!sidebarOpen} 
+              />
               <SidebarLink 
                 to="/admin/settings" 
                 icon={<Settings className="h-5 w-5" />} 

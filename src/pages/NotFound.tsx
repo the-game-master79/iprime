@@ -22,7 +22,8 @@ const NotFound = () => {
     '/payments',
     '/withdrawals',
     '/rank',
-    '/affiliate'
+    '/affiliate',
+    '/support' // Add this line
   ].some(route => location.pathname.startsWith(route));
 
   // Log the attempted access

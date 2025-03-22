@@ -77,7 +77,20 @@ const Register = () => {
         }
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message.includes("User already registered")) {
+          toast.error("User already registered. Please proceed to login.", {
+            duration: 5000,
+            action: {
+              label: "Login",
+              onClick: () => navigate("/auth/login")
+            }
+          });
+        } else {
+          throw signUpError;
+        }
+        return;
+      }
 
       if (authData.user) {
         // Create profile record
@@ -226,7 +239,7 @@ const Register = () => {
                   </Button>
                 </form>
                 
-                <p className="text-center text-sm text-muted-foreground">
+                <div className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
                   <Link
                     to="/auth/login"
@@ -234,7 +247,7 @@ const Register = () => {
                   >
                     Sign in
                   </Link>
-                </p>
+                </div>
               </div>
             </div>
           </div>

@@ -20,11 +20,31 @@ import {
   LogOut,
   DollarSign,
   Trophy,
-  ChevronLeft
+  ChevronLeft,
+  HelpCircle // Add this import
 } from "lucide-react";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // Add this import
+import { supabase } from "@/lib/supabase";
+
+interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  created_at: string;
+  category: 'admin' | 'referral' | 'system'; // Add this
+  reference_id?: string;  // Add this for linking to related transactions
+}
 
 export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -33,6 +53,8 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const { logout } = useAuth();
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   // Close sidebar on mobile when navigating to a new page
   useEffect(() => {
@@ -41,11 +63,85 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
     }
   }, [location.pathname, isMobile, isTablet]);
 
+  const fetchNotices = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+
+      const { data, error } = await supabase
+        .from('notices')
+        .select('*')
+        .or(`category.eq.system,category.eq.referral,and(category.eq.admin,is_active.eq.true),user_id.eq.${user.user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotices(data || []);
+      setUnreadCount((data?.filter(n => n.category === 'admin' && n.is_active) || []).length);
+    } catch (error) {
+      console.error('Error fetching notices:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotices();
+
+    // Set up realtime subscriptions for new notices
+    const noticesSubscription = supabase
+      .channel('custom-notices')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notices',
+          filter: `is_active=eq.true`
+        },
+        (payload) => {
+          setNotices(current => [payload.new as Notice, ...current]);
+          setUnreadCount(count => count + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      noticesSubscription.unsubscribe();
+    };
+  }, []);
+
   const toggleSidebar = () => {
     if (isMobile || isTablet) {
       setIsMobileSidebarOpen(!isMobileSidebarOpen);
     } else {
       setIsCollapsed(!isCollapsed);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+
+      // Only update admin notifications to is_active = false
+      const { error } = await supabase
+        .from('notices')
+        .update({ is_active: false })
+        .eq('category', 'admin');
+
+      if (error) throw error;
+
+      // Refresh notifications
+      const { data, error: fetchError } = await supabase
+        .from('notices')
+        .select('*')
+        .or(`category.eq.system,category.eq.referral,and(category.eq.admin,is_active.eq.true),user_id.eq.${user.user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setNotices(data || []);
+      setUnreadCount((data?.filter(n => n.category === 'admin' && n.is_active) || []).length);
+      
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
     }
   };
 
@@ -117,6 +213,13 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
                 label="Withdrawals"
                 href="/withdrawals"
                 active={location.pathname === '/withdrawals'}
+              />
+              <SidebarItem
+                collapsed={isCollapsed && !isMobile}
+                icon={<HelpCircle />}
+                label="Support"
+                href="/support"
+                active={location.pathname === '/support'}
               />
               <SidebarItem
                 collapsed={isCollapsed && !isMobile}
@@ -198,9 +301,135 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
             <DollarSign className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="icon">
-            <BellIcon className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <BellIcon className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <Badge 
+                    variant="default" 
+                    className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[380px]">
+              <div className="flex items-center justify-between px-4 py-2 border-b">
+                <span className="font-semibold">Notifications</span>
+                {notices.length > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs"
+                    onClick={handleMarkAllAsRead}
+                  >
+                    Mark all as read
+                  </Button>
+                )}
+              </div>
+              <Tabs defaultValue="admin" className="w-full">
+                <div className="px-4 py-2 border-b">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="admin" className="flex-1">Admin</TabsTrigger>
+                    <TabsTrigger value="referral" className="flex-1">Referrals</TabsTrigger>
+                    <TabsTrigger value="system" className="flex-1">System</TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="admin" className="mt-0">
+                  <div className="max-h-[300px] overflow-auto">
+                    {notices.filter(n => n.category === 'admin').length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No admin notifications
+                      </div>
+                    ) : (
+                      notices.filter(n => n.category === 'admin').map((notice) => (
+                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
+                          <div className="flex gap-3 w-full">
+                            <div className={`w-1.5 shrink-0 rounded-full ${
+                              notice.type === 'info' ? 'bg-blue-500' :
+                              notice.type === 'warning' ? 'bg-yellow-500' :
+                              notice.type === 'success' ? 'bg-green-500' :
+                              'bg-red-500'
+                            }`} />
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium leading-none">{notice.title}</p>
+                              <p className="text-sm text-muted-foreground">{notice.content}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(notice.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="referral" className="mt-0">
+                  <div className="max-h-[300px] overflow-auto">
+                    {notices.filter(n => n.category === 'referral').length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No referral notifications
+                      </div>
+                    ) : (
+                      notices.filter(n => n.category === 'referral').map((notice) => (
+                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
+                          <div className="flex gap-3 w-full">
+                            <div className={`w-1.5 shrink-0 rounded-full ${
+                              notice.type === 'info' ? 'bg-blue-500' :
+                              notice.type === 'warning' ? 'bg-yellow-500' :
+                              notice.type === 'success' ? 'bg-green-500' :
+                              'bg-red-500'
+                            }`} />
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium leading-none">{notice.title}</p>
+                              <p className="text-sm text-muted-foreground">{notice.content}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(notice.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="system" className="mt-0">
+                  <div className="max-h-[300px] overflow-auto">
+                    {notices.filter(n => n.category === 'system').length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No system notifications
+                      </div>
+                    ) : (
+                      notices.filter(n => n.category === 'system').map((notice) => (
+                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
+                          <div className="flex gap-3 w-full">
+                            <div className={`w-1.5 shrink-0 rounded-full ${
+                              notice.type === 'info' ? 'bg-blue-500' :
+                              notice.type === 'warning' ? 'bg-yellow-500' :
+                              notice.type === 'success' ? 'bg-green-500' :
+                              'bg-red-500'
+                            }`} />
+                            <div className="flex-1 space-y-1">
+                              <p className="text-sm font-medium leading-none">{notice.title}</p>
+                              <p className="text-sm text-muted-foreground">{notice.content}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(notice.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DepositDialog 
             open={depositDialogOpen} 

@@ -95,7 +95,7 @@ const AdminWithdrawalsPage = () => {
 
       if (fetchError) throw fetchError;
 
-      // Update withdrawal status only, balance deduction is handled by trigger
+      // Update withdrawal status - this will trigger notifications
       const { error: updateError } = await supabase
         .from('withdrawals')
         .update({ 
@@ -107,8 +107,8 @@ const AdminWithdrawalsPage = () => {
       if (updateError) throw updateError;
 
       toast({
-        title: "Withdrawal Verified",
-        description: `Withdrawal ${id} has been verified and completed.`,
+        title: "Withdrawal Approved",
+        description: `Withdrawal ${id} has been approved and user has been notified.`,
       });
 
       fetchWithdrawals();
@@ -116,7 +116,7 @@ const AdminWithdrawalsPage = () => {
       console.error('Error approving withdrawal:', error);
       toast({
         title: "Error",
-        description: "Failed to verify withdrawal",
+        description: "Failed to approve withdrawal",
         variant: "destructive"
       });
     }
@@ -126,14 +126,17 @@ const AdminWithdrawalsPage = () => {
     try {
       const { error } = await supabase
         .from('withdrawals')
-        .update({ status: 'Failed' })
+        .update({ 
+          status: 'Failed',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', id);
 
       if (error) throw error;
 
       toast({
         title: "Withdrawal Rejected",
-        description: `Withdrawal ${id} has been rejected.`,
+        description: `Withdrawal ${id} has been rejected and user has been notified.`,
         variant: "destructive",
       });
 
@@ -141,7 +144,7 @@ const AdminWithdrawalsPage = () => {
     } catch (error) {
       console.error('Error rejecting withdrawal:', error);
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to reject withdrawal",
         variant: "destructive"
       });

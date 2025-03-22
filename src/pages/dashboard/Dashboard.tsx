@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
-import { CreditCard, DollarSign, Users, Mail, Star, Trophy, Copy, QrCode, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import { CreditCard, DollarSign, Users, Mail, Star, Trophy, Copy, QrCode, ExternalLink, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import ShellLayout from "@/components/layout/Shell";
 import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,12 +13,14 @@ import QRCode from "qrcode";
 import { Progress } from "@/components/ui/progress";
 import { User } from "lucide-react";
 import Marquee from 'react-fast-marquee';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface MarqueeUser {
   id: string;
   name: string;
   country: string;
   joined_time: string;
+  plans: string; // Add this property if it exists
 }
 
 interface Rank {
@@ -47,6 +49,16 @@ interface LeaderboardEntry {
   rank: string;
 }
 
+interface Plan {
+  id: string;
+  name: string;
+  description: string;
+  investment: number;
+  returns_percentage: number;
+  duration_days: number;
+  status: 'active';
+}
+
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [performanceData, setPerformanceData] = useState([]);
@@ -72,6 +84,12 @@ const Dashboard = () => {
     referrals: LeaderboardEntry[];
   }>({ businessVolume: [], referrals: [] });
   const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
+  const [marqueeStartIndex, setMarqueeStartIndex] = useState(0);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [showInvestDialog, setShowInvestDialog] = useState(false);
+  const [processingInvestment, setProcessingInvestment] = useState(false);
+  const [subscribedPlansCount, setSubscribedPlansCount] = useState(0);
 
   const fetchUserData = async () => {
     try {
@@ -98,29 +116,33 @@ const Dashboard = () => {
     }
   };
 
+  const fetchInvestmentData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch profile data including investments
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('total_invested, balance')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      setTotalInvested(profile?.total_invested || 0);
+      // Also update user profile with latest data
+      setUserProfile(prev => ({ ...prev, ...profile }));
+    } catch (error) {
+      console.error('Error fetching investment data:', error);
+    }
+  };
+
   useEffect(() => {
     fetchUserData();
   }, []);
 
   useEffect(() => {
-    const fetchInvestmentData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('total_invested')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        setTotalInvested(profile?.total_invested || 0);
-      } catch (error) {
-        console.error('Error fetching investment data:', error);
-      }
-    };
-
     fetchInvestmentData();
   }, []);
 
@@ -175,14 +197,14 @@ const Dashboard = () => {
 
         const { data, error } = await supabase
           .from('transactions')
-          .select('amount')
+          .select('amount, type')
           .eq('user_id', user.id)
-          .eq('type', 'commission')
-          .eq('status', 'Completed');
+          .eq('status', 'Completed')
+          .or('type.eq.commission,type.eq.rank_bonus');
 
         if (error) throw error;
 
-        const total = (data || []).reduce((sum, tx) => sum + tx.amount, 0);
+        const total = (data || []).reduce((sum, tx) => sum + (tx.amount / 2), 0);
         setTotalCommissions(total);
       } catch (error) {
         console.error('Error fetching commissions:', error);
@@ -428,16 +450,63 @@ const Dashboard = () => {
           joined_time: formatJoinedTime(new Date(user.joined_time))
         }));
 
-        setMarqueeUsers(formattedUsers);
+        // Randomly rotate the array
+        const randomIndex = Math.floor(Math.random() * formattedUsers.length);
+        const rotatedUsers = [
+          ...formattedUsers.slice(randomIndex),
+          ...formattedUsers.slice(0, randomIndex)
+        ];
+
+        setMarqueeUsers(rotatedUsers);
       } catch (error) {
         console.error('Error fetching marquee users:', error);
       }
     };
 
     fetchMarqueeUsers();
-    // Fetch new data every 30 seconds
     const interval = setInterval(fetchMarqueeUsers, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('plans')
+          .select('*')
+          .eq('status', 'active')
+          .order('investment', { ascending: true }); // Removed .limit(4)
+
+        if (error) throw error;
+        setPlans(data || []);
+      } catch (error) {
+        console.error('Error fetching plans:', error);
+      }
+    };
+
+    fetchPlans();
+  }, []);
+
+  useEffect(() => {
+    const fetchSubscribedPlansCount = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { count, error } = await supabase
+          .from('user_plans')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+
+        if (error) throw error;
+        setSubscribedPlansCount(count || 0);
+      } catch (error) {
+        console.error('Error fetching subscribed plans count:', error);
+      }
+    };
+
+    fetchSubscribedPlansCount();
   }, []);
 
   const formatJoinedTime = (date: Date) => {
@@ -492,7 +561,79 @@ const Dashboard = () => {
       });
     }
   };
-  
+
+  const handleInvestClick = (plan: Plan) => {
+    setSelectedPlan(plan);
+    setShowInvestDialog(true);
+  };
+
+  const handleInvestment = async () => {
+    if (!selectedPlan || !userProfile) return;
+    setProcessingInvestment(true);
+
+    try {
+      // Check balance
+      const currentBalance = Number(userProfile.balance) || 0;
+      const investmentAmount = Number(selectedPlan.investment) || 0;
+
+      if (currentBalance < investmentAmount) {
+        toast({
+          title: "Insufficient Balance",
+          description: `You need $${investmentAmount.toLocaleString()} to invest in this plan.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create investment
+      const { error: investmentError } = await supabase
+        .from('investments')
+        .insert({
+          user_id: userProfile.id,
+          plan_id: selectedPlan.id,
+          amount: selectedPlan.investment,
+          status: 'active'
+        });
+
+      if (investmentError) throw investmentError;
+
+      // Create user_plan subscription
+      const { error: subscriptionError } = await supabase
+        .from('user_plans')
+        .upsert({
+          user_id: userProfile.id,
+          plan_id: selectedPlan.id,
+          status: 'active'
+        }, {
+          onConflict: 'user_id,plan_id'
+        });
+
+      if (subscriptionError) throw subscriptionError;
+
+      // Refresh user data - now fetchInvestmentData is defined
+      await Promise.all([
+        fetchUserData(),
+        fetchInvestmentData()
+      ]);
+
+      toast({
+        title: "Investment Successful",
+        description: `Successfully invested $${selectedPlan.investment.toLocaleString()} in ${selectedPlan.name}`,
+      });
+
+      setShowInvestDialog(false);
+    } catch (error) {
+      console.error('Error creating investment:', error);
+      toast({
+        title: "Investment Failed",
+        description: "Failed to process investment. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessingInvestment(false);
+    }
+  };
+
   return (
     <ShellLayout>
       <PageTransition>
@@ -519,7 +660,9 @@ const Dashboard = () => {
                       className="h-4 w-5 mr-2"
                     />
                     <span className="text-sm font-medium">{user.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">joined {user.joined_time}</span>
+                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      {user.plans}
+                    </span>
                   </span>
                 ))}
               </Marquee>
@@ -600,216 +743,314 @@ const Dashboard = () => {
             </DialogContent>
           </Dialog>
 
+          {/* Live Plans Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-semibold">All Plans</h2>
+              {subscribedPlansCount > 0 && (
+                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                  {subscribedPlansCount} Active
+                </span>
+              )}
+            </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+              {plans.map((plan) => (
+                <Card key={plan.id} className="hover:border-primary/50 transition-colors">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-medium">{plan.name}</CardTitle>
+                    <CardDescription className="text-2xl font-bold text-primary">
+                      ${plan.investment.toLocaleString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Daily ROI:</span>{' '}
+                      <span className="font-medium">{plan.returns_percentage}%</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Duration:</span>{' '}
+                      <span className="font-medium">{plan.duration_days} days</span>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => handleInvestClick(plan)}
+                      disabled={!userProfile || (userProfile.balance || 0) < plan.investment}
+                    >
+                      {!userProfile ? 'Loading...' : 
+                       (userProfile.balance || 0) < plan.investment 
+                         ? `Need $${plan.investment.toLocaleString()}` 
+                         : 'Select this Plan ->'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Investment Confirmation Dialog */}
+          <AlertDialog open={showInvestDialog} onOpenChange={setShowInvestDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Investment</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div>
+                    Are you sure you want to invest in this plan?
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              {selectedPlan && (
+                <div className="space-y-4 py-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plan:</span>
+                    <span className="font-medium">{selectedPlan.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Amount:</span>
+                    <span className="font-medium">${selectedPlan.investment.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Daily Returns:</span>
+                    <span className="font-medium">{selectedPlan.returns_percentage}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Duration:</span>
+                    <span className="font-medium">{selectedPlan.duration_days} days</span>
+                  </div>
+                </div>
+              )}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={processingInvestment}>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleInvestment}
+                  disabled={processingInvestment}
+                >
+                  {processingInvestment ? "Processing..." : "Confirm Investment"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <div className="grid gap-4 md:gap-8">
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Invested"
-                value={`$${totalInvested.toLocaleString()}`}
-                description="Active investments"
-                icon={<DollarSign className="h-4 w-4" />}
-                loading={loading}
-                className="w-full"
-              />
-              <StatCard
-                title="Available Balance"
-                value={`$${(performanceData[0]?.value || 0).toLocaleString()}`}
-                description="Available for withdrawal"
-                icon={<CreditCard className="h-4 w-4" />}
-                loading={loading}
-                className="w-full"
-              />
-              <StatCard
-                title="Total Commissions"
-                value={`$${totalCommissions.toLocaleString()}`}
-                description="Commission earned"
-                icon={<Users className="h-4 w-4" />}
-                loading={loading}
-                className="w-full"
-              />
-              <StatCard
-                title="Team Members"
-                value={totalReferrals.active.toString()}
-                description={`Downline Members`}
-                icon={<Users className="h-4 w-4" />}
-                loading={loading}
-                className="w-full"
-              />
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Your Stats</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard
+                  title="Total Invested"
+                  value={`$${totalInvested.toLocaleString()}`}
+                  description="Active investments"
+                  icon={<DollarSign className="h-4 w-4" />}
+                  loading={loading}
+                  className="w-full"
+                />
+                <StatCard
+                  title="Available Balance"
+                  value={`$${(performanceData[0]?.value || 0).toLocaleString()}`}
+                  description="Available for withdrawal"
+                  icon={<CreditCard className="h-4 w-4" />}
+                  loading={loading}
+                  className="w-full"
+                />
+                <StatCard
+                  title="Total Commissions"
+                  value={`$${totalCommissions.toLocaleString()}`}
+                  description="Commission earned"
+                  icon={<Users className="h-4 w-4" />}
+                  loading={loading}
+                  className="w-full"
+                />
+                <StatCard
+                  title="Team Members"
+                  value={totalReferrals.active.toString()}
+                  description={`Downline Members`}
+                  icon={<Users className="h-4 w-4" />}
+                  loading={loading}
+                  className="w-full"
+                />
+              </div>
             </div>
             
             {/* Rank and Profile Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-primary" />
-                    My Rank
-                  </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Your current business rank</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="h-20 flex items-center justify-center">
-                      <div className="animate-pulse bg-muted h-8 w-24 rounded" />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex flex-col items-start gap-2">
-                        <div className="text-2xl sm:text-4xl font-bold text-primary">
-                          {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
-                        </div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">
-                          Total Business Volume: <span className="font-semibold text-primary">
-                            ${businessRank.totalBusiness?.toLocaleString() || '0'}
-                          </span>
-                        </div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">
-                          Current Rank Bonus: <span className="font-semibold text-primary">
-                            ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
-                          </span>
-                        </div>
+            <div>
+              <h2 className="text-lg font-semibold mb-4">Your Progress</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-primary" />
+                      My Rank
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Your current business rank</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="h-20 flex items-center justify-center">
+                        <div className="animate-pulse bg-muted h-8 w-24 rounded" />
                       </div>
-                      {businessRank.nextRank && (
-                        <div className="space-y-2">
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex flex-col items-start gap-2">
+                          <div className="text-2xl sm:text-4xl font-bold text-primary">
+                            {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
+                          </div>
                           <div className="text-xs sm:text-sm text-muted-foreground">
-                            Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
+                            Total Business Volume: <span className="font-semibold text-primary">
+                              ${businessRank.totalBusiness?.toLocaleString() || '0'}
+                            </span>
                           </div>
-                          <Progress value={businessRank.progress} className="h-2" />
-                          <div className="text-xs text-muted-foreground">
-                            {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            Current Rank Bonus: <span className="font-semibold text-primary">
+                              ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
+                            </span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        {businessRank.nextRank && (
+                          <div className="space-y-2">
+                            <div className="text-xs sm:text-sm text-muted-foreground">
+                              Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
+                            </div>
+                            <Progress value={businessRank.progress} className="h-2" />
+                            <div className="text-xs text-muted-foreground">
+                              {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium flex items-center gap-2">
-                    <Star className="h-4 w-4 text-primary" />
-                    Profile Overview
-                  </CardTitle>
-                  <CardDescription>Your account information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="space-y-2">
-                      <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
-                      <div className="animate-pulse bg-muted h-4 w-1/2 rounded" />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-lg font-semibold text-primary">
-                            {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
-                          </span>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <Star className="h-4 w-4 text-primary" />
+                      Profile Overview
+                    </CardTitle>
+                    <CardDescription>Your account information</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="space-y-2">
+                        <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
+                        <div className="animate-pulse bg-muted h-4 w-1/2 rounded" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-lg font-semibold text-primary">
+                              {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {userProfile?.first_name} {userProfile?.last_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {userProfile?.email}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium">
-                            {userProfile?.first_name} {userProfile?.last_name}
-                          </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {userProfile?.email}
-                          </div>
+                        <div className="text-sm text-muted-foreground">
+                          Member since {new Date(userProfile?.created_at).toLocaleDateString()}
                         </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Member since {new Date(userProfile?.created_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
 
           {/* Leaderboards */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-primary" />
-                  Top Business Volume
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs sm:text-sm">
-                    <thead className="text-xs uppercase bg-muted/50">
-                      <tr>
-                        <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
-                        <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
-                        <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Volume</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {leaderboard.businessVolume.map((leader) => (
-                        <tr key={leader.id} className="hover:bg-muted/50">
-                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
-                          <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                            {leader.name}
-                          </td>
-                          <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                            ${leader.volume?.toLocaleString()}
-                          </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
-                            ${leader.income.toLocaleString()}
-                          </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
+          <div>
+            <h2 className="text-lg font-semibold mb-4">Top Performers</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-medium flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-primary" />
+                    Top Business Volume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm">
+                      <thead className="text-xs uppercase bg-muted/50">
+                        <tr>
+                          <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
+                          <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
+                          <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Volume</th>
+                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
+                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {leaderboard.businessVolume.map((leader) => (
+                          <tr key={leader.id} className="hover:bg-muted/50">
+                            <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
+                            <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
+                              {leader.name}
+                            </td>
+                            <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
+                              ${leader.volume?.toLocaleString()}
+                            </td>
+                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
+                              ${leader.income.toLocaleString()}
+                            </td>
+                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  Top Recruiters
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs sm:text-sm">
-                    <thead className="text-xs uppercase bg-muted/50">
-                      <tr>
-                        <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
-                        <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
-                        <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Referrals</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
-                        <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {leaderboard.referrals.map((leader) => (
-                        <tr key={leader.id} className="hover:bg-muted/50">
-                          <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
-                          <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                            {leader.name}
-                          </td>
-                          <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                            {leader.referrals}
-                          </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
-                            ${leader.income.toLocaleString()}
-                          </td>
-                          <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-medium flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    Top Recruiters
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm">
+                      <thead className="text-xs uppercase bg-muted/50">
+                        <tr>
+                          <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
+                          <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
+                          <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Referrals</th>
+                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
+                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {leaderboard.referrals.map((leader) => (
+                          <tr key={leader.id} className="hover:bg-muted/50">
+                            <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
+                            <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
+                              {leader.name}
+                            </td>
+                            <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
+                              {leader.referrals}
+                            </td>
+                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
+                              ${leader.income.toLocaleString()}
+                            </td>
+                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
         </div>

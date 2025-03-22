@@ -158,41 +158,23 @@ const UsersPage = () => {
 
   const handleKycStatus = async (userId: string, status: 'completed' | 'rejected') => {
     try {
-      // First fetch the current KYC record
-      const { data: currentKyc, error: fetchError } = await supabase
-        .from('kyc')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-      // Update KYC status
-      if (currentKyc) {
-        const { error: kycError } = await supabase
-          .from('kyc')
-          .update({ status: status === 'completed' ? 'verified' : 'rejected' })
-          .eq('user_id', userId);
-
-        if (kycError) throw kycError;
-      }
-
-      // Update profile KYC status
+      // Update profile KYC status - this will trigger the notification
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ kyc_status: status })
+        .update({ 
+          kyc_status: status,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId);
 
       if (profileError) throw profileError;
 
-      // Refresh users data
-      await fetchUsers();
-
       toast({
-        title: "KYC Status Updated",
-        description: `User KYC has been ${status}`,
+        title: "Success",
+        description: `KYC ${status === 'completed' ? 'approved' : 'rejected'} successfully`,
       });
 
+      fetchUsers();
     } catch (error) {
       console.error('Error updating KYC status:', error);
       toast({
@@ -257,10 +239,20 @@ const UsersPage = () => {
 
   const handleCreditReturns = async (userId: string) => {
     try {
-      // First call the credit_investment_returns function
-      const { error } = await supabase.rpc('credit_investment_returns', { p_user_id: userId });
+      // Show processing toast
+      const loadingToast = toast({
+        title: "Processing Returns",
+        description: "Crediting investment returns...",
+      });
+
+      // Call the credit_investment_returns function
+      const { data, error } = await supabase.rpc('credit_investment_returns', { 
+        p_user_id: userId 
+      });
       
       if (error) throw error;
+
+      const [result] = data || [{ total_credited: 0, transactions_count: 0 }];
 
       // Fetch updated user data
       const { data: updatedUser, error: userError } = await supabase
@@ -276,21 +268,11 @@ const UsersPage = () => {
         user.id === userId ? { ...user, balance: updatedUser.balance } : user
       ));
 
-      // Fetch recent transaction to confirm
-      const { data: recentTransaction, error: txError } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('type', 'investment_return')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (txError) throw txError;
-
+      // Dismiss loading toast and show success
       toast({
-        title: "Returns Credited",
-        description: `$${recentTransaction.amount.toFixed(2)} has been credited successfully`,
+        title: "Returns Credited Successfully",
+        description: `Credited $${result.total_credited.toFixed(2)} across ${result.transactions_count} investments.`,
+        variant: "success",
       });
 
     } catch (error) {
