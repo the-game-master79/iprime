@@ -255,8 +255,6 @@ const Withdrawals = () => {
         return;
       }
 
-      // Temporarily comment out 48-hour waiting period check
-      /* 
       // Check 48-hour waiting period
       const canWithdraw = await checkLastDeposit(user.id);
       if (!canWithdraw) {
@@ -267,7 +265,6 @@ const Withdrawals = () => {
         });
         return;
       }
-      */
 
       const amountValue = parseFloat(formData.amount);
       if (!formData.cryptoId) {
@@ -436,8 +433,20 @@ const Withdrawals = () => {
 
       <Tabs defaultValue="request" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="request">Request Withdrawal</TabsTrigger>
-          <TabsTrigger value="history">Withdrawal History</TabsTrigger>
+          <TabsTrigger 
+            value="request" 
+            disabled={kycStatus !== 'completed'}
+            className={kycStatus !== 'completed' ? 'cursor-not-allowed opacity-50' : ''}
+          >
+            Request Withdrawal
+          </TabsTrigger>
+          <TabsTrigger 
+            value="history"
+            disabled={kycStatus !== 'completed'}
+            className={kycStatus !== 'completed' ? 'cursor-not-allowed opacity-50' : ''}
+          >
+            Withdrawal History
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="request" className="space-y-6">

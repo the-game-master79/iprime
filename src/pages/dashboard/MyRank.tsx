@@ -365,7 +365,7 @@ const MyRank = () => {
                   <TableHead>Rank Name</TableHead>
                   <TableHead>Team Business</TableHead>
                   <TableHead>Bonus</TableHead>
-                  <TableHead>Bonus Description</TableHead>
+                  <TableHead>Additional Bonus</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>

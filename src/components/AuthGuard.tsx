@@ -20,14 +20,16 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
     const isPublicRoute = publicPaths.includes(location.pathname);
 
     if (!user && requireAuth) {
-      // Save the attempted URL to redirect back after login
+      // Store the full path including search params and hash
+      const returnTo = `${location.pathname}${location.search}${location.hash}`;
       navigate('/auth/login', { 
-        state: { from: location.pathname },
+        state: { from: returnTo },
         replace: true 
       });
     } else if (user && authPage) {
-      // Redirect authenticated users away from auth pages
-      navigate('/dashboard', { replace: true });
+      // Preserve the return URL from login state if it exists
+      const returnPath = location.state?.from || '/dashboard';
+      navigate(returnPath, { replace: true });
     }
   }, [user, loading, requireAuth, authPage, navigate, location]);
 

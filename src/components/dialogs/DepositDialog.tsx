@@ -277,8 +277,8 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
               )}
               
-              <div className="grid gap-4">
-                <div className="grid gap-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="crypto-type">Crypto</Label>
                   <Select 
                     onValueChange={(value) => {
@@ -312,7 +312,7 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 </div>
 
                 {cryptoType && (
-                  <div className="grid gap-2">
+                  <div className="space-y-2">
                     <Label htmlFor="network">Network</Label>
                     <Select onValueChange={setNetwork} value={network}>
                       <SelectTrigger id="network">
@@ -328,61 +328,61 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     </Select>
                   </div>
                 )}
+              </div>
 
-                {cryptoType && network && (
-                  <>
-                    <div className="rounded-lg border p-4">
-                      <div className="flex justify-center mb-4">
-                        {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url && (
-                          <img 
-                            src={depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url!} 
-                            alt="Deposit QR Code"
-                            className="w-40 h-40"
-                          />
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <code className="flex-1 rounded bg-muted p-2 text-sm overflow-auto">
-                            {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
-                          </code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="amount">Amount ({cryptoType})</Label>
-                      <div className="relative">
-                        <Input
-                          id="amount"
-                          type="text"
-                          min="0"
-                          placeholder={`Enter amount in ${cryptoType}`}
-                          value={amount}
-                          onChange={handleAmountChange}
-                          pattern="[0-9]*\.?[0-9]*"
-                          className="pl-3"
+              {cryptoType && network && (
+                <>
+                  <div className="rounded-lg border p-4">
+                    <div className="flex justify-center mb-4">
+                      {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url && (
+                        <img 
+                          src={depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url!} 
+                          alt="Deposit QR Code"
+                          className="w-40 h-40"
                         />
-                      </div>
-                      {amount && (
-                        <div className="text-sm text-muted-foreground">
-                          Total Value: ${calculateTotalUSD().toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })} USD
-                        </div>
                       )}
                     </div>
-                  </>
-                )}
-              </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded bg-muted p-2 text-sm overflow-auto">
+                          {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="amount">Amount ({cryptoType})</Label>
+                    <div className="relative">
+                      <Input
+                        id="amount"
+                        type="text"
+                        min="0"
+                        placeholder={`Enter amount in ${cryptoType}`}
+                        value={amount}
+                        onChange={handleAmountChange}
+                        pattern="[0-9]*\.?[0-9]*"
+                        className="pl-3"
+                      />
+                    </div>
+                    {amount && (
+                      <div className="text-sm text-muted-foreground">
+                        Total Value: ${calculateTotalUSD().toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })} USD
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </>
           )}
 

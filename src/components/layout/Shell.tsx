@@ -2,15 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { 
-  BarChart3, 
   BanknoteIcon, 
   GanttChartIcon, 
-  Gift, 
+
   LayoutDashboard, 
-  Layers, 
+
   Menu, 
   Package, 
   Settings, 
@@ -65,18 +63,30 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
 
   const fetchNotices = async () => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data, error } = await supabase
         .from('notices')
         .select('*')
-        .or(`category.eq.system,category.eq.referral,and(category.eq.admin,is_active.eq.true),user_id.eq.${user.user.id}`)
+        .or(
+          `and(category.eq.system,user_id.eq.${user.id}),` +
+          `and(category.eq.referral,user_id.eq.${user.id}),` + 
+          `and(category.eq.admin,is_active.eq.true)`
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setNotices(data || []);
-      setUnreadCount((data?.filter(n => n.category === 'admin' && n.is_active) || []).length);
+      
+      // Count unread notifications that belong to the user
+      setUnreadCount(
+        (data?.filter(n => 
+          (n.category === 'admin' && n.is_active) || 
+          ((n.category === 'referral' || n.category === 'system') && 
+           !n.read_at && n.user_id === user.id)
+        ) || []).length
+      );
     } catch (error) {
       console.error('Error fetching notices:', error);
     }
@@ -85,27 +95,33 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     fetchNotices();
 
-    // Set up realtime subscriptions for new notices
-    const noticesSubscription = supabase
-      .channel('custom-notices')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notices',
-          filter: `is_active=eq.true`
-        },
-        (payload) => {
-          setNotices(current => [payload.new as Notice, ...current]);
-          setUnreadCount(count => count + 1);
-        }
-      )
-      .subscribe();
+    const fetchUserAndSubscribe = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    return () => {
-      noticesSubscription.unsubscribe();
+      const noticesSubscription = supabase
+        .channel('custom-notices')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notices',
+            filter: `user_id=eq.${user.id}` // Only subscribe to user's notifications
+          },
+          (payload) => {
+            setNotices(current => [payload.new as Notice, ...current]);
+            setUnreadCount(count => count + 1);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        noticesSubscription.unsubscribe();
+      };
     };
+
+    fetchUserAndSubscribe();
   }, []);
 
   const toggleSidebar = () => {
@@ -118,28 +134,25 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      // Only update admin notifications to is_active = false
-      const { error } = await supabase
+      // Mark admin notices as inactive
+      await supabase
         .from('notices')
         .update({ is_active: false })
         .eq('category', 'admin');
 
-      if (error) throw error;
+      // Mark user's referral and system notifications as read
+      await supabase
+        .from('notices')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .in('category', ['referral', 'system'])
+        .is('read_at', null);
 
       // Refresh notifications
-      const { data, error: fetchError } = await supabase
-        .from('notices')
-        .select('*')
-        .or(`category.eq.system,category.eq.referral,and(category.eq.admin,is_active.eq.true),user_id.eq.${user.user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      setNotices(data || []);
-      setUnreadCount((data?.filter(n => n.category === 'admin' && n.is_active) || []).length);
-      
+      await fetchNotices();
     } catch (error) {
       console.error('Error marking notifications as read:', error);
     }
@@ -285,20 +298,11 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
           
           <Button 
             variant="default"
-            className="hidden sm:flex mr-2"
+            className="flex mr-2" // Remove hidden sm:flex to show on all screens
             onClick={() => setDepositDialogOpen(true)}
           >
             <DollarSign className="mr-2 h-4 w-4" />
             Deposit
-          </Button>
-
-          <Button 
-            variant="default"
-            size="icon"
-            className="sm:hidden mr-2"
-            onClick={() => setDepositDialogOpen(true)}
-          >
-            <DollarSign className="h-4 w-4" />
           </Button>
 
           <DropdownMenu>
@@ -315,13 +319,20 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[380px]">
+            <DropdownMenuContent 
+              align="end" 
+              className="w-[380px]"
+              aria-describedby="notifications-description"
+            >
               <div className="flex items-center justify-between px-4 py-2 border-b">
                 <span className="font-semibold">Notifications</span>
+                <span id="notifications-description" className="sr-only">
+                  View and manage your notifications
+                </span>
                 {notices.length > 0 && (
                   <Button 
                     variant="ghost" 
-                    size="sm" 
+                    size="sm"
                     className="text-xs"
                     onClick={handleMarkAllAsRead}
                   >
