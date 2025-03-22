@@ -24,6 +24,10 @@ export default defineConfig({
           vendor: ['react', 'react-dom']
         }
       }
-    }
-  }
+    },
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
+  },
+  base: '/'
 });
