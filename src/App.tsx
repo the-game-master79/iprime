@@ -15,6 +15,7 @@ import Withdrawals from "./pages/withdrawals/Withdrawals";
 import Profile from "./pages/profile/Profile";
 import MyRank from "@/pages/dashboard/MyRank";
 import SupportPage from "./pages/support/SupportPage";
+import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
 import Callback from "./pages/auth/Callback";
 
@@ -46,15 +47,25 @@ const App = () => (
               <Route path="/auth/register" element={<Register />} />
               <Route path="/auth/callback" element={<Callback />} />
 
-              {/* Main Routes */}
+              {/* Routes that can be loaded before auth check */}
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/plans" element={<Plans />} />
               <Route path="/affiliate" element={<Affiliate />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/withdrawals" element={<Withdrawals />} />
               <Route path="/rank" element={<MyRank />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/support" element={<SupportPage />} />
+              
+              {/* Strictly protected routes */}
+              <Route path="/profile" element={
+                <AuthGuard requireAuth>
+                  <Profile />
+                </AuthGuard>
+              } />
+              <Route path="/support" element={
+                <AuthGuard requireAuth>
+                  <SupportPage />
+                </AuthGuard>
+              } />
               
               {/* Admin Routes */}
               <Route
