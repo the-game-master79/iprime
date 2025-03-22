@@ -20,6 +20,7 @@ import { Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { checkDepositLimit } from "@/lib/rateLimit";
+import QRCode from "qrcode"; // Add this import
 
 interface DepositMethod {
   id: string;
@@ -50,6 +51,7 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   const [amount, setAmount] = useState<string>("");
   const [depositMethods, setDepositMethods] = useState<DepositMethod[]>([]);
   const [cryptoPrices, setCryptoPrices] = useState<Record<string, { usd: number }>>({});
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>(""); // Add this state
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -220,126 +222,147 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     }
   };
 
+  // Set crypto as default payment method
+  useEffect(() => {
+    if (open) {
+      setPaymentMethod('crypto');
+    }
+  }, [open]);
+
+  // Replace generateQRCodeUrl with this function
+  const generateQRCode = async (address: string) => {
+    try {
+      const qrDataUrl = await QRCode.toDataURL(address);
+      setQrCodeUrl(qrDataUrl);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate QR code",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Add effect to generate QR code when address changes
+  useEffect(() => {
+    const address = depositMethods.find(
+      m => m.crypto_symbol === cryptoType && m.network === network
+    )?.deposit_address;
+
+    if (address) {
+      generateQRCode(address);
+    }
+  }, [cryptoType, network, depositMethods]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-[525px] rounded-lg">
         <DialogHeader>
           <DialogTitle>Deposit Funds</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="payment-method">Available Methods</Label>
-            <Select onValueChange={setPaymentMethod} value={paymentMethod}>
-              <SelectTrigger id="payment-method">
-                <SelectValue placeholder="Select payment method" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueMethods.map(method => {
-                  const isMethodActive = depositMethods.some(m => m.method === method && m.is_active);
-                  return (
-                    <SelectItem 
-                      key={method} 
-                      value={method}
-                      disabled={!isMethodActive}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span>
-                          {method === 'bank_transfer' ? 'Bank Transfer' :
-                           method === 'upi' ? 'UPI' :
-                           'Cryptocurrency'}
-                        </span>
-                        {(method === 'bank_transfer' || method === 'upi') && (
-                          <Badge variant={isMethodActive ? "default" : "secondary"} className="ml-2">
-                            {isMethodActive ? 'Active' : 'Coming Soon'}
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="grid gap-6 py-4">
+          {/* Main container with relative positioning for the connecting line */}
+          <div className="relative">
+            {/* Vertical connecting line */}
+            <div className="absolute left-4 top-8 bottom-0 w-[1px] border-l-2 border-dashed border-gray-200" />
 
-          {paymentMethod === "crypto" && (
-            <>
-              {cryptoType && (
-                <div className="mb-2 p-4 bg-muted rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">
-                    {depositMethods.find(m => m.crypto_symbol === cryptoType)?.crypto_name} Price
+            {/* Step 1: Select Cryptocurrency */}
+            <div className="grid gap-6">
+              <div className="relative grid gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
+                    1
                   </div>
-                  <div className="text-2xl font-bold">
-                    ${(cryptoPrices[cryptoType.toLowerCase()]?.usd || 0).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })} USD
+                  <div className="grid gap-1">
+                    <Label htmlFor="crypto-type">Select Cryptocurrency</Label>
                   </div>
                 </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="crypto-type">Crypto</Label>
-                  <Select 
-                    onValueChange={(value) => {
-                      setCryptoType(value);
-                      setNetwork("");
-                      setAmount(""); // Reset amount when crypto changes
-                    }} 
-                    value={cryptoType}
-                  >
-                    <SelectTrigger id="crypto-type">
-                      <SelectValue placeholder="Select cryptocurrency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCryptos.map((symbol) => {
-                        const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
-                        if (!crypto) return null;
-                        
-                        return (
-                          <SelectItem key={symbol} value={symbol}>
+                <Select 
+                  onValueChange={(value) => {
+                    setCryptoType(value);
+                    setNetwork("");
+                    setAmount("");
+                  }} 
+                  value={cryptoType}
+                >
+                  <SelectTrigger id="crypto-type">
+                    <SelectValue placeholder="Select cryptocurrency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCryptos.map((symbol) => {
+                      const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
+                      if (!crypto) return null;
+                      
+                      return (
+                        <SelectItem key={symbol} value={symbol}>
+                          <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
                               {crypto.logo_url && (
                                 <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-5 h-5" />
                               )}
                               <span>{crypto.crypto_name}</span>
                             </div>
-                          </SelectItem>
-                        );
-                      })}
+                            <div className="flex-shrink-0 ml-4">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                ${(cryptoPrices[symbol.toLowerCase()]?.usd || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Step 2: Select Network */}
+              {cryptoType && (
+                <div className="relative grid gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
+                      2
+                    </div>
+                    <div className="grid gap-1">
+                      <Label htmlFor="network">Select Network</Label>
+                    </div>
+                  </div>
+                  <Select onValueChange={setNetwork} value={network}>
+                    <SelectTrigger id="network">
+                      <SelectValue placeholder="Select network" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableNetworks.map((net) => (
+                        <SelectItem key={net} value={net}>
+                          {net}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+              )}
 
-                {cryptoType && (
-                  <div className="space-y-2">
-                    <Label htmlFor="network">Network</Label>
-                    <Select onValueChange={setNetwork} value={network}>
-                      <SelectTrigger id="network">
-                        <SelectValue placeholder="Select network" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableNetworks.map((net) => (
-                          <SelectItem key={net} value={net}>
-                            {net}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
+              {/* Step 3: Deposit Details */}
               {cryptoType && network && (
-                <>
+                <div className="relative grid gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
+                      3
+                    </div>
+                    <div className="grid gap-1">
+                      <Label>Deposit Address</Label>
+                    </div>
+                  </div>
                   <div className="rounded-lg border p-4">
                     <div className="flex justify-center mb-4">
-                      {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url && (
-                        <img 
-                          src={depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.qr_code_url!} 
-                          alt="Deposit QR Code"
-                          className="w-40 h-40"
-                        />
+                      {qrCodeUrl && (
+                        <div className="p-2 sm:p-4">
+                          <img
+                            src={qrCodeUrl}
+                            alt="Deposit QR Code"
+                            className="w-40 h-40"
+                          />
+                        </div>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -358,37 +381,47 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     </div>
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="amount">Amount ({cryptoType})</Label>
-                    <div className="relative">
-                      <Input
-                        id="amount"
-                        type="text"
-                        min="0"
-                        placeholder={`Enter amount in ${cryptoType}`}
-                        value={amount}
-                        onChange={handleAmountChange}
-                        pattern="[0-9]*\.?[0-9]*"
-                        className="pl-3"
-                      />
-                    </div>
-                    {amount && (
-                      <div className="text-sm text-muted-foreground">
-                        Total Value: ${calculateTotalUSD().toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })} USD
+                  {/* Step 4: Amount */}
+                  <div className="grid gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
+                        4
                       </div>
-                    )}
+                      <div className="grid gap-1">
+                        <Label htmlFor="amount">Enter Amount</Label>
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <div className="relative">
+                        <Input
+                          id="amount"
+                          type="text"
+                          min="0"
+                          placeholder={`Enter exact amount you're sending in ${cryptoType}`}
+                          value={amount}
+                          onChange={handleAmountChange}
+                          pattern="[0-9]*\.?[0-9]*"
+                          className="pl-3"
+                        />
+                      </div>
+                      {amount && (
+                        <div className="text-sm text-muted-foreground">
+                          Total Value: ${calculateTotalUSD().toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })} USD
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </>
+                </div>
               )}
-            </>
-          )}
+            </div>
+          </div>
 
           <Button 
             className="w-full mt-2" 
-            disabled={!amount || (paymentMethod === "crypto" && (!cryptoType || !network))}
+            disabled={!amount || !cryptoType || !network}
             onClick={handleSubmit}
           >
             Submit Deposit

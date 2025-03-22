@@ -28,7 +28,6 @@
   width: max-content;
 }
 
-/* Add pause on hover */
 .marquee-content:hover {
   animation-play-state: paused;
 }
