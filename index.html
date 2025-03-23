@@ -46,6 +46,10 @@
     
       <!-- Async captcha with loading defer [[5]] -->
       <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+
+      <link rel="manifest" href="/manifest.json" />
+      <meta name="theme-color" content="#000000" />
+      <link rel="apple-touch-icon" href="/logo192.png" />
   </head>
   <body>
     
@@ -54,5 +58,16 @@
     <!-- Added preload for critical resources [[8]] -->
     <link rel="preload" href="/src/main.tsx" as="script">
     <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/serviceWorker.js')
+            .then(reg => console.log('Service worker registered'))
+            .catch(err => console.log('Service worker registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>

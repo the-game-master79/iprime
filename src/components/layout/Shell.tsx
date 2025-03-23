@@ -19,10 +19,13 @@ import {
   DollarSign,
   Trophy,
   ChevronLeft,
-  HelpCircle // Add this import
+  HelpCircle, // Add this import
+  Download, // Add this import
+  InfoIcon // Add this import
 } from "lucide-react";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
+import { InfoDialog } from "@/components/dialogs/InfoDialog"; // Add this import
 import { useAuth } from '@/contexts/AuthContext';
 import {
   DropdownMenu,
@@ -33,6 +36,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // Add this import
 import { supabase } from "@/lib/supabase";
+import { usePwaInstall } from "@/hooks/use-pwa-install"; // Add this import
 
 interface Notice {
   id: string;
@@ -50,9 +54,11 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
   const { isMobile, isTablet } = useBreakpoints();
   const location = useLocation();
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false); // Add this state
   const { logout } = useAuth();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { canInstall, install } = usePwaInstall();
   
   // Close sidebar on mobile when navigating to a new page
   useEffect(() => {
@@ -247,6 +253,17 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
         
         <div className="border-t p-4">
+          {canInstall && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start gap-2 mb-2"
+              onClick={install}
+            >
+              <Download className="h-4 w-4" />
+              {(!isCollapsed || isMobile) && <span>Install cloudforex</span>}
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="sm" 
@@ -295,6 +312,15 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
           </Button>
           
           <div className="flex-1" />
+          
+          <Button 
+            variant="ghost"
+            size="icon"
+            className="mr-2"
+            onClick={() => setInfoDialogOpen(true)}
+          >
+            <InfoIcon className="h-5 w-5" />
+          </Button>
           
           <Button 
             variant="default"
@@ -442,6 +468,11 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <InfoDialog 
+            open={infoDialogOpen}
+            onOpenChange={setInfoDialogOpen}
+          />
+          
           <DepositDialog 
             open={depositDialogOpen} 
             onOpenChange={setDepositDialogOpen} 

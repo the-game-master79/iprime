@@ -14,6 +14,7 @@ import Marquee from 'react-fast-marquee';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getReferralLink } from "@/lib/utils";  // Add this import
 
 interface MarqueeUser {
   id: string;
@@ -356,19 +357,18 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
 
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', authUser.id)
           .single();
 
         if (error) throw error;
         if (profile?.referral_code) {
-          // Update referral link to use correct path
-          setReferralLink(`${window.location.origin}/auth/register?ref=${profile.referral_code}`);
+          setReferralLink(getReferralLink(profile.referral_code));
         }
         setUserProfile(profile);
       } catch (error) {
@@ -378,6 +378,12 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
 
     fetchProfileData();
   }, []);
+
+  useEffect(() => {
+    if (userProfile?.referral_code) {
+      setReferralLink(getReferralLink(userProfile.referral_code));
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     // Simulate data loading
