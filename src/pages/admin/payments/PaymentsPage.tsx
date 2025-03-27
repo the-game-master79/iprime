@@ -18,7 +18,7 @@ interface Transaction {
   id: string;
   user_id: string;
   amount: number;
-  type: 'deposit' | 'withdrawal' | 'commission' | 'investment' | 'adjustment';
+  type: 'deposit' | 'withdrawal' | 'commission' | 'investment' | 'adjustment' | 'investment_closure';
   status: 'Pending' | 'Processing' | 'Completed' | 'Failed';
   created_at: string;
   method?: string;
@@ -218,6 +218,7 @@ const PaymentsPage = () => {
                 <SelectItem value="commission">Commissions</SelectItem>
                 <SelectItem value="investment">Investments</SelectItem>
                 <SelectItem value="adjustment">Adjustments</SelectItem>
+                <SelectItem value="investment_closure">Investment Closures</SelectItem>
               </SelectContent>
             </Select>
 

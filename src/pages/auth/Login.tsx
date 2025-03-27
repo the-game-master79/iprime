@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { PageTransition } from "@/components/ui-components";
 import { ArrowRight } from "lucide-react";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -70,7 +69,11 @@ const Login = () => {
             <div className="w-full p-4 lg:p-8">
               <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
                 <div className="flex flex-col items-center space-y-4">
-                  <img src="/cloudforex.svg" alt="cloudforex" className="w-auto h-10 object-contain" />
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+                    alt="cloudforex" 
+                    className="w-auto h-10 object-contain" 
+                  />
                   <div className="flex flex-col space-y-2 text-center">
                     <h1 className="text-2xl font-semibold tracking-tight">Login</h1>
                     <p className="text-sm text-muted-foreground">

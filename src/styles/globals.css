@@ -1,18 +1,23 @@
-@keyframes slideAndFade {
-  0% {
-    transform: translateX(0);
-    opacity: 0;
+@tailwind utilities;
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
   }
-  10% {
-    opacity: 1;
+  
+  .dark .glass-card {
+    @apply bg-black/30 border-white/10;
   }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
+}
+
+/* Non-critical animations */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
 }
 
 .marquee-container {

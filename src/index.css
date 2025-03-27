@@ -42,6 +42,7 @@
     --sidebar-accent-foreground: 220 100% 55%;
     --sidebar-border: 210 20% 90%;
     --sidebar-ring: 220 100% 55%;
+    font-family: 'Questrial', sans-serif; /* Ensure only Questrial is used */
   }
 
   .dark {
@@ -85,7 +86,7 @@
 
   /* Remove unused styles and keep only what's needed */
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 }
 

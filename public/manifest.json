@@ -1,0 +1,46 @@
+{
+  "id": "/",
+  "short_name": "CloudForex",
+  "name": "CloudForex Trading Platform",
+  "description": "CloudForex is a trading platform that allows you to trade forex using AI agents and gather profits from it.",
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//screenshota.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "CloudForex Trading Dashboard"
+    },
+    {
+      "src": "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//screenshotb.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Real-time Analytics"
+    },
+    {
+      "src": "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//screenshotc.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop Trading Interface"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

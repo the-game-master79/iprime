@@ -409,28 +409,28 @@ const Affiliate = () => {
                 className="w-full justify-start gap-2 px-3"
               >
                 <GitBranchPlus className="h-4 w-4" />
-                Tree View
+                Team Tree View
               </TabsTrigger>
               <TabsTrigger 
                 value="commissions" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <LineChart className="h-4 w-4" />
-                Commissions
+                Commissions Structure
               </TabsTrigger>
               <TabsTrigger 
                 value="bonuses" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <Gift className="h-4 w-4" />
-                Invite Bonus
+                Invite Bonus Program
               </TabsTrigger>
               <TabsTrigger 
                 value="materials" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <Download className="h-4 w-4" />
-                Marketing
+                Marketing Materials
               </TabsTrigger>
               <TabsTrigger 
                 value="globalPool" 
@@ -565,7 +565,7 @@ const Affiliate = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <GitBranchPlus className="h-5 w-5" />
-                    Organizational Structure
+                    Team Tree View
                   </CardTitle>
                   <CardDescription>
                     View your team's hierarchical structure

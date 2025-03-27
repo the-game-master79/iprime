@@ -18,7 +18,7 @@ interface Transaction {
   method?: string;
   crypto_name?: string;
   crypto_symbol?: string;
-  type?: 'investment' | 'commission' | 'adjustment' | 'investment_return' | 'rank_bonus';
+  type?: 'investment' | 'commission' | 'adjustment' | 'investment_return' | 'rank_bonus' | 'investment_closure';
   description?: string;
 }
 
@@ -46,12 +46,12 @@ const Payments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch transactions including commissions, adjustments, and investment returns
+      // Fetch transactions including commissions, adjustments, investment returns, and closures
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
-        .in('type', ['commission', 'adjustment', 'investment_return', 'rank_bonus'])
+        .in('type', ['commission', 'adjustment', 'investment_return', 'rank_bonus', 'investment_closure'])
         .order('created_at', { ascending: false });
 
       if (transactionsError) throw transactionsError;
@@ -61,6 +61,7 @@ const Payments = () => {
       const adjustmentsData = transactionsData?.filter(tx => tx.type === 'adjustment') || [];
       const investmentReturnsData = transactionsData?.filter(tx => tx.type === 'investment_return') || [];
       const rankBonusData = transactionsData?.filter(tx => tx.type === 'rank_bonus') || [];
+      const investmentClosuresData = transactionsData?.filter(tx => tx.type === 'investment_closure') || [];
 
       // Rest of your existing fetch calls
       const { data: depositsData, error: depositsError } = await supabase
@@ -99,7 +100,7 @@ const Payments = () => {
       setCommissions(commissionsData);
       setInvestmentReturns(investmentReturnsData);
       setRankBonusData(rankBonusData);
-      setInvestmentReturns(investmentReturnsData);
+      setAdjustments([...adjustmentsData, ...investmentClosuresData]); // Include closures with adjustments
 
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -170,13 +171,14 @@ const Payments = () => {
       case 'adjustment': return 'Adjustment';
       case 'investment_return': return 'Investment Return';
       case 'rank_bonus': return 'Rank Bonus';
+      case 'investment_closure': return 'Investment Closure';
       default: return 'Withdrawal';
     }
   };
 
   const getAmountClass = (tx: Transaction) => {
     if ('method' in tx || tx.type === 'commission' || tx.type === 'investment_return' || 
-        (tx.type === 'adjustment' && tx.amount > 0)) {
+        tx.type === 'investment_closure' || (tx.type === 'adjustment' && tx.amount > 0)) {
       return "text-green-600";
     }
     return tx.type === 'investment' ? "text-blue-600" : "text-red-500";
@@ -246,6 +248,7 @@ const Payments = () => {
                 <option value="adjustment">Adjustments</option>
                 <option value="rank_bonus">Rank Bonuses</option>
                 <option value="investment_return">Investment Returns</option>
+                <option value="investment_closure">Investment Closures</option>
               </select>
             </div>
           </div>
@@ -286,6 +289,7 @@ const Payments = () => {
                                  isCommission ? 'Commission' :
                                  isAdjustment ? 'Balance Adjustment' :
                                  tx.type === 'investment' ? 'Deduction for Package Purchase' :
+                                 tx.type === 'investment_closure' ? 'Amount Refunded (Plan Closed)' :
                                  isInvestmentReturn ? 
                                    tx.description?.replace(/Daily return from \$(\d+)\.?\d* investment at (\d+\.?\d*)% rate/, 
                                      'Daily credit on Basic Plan for $$$1 at $2% rate') || 'Investment Credit' :
