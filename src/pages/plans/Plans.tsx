@@ -25,6 +25,7 @@ interface Plan {
   total_earnings?: number;
   total_invested?: number; // Add this property
   investments?: { id: string; amount: number }[];
+  created_at?: string;  // Add this field
 }
 
 interface UserProfile {
@@ -49,6 +50,10 @@ const Plans = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [processingInvestment, setProcessingInvestment] = useState(false);
   const [subscribedPlansCount, setSubscribedPlansCount] = useState(0);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [closingPlan, setClosingPlan] = useState<Plan | null>(null);
+  const [refundDetails, setRefundDetails] = useState<{ adminCharges: number; forexCharges: number; totalRefund: number } | null>(null);
+  const [planWithdrawals, setPlanWithdrawals] = useState<number>(0);
 
   // Fetch plans from Supabase
   useEffect(() => {
@@ -98,92 +103,106 @@ const Plans = () => {
     fetchUserProfile();
   }, []);
 
+  const fetchSubscribedPlans = async () => {
+    if (!userProfile) return;
+    
+    try {
+      // First get all active investments with plan details and check if plan is active
+      const { data: investments, error: investmentsError } = await supabase
+        .from('investments')
+        .select(`
+          id,
+          amount,
+          status,
+          created_at,
+          plans (
+            id,
+            name,
+            description,
+            investment,
+            returns_percentage,
+            duration_days,
+            benefits,
+            status
+          )
+        `)
+        .eq('user_id', userProfile.id)
+        .eq('status', 'active');
+
+      if (investmentsError) throw investmentsError;
+
+      // Get user's active plan subscriptions
+      const { data: activePlans } = await supabase
+        .from('user_plans')
+        .select('plan_id')
+        .eq('user_id', userProfile.id)
+        .eq('status', 'active');
+
+      const activePlanIds = (activePlans || []).map(p => p.plan_id);
+
+      // Filter investments to only include active plans
+      const activeInvestments = investments?.filter(inv => 
+        inv.plans && activePlanIds.includes(inv.plans.id)
+      );
+
+      // Rest of transformation logic
+      const planMap = new Map<string, Plan>();
+      
+      activeInvestments?.forEach((inv) => {
+        if (!inv.plans) return;
+        const plan = inv.plans as Plan;
+        
+        if (!planMap.has(plan.id)) {
+          planMap.set(plan.id, {
+            ...plan,
+            total_invested: 0,
+            investments: [],
+            total_earnings: 0
+          });
+        }
+        
+        const existingPlan = planMap.get(plan.id)!;
+        existingPlan.total_invested! += Number(inv.amount);
+        existingPlan.investments!.push({
+          id: inv.id,
+          amount: Number(inv.amount)
+        });
+      });
+
+      // Get earnings for each investment
+      const plansWithEarnings = await Promise.all(
+        Array.from(planMap.values()).map(async (plan) => {
+          let totalEarnings = 0;
+          
+          // Get earnings for each investment under this plan
+          for (const inv of plan.investments!) {
+            const { data: transactions } = await supabase
+              .from('transactions')
+              .select('amount')
+              .eq('user_id', userProfile.id)
+              .eq('type', 'investment_return')
+              .eq('reference_id', inv.id)
+              .eq('status', 'Completed');
+
+            const earnings = transactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
+            totalEarnings += earnings;
+          }
+
+          return {
+            ...plan,
+            total_earnings: totalEarnings
+          };
+        })
+      );
+
+      setSubscribedPlans(plansWithEarnings);
+    } catch (error) {
+      console.error('Error fetching subscribed plans:', error);
+    }
+  };
+
   // Add this new effect to fetch subscribed plans
   useEffect(() => {
-    const fetchSubscribedPlans = async () => {
-      if (!userProfile) return;
-      
-      try {
-        // First get all active investments with plan details
-        const { data: investments, error: investmentsError } = await supabase
-          .from('investments')
-          .select(`
-            id,
-            amount,
-            status,
-            created_at,
-            plans (
-              id,
-              name,
-              description,
-              investment,
-              returns_percentage,
-              duration_days,
-              benefits,
-              status
-            )
-          `)
-          .eq('user_id', userProfile.id)
-          .eq('status', 'active');
-
-        if (investmentsError) throw investmentsError;
-
-        // Transform and group investments by plan
-        const planMap = new Map<string, Plan>();
-        
-        investments?.forEach((inv) => {
-          if (!inv.plans) return; // Skip if no plan data
-          const plan = inv.plans as Plan;
-          
-          if (!planMap.has(plan.id)) {
-            planMap.set(plan.id, {
-              ...plan,
-              total_invested: 0,
-              investments: [],
-              total_earnings: 0
-            });
-          }
-          
-          const existingPlan = planMap.get(plan.id)!;
-          existingPlan.total_invested! += Number(inv.amount);
-          existingPlan.investments!.push({
-            id: inv.id,
-            amount: Number(inv.amount)
-          });
-        });
-
-        // Get earnings for each investment
-        const plansWithEarnings = await Promise.all(
-          Array.from(planMap.values()).map(async (plan) => {
-            let totalEarnings = 0;
-            
-            // Get earnings for each investment under this plan
-            for (const inv of plan.investments!) {
-              const { data: transactions } = await supabase
-                .from('transactions')
-                .select('amount')
-                .eq('user_id', userProfile.id)
-                .eq('type', 'investment_return')
-                .eq('reference_id', inv.id)
-                .eq('status', 'Completed');
-
-              const earnings = transactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
-              totalEarnings += earnings;
-            }
-
-            return {
-              ...plan,
-              total_earnings: totalEarnings
-            };
-          })
-        );
-
-        setSubscribedPlans(plansWithEarnings);
-      } catch (error) {
-        console.error('Error fetching subscribed plans:', error);
-      }
-    };
-
     if (activeTab === 'subscribed') {
       fetchSubscribedPlans();
     }
@@ -384,6 +403,144 @@ const Plans = () => {
       // ...rest of existing subscription logic...
     } catch (error) {
       // ...existing error handling...
+    }
+  };
+
+  const handleClosePlanClick = async (plan: Plan) => {
+    try {
+      // First get all investments for this plan to get their creation dates
+      const { data: investments, error: investmentsError } = await supabase
+        .from('investments')
+        .select('id, created_at')
+        .eq('user_id', userProfile?.id)
+        .eq('plan_id', plan.id)
+        .eq('status', 'active');
+
+      if (investmentsError) throw investmentsError;
+      if (!investments?.length) {
+        throw new Error('No active investments found for this plan');
+      }
+
+      // Get the earliest investment date
+      const earliestInvestmentDate = investments
+        .map(inv => new Date(inv.created_at))
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+
+      // Fetch completed withdrawals since the earliest investment
+      const { data: withdrawalData, error: withdrawalError } = await supabase
+        .from('withdrawals')
+        .select('amount')
+        .eq('user_id', userProfile?.id)
+        .eq('status', 'Completed')
+        .gte('created_at', earliestInvestmentDate.toISOString());
+
+      if (withdrawalError) throw withdrawalError;
+
+      const totalWithdrawals = withdrawalData?.reduce((sum, w) => sum + Number(w.amount), 0) || 0;
+      setPlanWithdrawals(totalWithdrawals);
+
+      const adminCharges = plan.investment * 0.1;
+      const forexCharges = plan.investment * 0.05;
+      
+      // Ensure refund doesn't go below 0
+      const totalRefund = Math.max(0, plan.investment - adminCharges - forexCharges);
+      const actualRefund = Math.max(0, totalRefund - totalWithdrawals);
+
+      setRefundDetails({ 
+        adminCharges, 
+        forexCharges, 
+        totalRefund: actualRefund 
+      });
+      setClosingPlan(plan);
+      setShowCloseDialog(true);
+    } catch (error) {
+      console.error('Error calculating refund:', error);
+      toast({
+        title: "Error",
+        description: "Failed to calculate refund amount. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleConfirmClosePlan = async () => {
+    if (!closingPlan || !refundDetails || !userProfile) return;
+
+    try {
+      // First create the closure transaction
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: userProfile.id,
+          amount: refundDetails.totalRefund,
+          type: 'investment_closure',
+          status: 'Completed',
+          reference_id: closingPlan.id,
+          description: `Investment plan ${closingPlan.name} closed and refunded`
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update user's balance
+      const { data: updatedProfile, error: balanceError } = await supabase
+        .from('profiles')
+        .update({ balance: userProfile.balance + refundDetails.totalRefund })
+        .eq('id', userProfile.id)
+        .select()
+        .single();
+
+      if (balanceError) throw balanceError;
+
+      // Mark the plan subscription as closed
+      const { error: planError } = await supabase
+        .from('user_plans')
+        .update({ status: 'closed' })
+        .eq('user_id', userProfile.id)
+        .eq('plan_id', closingPlan.id);
+
+      if (planError) throw planError;
+
+      // Mark all active investments for this plan as inactive
+      const { error: investmentsError } = await supabase
+        .from('investments')
+        .update({ status: 'inactive' })
+        .eq('user_id', userProfile.id)
+        .eq('plan_id', closingPlan.id)
+        .eq('status', 'active');
+
+      if (investmentsError) throw investmentsError;
+
+      // Update local state
+      setUserProfile(updatedProfile);
+      setShowCloseDialog(false);
+      
+      // Force refresh of subscribed plans
+      if (activeTab === 'subscribed') {
+        await fetchSubscribedPlans();
+      }
+
+      // Update subscribed plans count
+      const { count } = await supabase
+        .from('user_plans')
+        .select('*', { count: 'exact' })
+        .eq('user_id', userProfile.id)
+        .eq('status', 'active');
+
+      setSubscribedPlansCount(count || 0);
+
+      toast({
+        title: "Success",
+        description: "Plan closed successfully. Refund credited to your wallet.",
+        variant: "default"
+      });
+
+    } catch (error) {
+      console.error('Error closing plan:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to close the plan. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -594,6 +751,14 @@ const Plans = () => {
                           </div>
 
                         </CardContent>
+                        <CardFooter className="flex flex-col gap-2">
+                          <Button variant="destructive" onClick={() => handleClosePlanClick(plan)}>
+                            Close this Plan
+                          </Button>
+                          {investmentError && selectedPlan === plan.id && (
+                            <p className="text-sm text-destructive">{investmentError}</p>
+                          )}
+                        </CardFooter>
                       </Card>
                     ))}
                   </div>
@@ -647,6 +812,28 @@ const Plans = () => {
               >
                 {processingInvestment ? "Processing..." : "Confirm Investment"}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Close Plan</DialogTitle>
+            </DialogHeader>
+            {closingPlan && refundDetails && (
+              <div className="space-y-4">
+                <p>Plan: <strong>{closingPlan.name}</strong></p>
+                <p>Investment Amount: <strong>${closingPlan.investment.toLocaleString()}</strong></p>
+                <p>Admin Charges (10%): <strong>-${refundDetails.adminCharges.toLocaleString()}</strong></p>
+                <p>Forex Charges (5%): <strong>-${refundDetails.forexCharges.toLocaleString()}</strong></p>
+                <p>Total Withdrawals: <strong>-${planWithdrawals.toLocaleString()}</strong></p>
+                <p>Refund Amount: <strong>${refundDetails.totalRefund.toLocaleString()}</strong></p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCloseDialog(false)}>Cancel</Button>
+              <Button onClick={handleConfirmClosePlan}>Confirm Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
