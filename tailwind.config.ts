@@ -118,7 +118,7 @@ export default {
 				'pulse-opacity': 'pulse-opacity 2s ease-in-out infinite'
 			},
 			fontFamily: {
-				sans: ['Inter Tight', 'system-ui', 'sans-serif'],
+				sans: ['Questrial', 'sans-serif'], // Removed other fallback fonts
 			},
 		}
 	},

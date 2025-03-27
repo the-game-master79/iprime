@@ -14,6 +14,7 @@ import Marquee from 'react-fast-marquee';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getReferralLink } from "@/lib/utils";  // Add this import
 
 interface MarqueeUser {
   id: string;
@@ -281,14 +282,13 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
 
         if (ranksError) throw ranksError;
 
-        // Calculate total business volume (personal)
-        const personalBusiness = (profile.business_volume || 0)
-        const totalBusinessVolume = personalBusiness;
+        // Calculate total business volume (personal only)
+        const totalBusinessVolume = profile.business_volume || 0;
 
-        // Find current rank based on total business volume and profile's business_rank
+        // Find current rank based on personal business volume
         let currentRank = ranks.find(rank => rank.title === profile.business_rank);
         if (!currentRank && ranks.length > 0) {
-          currentRank = ranks[0]; // Set to first rank if no rank assigned
+          currentRank = ranks[0];
         }
 
         // Find next rank
@@ -356,19 +356,18 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
 
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', authUser.id)
           .single();
 
         if (error) throw error;
         if (profile?.referral_code) {
-          // Update referral link to use correct path
-          setReferralLink(`${window.location.origin}/auth/register?ref=${profile.referral_code}`);
+          setReferralLink(getReferralLink(profile.referral_code));
         }
         setUserProfile(profile);
       } catch (error) {
@@ -378,6 +377,12 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
 
     fetchProfileData();
   }, []);
+
+  useEffect(() => {
+    if (userProfile?.referral_code) {
+      setReferralLink(getReferralLink(userProfile.referral_code));
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     // Simulate data loading

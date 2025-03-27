@@ -7,30 +7,34 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-import Dashboard from "./pages/dashboard/Dashboard";
-import Plans from "./pages/plans/Plans";
-import Affiliate from "./pages/affiliate/Affiliate";
-import Payments from "./pages/payments/Payments";
-import Withdrawals from "./pages/withdrawals/Withdrawals";
-import Profile from "./pages/profile/Profile";
-import MyRank from "@/pages/dashboard/MyRank";
-import SupportPage from "./pages/support/SupportPage";
+import Callback from "./pages/auth/Callback";
+import AdminLogin from "./pages/admin/Login";
 import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
-import Callback from "./pages/auth/Callback";
+import { lazy, Suspense } from "react";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
-// Admin Routes
-import AdminLogin from "./pages/admin/Login";
-import AdminDashboard from "./pages/admin/Dashboard";
-import UsersPage from "./pages/admin/users/UsersPage";
-import AffiliatesPage from "./pages/admin/affiliates/AffiliatesPage";
-import PaymentsPage from "./pages/admin/payments/PaymentsPage";
-import AdminWithdrawalsPage from "./pages/admin/withdrawals/AdminWithdrawalsPage";
-import DepositsPage from "./pages/admin/deposits/DepositsPage";
-import SettingsPage from "./pages/admin/settings/SettingsPage";
-import AdminPlans from "@/pages/admin/plans/Plans";
-import SupportManagePage from "./pages/admin/support/SupportManagePage"; // Add this import
-import AdminNotices from "./pages/admin/notices/NoticesPage"; // Add this import
+// Lazy load routes
+const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const Plans = lazy(() => import("./pages/plans/Plans")); 
+const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
+const Payments = lazy(() => import("./pages/payments/Payments"));
+const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
+const Profile = lazy(() => import("./pages/profile/Profile"));
+const MyRank = lazy(() => import("@/pages/dashboard/MyRank"));
+const SupportPage = lazy(() => import("./pages/support/SupportPage"));
+
+// Lazy load admin routes
+const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
+const UsersPage = lazy(() => import("./pages/admin/users/UsersPage"));
+const AffiliatesPage = lazy(() => import("./pages/admin/affiliates/AffiliatesPage"));
+const PaymentsPage = lazy(() => import("./pages/admin/payments/PaymentsPage"));
+const AdminWithdrawalsPage = lazy(() => import("./pages/admin/withdrawals/AdminWithdrawalsPage"));
+const DepositsPage = lazy(() => import("./pages/admin/deposits/DepositsPage"));
+const SettingsPage = lazy(() => import("./pages/admin/settings/SettingsPage"));
+const AdminPlans = lazy(() => import("@/pages/admin/plans/Plans"));
+const SupportManagePage = lazy(() => import("./pages/admin/support/SupportManagePage"));
+const AdminNotices = lazy(() => import("./pages/admin/notices/NoticesPage"));
 
 const queryClient = new QueryClient();
 
@@ -40,56 +44,58 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <AdminAuthProvider>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Navigate to="/auth/login" replace />} />
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/register" element={<Register />} />
-              <Route path="/auth/callback" element={<Callback />} />
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Navigate to="/auth/login" replace />} />
+                <Route path="/auth/login" element={<Login />} />
+                <Route path="/auth/register" element={<Register />} />
+                <Route path="/auth/callback" element={<Callback />} />
 
-              {/* Routes that can be loaded before auth check */}
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/plans" element={<Plans />} />
-              <Route path="/affiliate" element={<Affiliate />} />
-              <Route path="/payments" element={<Payments />} />
-              <Route path="/withdrawals" element={<Withdrawals />} />
-              <Route path="/rank" element={<MyRank />} />
-              
-              {/* Strictly protected routes */}
-              <Route path="/profile" element={
-                <AuthGuard requireAuth>
-                  <Profile />
-                </AuthGuard>
-              } />
-              <Route path="/support" element={
-                <AuthGuard requireAuth>
-                  <SupportPage />
-                </AuthGuard>
-              } />
-              
-              {/* Admin Routes */}
-              <Route
-                path="/admin/*"
-                element={
-                  <Routes>
-                    <Route path="login" element={<AdminLogin />} />
-                    <Route path="dashboard" element={<AdminDashboard />} />
-                    <Route path="users" element={<UsersPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-                    <Route path="payments" element={<PaymentsPage />} />
-                    <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                    <Route path="deposits" element={<DepositsPage />} />
-                    <Route path="affiliates" element={<AffiliatesPage />} />
-                    <Route path="plans" element={<AdminPlans />} />
-                    <Route path="notices" element={<AdminNotices />} />
-                    <Route path="support" element={<SupportManagePage />} />
-                    <Route path="promotions" element={<PromotionsPage />} />
-                  </Routes>
-                }
-              />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* Routes that can be loaded before auth check */}
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/plans" element={<Plans />} />
+                <Route path="/affiliate" element={<Affiliate />} />
+                <Route path="/payments" element={<Payments />} />
+                <Route path="/withdrawals" element={<Withdrawals />} />
+                <Route path="/rank" element={<MyRank />} />
+                
+                {/* Strictly protected routes */}
+                <Route path="/profile" element={
+                  <AuthGuard requireAuth>
+                    <Profile />
+                  </AuthGuard>
+                } />
+                <Route path="/support" element={
+                  <AuthGuard requireAuth>
+                    <SupportPage />
+                  </AuthGuard>
+                } />
+                
+                {/* Admin Routes */}
+                <Route
+                  path="/admin/*"
+                  element={
+                    <Routes>
+                      <Route path="login" element={<AdminLogin />} />
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="users" element={<UsersPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="payments" element={<PaymentsPage />} />
+                      <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                      <Route path="deposits" element={<DepositsPage />} />
+                      <Route path="affiliates" element={<AffiliatesPage />} />
+                      <Route path="plans" element={<AdminPlans />} />
+                      <Route path="notices" element={<AdminNotices />} />
+                      <Route path="support" element={<SupportManagePage />} />
+                      <Route path="promotions" element={<PromotionsPage />} />
+                    </Routes>
+                  }
+                />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
             <Toaster />
           </AdminAuthProvider>
         </AuthProvider>

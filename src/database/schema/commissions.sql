@@ -7,6 +7,9 @@ CREATE TABLE commission_structures (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Add related_investment column to transactions table if not exists
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS related_investment DECIMAL(15,2);
+
 -- Insert default commission structure
 INSERT INTO commission_structures (level, percentage, description) VALUES
     (1, 10.00, 'Direct referrals'),
@@ -27,3 +30,7 @@ CREATE TRIGGER update_commission_structures_updated_at
     BEFORE UPDATE ON commission_structures
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Drop any existing commission triggers if they exist
+DROP TRIGGER IF EXISTS create_commission_transaction ON investments;
+DROP FUNCTION IF EXISTS create_commission_transaction();

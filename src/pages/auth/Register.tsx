@@ -141,7 +141,11 @@ const Register = () => {
             <div className="w-full p-4 lg:p-8">
               <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[380px]">
                 <div className="flex flex-col items-center space-y-4">
-                  <img src="/cloudforex.svg" alt="cloudforex" className="w-auto h-10 object-contain" />
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+                    alt="cloudforex" 
+                    className="w-auto h-10 object-contain" 
+                  />
                   <div className="flex flex-col space-y-2 text-center">
                     <h1 className="text-2xl font-semibold tracking-tight">Register an account</h1>
                     <p className="text-sm text-muted-foreground">

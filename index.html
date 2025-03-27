@@ -3,6 +3,19 @@
   <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <!-- Add favicon -->
+      <link 
+        rel="icon" 
+        type="image/png" 
+        sizes="32x32" 
+        href="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//favicon-32x32.png"
+      >
+      <link 
+        rel="icon" 
+        type="image/png" 
+        sizes="16x16" 
+        href="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//favicon-16x16.png"
+      >
       <!-- Optimized title with primary keyword [[1]][[7]] -->
       <title>CloudForex | Best Forex Trading Platform for High Returns</title>
     
@@ -42,10 +55,56 @@
       <!-- Preconnected font loading with display swap [[5]][[8]] -->
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-      <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+      <link href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     
-      <!-- Async captcha with loading defer [[5]] -->
-      <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+      <!-- Preload critical resources -->
+      <link rel="modulepreload" href="/src/main.tsx" as="script">
+      <link rel="modulepreload" href="/src/App.tsx" as="script">
+
+      <link 
+        rel="preload" 
+        href="/src/styles/critical.css" 
+        as="style"
+      >
+      <link 
+        rel="stylesheet" 
+        href="/src/styles/critical.css"
+      >
+      <link 
+        rel="stylesheet" 
+        href="/src/styles/globals.css"
+        media="print" 
+        onload="this.media='all'"
+      >
+    
+      <!-- Defer non-critical scripts -->
+      <script 
+        src="https://js.hcaptcha.com/1/api.js" 
+        async 
+        defer 
+        data-lazy="true"
+        crossorigin="anonymous"
+        fetchpriority="low"
+      ></script>
+    
+      <!-- Load main bundle with cache headers -->
+      <script 
+        type="module" 
+        src="/src/main.tsx"
+        fetchpriority="high"
+      ></script>
+
+      <!-- Add cache headers for Vercel scripts -->
+      <script 
+        defer
+        src="/_vercel/speed-insights/script.js"
+        fetchpriority="low"
+        data-cache-control="public, max-age=2678400"
+      ></script>
+
+      <link rel="manifest" href="/manifest.json" />
+      <meta name="theme-color" content="#000000" />
+      <link rel="apple-touch-icon" href="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//logo192.png" />
   </head>
   <body>
     
@@ -53,6 +112,30 @@
     
     <!-- Added preload for critical resources [[8]] -->
     <link rel="preload" href="/src/main.tsx" as="script">
-    <script type="module" src="/src/main.tsx"></script>
+
+    <script>
+      // Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/serviceWorker.js')
+            .then(reg => console.log('Service worker registered'))
+            .catch(err => console.log('Service worker registration failed:', err));
+        });
+      }
+
+      // Defer hCaptcha until form interaction
+      document.addEventListener('DOMContentLoaded', () => {
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+          form.addEventListener('focusin', () => {
+            const script = document.querySelector('script[data-lazy="true"]');
+            if (script) {
+              script.setAttribute('src', script.dataset.src);
+              script.removeAttribute('data-lazy');
+            }
+          }, { once: true });
+        });
+      });
+    </script>
   </body>
 </html>

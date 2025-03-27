@@ -94,3 +94,5 @@ create trigger on_new_investment
   after insert on investments
   for each row
   execute function handle_new_investment();
+
+-- Drop the old function and trigger since they're replaced by the unified handler

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
-import { Copy, Users, ChevronDown, ChevronUp, Share2, Download, LineChart, BarChart, GitBranchPlus, ChevronRight, Gift } from "lucide-react";
+import { Copy, Users, ChevronDown, ChevronUp, Share2, Download, LineChart, BarChart, GitBranchPlus, ChevronRight, Gift, ChevronDownIcon, ChevronUpIcon, MinusSquare, PlusSquare } from "lucide-react";
 import ShellLayout from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,7 @@ interface TeamMember {
   referrerName: string;
   totalInvested: number;
   referralCode: string; // Add this line
+  referredBy: string; // Add this field
 }
 
 interface TeamTreeNode extends TeamMember {
@@ -41,6 +42,11 @@ interface CommissionStructure {
   level: number;
   percentage: number;
   description: string;
+}
+
+interface ReferralGroup {
+  referrer: TeamTreeNode;
+  downline: TeamTreeNode[];
 }
 
 const Affiliate = () => {
@@ -57,6 +63,8 @@ const Affiliate = () => {
   const [activeMembers, setActiveMembers] = useState(0); // renamed from activeReferrers
   const [currentMonthCommissions, setCurrentMonthCommissions] = useState(0);
   const [totalBusiness, setTotalBusiness] = useState(0);
+  const [firstLevelGroups, setFirstLevelGroups] = useState<ReferralGroup[]>([]);
+  const [collapsedNodes, setCollapsedNodes] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -96,88 +104,102 @@ const Affiliate = () => {
     return level1Members.map(member => buildTree(member));
   };
 
-  useEffect(() => {
-    const fetchTeamData = async () => {
-      try {
-        setIsLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.user) {
-          setTeamData([]);
-          return;
-        }
-
-        // Get complete referral network data
-        const { data: relationships, error } = await supabase
-          .from('referral_relationships')
-          .select(`
-            id,
-            level,
-            referred:profiles!referral_relationships_referred_id_fkey (
-              id,
-              first_name,
-              last_name,
-              created_at,
-              status,
-              referred_by,
-              total_invested,
-              referral_code
-            ),
-            referrer:profiles!referral_relationships_referrer_id_fkey (
-              first_name,
-              last_name,
-              referral_code
-            )
-          `)
-          .eq('referrer_id', session.user.id)
-          .order('level', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching team data:', error);
-          setTeamData([]);
-          return;
-        }
-
-        // Get all referral codes for mapping
-        const { data: allProfiles } = await supabase
-          .from('profiles')
-          .select('referral_code, first_name, last_name');
-
-        // Create a map of referral codes to names
-        const referralCodeToName = (allProfiles || []).reduce((acc: { [key: string]: string }, profile) => {
-          if (profile.referral_code) {
-            acc[profile.referral_code] = `${profile.first_name} ${profile.last_name}`;
-          }
-          return acc;
-        }, {});
-
-        // Process and format the team data
-        const processedData = relationships
-          ?.filter(rel => rel.referred)
-          .map(rel => ({
-            id: rel.referred.id,
-            name: `${rel.referred.first_name} ${rel.referred.last_name}`,
-            level: rel.level,
-            joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
-            status: rel.referred.status || 'Active',
-            commissions: 0,
-            totalInvested: rel.referred.total_invested || 0,
-            referrerName: rel.referred.referred_by 
-              ? referralCodeToName[rel.referred.referred_by] || 'Unknown'
-              : 'Direct',
-            referralCode: rel.referred.referral_code // Add this line
-          }));
-
-        setTeamData(processedData || []);
-        setTreeData(organizeDataIntoTree(processedData || []));
-      } catch (error) {
-        console.error('Error:', error);
+  const fetchTeamData = async () => {
+    try {
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
         setTeamData([]);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
+      // Get complete referral network with hierarchical data
+      const { data: networkData, error: networkError } = await supabase
+        .from('referral_relationships')
+        .select(`
+          id,
+          level,
+          referred:profiles!referral_relationships_referred_id_fkey (
+            id,
+            first_name,
+            last_name,
+            created_at,
+            status,
+            referred_by,
+            total_invested,
+            referral_code
+          ),
+          referrer:profiles!referral_relationships_referrer_id_fkey (
+            id,
+            first_name,
+            last_name,
+            referral_code
+          )
+        `)
+        .eq('referrer_id', session.user.id);
+
+      if (networkError) throw networkError;
+
+      // Process the network data into a hierarchical structure
+      const processedData = networkData
+        ?.filter(rel => rel.referred)
+        .map(rel => ({
+          id: rel.referred.id,
+          name: `${rel.referred.first_name} ${rel.referred.last_name}`,
+          level: rel.level,
+          joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
+          status: rel.referred.status || 'Active',
+          commissions: 0,
+          totalInvested: rel.referred.total_invested || 0,
+          referrerName: `${rel.referrer.first_name} ${rel.referrer.last_name}`,
+          referralCode: rel.referred.referral_code,
+          referredBy: rel.referred.referred_by || ''
+        }));
+
+      setTeamData(processedData || []);
+
+      // Organize first level referrals and their downlines
+      const groups = organizeFirstLevelReferrals(processedData || []);
+      setFirstLevelGroups(groups);
+
+    } catch (error) {
+      console.error('Error:', error);
+      setTeamData([]);
+      setFirstLevelGroups([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const buildTreeStructure = (referralCode: string | null, processedData: TeamMember[]): TeamTreeNode[] => {
+    return processedData
+      .filter(member => member.referredBy === referralCode)
+      .map(member => ({
+        ...member,
+        children: buildTreeStructure(member.referralCode, processedData)
+      }));
+  };
+
+  const organizeFirstLevelReferrals = (processedData: TeamMember[]) => {
+    const firstLevelMembers = processedData.filter(m => m.level === 1);
+    
+    return firstLevelMembers.map(member => {
+      const referrerNode: TeamTreeNode = {
+        ...member,
+        children: []
+      };
+      
+      const downlineNodes = buildTreeStructure(member.referralCode, processedData);
+      
+      return {
+        referrer: referrerNode,
+        downline: downlineNodes
+      };
+    });
+  };
+
+  useEffect(() => {
     fetchTeamData();
   }, []);
 
@@ -327,28 +349,86 @@ const Affiliate = () => {
     return (member.totalInvested * levelStructure.percentage) / 100;
   };
 
+  const toggleNodeCollapse = (nodeId: string) => {
+    setCollapsedNodes(prev => 
+      prev.includes(nodeId) 
+        ? prev.filter(id => id !== nodeId)
+        : [...prev, nodeId]
+    );
+  };
+
   const OrganizationalNode = ({ node }: { node: TeamTreeNode }) => (
-    <div className="relative p-4 min-w-[200px] rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
-      <div className="flex flex-col items-center gap-1 text-center">
-        <div className="font-medium">{node.name}</div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Level {node.level}</span>
-          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-            {node.referralCode}
-          </span>
-        </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          ${node.totalInvested.toLocaleString()}
+    <div className="relative group">
+      <div className="relative p-4 min-w-[240px] rounded-lg border border-border/50 bg-card shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleNodeCollapse(node.id);
+          }}
+        >
+          {collapsedNodes.includes(node.id) ? (
+            <PlusSquare className="h-4 w-4" />
+          ) : (
+            <MinusSquare className="h-4 w-4" />
+          )}
+        </Button>
+        
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="font-medium text-base">{node.name}</div>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-sm text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">Level {node.level}</span>
+            <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+              {node.referralCode}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-1 text-sm w-full">
+            <div className="text-center p-1.5 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">Investment</div>
+              <div className="font-medium">${node.totalInvested.toLocaleString()}</div>
+            </div>
+            <div className="text-center p-1.5 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">Joined</div>
+              <div className="font-medium">{new Date(node.joinDate).toLocaleDateString()}</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 
-  const renderTree = (node: TeamTreeNode) => (
-    <OrgTreeNode label={<OrganizationalNode node={node} />}>
-      {node.children.map((child) => renderTree(child))}
-    </OrgTreeNode>
-  );
+  const renderTree = (node: TeamTreeNode) => {
+    if (collapsedNodes.includes(node.id)) {
+      return <OrgTreeNode label={<OrganizationalNode node={node} />} />;
+    }
+    return (
+      <OrgTreeNode label={<OrganizationalNode node={node} />}>
+        {node.children.map((child) => renderTree(child))}
+      </OrgTreeNode>
+    );
+  };
+
+  const calculateDownlineTotals = (node: TeamTreeNode) => {
+    let totalBusiness = 0;
+    let totalMembers = 0;
+  
+    // Count direct downline
+    if (node.children) {
+      totalMembers += node.children.length;
+      totalBusiness += node.children.reduce((sum, child) => sum + (child.totalInvested || 0), 0);
+      
+      // Recursively count children's downlines
+      node.children.forEach(child => {
+        const childTotals = calculateDownlineTotals(child);
+        totalMembers += childTotals.totalMembers;
+        totalBusiness += childTotals.totalBusiness;
+      });
+    }
+  
+    return { totalMembers, totalBusiness };
+  };
 
   return (
     <ShellLayout>
@@ -409,28 +489,28 @@ const Affiliate = () => {
                 className="w-full justify-start gap-2 px-3"
               >
                 <GitBranchPlus className="h-4 w-4" />
-                Tree View
+                Team Tree View
               </TabsTrigger>
               <TabsTrigger 
                 value="commissions" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <LineChart className="h-4 w-4" />
-                Commissions
+                Commissions Structure
               </TabsTrigger>
               <TabsTrigger 
                 value="bonuses" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <Gift className="h-4 w-4" />
-                Invite Bonus
+                Invite Bonus Program
               </TabsTrigger>
               <TabsTrigger 
                 value="materials" 
                 className="w-full justify-start gap-2 px-3"
               >
                 <Download className="h-4 w-4" />
-                Marketing
+                Marketing Materials
               </TabsTrigger>
               <TabsTrigger 
                 value="globalPool" 
@@ -565,30 +645,51 @@ const Affiliate = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <GitBranchPlus className="h-5 w-5" />
-                    Organizational Structure
+                    First Level Referrals & Their Teams
                   </CardTitle>
                   <CardDescription>
-                    View your team's hierarchical structure
+                    View each first level referral and their downline structure
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {treeData.length > 0 ? (
-                    <div className="w-full overflow-auto">
-                      <div className="min-w-[800px] p-4">
-                        <Tree
-                          lineWidth="2px"
-                          lineColor="rgb(229 231 235)"
-                          lineBorderRadius="6px"
-                          label={<OrganizationalNode node={treeData[0]} />}
-                        >
-                          {treeData[0].children.map((node) => renderTree(node))}
-                        </Tree>
-                      </div>
+                  {firstLevelGroups.length > 0 ? (
+                    <div className="space-y-8">
+                      {firstLevelGroups.map((group, index) => {
+                        const downlineTotals = calculateDownlineTotals(group.referrer);
+                        // Subtract 1 from totalMembers since we don't want to count the referrer
+                        const totalDownlineMembers = downlineTotals.totalMembers - 1;
+                        
+                        return (
+                          <div key={group.referrer.id} className="relative">
+                            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-4 mb-4">
+                              <h3 className="text-lg font-medium">
+                                Direct Referral #{index + 1}: {group.referrer.name}
+                              </h3>
+                            </div>
+                            
+                            <div className="relative rounded-lg border bg-card/50 p-6">
+                              <div className="w-full overflow-auto">
+                                <div className="min-w-[600px] p-4">
+                                  <Tree
+                                    lineWidth="1.5px"
+                                    lineColor="hsl(var(--border))"
+                                    lineBorderRadius="8px"
+                                    label={<OrganizationalNode node={group.referrer} />}
+                                    className="[&>li]:!mt-6"
+                                  >
+                                    {group.downline.map((node) => renderTree(node))}
+                                  </Tree>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <EmptyState
                       icon={<Users />}
-                      title="No team members yet"
+                      title="No direct referrals yet"
                       description="Start sharing your referral link to build your team"
                     />
                   )}
