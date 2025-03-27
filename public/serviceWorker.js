@@ -34,12 +34,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
   // Custom caching strategies based on request type
   if (event.request.url.includes('hcaptcha.com')) {
     // Network first for hCaptcha
@@ -74,11 +68,10 @@ self.addEventListener('fetch', (event) => {
       .then(cachedResponse => {
         const fetchPromise = fetch(event.request)
           .then(networkResponse => {
-            if (networkResponse.ok) {
-              const responseToCache = networkResponse.clone();
-              caches.open(DYNAMIC_CACHE)
-                .then(cache => cache.put(event.request, responseToCache));
-            }
+            // Clone the response before using it
+            const responseToCache = networkResponse.clone();
+            caches.open(DYNAMIC_CACHE)
+              .then(cache => cache.put(event.request, responseToCache));
             return networkResponse;
           });
         return cachedResponse || fetchPromise;
