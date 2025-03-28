@@ -21,6 +21,8 @@ interface DepositMethod {
   logo_url: string | null;
   is_active: boolean;
   min_amount: number;
+  qr_code_url: string | null;
+  deposit_address: string | null;
 }
 
 interface WithdrawalFormData {
@@ -197,9 +199,34 @@ const Withdrawals = () => {
     return true; // If no deposits found, allow withdrawal
   };
 
-  const cryptoOptions = depositMethods.filter(m => m.method === 'crypto');
+  const getNetworksForCrypto = (cryptoSymbol: string): string[] => {
+    return depositMethods
+      .filter(m => m.crypto_symbol === cryptoSymbol && m.network)
+      .map(m => m.network!)
+      .filter((value, index, self) => self.indexOf(value) === index); // Remove duplicates
+  };
+
+  // Group deposit methods by crypto symbol to avoid duplicates
+  const cryptoOptions = [...new Set(
+    depositMethods
+      .filter(m => m.method === 'crypto')
+      .map(m => m.crypto_symbol)
+  )]
+  .filter(Boolean)
+  .map(symbol => {
+    const method = depositMethods.find(m => m.crypto_symbol === symbol);
+    return {
+      symbol,
+      name: method?.crypto_name,
+      logo: method?.logo_url,
+      id: method?.id
+    };
+  });
+
   const selectedCrypto = cryptoOptions.find(c => c.id === formData.cryptoId);
-  const networks = selectedCrypto?.network ? [selectedCrypto.network] : [];
+  const networks = formData.cryptoId ? 
+    getNetworksForCrypto(depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol || '') : 
+    [];
 
   const validateAmount = (amount: string) => {
     const amountValue = parseFloat(amount);
@@ -457,11 +484,11 @@ const Withdrawals = () => {
               <form onSubmit={handleSubmit}>
                 <CardHeader>
                   <CardTitle>Request a Payout</CardTitle>
-                  <CardDescription>
+                  <CardDescription id="withdrawal-dialog-description">
                     Request for a Payout of your earnings in various cryptocurrencies.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6" aria-describedby="withdrawal-dialog-description">
                   <div className="space-y-2">
                     <Label>Select Cryptocurrency</Label>
                     <Select 
@@ -475,17 +502,17 @@ const Withdrawals = () => {
                         {cryptoOptions.map(crypto => (
                           <SelectItem 
                             key={crypto.id} 
-                            value={crypto.id}
+                            value={crypto.id || ''}
                           >
                             <div className="flex items-center gap-2">
-                              {crypto.logo_url && (
+                              {crypto.logo && (
                                 <img 
-                                  src={crypto.logo_url} 
-                                  alt={crypto.crypto_name || ''} 
+                                  src={crypto.logo} 
+                                  alt={crypto.name || ''} 
                                   className="w-4 h-4"
                                 />
                               )}
-                              {crypto.crypto_name} ({crypto.crypto_symbol})
+                              {crypto.name} ({crypto.symbol})
                             </div>
                           </SelectItem>
                         ))}
@@ -572,11 +599,11 @@ const Withdrawals = () => {
           <Card>
             <CardHeader>
               <CardTitle>Withdrawal History</CardTitle>
-              <CardDescription>
+              <CardDescription id="history-dialog-description">
                 View all your past and pending withdrawals
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent aria-describedby="history-dialog-description">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-full">
                   <thead>
@@ -586,7 +613,6 @@ const Withdrawals = () => {
                       <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</th>
                       <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Method</th>
                       <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                      <th className="py-3 px-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -610,16 +636,6 @@ const Withdrawals = () => {
                               'bg-red-100 text-red-800'}`}>
                             {withdrawal.status}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8"
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Details
-                          </Button>
                         </td>
                       </tr>
                     ))}

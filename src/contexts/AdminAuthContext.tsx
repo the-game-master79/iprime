@@ -27,20 +27,16 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAdminStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    // For testing: consider any authenticated user as admin
-    setIsAdminAuthenticated(!!session);
+    // Check if user has admin role/session
+    setIsAdminAuthenticated(!!session && session.user.email === 'a1@ok.com');
   };
 
   const loginAdmin = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) return false;
-    // For testing: allow any successful login
-    setIsAdminAuthenticated(true);
-    return true;
+    if (email === 'a1@ok.com' && password === '678123') {
+      setIsAdminAuthenticated(true);
+      return true;
+    }
+    throw new Error('Invalid admin credentials');
   };
 
   const logoutAdmin = async () => {

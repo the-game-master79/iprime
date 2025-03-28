@@ -9,7 +9,10 @@ export default defineConfig({
     port: 8080,
     watch: {
       usePolling: true
-    }
+    },
+    headers: {
+      'Cache-Control': 'public, max-age=31536000',
+    },
   },
   resolve: {
     alias: {
@@ -21,9 +24,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom']
+          vendor: ['react', 'react-dom'],
+          auth: ['@supabase/auth-js'],
+          components: [
+            '@/components/ui/button',
+            '@/components/ui/input',
+            '@/components/ui/card'
+          ]
         }
       }
-    }
+    },
+    chunkSizeWarningLimit: 1000
   }
 });

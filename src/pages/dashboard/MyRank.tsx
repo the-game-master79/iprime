@@ -86,30 +86,13 @@ const MyRank = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: relationships, error } = await supabase
-        .from('referral_relationships')
-        .select(`
-          referred:profiles!referral_relationships_referred_id_fkey (
-            total_invested,
-            business_volume
-          )
-        `)
-        .eq('referrer_id', user.id);
-
-      if (error) throw error;
-
-      const referralBusiness = relationships?.reduce((sum, rel) => {
-        return sum + (rel.referred?.business_volume || 0);
-      }, 0) || 0;
-
       const { data: profile } = await supabase
         .from('profiles')
         .select('business_volume')
         .eq('id', user.id)
         .single();
 
-      const totalVolume = (profile?.business_volume || 0) + referralBusiness;
-      setTotalBusiness(totalVolume);
+      setTotalBusiness(profile?.business_volume || 0);
     } catch (error) {
       console.error('Error fetching total business:', error);
     }

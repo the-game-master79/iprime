@@ -6,7 +6,7 @@ DROP FUNCTION IF EXISTS handle_investment_commission() CASCADE;
 DROP FUNCTION IF EXISTS process_investment_commission() CASCADE;
 
 -- Create new unified investment handler function
-CREATE OR REPLACE FUNCTION handle_investment_and_commission()
+CREATE OR REPLACE FUNCTION handle_new_investment()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -17,14 +17,7 @@ DECLARE
     commission_rate decimal;
     commission_amount decimal;
 BEGIN
-    -- First handle the investment transaction
-    -- Update user's balance and total_invested
-    UPDATE profiles 
-    SET balance = balance - NEW.amount,
-        total_invested = total_invested + NEW.amount
-    WHERE id = NEW.user_id;
-
-    -- Create investment transaction record
+    -- Only create a single investment transaction per investment
     INSERT INTO transactions (
         user_id,
         amount,
@@ -36,7 +29,7 @@ BEGIN
         NEW.user_id,
         NEW.amount,
         'investment',
-        'Completed',  -- Changed from 'completed' to 'Completed'
+        'Completed',
         NEW.id,
         'Investment in plan'
     );
@@ -59,14 +52,13 @@ BEGIN
         IF commission_rate IS NOT NULL THEN
             commission_amount := (NEW.amount * commission_rate) / 100;
 
-            -- Update referrer's commissions_balance only (not the main balance)
+            -- Update referrer's balances and business volume in a single update
             UPDATE profiles 
             SET commissions_balance = COALESCE(commissions_balance, 0) + commission_amount,
-                -- Update business_volume to include downline's investment
                 business_volume = COALESCE(business_volume, 0) + NEW.amount
             WHERE id = current_referrer_id;
 
-            -- Create commission transaction
+            -- Create commission transaction (only create it here, not in other triggers)
             INSERT INTO transactions (
                 user_id,
                 amount,
@@ -78,7 +70,7 @@ BEGIN
                 current_referrer_id,
                 commission_amount,
                 'commission',
-                'Completed',  -- Changed from 'completed' to 'Completed'
+                'Completed',
                 NEW.id,
                 format('Level %s commission from investment of $%s', current_level, NEW.amount)
             );
@@ -99,14 +91,12 @@ BEGIN
 END;
 $$;
 
--- Drop existing investment trigger first
-DROP TRIGGER IF EXISTS handle_investment_trigger ON investments;
-
--- Create single trigger for investments
-CREATE TRIGGER handle_investment_trigger
+-- Create trigger for new investments
+DROP TRIGGER IF EXISTS on_new_investment ON investments;
+CREATE TRIGGER on_new_investment
     AFTER INSERT ON investments
     FOR EACH ROW
-    EXECUTE FUNCTION handle_investment_and_commission();
+    EXECUTE FUNCTION handle_new_investment();
 
 -- Update any existing transactions to ensure consistent status casing
 UPDATE transactions

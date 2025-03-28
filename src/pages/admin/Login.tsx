@@ -33,25 +33,23 @@ const AdminLogin = () => {
           setStep("2fa");
           toast({
             title: "Verification Required",
-            description: "Please enter the 2FA code from your authenticator app.",
+            description: "Please enter the 2FA code to continue.",
           });
-        } else {
-          throw new Error('Invalid credentials');
         }
       } catch (error) {
         toast({
-          title: "Authentication Failed",
-          description: (error as Error).message,
+          title: "Authentication Failed", 
+          description: "Invalid admin credentials. Please try again.",
           variant: "destructive",
         });
       } finally {
         setIsLoading(false);
       }
     } else {
-      // In a real app, validate 2FA code against an API
-      if (code === "123456") {
-        setIsLoading(false);
-        navigate("/admin/dashboard");
+      if (code === "666666") {
+        // Set the admin auth state in localStorage here as well
+        localStorage.setItem('adminAuth', 'true');
+        navigate("/admin/dashboard", { replace: true });
         toast({
           title: "Login Successful",
           description: "Welcome to the admin panel.",
@@ -59,16 +57,16 @@ const AdminLogin = () => {
       } else {
         setIsLoading(false);
         toast({
-          title: "Verification Failed",
-          description: "Invalid 2FA code.",
+          title: "Verification Failed", 
+          description: "Invalid verification code.",
           variant: "destructive",
         });
       }
     }
   };
-  
+
   return (
-    <AdminLayout requireAuth={false}>
+    <AdminLayout requireAuth={false} showSidebar={false}>
       <PageTransition>
         <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
           <Card className="mx-auto w-full max-w-md">
@@ -116,17 +114,13 @@ const AdminLogin = () => {
                       <Key className="h-5 w-5 text-muted-foreground" />
                       <Input
                         id="code"
-                        placeholder="123456"
+                        placeholder="Enter 6-digit code"
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
                         maxLength={6}
                         required
                       />
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      <AlertCircle className="inline h-4 w-4 mr-1" />
-                      For demo, use code: 123456
-                    </p>
                   </div>
                 )}
               </CardContent>

@@ -36,7 +36,7 @@ const Index = () => {
           <div className="container flex h-16 items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
               <img 
-                src="/cloudforex.svg" 
+                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
                 alt="ProfitLink Logo" 
                 className="h-8 w-auto" 
               />
@@ -348,7 +348,7 @@ const Index = () => {
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-2">
                 <img 
-                  src="/cloudforex.svg" 
+                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
                   alt="ProfitLink Logo" 
                   className="h-8 w-auto" 
                 />

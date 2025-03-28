@@ -51,3 +51,8 @@ export function isValidJson(str: string): boolean {
 export function truncateText(text: string, length: number): string {
   return text.length > length ? `${text.substring(0, length)}...` : text;
 }
+
+export const getReferralLink = (referralCode: string) => {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/auth/register?ref=${referralCode}`;
+};
