@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { KycFormData, DocumentType } from '@/types/kyc';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, subYears } from "date-fns"; // Add this import
+import { countries } from "@/data/countries"; // Add this import at the top
 
 // Add these validation helpers at the top of the file, before the Profile component
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -291,15 +292,11 @@ const Profile = () => {
     }
   };
 
-  // Add location data fetching functions
+  // Replace the fetchCountries function
   const fetchCountries = async () => {
     try {
-      const response = await fetch('https://restcountries.com/v3.1/all');
-      const data = await response.json();
-      const formattedCountries = data.map((country: any) => ({
-        code: country.cca2,
-        name: country.name.common
-      })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+      // Using local country data instead of API
+      const formattedCountries = countries.sort((a, b) => a.name.localeCompare(b.name));
       setCountries(formattedCountries);
     } catch (error) {
       console.error('Error fetching countries:', error);
@@ -544,559 +541,576 @@ const Profile = () => {
         </div>
       ) : (
         <Tabs defaultValue="personal" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="personal" className="gap-2">
-              <User className="h-4 w-4" />
-              Personal Info
-            </TabsTrigger>
-            <TabsTrigger value="kyc" className="gap-2">
-              <Shield className="h-4 w-4" />
-              KYC Verification
-            </TabsTrigger>
-            <TabsTrigger value="security" className="gap-2">
-              <Lock className="h-4 w-4" />
-              Security
-            </TabsTrigger>
-          </TabsList>
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px,1fr]">
+            {/* Vertical Tab List */}
+            <div className="space-y-1">
+              <TabsList className="flex flex-col h-auto w-full bg-muted p-1 gap-1">
+                <TabsTrigger 
+                  value="personal" 
+                  className="w-full justify-start gap-2 px-3"
+                >
+                  <User className="h-4 w-4" />
+                  Personal Info
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="kyc" 
+                  className="w-full justify-start gap-2 px-3"
+                >
+                  <Shield className="h-4 w-4" />
+                  KYC Verification
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="security" 
+                  className="w-full justify-start gap-2 px-3"
+                >
+                  <Lock className="h-4 w-4" />
+                  Security
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          <TabsContent value="personal" className="space-y-6">
-            <Card>
-              <form onSubmit={handlePersonalInfoUpdate}>
-                <CardHeader>
-                  <CardTitle>Personal Information</CardTitle>
-                  <CardDescription>
-                    Update your personal details and contact information
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input 
-                        id="firstName" 
-                        name="firstName"
-                        defaultValue={userData.firstName} 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input 
-                        id="lastName" 
-                        name="lastName"
-                        defaultValue={userData.lastName} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input 
-                        id="email" 
-                        name="email"
-                        type="email" 
-                        defaultValue={userData.email} 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input 
-                        id="phone" 
-                        name="phone"
-                        defaultValue={userData.phone} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Address</Label>
-                      <Input 
-                        id="address" 
-                        name="address"
-                        defaultValue={userData.address} 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City</Label>
-                      <Input 
-                        id="city" 
-                        name="city"
-                        defaultValue={userData.city} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input 
-                      id="country" 
-                      name="country"
-                      defaultValue={userData.country} 
-                    />
-                  </div>
-
-                  {/* Add Referral Section if user doesn't have a referrer */}
-                  {userData.referred_by ? (
-                    <div className="space-y-2 pt-4 border-t">
-                      <h3 className="font-medium">Referral Information</h3>
-                      <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                            <Check className="h-5 w-5 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-green-800">
-                              Referred by: <span className="font-medium">{currentReferrerName}</span>
-                            </p>
-                            <p className="text-xs text-green-600">Referral Code: {userData.referred_by}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 pt-4 border-t">
-                      <h3 className="font-medium">Add Referral Code</h3>
-                      <p className="text-sm text-muted-foreground">
-                        If someone referred you to our platform, you can add their referral code here
-                      </p>
-                      <div className="flex gap-2">
-                        <div className="flex-1 space-y-2">
-                          <Input
-                            placeholder="Enter referral code"
-                            value={referralCode}
-                            onChange={(e) => {
-                              setReferralCode(e.target.value);
-                              validateReferralCode(e.target.value);
-                            }}
+            {/* Tab Content */}
+            <div className="space-y-6">
+              <TabsContent value="personal" className="space-y-6 m-0">
+                <Card>
+                  <form onSubmit={handlePersonalInfoUpdate}>
+                    <CardHeader>
+                      <CardTitle>Personal Information</CardTitle>
+                      <CardDescription>
+                        Update your personal details and contact information
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="firstName">First Name</Label>
+                          <Input 
+                            id="firstName" 
+                            name="firstName"
+                            defaultValue={userData.firstName} 
                           />
-                          {isValidatingCode && (
-                            <p className="text-sm text-muted-foreground">
-                              <Clock className="h-3 w-3 inline mr-1" />
-                              Validating code...
-                            </p>
-                          )}
-                          {referralCode && !isValidatingCode && referrerName && (
-                            <p className="text-sm text-green-600">
-                              <Check className="h-3 w-3 inline mr-1" />
-                              Referred by: {referrerName}
-                            </p>
-                          )}
-                          {referralCode && !isValidatingCode && !referrerName && (
-                            <p className="text-sm text-red-600">
-                              <AlertTriangle className="h-3 w-3 inline mr-1" />
-                              Invalid referral code. Please check and try again.
-                            </p>
-                          )}
-                        </div>
-                        <Button 
-                          onClick={handleReferralSubmit}
-                          disabled={!referralCode || !referrerName || isSubmittingReferral}
-                        >
-                          {isSubmittingReferral ? "Adding..." : "Add Referral"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled={isUpdatingPersonal}>
-                    {isUpdatingPersonal ? (
-                      <>Processing...</>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="kyc" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>KYC Verification</CardTitle>
-                <CardDescription>
-                  Complete identity verification to unlock full platform features
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isLoadingKyc ? (
-                  <div className="flex items-center justify-center p-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : userData.kycStatus === 'completed' ? (
-                  <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <Check className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-green-800">Verification Complete</h3>
-                        <p className="text-sm text-green-700">
-                          Your identity has been verified successfully. You now have full access to all platform features.
-                        </p>
-                        {kycData && kycData.updated_at && (
-                          <div className="mt-3 flex gap-2 text-xs text-green-700">
-                            <span className="flex items-center gap-1">
-                              <ShieldAlert className="h-4 w-4" />
-                              Verified on {new Date(kycData.updated_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : userData.kycStatus === 'processing' ? (
-                  <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                        <Clock className="h-6 w-6 text-yellow-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-yellow-800">Verification In Progress</h3>
-                        <p className="text-sm text-yellow-700">
-                          Your documents are being reviewed. This usually takes 1-2 business days.
-                        </p>
-                        {kycData && (
-                          <div className="mt-3 flex gap-2 text-xs text-yellow-700">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              Submitted on {new Date(kycData.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : userData.kycStatus === 'rejected' ? (
-                  <div className="p-4 rounded-lg border bg-red-50 border-red-200">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                        <AlertTriangle className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-red-800">Verification Rejected</h3>
-                        <p className="text-sm text-red-700">
-                          Your verification was not successful. Please submit new documents following the guidelines below.
-                        </p>
-                        {kycData && kycData.updated_at && (
-                          <div className="mt-3 flex gap-2 text-xs text-red-700">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              Rejected on {new Date(kycData.updated_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Shield className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-blue-800">Verification Required</h3>
-                        <p className="text-sm text-blue-700">
-                          Please complete your KYC verification to unlock all platform features.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Show KYC form for rejected, pending or initial state */}
-                {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
-                  <div className="space-y-8">
-                    {/* Personal Details Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-medium">1. Personal Details</h3>
-                          <p className="text-sm text-muted-foreground">Provide your basic information</p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="full_name">Full Name (as per document)</Label>
-                          <Input
-                            id="full_name"
-                            value={kycFormData.full_name}
-                            onChange={handleNameChange}
-                            className={nameError ? "border-red-500" : ""}
-                          />
-                          {nameError && <p className="text-xs text-red-500">{nameError}</p>}
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="date_of_birth">Date of Birth</Label>
-                          <Input
-                            id="date_of_birth"
-                            type="date"
-                            max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
-                            value={kycFormData.date_of_birth}
-                            onChange={handleDobChange}
-                            className={dobError ? "border-red-500" : ""}
-                          />
-                          {dobError && <p className="text-xs text-red-500">{dobError}</p>}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="address">Residential Address</Label>
-                        <Input
-                          id="address"
-                          value={kycFormData.address}
-                          onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
-                          placeholder="Enter your full residential address"
-                          className="w-full"
-                        />
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="country">Country</Label>
-                          <Select 
-                            value={selectedCountry}
-                            onValueChange={(value) => {
-                              setSelectedCountry(value);
-                              setKycFormData(prev => ({...prev, country: value, city: ""}));
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select country" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {countries.map((country) => (
-                                <SelectItem key={country.code} value={country.code}>
-                                  {country.name} ({country.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="state">State/Province</Label>
-                          <Input
-                            id="state"
-                            value={kycFormData.state}
-                            onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
-                            placeholder="Enter state or province"
+                          <Label htmlFor="lastName">Last Name</Label>
+                          <Input 
+                            id="lastName" 
+                            name="lastName"
+                            defaultValue={userData.lastName} 
                           />
                         </div>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input 
+                            id="email" 
+                            name="email"
+                            type="email" 
+                            defaultValue={userData.email} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone Number</Label>
+                          <Input 
+                            id="phone" 
+                            name="phone"
+                            defaultValue={userData.phone} 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="address">Address</Label>
+                          <Input 
+                            id="address" 
+                            name="address"
+                            defaultValue={userData.address} 
+                          />
+                        </div>
                         <div className="space-y-2">
                           <Label htmlFor="city">City</Label>
-                          <Input
-                            id="city"
-                            value={kycFormData.city}
-                            onChange={(e) => handleCityChange(e.target.value)}
-                            placeholder="Enter city name"
-                            disabled={!selectedCountry}
-                            className={cityError ? "border-red-500" : ""}
-                          />
-                          {cityError && <p className="text-xs text-red-500">{cityError}</p>}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="postal_code">Postal Code</Label>
-                          <Input
-                            id="postal_code"
-                            value={kycFormData.postal_code}
-                            onChange={(e) => handlePostalChange(e.target.value)}
-                            placeholder="Enter postal code"
-                            className={postalError ? "border-red-500" : ""}
-                          />
-                          {postalError && <p className="text-xs text-red-500">{postalError}</p>}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Document Identification Section */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <CreditCard className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-medium">2. Document Identification</h3>
-                          <p className="text-sm text-muted-foreground">Provide your identification details</p>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="document_type">Document Type</Label>
-                          <Select 
-                            value={kycFormData.document_type}
-                            onValueChange={(value: DocumentType) => 
-                              setKycFormData(prev => ({...prev, document_type: value}))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select document type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="passport">Passport</SelectItem>
-                              <SelectItem value="national_id">National ID Card</SelectItem>
-                              <SelectItem value="driving_license">Driving License</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="document_number">Document Number</Label>
-                          <Input
-                            id="document_number"
-                            value={kycFormData.document_number}
-                            onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
-                            placeholder="Enter document number"
+                          <Input 
+                            id="city" 
+                            name="city"
+                            defaultValue={userData.city} 
                           />
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="occupation">Occupation</Label>
-                        <Input
-                          id="occupation"
-                          value={kycFormData.occupation}
-                          onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
-                          placeholder="Enter your occupation"
+                        <Label htmlFor="country">Country</Label>
+                        <Input 
+                          id="country" 
+                          name="country"
+                          defaultValue={userData.country} 
                         />
                       </div>
-                    </div>
 
-                    {/* Document Upload Section */}
-                    <div className="space-y-4 pt-4 border-t">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <Upload className="h-4 w-4 text-blue-600" />
+                      {/* Add Referral Section if user doesn't have a referrer */}
+                      {userData.referred_by ? (
+                        <div className="space-y-2 pt-4 border-t">
+                          <h3 className="font-medium">Referral Information</h3>
+                          <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                                <Check className="h-5 w-5 text-green-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-green-800">
+                                  Referred by: <span className="font-medium">{currentReferrerName}</span>
+                                </p>
+                                <p className="text-xs text-green-600">Referral Code: {userData.referred_by}</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="text-lg font-medium">3. Document Upload</h3>
-                          <p className="text-sm text-muted-foreground">Upload your identification documents</p>
+                      ) : (
+                        <div className="space-y-2 pt-4 border-t">
+                          <h3 className="font-medium">Add Referral Code</h3>
+                          <p className="text-sm text-muted-foreground">
+                            If someone referred you to our platform, you can add their referral code here
+                          </p>
+                          <div className="flex gap-2">
+                            <div className="flex-1 space-y-2">
+                              <Input
+                                placeholder="Enter referral code"
+                                value={referralCode}
+                                onChange={(e) => {
+                                  setReferralCode(e.target.value);
+                                  validateReferralCode(e.target.value);
+                                }}
+                              />
+                              {isValidatingCode && (
+                                <p className="text-sm text-muted-foreground">
+                                  <Clock className="h-3 w-3 inline mr-1" />
+                                  Validating code...
+                                </p>
+                              )}
+                              {referralCode && !isValidatingCode && referrerName && (
+                                <p className="text-sm text-green-600">
+                                  <Check className="h-3 w-3 inline mr-1" />
+                                  Referred by: {referrerName}
+                                </p>
+                              )}
+                              {referralCode && !isValidatingCode && !referrerName && (
+                                <p className="text-sm text-red-600">
+                                  <AlertTriangle className="h-3 w-3 inline mr-1" />
+                                  Invalid referral code. Please check and try again.
+                                </p>
+                              )}
+                            </div>
+                            <Button 
+                              onClick={handleReferralSubmit}
+                              disabled={!referralCode || !referrerName || isSubmittingReferral}
+                            >
+                              {isSubmittingReferral ? "Adding..." : "Add Referral"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" disabled={isUpdatingPersonal}>
+                        {isUpdatingPersonal ? (
+                          <>Processing...</>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="kyc" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>KYC Verification</CardTitle>
+                    <CardDescription>
+                      Complete identity verification to unlock full platform features
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {isLoadingKyc ? (
+                      <div className="flex items-center justify-center p-4">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : userData.kycStatus === 'completed' ? (
+                      <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <Check className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-green-800">Verification Complete</h3>
+                            <p className="text-sm text-green-700">
+                              Your identity has been verified successfully. You now have full access to all platform features.
+                            </p>
+                            {kycData && kycData.updated_at && (
+                              <div className="mt-3 flex gap-2 text-xs text-green-700">
+                                <span className="flex items-center gap-1">
+                                  <ShieldAlert className="h-4 w-4" />
+                                  Verified on {new Date(kycData.updated_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      <div className="rounded-lg border border-dashed p-4 bg-muted/50">
-                        <p className="font-medium text-sm mb-2">Document Upload Requirements:</p>
-                        <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                          <li>File size must be less than 10MB</li>
-                          <li>Accepted formats: JPG, PNG, SVG, PDF</li>
-                          <li>Images must be clear and legible</li>
-                          <li>All document edges must be visible</li>
-                          <li>No videos or animated GIFs allowed</li>
-                        </ul>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="idFront">Document Front</Label>
-                          <Input 
-                            id="idFront" 
-                            type="file" 
-                            accept=".jpg,.jpeg,.png,.svg,.pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              if (file && handleFileValidation(file)) {
-                                handleFileSelect('front', file);
-                                setKycFormData(prev => ({...prev, document_front: file}));
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="idBack">Document Back</Label>
-                          <Input 
-                            id="idBack" 
-                            type="file" 
-                            accept=".jpg,.jpeg,.png,.svg,.pdf"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
-                              if (file && handleFileValidation(file)) {
-                                handleFileSelect('back', file);
-                                setKycFormData(prev => ({...prev, document_back: file}));
-                              }
-                            }}
-                          />
+                    ) : userData.kycStatus === 'processing' ? (
+                      <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                            <Clock className="h-6 w-6 text-yellow-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-yellow-800">Verification In Progress</h3>
+                            <p className="text-sm text-yellow-700">
+                              Your documents are being reviewed. This usually takes 1-2 business days.
+                            </p>
+                            {kycData && (
+                              <div className="mt-3 flex gap-2 text-xs text-yellow-700">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-4 w-4" />
+                                  Submitted on {new Date(kycData.created_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      {fileError && <p className="text-xs text-red-500">{fileError}</p>}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-              {/* Update button visibility condition */}
-              {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
-                <CardFooter>
-                  <Button 
-                    onClick={handleSubmitKYC} 
-                    disabled={isSubmittingKYC || !selectedFiles.front || !selectedFiles.back}
-                    className={userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
-                  >
-                    {isSubmittingKYC ? (
-                      <>Processing...</>
+                    ) : userData.kycStatus === 'rejected' ? (
+                      <div className="p-4 rounded-lg border bg-red-50 border-red-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                            <AlertTriangle className="h-6 w-6 text-red-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-red-800">Verification Rejected</h3>
+                            <p className="text-sm text-red-700">
+                              Your verification was not successful. Please submit new documents following the guidelines below.
+                            </p>
+                            {kycData && kycData.updated_at && (
+                              <div className="mt-3 flex gap-2 text-xs text-red-700">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-4 w-4" />
+                                  Rejected on {new Date(kycData.updated_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
-                      <>{userData.kycStatus === 'rejected' ? 'Submit Again' : 'Submit for Verification'}</>
+                      <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <Shield className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-blue-800">Verification Required</h3>
+                            <p className="text-sm text-blue-700">
+                              Please complete your KYC verification to unlock all platform features.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     )}
-                  </Button>
-                </CardFooter>
-              )}
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="security" className="space-y-6">
-            <Card>
-              <form onSubmit={handleSecurityUpdate}>
-                <CardHeader>
-                  <CardTitle>Security Settings</CardTitle>
-                  <CardDescription>
-                    Manage your password and security preferences
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
-                    <Input id="currentPassword" type="password" />
-                  </div>
+                    {/* Show KYC form for rejected, pending or initial state */}
+                    {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
+                      <div className="space-y-8">
+                        {/* Personal Details Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-medium">1. Personal Details</h3>
+                              <p className="text-sm text-muted-foreground">Provide your basic information</p>
+                            </div>
+                          </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input id="newPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input id="confirmPassword" type="password" />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button type="submit" disabled={isUpdatingSecurity}>
-                    {isUpdatingSecurity ? (
-                      <>Processing...</>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="full_name">Full Name (as per document)</Label>
+                              <Input
+                                id="full_name"
+                                value={kycFormData.full_name}
+                                onChange={handleNameChange}
+                                className={nameError ? "border-red-500" : ""}
+                              />
+                              {nameError && <p className="text-xs text-red-500">{nameError}</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="date_of_birth">Date of Birth</Label>
+                              <Input
+                                id="date_of_birth"
+                                type="date"
+                                max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
+                                value={kycFormData.date_of_birth}
+                                onChange={handleDobChange}
+                                className={dobError ? "border-red-500" : ""}
+                              />
+                              {dobError && <p className="text-xs text-red-500">{dobError}</p>}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="address">Residential Address</Label>
+                            <Input
+                              id="address"
+                              value={kycFormData.address}
+                              onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
+                              placeholder="Enter your full residential address"
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="country">Country</Label>
+                              <Select 
+                                value={selectedCountry}
+                                onValueChange={(value) => {
+                                  setSelectedCountry(value);
+                                  setKycFormData(prev => ({...prev, country: value, city: ""}));
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select country" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {countries.map((country) => (
+                                    <SelectItem key={country.code} value={country.code}>
+                                      {country.name} ({country.code})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="state">State/Province</Label>
+                              <Input
+                                id="state"
+                                value={kycFormData.state}
+                                onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
+                                placeholder="Enter state or province"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="city">City</Label>
+                              <Input
+                                id="city"
+                                value={kycFormData.city}
+                                onChange={(e) => handleCityChange(e.target.value)}
+                                placeholder="Enter city name"
+                                disabled={!selectedCountry}
+                                className={cityError ? "border-red-500" : ""}
+                              />
+                              {cityError && <p className="text-xs text-red-500">{cityError}</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="postal_code">Postal Code</Label>
+                              <Input
+                                id="postal_code"
+                                value={kycFormData.postal_code}
+                                onChange={(e) => handlePostalChange(e.target.value)}
+                                placeholder="Enter postal code"
+                                className={postalError ? "border-red-500" : ""}
+                              />
+                              {postalError && <p className="text-xs text-red-500">{postalError}</p>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Document Identification Section */}
+                        <div className="space-y-4 pt-4 border-t">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <CreditCard className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-medium">2. Document Identification</h3>
+                              <p className="text-sm text-muted-foreground">Provide your identification details</p>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="document_type">Document Type</Label>
+                              <Select 
+                                value={kycFormData.document_type}
+                                onValueChange={(value: DocumentType) => 
+                                  setKycFormData(prev => ({...prev, document_type: value}))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select document type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="passport">Passport</SelectItem>
+                                  <SelectItem value="national_id">National ID Card</SelectItem>
+                                  <SelectItem value="driving_license">Driving License</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="document_number">Document Number</Label>
+                              <Input
+                                id="document_number"
+                                value={kycFormData.document_number}
+                                onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
+                                placeholder="Enter document number"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="occupation">Occupation</Label>
+                            <Input
+                              id="occupation"
+                              value={kycFormData.occupation}
+                              onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
+                              placeholder="Enter your occupation"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Document Upload Section */}
+                        <div className="space-y-4 pt-4 border-t">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <Upload className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-medium">3. Document Upload</h3>
+                              <p className="text-sm text-muted-foreground">Upload your identification documents</p>
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-dashed p-4 bg-muted/50">
+                            <p className="font-medium text-sm mb-2">Document Upload Requirements:</p>
+                            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                              <li>File size must be less than 10MB</li>
+                              <li>Accepted formats: JPG, PNG, SVG, PDF</li>
+                              <li>Images must be clear and legible</li>
+                              <li>All document edges must be visible</li>
+                              <li>No videos or animated GIFs allowed</li>
+                            </ul>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="idFront">Document Front</Label>
+                              <Input 
+                                id="idFront" 
+                                type="file" 
+                                accept=".jpg,.jpeg,.png,.svg,.pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file && handleFileValidation(file)) {
+                                    handleFileSelect('front', file);
+                                    setKycFormData(prev => ({...prev, document_front: file}));
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="idBack">Document Back</Label>
+                              <Input 
+                                id="idBack" 
+                                type="file" 
+                                accept=".jpg,.jpeg,.png,.svg,.pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file && handleFileValidation(file)) {
+                                    handleFileSelect('back', file);
+                                    setKycFormData(prev => ({...prev, document_back: file}));
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {fileError && <p className="text-xs text-red-500">{fileError}</p>}
+                        </div>
+                      </div>
                     )}
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
-          </TabsContent>
+                  </CardContent>
+                  {/* Update button visibility condition */}
+                  {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
+                    <CardFooter>
+                      <Button 
+                        onClick={handleSubmitKYC} 
+                        disabled={isSubmittingKYC || !selectedFiles.front || !selectedFiles.back}
+                        className={userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
+                      >
+                        {isSubmittingKYC ? (
+                          <>Processing...</>
+                        ) : (
+                          <>{userData.kycStatus === 'rejected' ? 'Submit Again' : 'Submit for Verification'}</>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  )}
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security" className="space-y-6">
+                <Card>
+                  <form onSubmit={handleSecurityUpdate}>
+                    <CardHeader>
+                      <CardTitle>Security Settings</CardTitle>
+                      <CardDescription>
+                        Manage your password and security preferences
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Input id="currentPassword" type="password" />
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="newPassword">New Password</Label>
+                          <Input id="newPassword" type="password" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">Confirm Password</Label>
+                          <Input id="confirmPassword" type="password" />
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button type="submit" disabled={isUpdatingSecurity}>
+                        {isUpdatingSecurity ? (
+                          <>Processing...</>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </form>
+                </Card>
+              </TabsContent>
+            </div>
+          </div>
         </Tabs>
       )}
     </ShellLayout>

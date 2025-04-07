@@ -83,7 +83,6 @@
         async 
         defer 
         data-lazy="true"
-        crossorigin="anonymous"
         fetchpriority="low"
       ></script>
     
@@ -94,12 +93,13 @@
         fetchpriority="high"
       ></script>
 
-      <!-- Add cache headers for Vercel scripts -->
+      <!-- Remove or update problematic script -->
       <script 
         defer
         src="/_vercel/speed-insights/script.js"
         fetchpriority="low"
         data-cache-control="public, max-age=2678400"
+        crossorigin="anonymous"
       ></script>
 
       <link rel="manifest" href="/manifest.json" />

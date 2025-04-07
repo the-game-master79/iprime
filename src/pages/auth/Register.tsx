@@ -24,6 +24,7 @@ const Register = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [referralCode, setReferralCode] = useState("");
+  const [referrerEmail, setReferrerEmail] = useState<string | null>(null);
 
   useEffect(() => {
     // Get referral code from URL query parameter
@@ -32,6 +33,41 @@ const Register = () => {
       setReferralCode(refCode);
     }
   }, [searchParams]);
+
+  const maskEmail = (email: string) => {
+    const [username, domain] = email.split('@');
+    const maskedUsername = username.charAt(0) + '*'.repeat(username.length - 2) + username.charAt(username.length - 1);
+    return `${maskedUsername}@${domain}`;
+  };
+
+  const validateReferralCode = async (code: string) => {
+    if (!code) {
+      setReferrerEmail(null);
+      return;
+    }
+
+    try {
+      const { data: referrerProfile, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('referral_code', code)
+        .single();
+
+      if (error || !referrerProfile) {
+        setReferrerEmail(null);
+        return;
+      }
+
+      setReferrerEmail(maskEmail(referrerProfile.email));
+    } catch (error) {
+      setReferrerEmail(null);
+    }
+  };
+
+  useEffect(() => {
+    // Validate referral code whenever it changes
+    validateReferralCode(referralCode);
+  }, [referralCode]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,19 +81,25 @@ const Register = () => {
       const firstName = formData.get('first-name') as string;
       const lastName = formData.get('last-name') as string;
 
+      // Store referrer profile data at a wider scope
+      let referrerData = null;
+
       // Validate referral code if provided
       if (providedReferralCode) {
         const { data: referrerProfile, error: referralError } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, email')
           .eq('referral_code', providedReferralCode)
           .single();
 
         if (referralError || !referrerProfile) {
           toast.error("Invalid referral code. Please check and try again.");
+          setReferrerEmail(null);
           setIsLoading(false);
           return;
         }
+        referrerData = referrerProfile; // Store the referrer data
+        setReferrerEmail(maskEmail(referrerProfile.email));
       }
 
       // Generate a unique referral code for the new user
@@ -105,10 +147,40 @@ const Register = () => {
             referred_by: providedReferralCode || null,
             referral_code: newReferralCode,
             status: 'active',
-            business_rank: 'New Member'  // Add this line
+            business_rank: 'New Member',
+            role: 'user'
           });
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+          throw profileError;
+        }
+
+        // Create referral relationship if there's a referrer
+        if (providedReferralCode && referrerData) {
+          // First check if relationship already exists
+          const { data: existingRelationship, error: checkError } = await supabase
+            .from('referral_relationships')
+            .select('id')
+            .eq('referrer_id', referrerData.id)
+            .eq('referred_id', authData.user.id)
+            .single();
+
+          if (!existingRelationship && !checkError) {
+            // Only create if relationship doesn't exist
+            const { error: relationshipError } = await supabase
+              .from('referral_relationships')
+              .insert({
+                referrer_id: referrerData.id,
+                referred_id: authData.user.id,
+                level: 1
+              });
+
+            if (relationshipError) {
+              console.error("Referral relationship error:", relationshipError);
+            }
+          }
+        }
 
         toast.success("Registration successful! Please check your email to verify your account.");
         navigate("/auth/login");
@@ -212,6 +284,11 @@ const Register = () => {
                       value={referralCode}
                       onChange={(e) => setReferralCode(e.target.value)}
                     />
+                    {referrerEmail && (
+                      <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                        <span className="text-green-700 font-medium">Referred by:</span> {referrerEmail}
+                      </p>
+                    )}
                   </div>
                   
                   <div className="flex items-center space-x-2">

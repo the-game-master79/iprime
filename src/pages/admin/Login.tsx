@@ -28,7 +28,6 @@ const AdminLogin = () => {
     if (step === "credentials") {
       try {
         const success = await loginAdmin(email, password);
-        
         if (success) {
           setStep("2fa");
           toast({
@@ -46,9 +45,7 @@ const AdminLogin = () => {
         setIsLoading(false);
       }
     } else {
-      if (code === "666666") {
-        // Set the admin auth state in localStorage here as well
-        localStorage.setItem('adminAuth', 'true');
+      if (code === "666666") { // Hardcoded 2FA code
         navigate("/admin/dashboard", { replace: true });
         toast({
           title: "Login Successful",
@@ -57,7 +54,7 @@ const AdminLogin = () => {
       } else {
         setIsLoading(false);
         toast({
-          title: "Verification Failed", 
+          title: "Verification Failed",
           description: "Invalid verification code.",
           variant: "destructive",
         });

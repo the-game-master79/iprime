@@ -5,14 +5,26 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "::",
+    host: true, // Change from "::" to true
     port: 8080,
+    strictPort: true,
     watch: {
       usePolling: true
     },
     headers: {
       'Cache-Control': 'public, max-age=31536000',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept'
     },
+    fs: {
+      strict: false
+    },
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: 8080
+    }
   },
   resolve: {
     alias: {

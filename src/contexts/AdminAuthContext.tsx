@@ -26,21 +26,23 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const checkAdminStatus = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    // Check if user has admin role/session
-    setIsAdminAuthenticated(!!session && session.user.email === 'a1@ok.com');
+    // Check if admin is logged in from localStorage
+    const adminAuth = localStorage.getItem('adminAuth');
+    setIsAdminAuthenticated(!!adminAuth);
   };
 
   const loginAdmin = async (email: string, password: string) => {
+    // Hardcoded admin credentials - DO NOT USE IN PRODUCTION
     if (email === 'a1@ok.com' && password === '678123') {
       setIsAdminAuthenticated(true);
+      localStorage.setItem('adminAuth', 'true');
       return true;
     }
     throw new Error('Invalid admin credentials');
   };
 
   const logoutAdmin = async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('adminAuth');
     setIsAdminAuthenticated(false);
   };
 

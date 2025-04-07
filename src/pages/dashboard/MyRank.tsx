@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+// Types and interfaces
 interface Rank {
   id: string;
   title: string;
@@ -17,7 +18,14 @@ interface Rank {
   bonus_description: string;
 }
 
+interface CurrentRankData {
+  rank: Rank | null;
+  nextRank: Rank | null;
+  progress: number;
+}
+
 const MyRank = () => {
+  // State management
   const { toast } = useToast();
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,53 +33,48 @@ const MyRank = () => {
   const [claimedRanks, setClaimedRanks] = useState<string[]>([]);
   const [totalBusiness, setTotalBusiness] = useState(0);
   const [totalBonusEarned, setTotalBonusEarned] = useState(0);
-  const [userRank, setUserRank] = useState<string>(''); // Add this state
-  const [currentRankData, setCurrentRankData] = useState<{
-    rank: Rank | null;
-    nextRank: Rank | null;
-    progress: number;
-  }>({ rank: null, nextRank: null, progress: 0 });
+  const [userRank, setUserRank] = useState<string>('');
+  const [currentRankData, setCurrentRankData] = useState<CurrentRankData>({
+    rank: null,
+    nextRank: null,
+    progress: 0
+  });
 
-  const calculateRank = (business: number, ranks: Rank[]) => {
+  // Utility functions
+  const calculateRankProgress = (business: number, currentRank: Rank, nextRank: Rank | null): number => {
+    if (!nextRank) return 100;
+    if (currentRank === nextRank) {
+      return (business / nextRank.business_amount) * 100;
+    }
+    const remainingBusiness = nextRank.business_amount - currentRank.business_amount;
+    const achievedBusiness = business - currentRank.business_amount;
+    return Math.max(0, Math.min(100, (achievedBusiness / remainingBusiness) * 100));
+  };
+
+  const calculateRank = (business: number, ranks: Rank[]): CurrentRankData => {
     const sortedRanks = [...ranks].sort((a, b) => a.business_amount - b.business_amount);
-    
-    let currentRank: Rank | null = sortedRanks[0]; // Set default to lowest rank
-    let nextRank: Rank | null = sortedRanks[0];
+    let currentRank = sortedRanks[0];
+    let nextRank = sortedRanks[0];
     
     for (let i = 0; i < sortedRanks.length; i++) {
       if (business >= sortedRanks[i].business_amount) {
         currentRank = sortedRanks[i];
         nextRank = sortedRanks[i + 1] || null;
-      } else {
-        break;
-      }
+      } else break;
     }
 
-    // Rest of progress calculation remains the same
-    let progress = 0;
-    if (nextRank) {
-      if (currentRank === nextRank) {
-        progress = (business / nextRank.business_amount) * 100;
-      } else {
-        const remainingBusiness = nextRank.business_amount - currentRank.business_amount;
-        const achievedBusiness = business - currentRank.business_amount;
-        progress = (achievedBusiness / remainingBusiness) * 100;
-      }
-    } else if (currentRank) {
-      progress = 100;
-    }
-
-    progress = Math.max(0, Math.min(100, progress));
-    return { currentRank, nextRank, progress };
+    const progress = calculateRankProgress(business, currentRank, nextRank);
+    return { rank: currentRank, nextRank, progress };
   };
 
+  // Data fetching functions
   const fetchRanks = async () => {
     try {
       const { data, error } = await supabase
         .from('ranks')
         .select('*')
         .order('business_amount', { ascending: true });
-          
+      
       if (error) throw error;
       setRanks(data || []);
     } catch (error) {
@@ -81,87 +84,63 @@ const MyRank = () => {
     }
   };
 
-  const fetchTotalBusiness = async () => {
+  const fetchUserData = async (userId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const [profileResponse, transactionsResponse] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('business_rank, business_volume')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('transactions')
+          .select('amount, description')
+          .eq('user_id', userId)
+          .eq('type', 'rank_bonus')
+      ]);
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_volume')
-        .eq('id', user.id)
-        .single();
+      if (profileResponse.error) throw profileResponse.error;
+      if (transactionsResponse.error) throw transactionsResponse.error;
 
-      setTotalBusiness(profile?.business_volume || 0);
-    } catch (error) {
-      console.error('Error fetching total business:', error);
-    }
-  };
+      // Update profile data
+      const { business_rank, business_volume } = profileResponse.data;
+      setUserRank(business_rank);
+      setTotalBusiness(business_volume || 0);
 
-  const fetchTotalBonus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Fetch both bonus transactions and their descriptions to know which ranks were claimed
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('amount, description')
-        .eq('user_id', user.id)
-        .eq('type', 'rank_bonus');
-
-      if (error) throw error;
-
-      const totalBonus = data?.reduce((sum, transaction) => sum + (transaction.amount || 0), 0) || 0;
+      // Update bonus data
+      const transactions = transactionsResponse.data;
+      const totalBonus = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
       setTotalBonusEarned(totalBonus);
 
-      // Extract claimed rank titles from transaction descriptions
-      const claimed = data?.map(tx => {
-        const match = tx.description.match(/bonus for (.+)$/);
-        return match ? match[1] : null;
-      }).filter(Boolean) as string[];
-      
-      setClaimedRanks(claimed || []);
+      // Update claimed ranks
+      const claimed = transactions
+        .map(tx => {
+          const match = tx.description.match(/bonus for (.+)$/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean) as string[];
+      setClaimedRanks(claimed);
+
     } catch (error) {
-      console.error('Error fetching total bonus:', error);
+      console.error('Error fetching user data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load user data",
+        variant: "destructive"
+      });
     }
   };
 
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('business_rank, business_volume')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-
-      // Set the user's current rank from profile
-      setUserRank(profile.business_rank);
-      setTotalBusiness(profile.business_volume || 0);
-
-      // Find the current rank object from ranks array
-      const currentRank = ranks.find(r => r.title === profile.business_rank);
-      if (currentRank) {
-        const rankData = calculateRank(profile.business_volume || 0, ranks);
-        setCurrentRankData(rankData);
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  };
-
+  // Action handlers
   const handleClaimBonus = async (rank: Rank) => {
     setClaimingRank(rank.title);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) throw new Error('User not authenticated');
 
-      const { error } = await supabase
-        .rpc('claim_rank_bonus', {
-          rank_title: rank.title
-        });
+      const { error } = await supabase.rpc('claim_rank_bonus', {
+        rank_title: rank.title
+      });
 
       if (error) throw error;
 
@@ -171,15 +150,8 @@ const MyRank = () => {
         variant: "success",
       });
 
-      // Add the newly claimed rank to claimedRanks
       setClaimedRanks(prev => [...prev, rank.title]);
-
-      // Refresh data
-      await Promise.all([
-        fetchTotalBusiness(),
-        fetchUserProfile(user.id),
-        fetchTotalBonus()
-      ]);
+      await fetchUserData(user.id);
 
     } catch (error: any) {
       console.error('Error claiming bonus:', error);
@@ -193,8 +165,8 @@ const MyRank = () => {
     }
   };
 
+  // Setup effects
   useEffect(() => {
-    // Move fetchRanks to its own useEffect
     fetchRanks();
   }, []);
 
@@ -210,12 +182,9 @@ const MyRank = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      await Promise.all([
-        fetchTotalBusiness(),
-        fetchUserProfile(user.id),
-        fetchTotalBonus()
-      ]);
+      await fetchUserData(user.id);
 
+      // Setup real-time subscriptions
       const channel = supabase
         .channel('profile-changes')
         .on(
@@ -226,10 +195,7 @@ const MyRank = () => {
             table: 'profiles',
             filter: `id=eq.${user.id}`,
           },
-          async (payload) => {
-            // Refresh user profile when rank changes
-            await fetchUserProfile(user.id);
-          }
+          async () => await fetchUserData(user.id)
         )
         .on(
           'postgres_changes',
@@ -245,8 +211,7 @@ const MyRank = () => {
               description: payload.new.description,
               variant: "success",
             });
-            // Refresh total business after bonus credit
-            fetchTotalBusiness();
+            fetchUserData(user.id);
           }
         )
         .subscribe();

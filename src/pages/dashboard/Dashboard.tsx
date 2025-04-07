@@ -1,522 +1,206 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from "@/lib/supabase";
+import { getReferralLink } from "@/lib/utils";
+
+// UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
-import { CreditCard, DollarSign, Users, Mail, Star, Trophy, Copy, QrCode, ExternalLink, ChevronLeft, ChevronRight, Bell } from "lucide-react";
-import ShellLayout from "@/components/layout/Shell";
-import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
+import ShellLayout from "@/components/layout/Shell";
+import { DepositDialog } from "@/components/dialogs/DepositDialog";
+import Marquee from 'react-fast-marquee';
+
+// Icons
+import {
+  DollarSign, Users, Mail, Star, Trophy, Copy, QrCode,
+  Briefcase, ArrowDownToLine, ArrowUpToLine
+} from "lucide-react";
+
+// Utilities
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
-import { Progress } from "@/components/ui/progress";
-import Marquee from 'react-fast-marquee';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { getReferralLink } from "@/lib/utils";  // Add this import
 
-interface MarqueeUser {
-  id: string;
-  name: string;
-  country: string;
-  joined_time: string;
-  plans: string; // Add this property if it exists
-}
+// Types
+import type { 
+  MarqueeUser, 
+  Rank, 
+  LeaderboardEntry, 
+  Plan,
+  BusinessRankState,
+  UserProfile 
+} from "@/types/dashboard"; // You'll need to create this types file
 
-interface Rank {
-  id: string;
-  title: string;
-  business_amount: number;
-  bonus: number;
-}
+// Constants
+const REFRESH_INTERVAL = 30000;
+const MIN_DISPLAY_AMOUNT = 0.01;
 
-interface Promotion {
-  id: string;
-  title: string;
-  image_url: string;
-  link: string;
-  status: 'active' | 'inactive';
-  created_at: string;
-}
-
-interface LeaderboardEntry {
-  id: string;
-  serial_number: number;
-  name: string;
-  volume?: number;
-  referrals?: number;
-  income: number;
-  rank: string;
-}
-
-interface Plan {
-  id: string;
-  name: string;
-  description: string;
-  investment: number;
-  returns_percentage: number;
-  duration_days: number;
-  status: 'active';
-}
-
-interface DashboardContentProps {
-  loading: boolean;
-}
-
-const DashboardContent = ({ loading }: DashboardContentProps) => {
+const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
+  // State management
   const [isLoading, setIsLoading] = useState(true);
-  const [performanceData, setPerformanceData] = useState([]);
-  const [totalInvested, setTotalInvested] = useState(0);
-  const [totalReferrals, setTotalReferrals] = useState({ active: 0, total: 0 });
-  const [totalCommissions, setTotalCommissions] = useState(0);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const [userRank, setUserRank] = useState({ rank: 0, totalUsers: 0 });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [referralLink, setReferralLink] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQrCode, setShowQrCode] = useState(false);
-  const { toast } = useToast();
-  const [businessRank, setBusinessRank] = useState<{
-    currentRank: { title: string; bonus: number; business_amount: number } | null;
-    nextRank: { title: string; bonus: number; business_amount: number } | null;
-    progress: number;
-    totalBusiness: number;
-  }>({ currentRank: null, nextRank: null, progress: 0, totalBusiness: 0 });
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [leaderboard, setLeaderboard] = useState<{
-    businessVolume: LeaderboardEntry[];
-    referrals: LeaderboardEntry[];
-  }>({ businessVolume: [], referrals: [] });
-  const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
-  const [marqueeStartIndex, setMarqueeStartIndex] = useState(0);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [showInvestDialog, setShowInvestDialog] = useState(false);
-  const [processingInvestment, setProcessingInvestment] = useState(false);
-  const [subscribedPlansCount, setSubscribedPlansCount] = useState(0);
+  const [showDepositDialog, setShowDepositDialog] = useState(false);
+  
+  // Business data
+  const [totalInvested, setTotalInvested] = useState(0);
+  const [totalReferrals, setTotalReferrals] = useState({ active: 0, total: 0 });
+  const [totalCommissions, setTotalCommissions] = useState(0);
+  const [businessRank, setBusinessRank] = useState<BusinessRankState>({
+    currentRank: null,
+    nextRank: null,
+    progress: 0,
+    totalBusiness: 0
+  });
 
-  const fetchUserData = async () => {
+  // Display data
+  const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
+  const [leaderboard, setLeaderboard] = useState({
+    businessVolume: [] as LeaderboardEntry[],
+    referrals: [] as LeaderboardEntry[]
+  });
+
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Data fetching functions
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      setUserProfile(profile);
+      if (profile?.referral_code) {
+        setReferralLink(getReferralLink(profile.referral_code));
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  const fetchReferralData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: relationships, error } = await supabase
+        .from('referral_relationships')
+        .select(`
+          id,
+          level,
+          referred:profiles!referral_relationships_referred_id_fkey (
+            id,
+            first_name,
+            last_name,
+            created_at,
+            status,
+            referred_by
+          )
+        `)
+        .eq('referrer_id', user.id);
+
+      if (error) throw error;
+
+      const processedData = relationships?.filter(rel => rel.referred);
+      const activeReferrals = processedData?.filter(ref => ref.level === 1).length || 0;
+      const totalReferrals = processedData?.length || 0;
+
+      setTotalReferrals({
+        active: activeReferrals,
+        total: totalReferrals
+      });
+
+    } catch (error) {
+      console.error('Error fetching referral data:', error);
+    }
+  };
+
+  const fetchCommissions = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
-        .from('profiles')
-        .select('balance')
-        .eq('id', user.id)
-        .single();
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', user.id)
+        .eq('status', 'Completed')
+        .or('type.eq.commission,type.eq.rank_bonus');
 
       if (error) throw error;
 
-      setPerformanceData([
-        {
-          name: "Investment Balance",
-          value: data.balance || 0
-        }
-        // ...other performance data
-      ]);
+      const total = (data || []).reduce((sum, tx) => sum + (tx.amount / 2), 0);
+      setTotalCommissions(total);
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error fetching commissions:', error);
     }
   };
 
-  const fetchInvestmentData = async () => {
+  const fetchLeaderboards = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: businessVolumeData, error: businessVolumeError } = await supabase
+        .from('business_volume_display')
+        .select('*')
+        .order('serial_number', { ascending: true });
 
-      // Fetch profile data including investments
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('total_invested, balance')
-        .eq('id', user.id)
-        .single();
+      if (businessVolumeError) throw businessVolumeError;
 
-      if (error) throw error;
-      
-      setTotalInvested(profile?.total_invested || 0);
-      // Also update user profile with latest data
-      setUserProfile(prev => ({ ...prev, ...profile }));
+      const { data: recruitersData, error: recruitersError } = await supabase
+        .from('top_recruiters_display')
+        .select('*')
+        .order('serial_number', { ascending: true });
+
+      if (recruitersError) throw recruitersError;
+
+      setLeaderboard({
+        businessVolume: businessVolumeData || [],
+        referrals: recruitersData || []
+      });
     } catch (error) {
-      console.error('Error fetching investment data:', error);
+      console.error('Error fetching leaderboards:', error);
     }
   };
 
-  useEffect(() => {
-    fetchUserData();
-  }, []);
+  const fetchMarqueeData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('new_users_marquee')
+        .select('*')
+        .order('joined_time', { ascending: false })
+        .limit(10);
 
-  useEffect(() => {
-    fetchInvestmentData();
-  }, []);
+      if (error) throw error;
 
-  useEffect(() => {
-    const fetchReferralData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      const formattedUsers = data.map(user => ({
+        ...user,
+        joined_time: formatJoinedTime(new Date(user.joined_time))
+      }));
 
-        // Get complete referral network data using the same query as Affiliate page
-        const { data: relationships, error } = await supabase
-          .from('referral_relationships')
-          .select(`
-            id,
-            level,
-            referred:profiles!referral_relationships_referred_id_fkey (
-              id,
-              first_name,
-              last_name,
-              created_at,
-              status,
-              referred_by
-            )
-          `)
-          .eq('referrer_id', user.id);
+      const randomIndex = Math.floor(Math.random() * formattedUsers.length);
+      const rotatedUsers = [
+        ...formattedUsers.slice(randomIndex),
+        ...formattedUsers.slice(0, randomIndex)
+      ];
 
-        if (error) throw error;
-
-        // Process the relationships data
-        const processedData = relationships?.filter(rel => rel.referred);
-        const activeReferrals = processedData?.filter(ref => ref.level === 1).length || 0;
-        const totalReferrals = processedData?.length || 0;
-
-        setTotalReferrals({
-          active: activeReferrals,
-          total: totalReferrals
-        });
-
-      } catch (error) {
-        console.error('Error fetching referral data:', error);
-      }
-    };
-
-    fetchReferralData();
-  }, []);
-
-  useEffect(() => {
-    const fetchCommissions = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('amount, type')
-          .eq('user_id', user.id)
-          .eq('status', 'Completed')
-          .or('type.eq.commission,type.eq.rank_bonus');
-
-        if (error) throw error;
-
-        const total = (data || []).reduce((sum, tx) => sum + (tx.amount / 2), 0);
-        setTotalCommissions(total);
-      } catch (error) {
-        console.error('Error fetching commissions:', error);
-      }
-    };
-
-    fetchCommissions();
-  }, []);
-
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Fetch all types of transactions
-        const { data: transactionsData, error: transactionsError } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        if (transactionsError) throw transactionsError;
-
-        // Format the transactions data
-        const formattedTransactions = (transactionsData || []).map(tx => ({
-          id: tx.id,
-          date: new Date(tx.created_at).toLocaleDateString(),
-          amount: `$${tx.amount.toLocaleString()}`,
-          status: tx.status.toLowerCase(),
-          type: tx.type,
-          plan: tx.description || '-'
-        }));
-
-        setTransactions(formattedTransactions);
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-      }
-    };
-
-    fetchTransactions();
-  }, []);
-
-  useEffect(() => {
-    const fetchProfileAndRank = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Fetch profile with business volume and business rank
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select(`
-            id,
-            business_volume,
-            business_rank,
-            total_invested
-          `)
-          .eq('id', user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        // Fetch all ranks ordered by business amount
-        const { data: ranks, error: ranksError } = await supabase
-          .from('ranks')
-          .select('*')
-          .order('business_amount', { ascending: true });
-
-        if (ranksError) throw ranksError;
-
-        // Calculate total business volume (personal only)
-        const totalBusinessVolume = profile.business_volume || 0;
-
-        // Find current rank based on personal business volume
-        let currentRank = ranks.find(rank => rank.title === profile.business_rank);
-        if (!currentRank && ranks.length > 0) {
-          currentRank = ranks[0];
-        }
-
-        // Find next rank
-        const currentRankIndex = ranks.findIndex(rank => rank.title === profile?.business_rank);
-        const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
-
-        // Calculate progress
-        let progress = 0;
-        if (nextRank) {
-          if (!currentRank) {
-            // Progress towards first rank
-            progress = (totalBusinessVolume / nextRank.business_amount) * 100;
-          } else {
-            // Progress between current and next rank
-            const businessDifference = nextRank.business_amount - currentRank.business_amount;
-            const achievedDifference = totalBusinessVolume - currentRank.business_amount;
-            progress = (achievedDifference / businessDifference) * 100;
-          }
-        } else if (currentRank) {
-          progress = 100; // Max rank achieved
-        }
-
-        // Ensure progress stays between 0 and 100
-        progress = Math.max(0, Math.min(100, progress));
-
-        setBusinessRank({
-          currentRank,
-          nextRank,
-          progress,
-          totalBusiness: totalBusinessVolume
-        });
-
-      } catch (error) {
-        console.error('Error fetching profile and rank:', error);
-      }
-    };
-
-    fetchProfileAndRank();
-  }, []);
-
-  useEffect(() => {
-    const fetchReferralCode = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('referral_code')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        
-        const baseUrl = window.location.origin;
-        setReferralLink(`${baseUrl}/register?ref=${profile?.referral_code}`);
-      } catch (error) {
-        console.error('Error fetching referral code:', error);
-      }
-    };
-
-    fetchReferralCode();
-  }, []);
-
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser) return;
-
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-
-        if (error) throw error;
-        if (profile?.referral_code) {
-          setReferralLink(getReferralLink(profile.referral_code));
-        }
-        setUserProfile(profile);
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-      }
-    };
-
-    fetchProfileData();
-  }, []);
-
-  useEffect(() => {
-    if (userProfile?.referral_code) {
-      setReferralLink(getReferralLink(userProfile.referral_code));
+      setMarqueeUsers(rotatedUsers);
+    } catch (error) {
+      console.error('Error fetching marquee users:', error);
     }
-  }, [userProfile]);
-
-  useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchPromotions = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('promotions')
-          .select('*')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setPromotions(data || []);
-      } catch (error) {
-        console.error('Error fetching promotions:', error);
-      }
-    };
-
-    fetchPromotions();
-  }, []);
-
-  useEffect(() => {
-    const fetchLeaderboards = async () => {
-      try {
-        // Fetch business volume leaderboard
-        const { data: businessVolumeData, error: businessVolumeError } = await supabase
-          .from('business_volume_display')
-          .select('*')
-          .order('serial_number', { ascending: true });
-
-        if (businessVolumeError) throw businessVolumeError;
-
-        // Fetch top recruiters leaderboard
-        const { data: recruitersData, error: recruitersError } = await supabase
-          .from('top_recruiters_display')
-          .select('*')
-          .order('serial_number', { ascending: true });
-
-        if (recruitersError) throw recruitersError;
-
-        setLeaderboard({
-          businessVolume: businessVolumeData || [],
-          referrals: recruitersData || []
-        });
-      } catch (error) {
-        console.error('Error fetching leaderboards:', error);
-      }
-    };
-
-    fetchLeaderboards();
-  }, []);
-  
-  useEffect(() => {
-    const fetchMarqueeUsers = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('new_users_marquee')
-          .select('*')
-          .order('joined_time', { ascending: false })
-          .limit(10);
-
-        if (error) throw error;
-
-        const formattedUsers = data.map(user => ({
-          ...user,
-          joined_time: formatJoinedTime(new Date(user.joined_time))
-        }));
-
-        // Randomly rotate the array
-        const randomIndex = Math.floor(Math.random() * formattedUsers.length);
-        const rotatedUsers = [
-          ...formattedUsers.slice(randomIndex),
-          ...formattedUsers.slice(0, randomIndex)
-        ];
-
-        setMarqueeUsers(rotatedUsers);
-      } catch (error) {
-        console.error('Error fetching marquee users:', error);
-      }
-    };
-
-    fetchMarqueeUsers();
-    const interval = setInterval(fetchMarqueeUsers, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('status', 'active')
-          .order('investment', { ascending: true }); // Removed .limit(4)
-
-        if (error) throw error;
-        setPlans(data || []);
-      } catch (error) {
-        console.error('Error fetching plans:', error);
-      }
-    };
-
-    fetchPlans();
-  }, []);
-
-  useEffect(() => {
-    const fetchSubscribedPlansCount = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { count, error } = await supabase
-          .from('user_plans')
-          .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
-          .eq('status', 'active');
-
-        if (error) throw error;
-        setSubscribedPlansCount(count || 0);
-      } catch (error) {
-        console.error('Error fetching subscribed plans count:', error);
-      }
-    };
-
-    fetchSubscribedPlansCount();
-  }, []);
+  };
 
   const formatJoinedTime = (date: Date) => {
     const now = new Date();
@@ -527,17 +211,11 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
     return `${Math.floor(diffInHours / 24)} days ago`;
   };
 
-  const formatCurrency = (value: number | string) => {
-    if (typeof value === 'number') {
-      return `$${value.toLocaleString()}`;
-    }
-    return value;
-  };
-
+  // Event handlers
   const handleCopyLink = () => {
     navigator.clipboard.writeText(referralLink);
     toast({
-      title: "Referral Link is Copied!",
+      title: "Referral Link Copied!",
       description: "Share this Link in your network",
     });
   };
@@ -557,90 +235,71 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
     }
   };
 
-  const handleScroll = (direction: 'left' | 'right') => {
-    const container = document.getElementById('promotions-container');
-    if (container) {
-      const scrollAmount = window.innerWidth >= 768 
-        ? container.offsetWidth / 2  // Desktop: scroll half width (one banner)
-        : container.offsetWidth;     // Mobile: scroll full width
-
-      container.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  const handleInvestClick = (plan: Plan) => {
-    setSelectedPlan(plan);
-    setShowInvestDialog(true);
-  };
-
-  const handleInvestment = async () => {
-    if (!selectedPlan || !userProfile) return;
-    setProcessingInvestment(true);
-
-    try {
-      // Check balance
-      const currentBalance = Number(userProfile.balance) || 0;
-      const investmentAmount = Number(selectedPlan.investment) || 0;
-
-      if (currentBalance < investmentAmount) {
-        toast({
-          title: "Insufficient Balance",
-          description: `You need $${investmentAmount.toLocaleString()} to invest in this plan.`,
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Create investment
-      const { error: investmentError } = await supabase
-        .from('investments')
-        .insert({
-          user_id: userProfile.id,
-          plan_id: selectedPlan.id,
-          amount: selectedPlan.investment,
-          status: 'active'
-        });
-
-      if (investmentError) throw investmentError;
-
-      // Create user_plan subscription
-      const { error: subscriptionError } = await supabase
-        .from('user_plans')
-        .upsert({
-          user_id: userProfile.id,
-          plan_id: selectedPlan.id,
-          status: 'active'
-        }, {
-          onConflict: 'user_id,plan_id'
-        });
-
-      if (subscriptionError) throw subscriptionError;
-
-      // Refresh user data - now fetchInvestmentData is defined
+  // Effects
+  useEffect(() => {
+    const initializeDashboard = async () => {
       await Promise.all([
-        fetchUserData(),
-        fetchInvestmentData()
+        fetchUserProfile(),
+        fetchReferralData(),
+        fetchCommissions(),
+        fetchLeaderboards()
       ]);
+      setIsLoading(false);
+    };
 
-      toast({
-        title: "Investment Successful",
-        description: `Successfully invested $${selectedPlan.investment.toLocaleString()} in ${selectedPlan.name}`,
-      });
+    initializeDashboard();
+  }, []);
 
-      setShowInvestDialog(false);
-    } catch (error) {
-      console.error('Error creating investment:', error);
-      toast({
-        title: "Investment Failed",
-        description: "Failed to process investment. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setProcessingInvestment(false);
+  // Auto-refresh marquee data
+  useEffect(() => {
+    fetchMarqueeData();
+    const interval = setInterval(fetchMarqueeData, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Render helper functions
+  const renderStats = () => {
+    if (!(totalInvested > MIN_DISPLAY_AMOUNT || totalCommissions > MIN_DISPLAY_AMOUNT || totalReferrals.active > 0)) {
+      return null;
     }
+
+    return (
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Your Stats</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {totalInvested > MIN_DISPLAY_AMOUNT && (
+            <StatCard
+              title="Total Invested"
+              value={`$${totalInvested.toLocaleString()}`}
+              description="Active investments"
+              icon={<DollarSign className="h-4 w-4" />}
+              loading={isLoading}
+              className="w-full"
+            />
+          )}
+          {totalCommissions > MIN_DISPLAY_AMOUNT && (
+            <StatCard
+              title="Total Commissions"
+              value={`$${totalCommissions.toLocaleString()}`}
+              description="Commission earned"
+              icon={<Users className="h-4 w-4" />}
+              loading={loading}
+              className="w-full"
+            />
+          )}
+          {totalReferrals.active > 0 && (
+            <StatCard
+              title="Team Members"
+              value={totalReferrals.active.toString()}
+              description={`Downline Members`}
+              icon={<Users className="h-4 w-4" />}
+              loading={loading}
+              className="w-full"
+            />
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -652,7 +311,6 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
             description="Overview of your investments and affiliate performance"
           />
 
-          {/* Updated Marquee Section */}
           <div className="w-full bg-card border rounded-lg overflow-hidden">
             <div className="bg-muted/30">
               <Marquee
@@ -678,7 +336,6 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
             </div>
           </div>
 
-          {/* Referral Link Section */}
           <Card className="border-dashed w-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium">Your Referral Link</CardTitle>
@@ -690,29 +347,85 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
                     <Input
                       readOnly
                       value={referralLink}
-                      className="pr-20 font-mono text-xs sm:text-sm bg-muted overflow-x-auto"
+                      className="pr-32 font-mono text-xs sm:text-sm bg-muted overflow-x-auto"
                     />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute right-0 top-0 h-full px-2 sm:px-3 hover:bg-muted"
-                      onClick={handleCopyLink}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                    <div className="absolute right-0 top-0 h-full flex items-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="px-2 sm:px-3 hover:bg-muted"
+                        onClick={handleShowQrCode}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="px-2 sm:px-3 hover:bg-muted"
+                        onClick={handleCopyLink}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button variant="outline" size="sm" className="w-full" onClick={handleShowQrCode}>
-                    <QrCode className="h-4 w-4 mr-2" />
-                    Referral QR Code
-                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* QR Code Dialog */}
+          <div>
+            <h2 className="text-lg font-semibold mb-4">Start earning in your account</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button
+                variant="ghost"
+                className="h-32 relative overflow-hidden group w-full"
+                onClick={() => navigate('/plans')}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-indigo-400/20 to-violet-500/20 group-hover:opacity-75 transition-opacity" />
+                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
+                  <Briefcase className="h-8 w-8 text-blue-500" />
+                  <span className="font-bold">Buy a Plan</span>
+                </div>
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="h-32 relative overflow-hidden group w-full"
+                onClick={() => setShowDepositDialog(true)}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 via-emerald-400/20 to-teal-500/20 group-hover:opacity-75 transition-opacity" />
+                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
+                  <ArrowDownToLine className="h-8 w-8 text-green-500" />
+                  <span className="font-bold">Deposit</span>
+                </div>
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="h-32 relative overflow-hidden group w-full"  
+                onClick={() => navigate('/withdrawals')}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-amber-400/20 to-yellow-500/20 group-hover:opacity-75 transition-opacity" />
+                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
+                  <ArrowUpToLine className="h-8 w-8 text-orange-500" />
+                  <span className="font-bold">Withdraw</span>
+                </div>
+              </Button>
+
+              <Button
+                variant="ghost" 
+                className="h-32 relative overflow-hidden group w-full"
+                onClick={() => navigate('/affiliate')}
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-fuchsia-400/20 to-pink-500/20 group-hover:opacity-75 transition-opacity" />
+                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
+                  <Users className="h-8 w-8 text-purple-500" />
+                  <span className="font-bold">View Referrals</span>
+                </div>
+              </Button>
+            </div>
+          </div>
+
           <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
             <DialogContent className="w-[95vw] max-w-md mx-auto">
               <DialogHeader className="text-center">
@@ -752,229 +465,113 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
             </DialogContent>
           </Dialog>
 
-          {/* Live Plans Section */}
+          {renderStats()}
+
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-lg font-semibold">All Plans</h2>
-              {subscribedPlansCount > 0 && (
-                <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                  {subscribedPlansCount} Active
-                </span>
-              )}
-            </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
-              {plans.map((plan) => (
-                <Card key={plan.id} className="hover:border-primary/50 transition-colors">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-medium">{plan.name}</CardTitle>
-                    <CardDescription className="text-2xl font-bold text-primary">
-                      ${plan.investment.toLocaleString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Daily ROI:</span>{' '}
-                      <span className="font-medium">{plan.returns_percentage}%</span>
+            <h2 className="text-lg font-semibold mb-4">Your Progress</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-primary" />
+                    My Rank
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">Your current business rank</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="h-20 flex items-center justify-center">
+                      <div className="animate-pulse bg-muted h-8 w-24 rounded" />
                     </div>
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Duration:</span>{' '}
-                      <span className="font-medium">{plan.duration_days} days</span>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full mt-2"
-                      onClick={() => handleInvestClick(plan)}
-                      disabled={!userProfile || (userProfile.balance || 0) < plan.investment}
-                    >
-                      {!userProfile ? 'Loading...' : 
-                       (userProfile.balance || 0) < plan.investment 
-                         ? `Need $${plan.investment.toLocaleString()}` 
-                         : 'Select this Plan ->'}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-
-          {/* Investment Confirmation Dialog */}
-          <AlertDialog open={showInvestDialog} onOpenChange={setShowInvestDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Investment</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div>
-                    Are you sure you want to invest in this plan?
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              {selectedPlan && (
-                <div className="space-y-4 py-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plan:</span>
-                    <span className="font-medium">{selectedPlan.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount:</span>
-                    <span className="font-medium">${selectedPlan.investment.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Daily Returns:</span>
-                    <span className="font-medium">{selectedPlan.returns_percentage}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duration:</span>
-                    <span className="font-medium">{selectedPlan.duration_days} days</span>
-                  </div>
-                </div>
-              )}
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={processingInvestment}>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleInvestment}
-                  disabled={processingInvestment}
-                >
-                  {processingInvestment ? "Processing..." : "Confirm Investment"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <div className="grid gap-4 md:gap-8">
-            {/* Stats Overview */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Your Stats</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                  title="Total Invested"
-                  value={`$${totalInvested.toLocaleString()}`}
-                  description="Active investments"
-                  icon={<DollarSign className="h-4 w-4" />}
-                  loading={isLoading}
-                  className="w-full"
-                />
-                <StatCard
-                  title="Available Balance"
-                  value={`$${(performanceData[0]?.value || 0).toLocaleString()}`}
-                  description="Available for withdrawal"
-                  icon={<CreditCard className="h-4 w-4" />}
-                  loading={loading}
-                  className="w-full"
-                />
-                <StatCard
-                  title="Total Commissions"
-                  value={`$${totalCommissions.toLocaleString()}`}
-                  description="Commission earned"
-                  icon={<Users className="h-4 w-4" />}
-                  loading={loading}
-                  className="w-full"
-                />
-                <StatCard
-                  title="Team Members"
-                  value={totalReferrals.active.toString()}
-                  description={`Downline Members`}
-                  icon={<Users className="h-4 w-4" />}
-                  loading={loading}
-                  className="w-full"
-                />
-              </div>
-            </div>
-            
-            {/* Rank and Profile Cards */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Your Progress</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <Trophy className="h-4 w-4 text-primary" />
-                      My Rank
-                    </CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Your current business rank</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loading ? (
-                      <div className="h-20 flex items-center justify-center">
-                        <div className="animate-pulse bg-muted h-8 w-24 rounded" />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="text-2xl sm:text-4xl font-bold text-primary">
+                        {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex flex-col items-start gap-2">
-                          <div className="text-2xl sm:text-4xl font-bold text-primary">
-                            {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
-                          </div>
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            Total Business Volume: <span className="font-semibold text-primary">
-                              ${businessRank.totalBusiness?.toLocaleString() || '0'}
-                            </span>
-                          </div>
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            Current Rank Bonus: <span className="font-semibold text-primary">
-                              ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
-                            </span>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-muted/50 p-3 rounded-lg">
+                          <div className="text-sm font-medium text-muted-foreground">Total Volume</div>
+                          <div className="text-lg font-semibold text-primary">
+                            ${businessRank.totalBusiness?.toLocaleString() || '0'}
                           </div>
                         </div>
-                        {businessRank.nextRank && (
-                          <div className="space-y-2">
-                            <div className="text-xs sm:text-sm text-muted-foreground">
-                              Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
-                            </div>
-                            <Progress value={businessRank.progress} className="h-2" />
-                            <div className="text-xs text-muted-foreground">
-                              {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
-                            </div>
+                        <div className="bg-muted/50 p-3 rounded-lg">
+                          <div className="text-sm font-medium text-muted-foreground">Rank Bonus</div>
+                          <div className="text-lg font-semibold text-primary">
+                            ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
                           </div>
-                        )}
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
 
-                <Card>
-                  <CardHeader className="pb-2">
+                      {businessRank.nextRank && (
+                        <div className="space-y-2">
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
+                          </div>
+                          <Progress value={businessRank.progress} className="h-2" />
+                          <div className="text-xs text-muted-foreground">
+                            {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
                     <CardTitle className="text-base font-medium flex items-center gap-2">
                       <Star className="h-4 w-4 text-primary" />
                       Profile Overview
                     </CardTitle>
-                    <CardDescription>Your account information</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {loading ? (
-                      <div className="space-y-2">
-                        <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
-                        <div className="animate-pulse bg-muted h-4 w-1/2 rounded" />
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-lg font-semibold text-primary">
-                              {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
-                            </span>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
+                      ${userProfile?.kyc_status === 'completed' ? 'bg-green-100 text-green-800' : 
+                        userProfile?.kyc_status === 'pending' ? 'bg-red-100 text-red-800' : 
+                        'bg-red-100 text-red-800'}`}>
+                      {userProfile?.kyc_status === 'completed' ? 'Verified' :
+                       userProfile?.kyc_status === 'pending' ? 'Not Submitted' :
+                       'Not Submitted'}
+                    </span>
+                  </div>
+                  <CardDescription>Your account information</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-2">
+                      <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
+                      <div className="animate-pulse bg-muted h-4 w-1/2 rounded" />
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-lg font-semibold text-primary">
+                            {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium">
+                            {userProfile?.first_name} {userProfile?.last_name}
                           </div>
-                          <div>
-                            <div className="font-medium">
-                              {userProfile?.first_name} {userProfile?.last_name}
-                            </div>
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {userProfile?.email}
-                            </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {userProfile?.email}
                           </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Member since {new Date(userProfile?.created_at).toLocaleDateString()}
-                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                      <div className="text-sm text-muted-foreground">
+                        Member since {new Date(userProfile?.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Leaderboards */}
           <div>
             <h2 className="text-lg font-semibold mb-4">Top Performers</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1064,6 +661,10 @@ const DashboardContent = ({ loading }: DashboardContentProps) => {
 
         </div>
       </PageTransition>
+      <DepositDialog
+        open={showDepositDialog}
+        onOpenChange={setShowDepositDialog}
+      />
     </ShellLayout>
   );
 };
@@ -1081,7 +682,6 @@ const Dashboard = () => {
       });
     }
     
-    // Auto set loading to false after auth check
     if (!loading) {
       setIsLoading(false);
     }
@@ -1095,9 +695,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return <DashboardContent loading={loading} />;
 };

@@ -1,72 +1,280 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+
+// Component imports
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
-import { 
-  BanknoteIcon, 
-  GanttChartIcon, 
-
-  LayoutDashboard, 
-
-  Menu, 
-  Package, 
-  Settings, 
-  Users, 
-  X, 
-  BellIcon, 
-  LogOut,
-  DollarSign,
-  Trophy,
-  ChevronLeft,
-  HelpCircle, // Add this import
-  Download, // Add this import
-  InfoIcon // Add this import
-} from "lucide-react";
-import { useBreakpoints } from "@/hooks/use-breakpoints";
-import { DepositDialog } from "@/components/dialogs/DepositDialog";
-import { InfoDialog } from "@/components/dialogs/InfoDialog"; // Add this import
-import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // Add this import
-import { supabase } from "@/lib/supabase";
-import { usePwaInstall } from "@/hooks/use-pwa-install"; // Add this import
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DepositDialog } from "@/components/dialogs/DepositDialog";
+import { InfoDialog } from "@/components/dialogs/InfoDialog";
 
+// Hooks
+import { useBreakpoints } from "@/hooks/use-breakpoints";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
+
+// Icons
+import {
+  BanknoteIcon, GanttChartIcon, LayoutDashboard, Menu, Package,
+  Settings, Users, X, BellIcon, LogOut, DollarSign, Trophy,
+  ChevronLeft, HelpCircle, Download, InfoIcon
+} from "lucide-react";
+
+// Types
 interface Notice {
   id: string;
   title: string;
   content: string;
   type: 'info' | 'warning' | 'success' | 'error';
   created_at: string;
-  category: 'admin' | 'referral' | 'system'; // Add this
-  reference_id?: string;  // Add this for linking to related transactions
+  category: 'admin' | 'referral' | 'system';
+  reference_id?: string;
+  user_id?: string;
+  is_active?: boolean;
+  read_at?: string;
 }
 
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  href: string;
+  active?: boolean;
+  collapsed?: boolean;
+}
+
+// Notification components
+const NotificationsList = ({ notices, category }: { notices: Notice[], category: Notice['category'] }) => {
+  const filteredNotices = notices.filter(n => n.category === category);
+  
+  if (filteredNotices.length === 0) {
+    return (
+      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+        No {category} notifications
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-h-[300px] overflow-auto">
+      {filteredNotices.map((notice) => (
+        <NotificationItem key={notice.id} notice={notice} />
+      ))}
+    </div>
+  );
+};
+
+const NotificationItem = ({ notice }: { notice: Notice }) => (
+  <DropdownMenuItem className="px-4 py-3 cursor-default">
+    <div className="flex gap-3 w-full">
+      <div className={`w-1.5 shrink-0 rounded-full ${
+        notice.type === 'info' ? 'bg-blue-500' :
+        notice.type === 'warning' ? 'bg-yellow-500' :
+        notice.type === 'success' ? 'bg-green-500' :
+        'bg-red-500'
+      }`} />
+      <div className="flex-1 space-y-1">
+        <p className="text-sm font-medium leading-none">{notice.title}</p>
+        <p className="text-sm text-muted-foreground">{notice.content}</p>
+        <p className="text-xs text-muted-foreground">
+          {new Date(notice.created_at).toLocaleDateString()}
+        </p>
+      </div>
+    </div>
+  </DropdownMenuItem>
+);
+
+// Sidebar components
+const SidebarItem = ({ icon, label, href, active, collapsed }: SidebarItemProps) => (
+  <Link to={href}>
+    <Button
+      variant={active ? "secondary" : "ghost"}
+      className={cn(
+        "w-full justify-start gap-2 transition-all",
+        collapsed && "justify-center px-0"
+      )}
+    >
+      <span>{icon}</span>
+      {!collapsed && <span>{label}</span>}
+    </Button>
+  </Link>
+);
+
+const Sidebar = ({ isCollapsed, isMobile, isMobileSidebarOpen, onLogout, location, canInstall, onInstall }: any) => (
+  <aside
+    className={cn(
+      "fixed inset-y-0 z-50 flex h-full flex-col border-r bg-sidebar transition-transform duration-300 ease-in-out",
+      (isMobile)
+        ? `w-[280px] ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`
+        : (isCollapsed ? "w-20" : "w-64")
+    )}
+  >
+    <div className="flex h-14 items-center px-4">
+      <Link to="/" className="flex items-center gap-2">
+        <img 
+          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+          alt="cloudforex Logo" 
+          className={cn(
+            "h-8 transition-all duration-300",
+            isCollapsed && !isMobile && "w-8"
+          )} 
+        />
+      </Link>
+    </div>
+    
+    <div className="flex-1 overflow-auto">
+      <ScrollArea className="h-full px-3">
+        <nav className="flex flex-col gap-2 py-4">
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<LayoutDashboard />}
+            label="Dashboard"
+            href="/dashboard"
+            active={location.pathname === '/dashboard'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<Trophy />}
+            label="My Rank"
+            href="/rank"
+            active={location.pathname === '/rank'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<Package />}
+            label="Plans"
+            href="/plans"
+            active={location.pathname === '/plans'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<Users />}
+            label="Affiliate"
+            href="/affiliate"
+            active={location.pathname === '/affiliate'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<BanknoteIcon />}
+            label="Payments"
+            href="/payments"
+            active={location.pathname === '/payments'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<GanttChartIcon />}
+            label="Withdrawals"
+            href="/withdrawals"
+            active={location.pathname === '/withdrawals'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<HelpCircle />}
+            label="Support"
+            href="/support"
+            active={location.pathname === '/support'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<Settings />}
+            label="Settings"
+            href="/profile"
+            active={location.pathname === '/profile'}
+          />
+        </nav>
+      </ScrollArea>
+    </div>
+    
+    <div className="border-t p-4">
+      {canInstall && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="w-full justify-start gap-2 mb-2"
+          onClick={onInstall}
+        >
+          <Download className="h-4 w-4" />
+          {(!isCollapsed || isMobile) && <span>Install cloudforex</span>}
+        </Button>
+      )}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="w-full justify-start gap-2"
+        onClick={onLogout}
+      >
+        <LogOut className="h-4 w-4" />
+        {(!isCollapsed || isMobile) && <span>Logout</span>}
+      </Button>
+    </div>
+  </aside>
+);
+
 export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
+  // State management
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { isMobile, isTablet } = useBreakpoints();
-  const location = useLocation();
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
-  const [infoDialogOpen, setInfoDialogOpen] = useState(false); // Add this state
-  const { logout } = useAuth();
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [performanceData, setPerformanceData] = useState<{ value: number }[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Hooks
+  const { isMobile, isTablet } = useBreakpoints();
+  const location = useLocation();
+  const { logout } = useAuth();
   const { canInstall, install } = usePwaInstall();
-  
-  // Close sidebar on mobile when navigating to a new page
+
+  // Effects
   useEffect(() => {
     if ((isMobile || isTablet) && isMobileSidebarOpen) {
       setIsMobileSidebarOpen(false);
     }
   }, [location.pathname, isMobile, isTablet]);
 
+  // Notifications subscription
+  useEffect(() => {
+    const setupNotifications = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await fetchNotices();
+
+      const noticesSubscription = supabase
+        .channel('custom-notices')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notices',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            setNotices(current => [payload.new as Notice, ...current]);
+            setUnreadCount(count => count + 1);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        noticesSubscription.unsubscribe();
+      };
+    };
+
+    setupNotifications();
+  }, []);
+
+  // Handlers
   const fetchNotices = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -98,46 +306,6 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  useEffect(() => {
-    fetchNotices();
-
-    const fetchUserAndSubscribe = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const noticesSubscription = supabase
-        .channel('custom-notices')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notices',
-            filter: `user_id=eq.${user.id}` // Only subscribe to user's notifications
-          },
-          (payload) => {
-            setNotices(current => [payload.new as Notice, ...current]);
-            setUnreadCount(count => count + 1);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        noticesSubscription.unsubscribe();
-      };
-    };
-
-    fetchUserAndSubscribe();
-  }, []);
-
-  const toggleSidebar = () => {
-    if (isMobile || isTablet) {
-      setIsMobileSidebarOpen(!isMobileSidebarOpen);
-    } else {
-      setIsCollapsed(!isCollapsed);
-    }
-  };
-
   const handleMarkAllAsRead = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -164,117 +332,25 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const toggleSidebar = () => {
+    if (isMobile || isTablet) {
+      setIsMobileSidebarOpen(!isMobileSidebarOpen);
+    } else {
+      setIsCollapsed(!isCollapsed);
+    }
+  };
+
   return (
     <div className="flex min-h-screen w-full overflow-x-hidden">
-      <aside
-        id="sidebar"
-        className={cn(
-          "fixed inset-y-0 z-50 flex h-full flex-col border-r bg-sidebar transition-transform duration-300 ease-in-out",
-          (isMobile || isTablet)
-            ? `w-[280px] ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-            : (isCollapsed ? "w-20" : "w-64")
-        )}
-      >
-        <div className="flex h-14 items-center px-4">
-          <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
-              alt="cloudforex Logo" 
-              className={cn(
-                "h-8 transition-all duration-300",
-                isCollapsed && !isMobile && "w-8"
-              )} 
-            />
-          </Link>
-        </div>
-        
-        <div className="flex-1 overflow-auto">
-          <ScrollArea className="h-full px-3">
-            <nav className="flex flex-col gap-2 py-4">
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<LayoutDashboard />}
-                label="Dashboard"
-                href="/dashboard"
-                active={location.pathname === '/dashboard'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<Trophy />}
-                label="My Rank"
-                href="/rank"
-                active={location.pathname === '/rank'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<Package />}
-                label="Plans"
-                href="/plans"
-                active={location.pathname === '/plans'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<Users />}
-                label="Affiliate"
-                href="/affiliate"
-                active={location.pathname === '/affiliate'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<BanknoteIcon />}
-                label="Payments"
-                href="/payments"
-                active={location.pathname === '/payments'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<GanttChartIcon />}
-                label="Withdrawals"
-                href="/withdrawals"
-                active={location.pathname === '/withdrawals'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<HelpCircle />}
-                label="Support"
-                href="/support"
-                active={location.pathname === '/support'}
-              />
-              <SidebarItem
-                collapsed={isCollapsed && !isMobile}
-                icon={<Settings />}
-                label="Settings"
-                href="/profile"
-                active={location.pathname === '/profile'}
-              />
-
-            </nav>
-          </ScrollArea>
-        </div>
-        
-        <div className="border-t p-4">
-          {canInstall && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full justify-start gap-2 mb-2"
-              onClick={install}
-            >
-              <Download className="h-4 w-4" />
-              {(!isCollapsed || isMobile) && <span>Install cloudforex</span>}
-            </Button>
-          )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start gap-2"
-            onClick={logout}
-          >
-            <LogOut className="h-4 w-4" />
-            {(!isCollapsed || isMobile) && <span>Logout</span>}
-          </Button>
-        </div>
-      </aside>
+      <Sidebar 
+        isCollapsed={isCollapsed}
+        isMobile={isMobile}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        onLogout={logout}
+        location={location}
+        canInstall={canInstall}
+        onInstall={install}
+      />
 
       {/* Mobile/Tablet overlay */}
       {(isMobile || isTablet) && isMobileSidebarOpen && (
@@ -285,7 +361,6 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
         />
       )}
 
-      {/* Main content */}
       <main 
         className={cn(
           "flex-1 transition-all duration-300 ease-in-out",
@@ -313,6 +388,15 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
           
           <div className="flex-1" />
           
+          <div 
+            className="text-sm font-medium mr-4 px-3 py-1.5 border rounded-md shadow-sm hover:bg-accent transition-colors cursor-pointer"
+            onClick={() => setDepositDialogOpen(true)}
+            role="button"
+            tabIndex={0}
+          >
+            ${(performanceData[0]?.value || 0).toLocaleString()}
+          </div>
+
           <Button 
             variant="ghost"
             size="icon"
@@ -320,15 +404,6 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
             onClick={() => setInfoDialogOpen(true)}
           >
             <InfoIcon className="h-5 w-5" />
-          </Button>
-          
-          <Button 
-            variant="default"
-            className="flex mr-2" // Remove hidden sm:flex to show on all screens
-            onClick={() => setDepositDialogOpen(true)}
-          >
-            <DollarSign className="mr-2 h-4 w-4" />
-            Deposit
           </Button>
 
           <DropdownMenu>
@@ -376,93 +451,15 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
                 </div>
 
                 <TabsContent value="admin" className="mt-0">
-                  <div className="max-h-[300px] overflow-auto">
-                    {notices.filter(n => n.category === 'admin').length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                        No admin notifications
-                      </div>
-                    ) : (
-                      notices.filter(n => n.category === 'admin').map((notice) => (
-                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
-                          <div className="flex gap-3 w-full">
-                            <div className={`w-1.5 shrink-0 rounded-full ${
-                              notice.type === 'info' ? 'bg-blue-500' :
-                              notice.type === 'warning' ? 'bg-yellow-500' :
-                              notice.type === 'success' ? 'bg-green-500' :
-                              'bg-red-500'
-                            }`} />
-                            <div className="flex-1 space-y-1">
-                              <p className="text-sm font-medium leading-none">{notice.title}</p>
-                              <p className="text-sm text-muted-foreground">{notice.content}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(notice.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                    )}
-                  </div>
+                  <NotificationsList notices={notices} category="admin" />
                 </TabsContent>
 
                 <TabsContent value="referral" className="mt-0">
-                  <div className="max-h-[300px] overflow-auto">
-                    {notices.filter(n => n.category === 'referral').length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                        No referral notifications
-                      </div>
-                    ) : (
-                      notices.filter(n => n.category === 'referral').map((notice) => (
-                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
-                          <div className="flex gap-3 w-full">
-                            <div className={`w-1.5 shrink-0 rounded-full ${
-                              notice.type === 'info' ? 'bg-blue-500' :
-                              notice.type === 'warning' ? 'bg-yellow-500' :
-                              notice.type === 'success' ? 'bg-green-500' :
-                              'bg-red-500'
-                            }`} />
-                            <div className="flex-1 space-y-1">
-                              <p className="text-sm font-medium leading-none">{notice.title}</p>
-                              <p className="text-sm text-muted-foreground">{notice.content}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(notice.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                    )}
-                  </div>
+                  <NotificationsList notices={notices} category="referral" />
                 </TabsContent>
 
                 <TabsContent value="system" className="mt-0">
-                  <div className="max-h-[300px] overflow-auto">
-                    {notices.filter(n => n.category === 'system').length === 0 ? (
-                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                        No system notifications
-                      </div>
-                    ) : (
-                      notices.filter(n => n.category === 'system').map((notice) => (
-                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default">
-                          <div className="flex gap-3 w-full">
-                            <div className={`w-1.5 shrink-0 rounded-full ${
-                              notice.type === 'info' ? 'bg-blue-500' :
-                              notice.type === 'warning' ? 'bg-yellow-500' :
-                              notice.type === 'success' ? 'bg-green-500' :
-                              'bg-red-500'
-                            }`} />
-                            <div className="flex-1 space-y-1">
-                              <p className="text-sm font-medium leading-none">{notice.title}</p>
-                              <p className="text-sm text-muted-foreground">{notice.content}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(notice.created_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                    )}
-                  </div>
+                  <NotificationsList notices={notices} category="system" />
                 </TabsContent>
               </Tabs>
             </DropdownMenuContent>
@@ -484,37 +481,6 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
         </div>
       </main>
     </div>
-  );
-};
-
-interface SidebarItemProps {
-  icon: React.ReactNode;
-  label: string;
-  href: string;
-  active?: boolean;
-  collapsed?: boolean;
-}
-
-const SidebarItem = ({
-  icon,
-  label,
-  href,
-  active,
-  collapsed,
-}: SidebarItemProps) => {
-  return (
-    <Link to={href}>
-      <Button
-        variant={active ? "secondary" : "ghost"}
-        className={cn(
-          "w-full justify-start gap-2 transition-all",
-          collapsed && "justify-center px-0"
-        )}
-      >
-        <span>{icon}</span>
-        {!collapsed && <span>{label}</span>}
-      </Button>
-    </Link>
   );
 };
 

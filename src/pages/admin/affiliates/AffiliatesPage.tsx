@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Download, Search, Users, LineChart, BarChart } from "lucide-react";
+import { ArrowDownUp, Download, Search, Users, LineChart, BarChart, MinusSquare, PlusSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tree, TreeNode as OrgTreeNode } from 'react-organizational-chart';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Affiliate {
   id: string;
@@ -43,6 +45,17 @@ interface Affiliate {
   isRecentlyActive?: boolean;
 }
 
+interface TeamMember {
+  id: string;
+  name: string;
+  level: number;
+  joinDate: string;
+  status: string;
+  totalInvested: number;
+  referralCode: string;
+  children: TeamMember[];
+}
+
 const AffiliatesPage = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +63,10 @@ const AffiliatesPage = () => {
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [topPerformerSort, setTopPerformerSort] = useState<"commissions" | "referrals">("commissions");
+  const [showTreeDialog, setShowTreeDialog] = useState(false);
+  const [selectedAffiliate, setSelectedAffiliate] = useState<string | null>(null);
+  const [treeData, setTreeData] = useState<TeamMember[]>([]);
+  const [collapsedNodes, setCollapsedNodes] = useState<string[]>([]);
 
   useEffect(() => {
     fetchAffiliates();
@@ -82,14 +99,14 @@ const AffiliatesPage = () => {
 
       if (relationshipsError) throw relationshipsError;
 
-      // Get commissions
-      const { data: commissions, error: commissionsError } = await supabase
+      // Get ALL commission-related transactions
+      const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
-        .eq('type', 'commission')
+        .in('type', ['commission', 'rank_bonus', 'investment_return'])
         .eq('status', 'Completed');
 
-      if (commissionsError) throw commissionsError;
+      if (transactionsError) throw transactionsError;
 
       // Calculate the timestamp for 48 hours ago
       const fortyEightHoursAgo = new Date();
@@ -98,8 +115,24 @@ const AffiliatesPage = () => {
       // Process data
       const processedAffiliates = profiles?.map(profile => {
         const userReferrals = relationships?.filter(rel => rel.referrer_id === profile.id) || [];
-        const userCommissions = commissions?.filter(com => com.user_id === profile.id) || [];
-        const totalCommissions = userCommissions.reduce((sum, com) => sum + (com.amount || 0), 0);
+        
+        // Calculate total earnings from all transaction types
+        const totalEarnings = (transactions || [])
+          .filter(tx => tx.user_id === profile.id)
+          .reduce((sum, tx) => {
+            if (!tx.amount) return sum;
+            
+            switch (tx.type) {
+              case 'commission':
+                return sum + tx.amount; // Direct commission amount
+              case 'rank_bonus':
+                return sum + tx.amount; // Rank achievement bonus
+              case 'investment_return':
+                return sum + tx.amount; // Investment returns
+              default:
+                return sum;
+            }
+          }, 0);
 
         // Get the most recent referral date
         const lastReferral = userReferrals[0];
@@ -111,7 +144,7 @@ const AffiliatesPage = () => {
           name: `${profile.first_name} ${profile.last_name}`,
           email: profile.email || '',
           referrals: userReferrals.length,
-          commissions: totalCommissions,
+          commissions: totalEarnings, // Total earnings from all commission types
           status: profile.status || 'Active',
           joinDate: new Date(profile.created_at).toLocaleDateString(),
           lastReferralDate: lastReferralDate?.toLocaleString(),
@@ -125,6 +158,116 @@ const AffiliatesPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchAffiliateTree = async (affiliateId: string) => {
+    try {
+      const { data: networkData, error } = await supabase
+        .from('referral_relationships')
+        .select(`
+          id,
+          level,
+          referred:profiles!referral_relationships_referred_id_fkey (
+            id,
+            first_name,
+            last_name,
+            created_at,
+            status,
+            total_invested,
+            referral_code
+          )
+        `)
+        .eq('referrer_id', affiliateId);
+
+      if (error) throw error;
+
+      const processedData = networkData
+        ?.filter(rel => rel.referred)
+        .map(rel => ({
+          id: rel.referred.id,
+          name: `${rel.referred.first_name} ${rel.referred.last_name}`,
+          level: rel.level,
+          joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
+          status: rel.referred.status || 'Active',
+          totalInvested: rel.referred.total_invested || 0,
+          referralCode: rel.referred.referral_code,
+          children: []
+        }));
+
+      // Build tree structure
+      const buildTree = (members: TeamMember[], level: number = 1): TeamMember[] => {
+        const levelMembers = members.filter(m => m.level === level);
+        return levelMembers.map(member => ({
+          ...member,
+          children: buildTree(members, level + 1)
+        }));
+      };
+
+      setTreeData(buildTree(processedData || []));
+    } catch (error) {
+      console.error('Error fetching affiliate tree:', error);
+    }
+  };
+
+  const toggleNodeCollapse = (nodeId: string) => {
+    setCollapsedNodes(prev => 
+      prev.includes(nodeId) 
+        ? prev.filter(id => id !== nodeId)
+        : [...prev, nodeId]
+    );
+  };
+
+  const OrganizationalNode = ({ node }: { node: TeamMember }) => (
+    <div className="relative group">
+      <div className="relative p-4 min-w-[240px] rounded-lg border border-border/50 bg-card shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleNodeCollapse(node.id);
+          }}
+        >
+          {collapsedNodes.includes(node.id) ? (
+            <PlusSquare className="h-4 w-4" />
+          ) : (
+            <MinusSquare className="h-4 w-4" />
+          )}
+        </Button>
+        
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="font-medium text-base">{node.name}</div>
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-sm text-muted-foreground bg-accent/50 px-2 py-0.5 rounded">Level {node.level}</span>
+            <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+              {node.referralCode}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-1 text-sm w-full">
+            <div className="text-center p-1.5 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">Investment</div>
+              <div className="font-medium">${node.totalInvested.toLocaleString()}</div>
+            </div>
+            <div className="text-center p-1.5 rounded bg-muted/50">
+              <div className="text-xs text-muted-foreground">Joined</div>
+              <div className="font-medium">{node.joinDate}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTree = (node: TeamMember) => {
+    if (collapsedNodes.includes(node.id)) {
+      return <OrgTreeNode label={<OrganizationalNode node={node} />} />;
+    }
+    return (
+      <OrgTreeNode label={<OrganizationalNode node={node} />}>
+        {node.children.map((child) => renderTree(child))}
+      </OrgTreeNode>
+    );
   };
 
   // Filter and sort affiliates
@@ -359,7 +502,17 @@ const AffiliatesPage = () => {
                   <TableCell>{affiliate.joinDate}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">View</Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedAffiliate(affiliate.id);
+                          fetchAffiliateTree(affiliate.id);
+                          setShowTreeDialog(true);
+                        }}
+                      >
+                        View
+                      </Button>
                       <Button variant="ghost" size="sm" className="text-red-500">Deactivate</Button>
                     </div>
                   </TableCell>
@@ -369,6 +522,26 @@ const AffiliatesPage = () => {
           </Table>
         </div>
       </div>
+
+      <Dialog open={showTreeDialog} onOpenChange={setShowTreeDialog}>
+        <DialogContent className="max-w-7xl">
+          <DialogHeader>
+            <DialogTitle>Affiliate Network Structure</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 overflow-auto">
+            <div className="min-w-[800px] p-4">
+              <Tree
+                lineWidth="1.5px"
+                lineColor="hsl(var(--border))"
+                lineBorderRadius="8px"
+                label={<div className="h-4" />}
+              >
+                {treeData.map(node => renderTree(node))}
+              </Tree>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };
