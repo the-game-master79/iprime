@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, Filter, Search, Receipt, CreditCard, Copy } from "lucide-react";
+import { Download, Filter, Search, Receipt, CreditCard, Copy, DollarSign } from "lucide-react";
 import ShellLayout from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,26 +15,23 @@ interface Transaction {
   amount: number;
   status: string;
   created_at: string;
+  type: string;
   method?: string;
   crypto_name?: string;
   crypto_symbol?: string;
-  type?: 'investment' | 'commission' | 'adjustment' | 'investment_return' | 'rank_bonus' | 'investment_closure';
+  network?: string;
   description?: string;
+  reference_id?: string;
+  wallet_type?: string;
 }
 
 const Payments = () => {
   const { toast } = useToast();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [deposits, setDeposits] = useState<Transaction[]>([]);
-  const [withdrawals, setWithdrawals] = useState<Transaction[]>([]);
-  const [investments, setInvestments] = useState<Transaction[]>([]);
-  const [commissions, setCommissions] = useState<Transaction[]>([]);
-  const [adjustments, setAdjustments] = useState<Transaction[]>([]);
-  const [investmentReturns, setInvestmentReturns] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [rankBonusData, setRankBonusData] = useState<Transaction[]>([]);
 
   useEffect(() => {
     fetchTransactions();
@@ -46,33 +43,17 @@ const Payments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch transactions including commissions, adjustments, investment returns, and closures
-      const { data: transactionsData, error: transactionsError } = await supabase
+      // Fetch all transactions including deposits
+      const { data: txData, error: txError } = await supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
-        .in('type', ['commission', 'adjustment', 'investment_return', 'rank_bonus', 'investment_closure'])
         .order('created_at', { ascending: false });
 
-      if (transactionsError) throw transactionsError;
+      if (txError) throw txError;
 
-      // Split transactions by type
-      const commissionsData = transactionsData?.filter(tx => tx.type === 'commission') || [];
-      const adjustmentsData = transactionsData?.filter(tx => tx.type === 'adjustment') || [];
-      const investmentReturnsData = transactionsData?.filter(tx => tx.type === 'investment_return') || [];
-      const rankBonusData = transactionsData?.filter(tx => tx.type === 'rank_bonus') || [];
-      const investmentClosuresData = transactionsData?.filter(tx => tx.type === 'investment_closure') || [];
-
-      // Rest of your existing fetch calls
-      const { data: depositsData, error: depositsError } = await supabase
-        .from('deposits')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (depositsError) throw depositsError;
-
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
+      // Fetch withdrawals
+      const { data: withdrawals, error: withdrawalsError } = await supabase
         .from('withdrawals')
         .select('*')
         .eq('user_id', user.id)
@@ -80,28 +61,19 @@ const Payments = () => {
 
       if (withdrawalsError) throw withdrawalsError;
 
-      const { data: investmentsData, error: investmentsError } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (investmentsError) throw investmentsError;
-
-      // Transform investment data
-      const investmentTransactions = (investmentsData || []).map(inv => ({
-        ...inv,
-        type: 'investment' as const,
+      // Format withdrawals as transactions
+      const formattedWithdrawals = (withdrawals || []).map(w => ({
+        ...w,
+        type: 'withdrawal'
       }));
 
-      setDeposits(depositsData || []);
-      setWithdrawals(withdrawalsData || []);
-      setInvestments(investmentTransactions);
-      setCommissions(commissionsData);
-      setInvestmentReturns(investmentReturnsData);
-      setRankBonusData(rankBonusData);
-      setAdjustments([...adjustmentsData, ...investmentClosuresData]); // Include closures with adjustments
+      // Combine all transactions
+      const allTransactions = [
+        ...txData,
+        ...formattedWithdrawals
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      setTransactions(allTransactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -114,30 +86,42 @@ const Payments = () => {
     }
   };
 
-  // Combine and filter transactions based on search and filters
-  const filteredTransactions = [...deposits, ...withdrawals, ...investments, ...commissions, 
-    ...adjustments, ...investmentReturns, ...rankBonusData]
-    .filter(tx => {
-      const isDeposit = 'method' in tx && !tx.type; // Updated condition
-      const isInvestment = tx.type === 'investment';
-      const isCommission = tx.type === 'commission';
-      const isAdjustment = tx.type === 'adjustment';
-      const isInvestmentReturn = tx.type === 'investment_return';
-      const isRankBonus = tx.type === 'rank_bonus';
-      const type = isDeposit ? 'Deposit' : 
-                  isInvestment ? 'Investment' : 
-                  isCommission ? 'Commission' :
-                  isAdjustment ? 'Adjustment' :
-                  isInvestmentReturn ? 'Investment Return' :
-                  isRankBonus ? 'Rank Bonus' : 'Withdrawal';
-      
-      const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || tx.status.toLowerCase() === statusFilter.toLowerCase();
-      const matchesType = typeFilter === "all" || type.toLowerCase() === typeFilter.toLowerCase();
-      
-      return matchesSearch && matchesStatus && matchesType;
-    })
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  // Calculate statistics
+  const stats = {
+    deposits: transactions
+      .filter(tx => tx.type === 'investment' && tx.status === 'Completed')
+      .reduce((sum, tx) => sum + tx.amount, 0),
+    withdrawals: transactions
+      .filter(tx => tx.type === 'withdrawal' && tx.status === 'Completed')
+      .reduce((sum, tx) => sum + tx.amount, 0),
+    commissions: transactions
+      .filter(tx => (tx.type === 'commission' || tx.type === 'rank_bonus' || tx.type === 'investment_return') && tx.status === 'Completed')
+      .reduce((sum, tx) => sum + tx.amount, 0)
+  };
+
+  const getTransactionType = (type: string): string => {
+    const types: Record<string, string> = {
+      deposit: 'Deposit',
+      withdrawal: 'Withdrawal',
+      investment: 'Plan Purchase',
+      commission: 'Commission',
+      rank_bonus: 'Rank Bonus',
+      adjustment: 'Adjustment',
+      investment_return: 'Investment Returns',
+      investment_closure: 'Investment Closure'
+    };
+    return types[type] || type;
+  };
+
+  const filteredTransactions = transactions.filter(tx => {
+    // Skip system investment entries
+    if (tx.type === 'investment' && tx.method === 'system') return false;
+
+    const matchesSearch = tx.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || tx.status.toLowerCase() === statusFilter.toLowerCase();
+    const matchesType = typeFilter === "all" || tx.type.toLowerCase() === typeFilter.toLowerCase();
+    return matchesSearch && matchesStatus && matchesType;
+  });
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -145,43 +129,6 @@ const Payments = () => {
       title: "Copied",
       description: "Transaction ID copied to clipboard",
     });
-  };
-
-  // Calculate statistics
-  const totalDeposits = deposits
-    .filter(d => d.status === 'Completed')
-    .reduce((sum, d) => sum + d.amount, 0);
-
-  const totalWithdrawals = withdrawals
-    .filter(w => w.status === 'Completed')
-    .reduce((sum, w) => sum + w.amount, 0);
-
-  const totalCommissions = commissions
-    .filter(c => c.status === 'Completed')
-    .reduce((sum, c) => sum + c.amount, 0);
-
-  const pendingTransactions = [...deposits, ...withdrawals]
-    .filter(tx => tx.status === 'Pending').length;
-
-  const getTransactionType = (tx: Transaction) => {
-    if ('method' in tx && !tx.type) return 'Deposit'; // Updated condition
-    switch (tx.type) {
-      case 'investment': return 'Investment';
-      case 'commission': return 'Commission';
-      case 'adjustment': return 'Adjustment';
-      case 'investment_return': return 'Investment Return';
-      case 'rank_bonus': return 'Rank Bonus';
-      case 'investment_closure': return 'Investment Closure';
-      default: return 'Withdrawal';
-    }
-  };
-
-  const getAmountClass = (tx: Transaction) => {
-    if ('method' in tx || tx.type === 'commission' || tx.type === 'investment_return' || 
-        tx.type === 'investment_closure' || (tx.type === 'adjustment' && tx.amount > 0)) {
-      return "text-green-600";
-    }
-    return tx.type === 'investment' ? "text-blue-600" : "text-red-500";
   };
 
   return (
@@ -193,19 +140,19 @@ const Payments = () => {
 
       <div className="grid gap-6 md:grid-cols-3 mb-6">
         <StatCard
-          title="Total Deposits"
-          value={`$${totalDeposits.toLocaleString()}`}
+          title="Total Invested"
+          value={`$${stats.deposits.toLocaleString()}`}
           icon={<CreditCard className="h-4 w-4" />}
         />
         <StatCard
           title="Total Withdrawals"
-          value={`$${totalWithdrawals.toLocaleString()}`}
+          value={`$${stats.withdrawals.toLocaleString()}`}
           icon={<Receipt className="h-4 w-4" />}
         />
         <StatCard
-          title="Pending Transactions"
-          value={pendingTransactions.toString()}
-          icon={<Filter className="h-4 w-4" />}
+          title="Total Commissions"
+          value={`$${stats.commissions.toLocaleString()}`}
+          icon={<DollarSign className="h-4 w-4" />}
         />
       </div>
 
@@ -261,7 +208,6 @@ const Payments = () => {
                   <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">ID</th>
                   <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Date</th>
                   <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Type</th>
-                  <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Method</th>
                   <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Amount</th>
                   <th className="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                 </tr>
@@ -269,7 +215,7 @@ const Payments = () => {
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center">
+                    <td colSpan={5} className="p-4 text-center">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-4 w-[250px] bg-muted/60 rounded animate-pulse" />
                       </div>
@@ -277,65 +223,50 @@ const Payments = () => {
                   </tr>
                 ) : filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center text-muted-foreground">No transactions found</td>
+                    <td colSpan={5} className="p-4 text-center text-muted-foreground">No transactions found</td>
                   </tr>
                 ) : (
-                  filteredTransactions.map((tx) => {
-                    const isDeposit = 'method' in tx && !tx.type;
-                    const isCommission = tx.type === 'commission';
-                    const isAdjustment = tx.type === 'adjustment';
-                    const isInvestmentReturn = tx.type === 'investment_return';
-                    const method = isDeposit ? tx.method : 
-                                 isCommission ? 'Commission' :
-                                 isAdjustment ? 'Balance Adjustment' :
-                                 tx.type === 'investment' ? 'Deduction for Package Purchase' :
-                                 tx.type === 'investment_closure' ? 'Amount Refunded (Plan Closed)' :
-                                 isInvestmentReturn ? 
-                                   tx.description?.replace(/Daily return from \$(\d+)\.?\d* investment at (\d+\.?\d*)% rate/, 
-                                     'Daily credit on Basic Plan for $$$1 at $2% rate') || 'Investment Credit' :
-                                 tx.type === 'rank_bonus' ? tx.description || 'Rank Bonus' :
-                                 `${tx.crypto_name} (${tx.crypto_symbol})`;
-                    
-                    return (
-                      <tr key={tx.id} className="border-b transition-colors hover:bg-muted/50">
-                        <td className="p-4 align-middle">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{tx.id}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 hover:bg-background"
-                              onClick={() => handleCopyId(tx.id)}
-                            >
-                              <Copy className="h-3 w-3" />
-                              <span className="sr-only">Copy ID</span>
-                            </Button>
-                          </div>
-                        </td>
-                        <td className="p-4 align-middle text-muted-foreground">
-                          {new Date(tx.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="p-4 align-middle">
-                          {getTransactionType(tx)}
-                        </td>
-                        <td className="p-4 align-middle">{method}</td>
-                        <td className="p-4 align-middle font-medium">
-                          <span className={getAmountClass(tx)}>
-                            ${tx.amount.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="p-4 align-middle">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                            ${tx.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                              tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
-                              tx.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 
-                              'bg-red-100 text-red-800'}`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  filteredTransactions.map((tx) => (
+                    <tr key={tx.id} className="border-b transition-colors hover:bg-muted/50">
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{tx.id}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 hover:bg-background"
+                            onClick={() => handleCopyId(tx.id)}
+                          >
+                            <Copy className="h-3 w-3" />
+                            <span className="sr-only">Copy ID</span>
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle text-muted-foreground">
+                        {new Date(tx.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="p-4 align-middle">
+                        {getTransactionType(tx.type)}
+                      </td>
+                      <td className="p-4 align-middle font-medium">
+                        <span className={`text-${
+                          tx.type === 'deposit' || tx.type === 'commission' || tx.type === 'investment_return' ? 'green' : 
+                          tx.type === 'withdrawal' || tx.type === 'investment' ? 'red' : 
+                          'blue'}-600`}>
+                          ${tx.amount.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
+                          ${tx.status === 'Completed' ? 'bg-green-100 text-green-800' : 
+                            tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
+                            tx.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 
+                            'bg-red-100 text-red-800'}`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

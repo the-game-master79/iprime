@@ -43,7 +43,20 @@ interface CryptoPrice {
   networks: string[];
 }
 
-export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+interface Plan {
+  id: string;
+  name: string;
+  investment: number;
+}
+
+interface DepositDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedPlan?: Plan | null;
+  onSuccess?: () => void;
+}
+
+export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: DepositDialogProps) {
   const { toast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cryptoType, setCryptoType] = useState<string>("");
@@ -166,38 +179,22 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     setAmount(value);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (investment: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Check rate limits
-      if (!checkDepositLimit(user.id)) {
-        toast({
-          title: "Rate Limited",
-          description: "You have exceeded the maximum number of deposits allowed. Please try again later.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Calculate the USD value before submitting
-      const totalUsdValue = calculateTotalUSD();
-
-      const { error } = await supabase.from('deposits').insert({
+      const { error } = await supabase.from('plans_subscriptions').insert({
         user_id: user.id,
-        user_name: user.email?.split('@')[0] || 'Unknown',
-        amount: totalUsdValue, // Store the USD value instead of crypto amount
-        method: paymentMethod === 'crypto' ? `${cryptoType} (${network})` : paymentMethod,
-        status: 'Pending'
+        plan_id: selectedPlan?.id,
+        amount: investment,
+        status: 'pending',
       });
 
       if (error) {
         toast({
           title: "Error",
-          description: "Failed to submit deposit request.",
+          description: "Failed to submit plan subscription.",
           variant: "destructive"
         });
         return;
@@ -205,18 +202,15 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
       toast({
         title: "Success",
-        description: "Deposit request submitted successfully."
+        description: "Plan subscription submitted successfully."
       });
-      
+
       onOpenChange(false);
       setAmount('');
-      setPaymentMethod('');
-      setCryptoType('');
-      setNetwork('');
     } catch (error) {
       toast({
         title: "Error",
-        description: "An error occurred while submitting the deposit request.",
+        description: "An error occurred while submitting the plan subscription.",
         variant: "destructive"
       });
     }
@@ -226,6 +220,9 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   useEffect(() => {
     if (open) {
       setPaymentMethod('crypto');
+      // Reset other form fields
+      setCryptoType('');
+      setNetwork('');
     }
   }, [open]);
 
@@ -259,7 +256,13 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-[525px] rounded-lg max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Deposit Funds</DialogTitle>
+          <DialogTitle>Complete Plan Subscription</DialogTitle>
+          {selectedPlan && (
+            <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
+              <p className="text-sm text-muted-foreground">You're subscribing to {selectedPlan.name}</p>
+              <p className="text-2xl font-bold">${selectedPlan.investment.toLocaleString()}</p>
+            </div>
+          )}
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-2">
           <div className="grid gap-6 py-4">
@@ -381,40 +384,6 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                         </div>
                       </div>
                     </div>
-
-                    {/* Step 4: Amount */}
-                    <div className="grid gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-20">
-                          4
-                        </div>
-                        <div className="grid gap-1">
-                          <Label htmlFor="amount">Enter Amount</Label>
-                        </div>
-                      </div>
-                      <div className="grid gap-2">
-                        <div className="relative z-10">
-                          <Input
-                            id="amount"
-                            type="text"
-                            min="0"
-                            placeholder={`Enter the amount you're sending in ${cryptoType}`}
-                            value={amount}
-                            onChange={handleAmountChange}
-                            pattern="[0-9]*\.?[0-9]*"
-                            className="pl-3 bg-background"
-                          />
-                        </div>
-                        {amount && (
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Total Value: ${calculateTotalUSD().toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2
-                            })} USD
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -424,10 +393,15 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
         <Button 
           className="w-full mt-2 flex-shrink-0" 
-          disabled={!amount || !cryptoType || !network}
-          onClick={handleSubmit}
+          disabled={!cryptoType || !network}
+          onClick={async () => {
+            if (selectedPlan) {
+              await handleSubmit(selectedPlan.investment);
+              onSuccess?.();
+            }
+          }}
         >
-          Submit Deposit
+          Complete Subscription
         </Button>
       </DialogContent>
     </Dialog>

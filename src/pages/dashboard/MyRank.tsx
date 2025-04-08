@@ -89,7 +89,7 @@ const MyRank = () => {
       const [profileResponse, transactionsResponse] = await Promise.all([
         supabase
           .from('profiles')
-          .select('business_rank, business_volume')
+          .select('business_volume, direct_count')
           .eq('id', userId)
           .single(),
         supabase
@@ -102,17 +102,24 @@ const MyRank = () => {
       if (profileResponse.error) throw profileResponse.error;
       if (transactionsResponse.error) throw transactionsResponse.error;
 
-      // Update profile data
-      const { business_rank, business_volume } = profileResponse.data;
-      setUserRank(business_rank);
-      setTotalBusiness(business_volume || 0);
+      const hasMinimumReferrals = profileResponse.data.direct_count >= 2;
+      const businessVolume = hasMinimumReferrals ? (profileResponse.data.business_volume || 0) : 0;
+
+      setTotalBusiness(businessVolume);
+
+      // Set rank based on business volume if ranks are available
+      if (ranks.length > 0 && hasMinimumReferrals) {
+        const rankData = calculateRank(businessVolume, ranks);
+        setUserRank(rankData.rank?.title || 'New Member');
+      } else {
+        setUserRank('New Member');
+      }
 
       // Update bonus data
       const transactions = transactionsResponse.data;
       const totalBonus = transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
       setTotalBonusEarned(totalBonus);
 
-      // Update claimed ranks
       const claimed = transactions
         .map(tx => {
           const match = tx.description.match(/bonus for (.+)$/);

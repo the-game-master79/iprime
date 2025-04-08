@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Download, PlusCircle, Search, Eye, Copy, CreditCard, Check, XCircle } from "lucide-react"; "lucide-react";
+import { ArrowDownUp, Download, PlusCircle, Search, Eye, Copy, Check, XCircle } from "lucide-react"; 
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +40,7 @@ interface User {
   status: string;
   date_joined: string;
   kyc_status: string;
-  balance: number;
+  withdrawal_wallet: number;
   kyc_documents?: {
     document_front?: string;
     document_back?: string;
@@ -98,7 +98,7 @@ const UsersPage = () => {
         status,
         date_joined,
         kyc_status,
-        balance
+        withdrawal_wallet
       `);
 
     if (error) {
@@ -217,34 +217,20 @@ const UsersPage = () => {
 
     try {
       const newBalanceNum = parseFloat(newBalance);
-      const difference = newBalanceNum - selectedUser.balance;
       
-      // Update user balance
+      // Update user wallet balance first
       const { error: balanceError } = await supabase
         .from('profiles')
-        .update({ balance: newBalanceNum })
+        .update({ withdrawal_wallet: newBalanceNum })
         .eq('id', selectedUser.id);
 
       if (balanceError) throw balanceError;
-
-      // Create transaction record
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: selectedUser.id,
-          amount: Math.abs(difference),
-          type: 'adjustment',
-          status: 'Completed',
-          description: `Manual balance ${difference >= 0 ? 'increase' : 'decrease'} by admin`,
-        });
-
-      if (transactionError) throw transactionError;
 
       await fetchUsers();
       setIsBalanceDialogOpen(false);
       toast({
         title: "Balance Updated",
-        description: `Balance has been updated successfully`,
+        description: `Withdrawal wallet balance has been updated successfully`,
       });
     } catch (error) {
       console.error('Error updating balance:', error);
@@ -256,60 +242,35 @@ const UsersPage = () => {
     }
   };
 
+  const handleCreditReturns = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('credit_user_plan_returns', {
+        user_id_param: userId
+      });
+
+      if (error) throw error;
+
+      await fetchUsers();
+      toast({
+        title: "Returns Credited",
+        description: `Credited $${data.total_credited.toFixed(2)} from ${data.plans_credited} plans`,
+      });
+    } catch (error) {
+      console.error('Error crediting returns:', error);
+      toast({
+        title: "Error",
+        description: "Failed to credit returns",
+        variant: "destructive"
+      });
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied to clipboard",
       description: "ID has been copied to clipboard",
     });
-  };
-
-  const handleCreditReturns = async (userId: string) => {
-    try {
-      // Show processing toast
-      const loadingToast = toast({
-        title: "Processing Returns",
-        description: "Crediting investment returns...",
-      });
-
-      // Call the credit_investment_returns function
-      const { data, error } = await supabase.rpc('credit_investment_returns', { 
-        p_user_id: userId 
-      });
-      
-      if (error) throw error;
-
-      const [result] = data || [{ total_credited: 0, transactions_count: 0 }];
-
-      // Fetch updated user data
-      const { data: updatedUser, error: userError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (userError) throw userError;
-
-      // Update users list with new balance
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, balance: updatedUser.balance } : user
-      ));
-
-      // Dismiss loading toast and show success
-      toast({
-        title: "Returns Credited Successfully",
-        description: `Credited $${result.total_credited.toFixed(2)} across ${result.transactions_count} investments.`,
-        variant: "success",
-      });
-
-    } catch (error) {
-      console.error('Error crediting returns:', error);
-      toast({
-        title: "Error",
-        description: "Failed to credit investment returns",
-        variant: "destructive"
-      });
-    }
   };
 
   const fetchUserProfile = async (userId: string) => {
@@ -613,7 +574,7 @@ const UsersPage = () => {
                         size="sm"
                         onClick={() => {
                           setSelectedUser(user);
-                          setNewBalance(user.balance.toString());
+                          setNewBalance(user.withdrawal_wallet.toString());
                           setIsBalanceDialogOpen(true);
                         }}
                       >
@@ -624,7 +585,6 @@ const UsersPage = () => {
                         size="sm"
                         onClick={() => handleCreditReturns(user.id)}
                       >
-                        <CreditCard className="h-4 w-4 mr-1" />
                         Credit Returns
                       </Button>
                     </div>
@@ -652,7 +612,7 @@ const UsersPage = () => {
               <div>
                 <label className="text-sm font-medium">Current Balance</label>
                 <p className="text-sm text-muted-foreground">
-                  ${selectedUser?.balance.toFixed(2)}
+                  ${selectedUser?.withdrawal_wallet.toFixed(2)}
                 </p>
               </div>
               <div>

@@ -876,24 +876,16 @@ const Profile = () => {
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
                               <Label htmlFor="country">Country</Label>
-                              <Select 
-                                value={selectedCountry}
-                                onValueChange={(value) => {
-                                  setSelectedCountry(value);
-                                  setKycFormData(prev => ({...prev, country: value, city: ""}));
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select country" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {countries.map((country) => (
-                                    <SelectItem key={country.code} value={country.code}>
-                                      {country.name} ({country.code})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <Input
+                                id="country"
+                                type="text"
+                                placeholder="Enter your country"
+                                value={kycFormData.country}
+                                onChange={(e) => setKycFormData(prev => ({
+                                  ...prev,
+                                  country: e.target.value
+                                }))}
+                              />
                             </div>
 
                             <div className="space-y-2">
@@ -915,7 +907,6 @@ const Profile = () => {
                                 value={kycFormData.city}
                                 onChange={(e) => handleCityChange(e.target.value)}
                                 placeholder="Enter city name"
-                                disabled={!selectedCountry}
                                 className={cityError ? "border-red-500" : ""}
                               />
                               {cityError && <p className="text-xs text-red-500">{cityError}</p>}

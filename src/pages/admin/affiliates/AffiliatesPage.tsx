@@ -59,9 +59,11 @@ interface TeamMember {
 const AffiliatesPage = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Removed duplicate declaration of totalCommissions
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [totalCommissions, setTotalCommissions] = useState(0);
   const [topPerformerSort, setTopPerformerSort] = useState<"commissions" | "referrals">("commissions");
   const [showTreeDialog, setShowTreeDialog] = useState(false);
   const [selectedAffiliate, setSelectedAffiliate] = useState<string | null>(null);
@@ -102,9 +104,9 @@ const AffiliatesPage = () => {
       // Get ALL commission-related transactions
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('*')
-        .in('type', ['commission', 'rank_bonus', 'investment_return'])
-        .eq('status', 'Completed');
+        .select('amount, type, user_id, status')
+        .eq('status', 'Completed')
+        .or('type.eq.commission,type.eq.rank_bonus'); // Include both types
 
       if (transactionsError) throw transactionsError;
 
@@ -114,27 +116,18 @@ const AffiliatesPage = () => {
 
       // Process data
       const processedAffiliates = profiles?.map(profile => {
-        const userReferrals = relationships?.filter(rel => rel.referrer_id === profile.id) || [];
+        // Only count direct referrals (level 1)
+        const userReferrals = relationships?.filter(rel => 
+          rel.referrer_id === profile.id && 
+          rel.level === 1
+        ) || [];
         
-        // Calculate total earnings from all transaction types
+        // Calculate total earnings from both commission and rank bonus transactions
         const totalEarnings = (transactions || [])
           .filter(tx => tx.user_id === profile.id)
-          .reduce((sum, tx) => {
-            if (!tx.amount) return sum;
-            
-            switch (tx.type) {
-              case 'commission':
-                return sum + tx.amount; // Direct commission amount
-              case 'rank_bonus':
-                return sum + tx.amount; // Rank achievement bonus
-              case 'investment_return':
-                return sum + tx.amount; // Investment returns
-              default:
-                return sum;
-            }
-          }, 0);
+          .filter(tx => tx.type === 'commission' || tx.type === 'rank_bonus') // Explicitly check both types
+          .reduce((sum, tx) => sum + Number(tx.amount), 0); // Use Number() to ensure proper addition
 
-        // Get the most recent referral date
         const lastReferral = userReferrals[0];
         const lastReferralDate = lastReferral ? new Date(lastReferral.created_at) : null;
         const isRecentlyActive = lastReferralDate ? lastReferralDate > fortyEightHoursAgo : false;
@@ -143,8 +136,8 @@ const AffiliatesPage = () => {
           id: profile.id,
           name: `${profile.first_name} ${profile.last_name}`,
           email: profile.email || '',
-          referrals: userReferrals.length,
-          commissions: totalEarnings, // Total earnings from all commission types
+          referrals: userReferrals.length, // This now only counts direct referrals
+          commissions: totalEarnings,
           status: profile.status || 'Active',
           joinDate: new Date(profile.created_at).toLocaleDateString(),
           lastReferralDate: lastReferralDate?.toLocaleString(),
@@ -153,6 +146,13 @@ const AffiliatesPage = () => {
       }) || [];
 
       setAffiliates(processedAffiliates);
+
+      // Calculate overall total commissions - include both commission types
+      const overallCommissions = (transactions || [])
+        .filter(tx => tx.type === 'commission' || tx.type === 'rank_bonus') // Explicitly check both types
+        .reduce((sum, tx) => sum + Number(tx.amount), 0); // Use Number() to ensure proper addition
+
+      setTotalCommissions(overallCommissions);
     } catch (error) {
       console.error('Error fetching affiliates:', error);
     } finally {
@@ -312,7 +312,8 @@ const AffiliatesPage = () => {
   const totalAffiliates = affiliates.length;
   const activeAffiliates = affiliates.filter(a => a.isRecentlyActive).length;
   const totalReferrals = affiliates.reduce((sum, a) => sum + a.referrals, 0);
-  const totalCommissions = affiliates.reduce((sum, a) => sum + a.commissions, 0);
+  // Remove this line as we're now using the state variable
+  // const totalCommissions = affiliates.reduce((sum, a) => sum + a.commissions, 0);
 
   return (
     <AdminLayout>
@@ -511,9 +512,8 @@ const AffiliatesPage = () => {
                           setShowTreeDialog(true);
                         }}
                       >
-                        View
+                        View Tree
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-red-500">Deactivate</Button>
                     </div>
                   </TableCell>
                 </TableRow>

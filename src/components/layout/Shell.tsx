@@ -227,6 +227,7 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
   const [performanceData, setPerformanceData] = useState<{ value: number }[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userBalance, setUserBalance] = useState<number>(0);
 
   // Hooks
   const { isMobile, isTablet } = useBreakpoints();
@@ -272,6 +273,50 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
     };
 
     setupNotifications();
+  }, []);
+
+  useEffect(() => {
+    const setupBalanceTracking = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Initial balance fetch
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('withdrawal_wallet')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setUserBalance(data?.withdrawal_wallet || 0);
+
+        // Setup real-time subscription
+        const channel = supabase
+          .channel('profile-changes')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'profiles',
+              filter: `id=eq.${user.id}`,
+            },
+            (payload) => {
+              setUserBalance(payload.new.withdrawal_wallet || 0);
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      } catch (error) {
+        console.error('Error setting up wallet tracking:', error);
+      }
+    };
+
+    setupBalanceTracking();
   }, []);
 
   // Handlers
@@ -387,15 +432,6 @@ export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
           </Button>
           
           <div className="flex-1" />
-          
-          <div 
-            className="text-sm font-medium mr-4 px-3 py-1.5 border rounded-md shadow-sm hover:bg-accent transition-colors cursor-pointer"
-            onClick={() => setDepositDialogOpen(true)}
-            role="button"
-            tabIndex={0}
-          >
-            ${(performanceData[0]?.value || 0).toLocaleString()}
-          </div>
 
           <Button 
             variant="ghost"

@@ -110,10 +110,11 @@
     
     <div id="root"></div>
     
-    <!-- Added preload for critical resources [[8]] -->
-    <link rel="preload" href="/src/main.tsx" as="script">
+    <!-- React and core dependencies must load first -->
+    <script type="module" src="/src/main.tsx"></script>
 
-    <script>
+    <!-- Service worker and other scripts -->
+    <script type="application/javascript">
       // Service Worker Registration
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -122,17 +123,27 @@
             .catch(err => console.log('Service worker registration failed:', err));
         });
       }
+    </script>
 
-      // Defer hCaptcha until form interaction
+    <!-- Performance monitoring script -->
+    <script 
+      async
+      type="application/javascript"
+      src="/_vercel/speed-insights/script.js"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- hCaptcha script with lazy loading -->
+    <script>
       document.addEventListener('DOMContentLoaded', () => {
         const forms = document.querySelectorAll('form');
         forms.forEach(form => {
           form.addEventListener('focusin', () => {
-            const script = document.querySelector('script[data-lazy="true"]');
-            if (script) {
-              script.setAttribute('src', script.dataset.src);
-              script.removeAttribute('data-lazy');
-            }
+            const script = document.createElement('script');
+            script.src = 'https://js.hcaptcha.com/1/api.js';
+            script.async = true;
+            script.defer = true;
+            document.body.appendChild(script);
           }, { once: true });
         });
       });

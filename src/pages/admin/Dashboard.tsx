@@ -63,6 +63,8 @@ const getStatusIcon = (status: string | undefined) => {
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [limit, setLimit] = useState(10);
+  const [hasMore, setHasMore] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -117,24 +119,30 @@ const AdminDashboard = () => {
   };
 
   const fetchRecentActivity = async () => {
-    const { data, error } = await supabase
-      .from('platform_activity_view')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(10);
+    try {
+      const { data, error, count } = await supabase
+        .from('platform_activity_view')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (error) {
+      if (error) throw error;
+
+      setRecentActivity(data || []);
+      setHasMore((count || 0) > limit);
+    } catch (error) {
       console.error('Error fetching activity:', error);
-      return;
     }
-
-    setRecentActivity(data || []);
   };
 
   useEffect(() => {
     fetchStats();
     fetchRecentActivity();
-  }, []);
+  }, [limit]);
+
+  const handleLoadMore = () => {
+    setLimit(prev => prev + 10);
+  };
 
   return (
     <AdminLayout>
@@ -243,6 +251,18 @@ const AdminDashboard = () => {
               ))}
             </TableBody>
           </Table>
+          {hasMore && (
+            <div className="mt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLoadMore}
+                disabled={loading}
+              >
+                {loading ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </AdminLayout>

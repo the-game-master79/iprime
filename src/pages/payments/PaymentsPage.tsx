@@ -84,13 +84,26 @@ const MyRank = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('business_volume')
-        .eq('id', user.id)
-        .single();
+      // Get referral relationships with total invested amounts
+      const { data: referrals, error: referralsError } = await supabase
+        .from('referral_relationships')
+        .select(`
+          referred:profiles!referral_relationships_referred_id_fkey (
+            id,
+            total_invested
+          )
+        `)
+        .eq('referrer_id', user.id);
 
-      setTotalBusiness(profile?.business_volume || 0);
+      if (referralsError) throw referralsError;
+
+      // Calculate total business volume from team investments
+      const teamBusiness = referrals.reduce((sum, ref) => 
+        sum + (ref.referred?.total_invested || 0), 0
+      );
+
+      setTotalBusiness(teamBusiness);
+
     } catch (error) {
       console.error('Error fetching total business:', error);
     }

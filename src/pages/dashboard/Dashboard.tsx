@@ -59,6 +59,15 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     totalBusiness: 0
   });
 
+  const [businessStats, setBusinessStats] = useState({
+    currentRank: '',
+    totalVolume: 0,
+    rankBonus: 0,
+    nextRank: null,
+    progress: 0,
+    targetVolume: 0
+  });
+
   // Display data
   const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
   const [leaderboard, setLeaderboard] = useState({
@@ -202,6 +211,85 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     }
   };
 
+  const fetchBusinessStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get total business volume directly from business_volumes table
+      const { data: businessData, error: businessError } = await supabase
+        .from('business_volumes')
+        .select('amount')
+        .eq('user_id', user.id);
+
+      if (businessError) throw businessError;
+
+      const totalVolume = businessData?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+
+      // Get user's rank info
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('business_rank')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Get all claimed rank bonuses
+      const { data: rankBonuses, error: bonusError } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('type', 'rank_bonus')
+        .eq('status', 'Completed');
+
+      if (bonusError) throw bonusError;
+
+      const totalRankBonus = rankBonuses?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+
+      // Get all ranks for progression tracking
+      const { data: ranks, error: ranksError } = await supabase
+        .from('ranks')
+        .select('*')
+        .order('business_amount', { ascending: true });
+
+      if (ranksError) throw ranksError;
+
+      // Find current and next rank based on business volume
+      let currentRank = ranks[0];
+      let nextRank = null;
+
+      for (let i = 0; i < ranks.length; i++) {
+        if (totalVolume >= ranks[i].business_amount) {
+          currentRank = ranks[i];
+          nextRank = ranks[i + 1] || null;
+        } else {
+          break;
+        }
+      }
+
+      // Calculate progress to next rank
+      let progress = 0;
+      if (nextRank) {
+        const remaining = nextRank.business_amount - currentRank.business_amount;
+        const achieved = totalVolume - currentRank.business_amount;
+        progress = Math.min(100, Math.max(0, (achieved / remaining) * 100));
+      }
+
+      setBusinessStats({
+        currentRank: currentRank.title,
+        totalVolume: totalVolume,
+        rankBonus: totalRankBonus,
+        nextRank: nextRank?.title || null,
+        progress,
+        targetVolume: nextRank ? nextRank.business_amount : currentRank.business_amount
+      });
+
+    } catch (error) {
+      console.error('Error fetching business stats:', error);
+    }
+  };
+
   const formatJoinedTime = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
@@ -242,7 +330,8 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
         fetchUserProfile(),
         fetchReferralData(),
         fetchCommissions(),
-        fetchLeaderboards()
+        fetchLeaderboards(),
+        fetchBusinessStats()
       ]);
       setIsLoading(false);
     };
@@ -256,6 +345,26 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     const interval = setInterval(fetchMarqueeData, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${userProfile?.id}`,
+        },
+        () => fetchBusinessStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userProfile?.id]);
 
   // Render helper functions
   const renderStats = () => {
@@ -469,102 +578,40 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
           <div>
             <h2 className="text-lg font-semibold mb-4">Your Progress</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-medium flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-primary" />
-                    My Rank
+                    Business Overview
                   </CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Your current business rank</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="h-20 flex items-center justify-center">
-                      <div className="animate-pulse bg-muted h-8 w-24 rounded" />
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <div className="text-sm font-medium text-muted-foreground">Current Rank</div>
+                      <div className="text-2xl font-semibold text-primary">{businessStats.currentRank}</div>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="text-2xl sm:text-4xl font-bold text-primary">
-                        {businessRank.currentRank ? businessRank.currentRank.title : 'New Member'}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-muted/50 p-3 rounded-lg">
-                          <div className="text-sm font-medium text-muted-foreground">Total Volume</div>
-                          <div className="text-lg font-semibold text-primary">
-                            ${businessRank.totalBusiness?.toLocaleString() || '0'}
-                          </div>
-                        </div>
-                        <div className="bg-muted/50 p-3 rounded-lg">
-                          <div className="text-sm font-medium text-muted-foreground">Rank Bonus</div>
-                          <div className="text-lg font-semibold text-primary">
-                            ${businessRank.currentRank?.bonus?.toLocaleString() || '0'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {businessRank.nextRank && (
-                        <div className="space-y-2">
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            Next Rank: {businessRank.nextRank.title} (${businessRank.nextRank.business_amount?.toLocaleString()} business required)
-                          </div>
-                          <Progress value={businessRank.progress} className="h-2" />
-                          <div className="text-xs text-muted-foreground">
-                            {Math.round(businessRank.progress)}% progress to {businessRank.nextRank.title}
-                          </div>
-                        </div>
-                      )}
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <div className="text-sm font-medium text-muted-foreground">Total Volume</div>
+                      <div className="text-2xl font-semibold">${businessStats.totalVolume.toLocaleString()}</div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                      <Star className="h-4 w-4 text-primary" />
-                      Profile Overview
-                    </CardTitle>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                      ${userProfile?.kyc_status === 'completed' ? 'bg-green-100 text-green-800' : 
-                        userProfile?.kyc_status === 'pending' ? 'bg-red-100 text-red-800' : 
-                        'bg-red-100 text-red-800'}`}>
-                      {userProfile?.kyc_status === 'completed' ? 'Verified' :
-                       userProfile?.kyc_status === 'pending' ? 'Not Submitted' :
-                       'Not Submitted'}
-                    </span>
+                    <div className="p-4 rounded-lg bg-muted/50">
+                      <div className="text-sm font-medium text-muted-foreground">Rank Bonus</div>
+                      <div className="text-2xl font-semibold text-green-600">${businessStats.rankBonus.toLocaleString()}</div>
+                    </div>
                   </div>
-                  <CardDescription>Your account information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
+
+                  {businessStats.nextRank && (
                     <div className="space-y-2">
-                      <div className="animate-pulse bg-muted h-4 w-3/4 rounded" />
-                      <div className="animate-pulse bg-muted h-4 w-1/2 rounded" />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-lg font-semibold text-primary">
-                            {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <div className="font-medium">
-                            {userProfile?.first_name} {userProfile?.last_name}
-                          </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {userProfile?.email}
-                          </div>
-                        </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Progress to {businessStats.nextRank}</span>
+                        <span>{Math.round(businessStats.progress)}%</span>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Member since {new Date(userProfile?.created_at).toLocaleDateString()}
-                      </div>
+                      <Progress value={businessStats.progress} className="h-2" />
+                      <p className="text-xs text-muted-foreground">
+                        Target: ${businessStats.targetVolume.toLocaleString()}
+                      </p>
                     </div>
                   )}
                 </CardContent>

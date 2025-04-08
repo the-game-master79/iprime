@@ -46,7 +46,8 @@ interface Withdrawal {
 
 interface Profile {
   id: string;
-  balance: number;
+  withdrawal_wallet: number;
+  investment_wallet: number;
   kyc_status: 'pending' | 'completed' | 'rejected' | null;
 }
 
@@ -125,7 +126,7 @@ const Withdrawals = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('balance')
+        .select('withdrawal_wallet')
         .eq('id', user.id)
         .single();
 
@@ -135,24 +136,24 @@ const Withdrawals = () => {
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert([
-              { id: user.id, balance: 0 }
+              { id: user.id, withdrawal_wallet: 0, investment_wallet: 0 }
             ])
-            .select('balance')
+            .select('withdrawal_wallet')
             .single();
 
           if (createError) throw createError;
-          setUserBalance(newProfile?.balance || 0);
+          setUserBalance(newProfile?.withdrawal_wallet || 0);
         } else {
           throw error;
         }
       } else {
-        setUserBalance(data?.balance || 0);
+        setUserBalance(data?.withdrawal_wallet || 0);
       }
     } catch (error) {
       console.error('Error fetching user balance:', error);
       toast({
         title: "Error",
-        description: "Failed to load account balance. Please try refreshing the page.",
+        description: "Failed to load withdrawal wallet balance. Please try refreshing the page.",
         variant: "destructive"
       });
     }
@@ -174,29 +175,6 @@ const Withdrawals = () => {
     } catch (error) {
       console.error('Error fetching KYC status:', error);
     }
-  };
-
-  const checkLastDeposit = async (userId: string) => {
-    const timeLimit = 48; // hours
-    const { data, error } = await supabase
-      .from('deposits')
-      .select('created_at')
-      .eq('user_id', userId)
-      .eq('status', 'Completed')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      const lastDepositTime = new Date(data[0].created_at).getTime();
-      const currentTime = new Date().getTime();
-      const hoursSinceDeposit = (currentTime - lastDepositTime) / (1000 * 60 * 60);
-      
-      return hoursSinceDeposit >= timeLimit;
-    }
-    
-    return true; // If no deposits found, allow withdrawal
   };
 
   const getNetworksForCrypto = (cryptoSymbol: string): string[] => {
@@ -278,17 +256,6 @@ const Withdrawals = () => {
           title: "Rate Limited",
           description: "You have exceeded the maximum number of withdrawals allowed. Please try again later.",
           variant: "destructive"
-        });
-        return;
-      }
-
-      // Check 48-hour waiting period
-      const canWithdraw = await checkLastDeposit(user.id);
-      if (!canWithdraw) {
-        toast({
-          title: "Withdrawal Not Allowed",
-          description: "You must wait 48 hours after your last deposit before making a withdrawal.",
-          variant: "destructive",
         });
         return;
       }
@@ -442,8 +409,9 @@ const Withdrawals = () => {
 
       <div className="grid gap-6 md:grid-cols-3 mb-6">
         <StatCard
-          title="Available Balance"
+          title="Withdrawal Wallet"
           value={`$${userBalance.toLocaleString()}`}
+          description="Available for withdrawal"
           icon={<DollarSign className="h-4 w-4" />}
         />
         <StatCard

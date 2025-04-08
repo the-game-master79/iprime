@@ -65,6 +65,11 @@ const Affiliate = () => {
   const [totalBusiness, setTotalBusiness] = useState(0);
   const [firstLevelGroups, setFirstLevelGroups] = useState<ReferralGroup[]>([]);
   const [collapsedNodes, setCollapsedNodes] = useState<string[]>([]);
+  const [eligibility, setEligibility] = useState({
+    hasDirectReferrals: false,
+    isCommissionEligible: false,
+    isRankEligible: false
+  });
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -114,12 +119,13 @@ const Affiliate = () => {
         return;
       }
 
-      // Get complete referral network with hierarchical data
+      // Get complete referral network
       const { data: networkData, error: networkError } = await supabase
         .from('referral_relationships')
         .select(`
           id,
           level,
+          referred_id,
           referred:profiles!referral_relationships_referred_id_fkey (
             id,
             first_name,
@@ -127,21 +133,31 @@ const Affiliate = () => {
             created_at,
             status,
             referred_by,
-            total_invested,
-            referral_code
-          ),
-          referrer:profiles!referral_relationships_referrer_id_fkey (
-            id,
-            first_name,
-            last_name,
-            referral_code
+            referral_code,
+            total_invested
           )
         `)
         .eq('referrer_id', session.user.id);
 
       if (networkError) throw networkError;
 
-      // Process the network data into a hierarchical structure
+      // Process the rest of the logic with total_invested directly from profiles
+      const directReferrals = networkData?.filter(rel => rel.level === 1) || [];
+      const hasDirectReferrals = directReferrals.length >= 2;
+      const activeInvestors = networkData?.filter(rel => 
+        rel.referred?.total_invested > 0
+      ) || [];
+      const isCommissionEligible = hasDirectReferrals && activeInvestors.length > 0;
+      const totalBusiness = activeInvestors.reduce((sum, rel) => 
+        sum + (rel.referred?.total_invested || 0), 0);
+
+      setEligibility({
+        hasDirectReferrals,
+        isCommissionEligible,
+        isRankEligible: hasDirectReferrals && totalBusiness >= 1000
+      });
+
+      // Process the network data
       const processedData = networkData
         ?.filter(rel => rel.referred)
         .map(rel => ({
@@ -152,14 +168,14 @@ const Affiliate = () => {
           status: rel.referred.status || 'Active',
           commissions: 0,
           totalInvested: rel.referred.total_invested || 0,
-          referrerName: `${rel.referrer.first_name} ${rel.referrer.last_name}`,
+          referrerName: 'Direct Sponsor',
           referralCode: rel.referred.referral_code,
           referredBy: rel.referred.referred_by || ''
         }));
 
       setTeamData(processedData || []);
-
-      // Organize first level referrals and their downlines
+      
+      // Organize referral groups
       const groups = organizeFirstLevelReferrals(processedData || []);
       setFirstLevelGroups(groups);
 
@@ -401,11 +417,15 @@ const Affiliate = () => {
 
   const renderTree = (node: TeamTreeNode) => {
     if (collapsedNodes.includes(node.id)) {
-      return <OrgTreeNode label={<OrganizationalNode node={node} />} />;
+      return <OrgTreeNode key={node.id} label={<OrganizationalNode node={node} />} />;
     }
     return (
-      <OrgTreeNode label={<OrganizationalNode node={node} />}>
-        {node.children.map((child) => renderTree(child))}
+      <OrgTreeNode key={node.id} label={<OrganizationalNode node={node} />}>
+        {node.children.map((child) => (
+          <div key={child.id}>
+            {renderTree(child)}
+          </div>
+        ))}
       </OrgTreeNode>
     );
   };
@@ -437,14 +457,76 @@ const Affiliate = () => {
         description="Earn commissions by referring new investors to GrowthVest"
       />
 
-      <div className="bg-muted p-6 rounded-lg mb-6">
-        <h2 className="text-xl font-semibold mb-3">How to Earn</h2>
-        <ul className="space-y-2 text-muted-foreground list-disc pl-5">
-          <li>Users can earn across 10 levels</li>
-          <li>Recieve Volume Bonus on Rank Achievement</li>
-          <li>Recieve Team Bonus on Rank Achievement</li>
-          <li>Get 0.18% Global Pool Bonus on Pearl Rank Achievement</li>
-        </ul>
+      <div className="grid gap-6 md:grid-cols-2 mb-6">
+        <div className="bg-muted p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-3">How to Earn</h2>
+          <ul className="space-y-2 text-muted-foreground list-disc pl-5">
+            <li>Users can earn across 10 levels</li>
+            <li>Recieve Volume Bonus on Rank Achievement</li>
+            <li>Recieve Team Bonus on Rank Achievement</li>
+            <li>Get 0.18% Global Pool Bonus on Pearl Rank Achievement</li>
+          </ul>
+        </div>
+
+        <div className="bg-muted p-6 rounded-lg">
+          <div className="mb-4">
+            <h2 className="text-xl font-semibold mb-2">Account Activation Status</h2>
+            <p className="text-sm text-muted-foreground">Get 2 direct referrals to activate your account</p>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-card mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                eligibility.hasDirectReferrals ? 'bg-green-100' : 'bg-yellow-100'
+              }`}>
+                <Users className={`h-4 w-4 ${
+                  eligibility.hasDirectReferrals ? 'text-green-600' : 'text-yellow-600'
+                }`} />
+              </div>
+              <div>
+                <div className="font-medium">Direct Referrals</div>
+                <div className="text-sm text-muted-foreground">Minimum requirement: 2</div>
+              </div>
+            </div>
+            <div className={`px-3 py-1.5 rounded-full text-sm font-medium ${
+              eligibility.hasDirectReferrals 
+                ? 'bg-green-100 text-green-700' 
+                : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {teamData.filter(m => m.level === 1).length}/2
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between opacity-75">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${
+                  eligibility.hasDirectReferrals ? 'bg-green-500' : 'bg-muted'
+                }`} />
+                <span className="text-sm">Commission Earnings</span>
+              </div>
+              <span className={`text-sm font-medium ${
+                eligibility.hasDirectReferrals ? 'text-green-600' : 'text-muted-foreground'
+              }`}>
+                {eligibility.hasDirectReferrals ? 'Active' : 'Requires 2 Referrals'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between opacity-75">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${
+                  eligibility.hasDirectReferrals ? 'bg-green-500' : 'bg-muted'
+                }`} />
+                <span className="text-sm">Rank Bonus</span>
+              </div>
+              <span className={`text-sm font-medium ${
+                eligibility.hasDirectReferrals ? 'text-green-600' : 'text-muted-foreground'
+              }`}>
+                {eligibility.hasDirectReferrals ? 'Active' : 'Requires 2 Referrals'}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -549,6 +631,7 @@ const Affiliate = () => {
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
+                  
                   </div>
                   
                   <div className="space-y-2">

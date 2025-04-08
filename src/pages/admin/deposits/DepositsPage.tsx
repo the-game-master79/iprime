@@ -1,431 +1,154 @@
-import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Check, Download, Search, XCircle, DollarSign, CreditCard, Clock, ArrowDownCircle } from "lucide-react";
-import AdminLayout from "@/pages/admin/AdminLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { 
-  PageHeader,
-  StatCard
-} from "@/components/ui-components";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-
-interface Deposit {
-  id: string;
-  user_id: string;
-  user_name: string;
-  amount: number;
-  method: string;
-  status: "Pending" | "Completed" | "Failed";
-  created_at: string;
-}
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
+import AdminLayout from "@/pages/admin/AdminLayout";
 
 const DepositsPage = () => {
-  const { toast } = useToast();
-  const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [filterMethod, setFilterMethod] = useState<string | null>(null);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [volumes, setVolumes] = useState({ pending: 0, approved: 0, rejected: 0 });
 
   useEffect(() => {
-    fetchDeposits();
+    fetchSubscriptions();
   }, []);
 
-  const fetchDeposits = async () => {
+  const fetchSubscriptions = async () => {
     try {
+      setIsLoading(true);
       const { data, error } = await supabase
-        .from('deposits')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("plans_subscriptions")
+        .select("id, user_id, amount, plan_id, status, created_at")
+        .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error('Error fetching deposits:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch deposits. " + error.message,
-          variant: "destructive"
-        });
-        return;
-      }
+      if (error) throw error;
 
-      if (data) {
-        // Format the dates for display
-        const formattedDeposits = data.map(deposit => ({
-          ...deposit,
-          created_at: new Date(deposit.created_at).toLocaleDateString()
-        }));
-        setDeposits(formattedDeposits);
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive"
-      });
-    }
-  };
+      setSubscriptions(data || []);
 
-  const handleApprove = async (id: string) => {
-    try {
-      // Get deposit details first to verify it exists and isn't already completed
-      const { data: deposit, error: fetchError } = await supabase
-        .from('deposits')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Calculate volumes
+      const volumeData = data.reduce(
+        (acc, sub) => {
+          if (sub.status === "pending") acc.pending += sub.amount;
+          else if (sub.status === "approved") acc.approved += sub.amount;
+          else if (sub.status === "rejected") acc.rejected += sub.amount;
+          return acc;
+        },
+        { pending: 0, approved: 0, rejected: 0 }
+      );
 
-      if (fetchError) throw fetchError;
-      if (deposit.status === 'Completed') {
-        toast({
-          title: "Already Processed",
-          description: "This deposit has already been approved",
-          variant: "default"
-        });
-        return;
-      }
-
-      // Update the deposit status - the trigger will handle balance update
-      const { error: updateError } = await supabase
-        .from('deposits')
-        .update({ 
-          status: 'Completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (updateError) throw updateError;
-
-      toast({
-        title: "Success",
-        description: "Deposit approved and balance updated successfully"
-      });
-      
-      fetchDeposits();
+      setVolumes(volumeData);
     } catch (error) {
-      console.error('Error approving deposit:', error);
-      toast({
-        title: "Error",
-        description: "Failed to approve deposit",
-        variant: "destructive"
-      });
+      console.error("Error fetching subscriptions:", error);
+      toast.error("Failed to load subscriptions");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleReject = async (id: string) => {
-    const { error } = await supabase
-      .from('deposits')
-      .update({ 
-        status: 'Failed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id);
+  const handleVerify = async (id) => {
+    try {
+      const { error } = await supabase
+        .from("plans_subscriptions")
+        .update({ status: "approved" })
+        .eq("id", id);
 
-    if (error) {
-      console.error('Error rejecting deposit:', error);
-      toast({
-        title: "Error",
-        description: `Failed to reject deposit: ${error.message}`,
-        variant: "destructive"
-      });
-      return;
-    }
+      if (error) throw error;
 
-    toast({
-      title: "Success",
-      description: "Deposit rejected successfully"
-    });
-    
-    fetchDeposits();
-  };
-
-  // Calculate statistics from real data
-  const totalDeposits = deposits.length;
-  const pendingDeposits = deposits.filter(d => d.status === "Pending").length;
-  const totalAmount = deposits
-    .filter(d => d.status === "Completed")
-    .reduce((sum, d) => sum + d.amount, 0);
-  const pendingAmount = deposits
-    .filter(d => d.status === "Pending")
-    .reduce((sum, d) => sum + d.amount, 0);
-
-  // Filter deposits
-  const filteredDeposits = deposits.filter(
-    (deposit) => {
-      // Search filter
-      const matchesSearch = 
-        deposit.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        deposit.user_name.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = filterStatus ? deposit.status === filterStatus : true;
-      
-      // Method filter
-      const matchesMethod = filterMethod ? deposit.method === filterMethod : true;
-      
-      return matchesSearch && matchesStatus && matchesMethod;
-    }
-  );
-
-  // Sort deposits
-  const sortedDeposits = [...filteredDeposits].sort((a, b) => {
-    if (!sortField) return 0;
-    
-    const fieldA = a[sortField as keyof typeof a];
-    const fieldB = b[sortField as keyof typeof b];
-    
-    if (fieldA < fieldB) return sortDirection === "asc" ? -1 : 1;
-    if (fieldA > fieldB) return sortDirection === "asc" ? 1 : -1;
-    return 0;
-  });
-
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
+      toast.success("Plan subscription approved successfully");
+      fetchSubscriptions();
+    } catch (error) {
+      console.error("Error approving subscription:", error);
+      toast.error("Failed to approve subscription");
     }
   };
 
-  const clearFilters = () => {
-    setFilterStatus(null);
-    setFilterMethod(null);
+  const handleReject = async (id) => {
+    try {
+      const { error } = await supabase
+        .from("plans_subscriptions")
+        .update({ status: "rejected" })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast.success("Plan subscription rejected successfully");
+      fetchSubscriptions();
+    } catch (error) {
+      console.error("Error rejecting subscription:", error);
+      toast.error("Failed to reject subscription");
+    }
   };
 
   return (
     <AdminLayout>
-      <PageHeader 
-        title="Deposit Management" 
-        description="Review and process user deposit transactions"
-        action={
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            Export Deposits
-          </Button>
-        }
-      />
+      <div className="p-6 space-y-6">
+        <h2 className="text-3xl font-bold">Plan Subscriptions</h2>
 
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <StatCard
-          title="Total Deposits"
-          value={totalDeposits.toString()}
-          icon={<ArrowDownCircle className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Pending Verification"
-          value={pendingDeposits.toString()}
-          icon={<Clock className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Verified Amount"
-          value={`$${totalAmount.toLocaleString()}`}
-          icon={<DollarSign className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Pending Amount"
-          value={`$${pendingAmount.toLocaleString()}`}
-          icon={<CreditCard className="h-4 w-4" />}
-        />
-      </div>
-
-      <div className="bg-background border rounded-lg shadow-sm">
-        <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b">
-          <div className="relative w-full sm:w-auto">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search deposits..."
-              className="pl-8 w-full sm:w-[300px]"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        {/* Volume Summary */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-4 bg-white shadow rounded">
+            <h3 className="text-lg font-semibold">Pending Volume</h3>
+            <p>${volumes.pending.toLocaleString()}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <Button 
-                variant={filterStatus === "Pending" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterStatus(filterStatus === "Pending" ? null : "Pending")}
-              >
-                Pending
-              </Button>
-              <Button 
-                variant={filterStatus === "Completed" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterStatus(filterStatus === "Completed" ? null : "Completed")}
-              >
-                Completed
-              </Button>
-              <Button 
-                variant={filterStatus === "Failed" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterStatus(filterStatus === "Failed" ? null : "Failed")}
-              >
-                Failed
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant={filterMethod === "Credit Card" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterMethod(filterMethod === "Credit Card" ? null : "Credit Card")}
-              >
-                Credit Card
-              </Button>
-              <Button 
-                variant={filterMethod === "Bank Transfer" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterMethod(filterMethod === "Bank Transfer" ? null : "Bank Transfer")}
-              >
-                Bank Transfer
-              </Button>
-              <Button 
-                variant={filterMethod === "PayPal" ? "secondary" : "ghost"} 
-                size="sm"
-                onClick={() => setFilterMethod(filterMethod === "PayPal" ? null : "PayPal")}
-              >
-                PayPal
-              </Button>
-            </div>
-            {(filterStatus || filterMethod) && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear Filters
-              </Button>
-            )}
+          <div className="p-4 bg-white shadow rounded">
+            <h3 className="text-lg font-semibold">Approved Volume</h3>
+            <p>${volumes.approved.toLocaleString()}</p>
+          </div>
+          <div className="p-4 bg-white shadow rounded">
+            <h3 className="text-lg font-semibold">Rejected Volume</h3>
+            <p>${volumes.rejected.toLocaleString()}</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        {/* Subscriptions Table */}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Plan Amount</TableHead>
+              <TableHead>Plan ID</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
               <TableRow>
-                <TableHead className="w-[100px]">
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("id")}
-                  >
-                    ID
-                    {sortField === "id" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("user_name")}
-                  >
-                    User
-                    {sortField === "user_name" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("amount")}
-                  >
-                    Amount
-                    {sortField === "amount" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("method")}
-                  >
-                    Method
-                    {sortField === "method" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("created_at")}
-                  >
-                    Date
-                    {sortField === "created_at" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status
-                    {sortField === "status" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>Actions</TableHead>
+                <TableCell colSpan={7}>Loading...</TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedDeposits.map((deposit) => (
-                <TableRow key={deposit.id}>
-                  <TableCell className="font-medium">{deposit.id}</TableCell>
-                  <TableCell>{deposit.user_name}</TableCell>
-                  <TableCell>${deposit.amount.toLocaleString()}</TableCell>
-                  <TableCell>{deposit.method}</TableCell>
-                  <TableCell>{deposit.created_at}</TableCell>
+            ) : subscriptions.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7}>No subscriptions found</TableCell>
+              </TableRow>
+            ) : (
+              subscriptions.map((sub) => (
+                <TableRow key={sub.id}>
+                  <TableCell>{sub.id}</TableCell>
+                  <TableCell>{sub.user_id}</TableCell>
+                  <TableCell>${sub.amount.toLocaleString()}</TableCell>
+                  <TableCell>{sub.plan_id}</TableCell>
+                  <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>{sub.status}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                      ${deposit.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                        deposit.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'}`}>
-                      {deposit.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">View</Button>
-                      {deposit.status === "Pending" && (
-                        <>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-green-500"
-                            onClick={() => handleApprove(deposit.id)}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Verify
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-red-500"
-                            onClick={() => handleReject(deposit.id)}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                    {sub.status === "pending" && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleVerify(sub.id)}>
+                          Verify
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleReject(sub.id)}>
+                          Reject
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </AdminLayout>
   );
