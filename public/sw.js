@@ -20,6 +20,12 @@ self.addEventListener('fetch', event => {
         if (response) {
           return response;
         }
+        
+        // For navigation requests, return index.html
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
+
         return fetch(event.request);
       })
   );

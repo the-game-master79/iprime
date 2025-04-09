@@ -16,7 +16,9 @@ export default defineConfig({
       'Cache-Control': 'public, max-age=31536000',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept'
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+      'Content-Security-Policy': "img-src 'self' https: data: blob:",
+      'X-Content-Type-Options': 'nosniff'
     },
     fs: {
       strict: false
@@ -36,15 +38,7 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          auth: ['@supabase/auth-js'],
-          components: [
-            '@/components/ui/button',
-            '@/components/ui/input',
-            '@/components/ui/card'
-          ]
-        }
+        manualChunks: undefined
       }
     },
     chunkSizeWarningLimit: 1000

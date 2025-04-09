@@ -23,9 +23,9 @@ export default {
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
-				foreground: 'hsl(var(--foreground))',
+				foreground: '#253262',
 				primary: {
-					DEFAULT: 'hsl(var(--primary))',
+					DEFAULT: '#007AEE',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
@@ -38,19 +38,19 @@ export default {
 				},
 				muted: {
 					DEFAULT: 'hsl(var(--muted))',
-					foreground: 'hsl(var(--muted-foreground))'
+					foreground: '#253262'
 				},
 				accent: {
 					DEFAULT: 'hsl(var(--accent))',
-					foreground: 'hsl(var(--accent-foreground))'
+					foreground: '#253262'
 				},
 				popover: {
 					DEFAULT: 'hsl(var(--popover))',
-					foreground: 'hsl(var(--popover-foreground))'
+					foreground: '#253262'
 				},
 				card: {
 					DEFAULT: 'hsl(var(--card))',
-					foreground: 'hsl(var(--card-foreground))'
+					foreground: '#253262'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
