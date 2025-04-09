@@ -7,13 +7,14 @@ import { getReferralLink } from "@/lib/utils";
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
 import ShellLayout from "@/components/layout/Shell";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import Marquee from 'react-fast-marquee';
+import { Badge } from "@/components/ui/badge";
 
 // Icons
 import {
@@ -47,6 +48,8 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQrCode, setShowQrCode] = useState(false);
   const [showDepositDialog, setShowDepositDialog] = useState(false);
+  const [activePlans, setActivePlans] = useState({ count: 0, amount: 0 });
+  const [withdrawalBalance, setWithdrawalBalance] = useState(0);
   
   // Business data
   const [totalInvested, setTotalInvested] = useState(0);
@@ -84,18 +87,38 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      // Get user profile and subscribed plans data
+      const [profileData, plansData] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single(),
+        supabase
+          .from('plans_subscriptions')
+          .select(`
+            id,
+            investment,
+            status
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'approved')
+      ]);
 
-      if (error) throw error;
-
-      setUserProfile(profile);
-      if (profile?.referral_code) {
-        setReferralLink(getReferralLink(profile.referral_code));
+      if (profileData.error) throw profileData.error;
+      
+      setUserProfile(profileData.data);
+      setWithdrawalBalance(profileData.data?.withdrawal_wallet || 0);
+      if (profileData.data?.referral_code) {
+        setReferralLink(getReferralLink(profileData.data.referral_code));
       }
+
+      // Calculate subscribed plans stats from approved subscriptions
+      const approvedSubscriptions = plansData.data || [];
+      setActivePlans({
+        count: approvedSubscriptions.length,
+        amount: approvedSubscriptions.reduce((sum, sub) => sum + (sub.investment || 0), 0)
+      });
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
@@ -216,7 +239,31 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get total business volume directly from business_volumes table
+      // Get direct referral count first
+      const { data: referralCount, error: referralError } = await supabase
+        .from('referral_relationships')
+        .select('count')
+        .eq('referrer_id', user.id)
+        .eq('level', 1)
+        .single();
+
+      if (referralError) throw referralError;
+
+      // Only proceed if user has at least 2 direct referrals
+      const directCount = referralCount?.count || 0;
+      if (directCount < 2) {
+        setBusinessStats({
+          currentRank: 'New Member',
+          totalVolume: 0,
+          rankBonus: 0,
+          nextRank: null,
+          progress: 0,
+          targetVolume: 0
+        });
+        return;
+      }
+
+      // Get total business volume
       const { data: businessData, error: businessError } = await supabase
         .from('business_volumes')
         .select('amount')
@@ -226,16 +273,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
       const totalVolume = businessData?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
 
-      // Get user's rank info
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('business_rank')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      // Get all claimed rank bonuses
+      // Get rank bonuses
       const { data: rankBonuses, error: bonusError } = await supabase
         .from('transactions')
         .select('amount')
@@ -287,6 +325,11 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
     } catch (error) {
       console.error('Error fetching business stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load business stats",
+        variant: "destructive"
+      });
     }
   };
 
@@ -518,6 +561,11 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                 <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
                   <ArrowUpToLine className="h-8 w-8 text-orange-500" />
                   <span className="font-bold">Withdraw</span>
+                  {withdrawalBalance > 0 && (
+                    <span className="absolute top-2 right-2 bg-white text-xs px-3 py-1.5 rounded-full shadow-sm border border-border/50 font-medium">
+                      Balance: ${withdrawalBalance.toLocaleString()}
+                    </span>
+                  )}
                 </div>
               </Button>
 
@@ -530,6 +578,11 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                 <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
                   <Users className="h-8 w-8 text-purple-500" />
                   <span className="font-bold">View Referrals</span>
+                  {totalReferrals && totalReferrals.total > 0 && (
+                    <span className="absolute top-2 right-2 bg-white text-xs px-3 py-1.5 rounded-full shadow-sm border border-border/50 font-medium">
+                      Downlines: {totalReferrals.total}
+                    </span>
+                  )}
                 </div>
               </Button>
             </div>
