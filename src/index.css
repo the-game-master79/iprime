@@ -87,4 +87,12 @@
   .page-transition-exit {
     @apply animate-fade-out;
   }
+
+  .hover-trigger:hover .hover-trigger\:opacity-0 {
+    opacity: 0;
+  }
+
+  .hover-trigger:hover .hover-trigger\:opacity-100 {
+    opacity: 1;
+  }
 }

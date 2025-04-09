@@ -13,12 +13,11 @@ import { Progress } from "@/components/ui/progress";
 import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
 import ShellLayout from "@/components/layout/Shell";
 import Marquee from 'react-fast-marquee';
-import { Badge } from "@/components/ui/badge";
 
 // Icons
 import {
   DollarSign, Users, Mail, Star, Trophy, Copy, QrCode,
-  Briefcase, ArrowUpToLine
+  Briefcase, ArrowUpToLine, ArrowUpRight, ArrowRight
 } from "lucide-react";
 
 // Utilities
@@ -416,61 +415,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     };
   }, [userProfile?.id]);
 
-  // Render helper functions
-  const renderStats = () => {
-    if (!(totalInvested > MIN_DISPLAY_AMOUNT || totalCommissions > MIN_DISPLAY_AMOUNT || totalReferrals.active > 0 || withdrawalBalance > 0)) {
-      return null;
-    }
-
-    return (
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Your Stats</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {withdrawalBalance > 0 && (
-            <StatCard
-              title="Withdrawal Balance"
-              value={`$${withdrawalBalance.toLocaleString()}`}
-              description="Available for withdrawal"
-              icon={<DollarSign className="h-4 w-4 text-green-500" />}
-              loading={isLoading}
-              className="w-full"
-            />
-          )}
-          {totalInvested > MIN_DISPLAY_AMOUNT && (
-            <StatCard
-              title="Total Invested"
-              value={`$${totalInvested.toLocaleString()}`}
-              description={`${activePlans.count} Active Plan${activePlans.count !== 1 ? 's' : ''}`}
-              icon={<DollarSign className="h-4 w-4" />}
-              loading={isLoading}
-              className="w-full"
-            />
-          )}
-          {totalCommissions > MIN_DISPLAY_AMOUNT && (
-            <StatCard
-              title="Total Commissions"
-              value={`$${totalCommissions.toLocaleString()}`}
-              description="Commission earned"
-              icon={<Users className="h-4 w-4" />}
-              loading={loading}
-              className="w-full"
-            />
-          )}
-          {totalReferrals.active > 0 && (
-            <StatCard
-              title="Team Members"
-              value={totalReferrals.active.toString()}
-              description={`Downline Members`}
-              icon={<Users className="h-4 w-4" />}
-              loading={loading}
-              className="w-full"
-            />
-          )}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <ShellLayout>
       <PageTransition>
@@ -479,8 +423,70 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
             title="Dashboard" 
             description="Overview of your investments and affiliate performance"
           />
+          
+          {totalInvested > 0 && (
+            <div className="grid grid-cols-2 gap-6">
+              <div className="row-span-2 p-6 bg-card border rounded-lg relative overflow-hidden">
+                <img 
+                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cfwatermark.png"
+                  alt="CloudForex Watermark"
+                  className="absolute -top-8 -right-8 w-48 h-48 opacity-10 select-none pointer-events-none object-contain"
+                />
+                <div className="relative z-10 flex flex-col h-full">
+                  <div>
+                    <div className="text-muted-foreground text-base">Total Invested</div>
+                    <div className="text-7xl font-bold text-primary tracking-tight mt-3">
+                      ${totalInvested.toLocaleString()}
+                    </div>
+                    <div className="text-base text-muted-foreground mt-3">
+                      Across {activePlans.count} Active Plan{activePlans.count !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <div className="flex mt-auto hover-trigger">
+                    <Button 
+                      size="lg"
+                      className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
+                      onClick={() => navigate('/plans')}
+                    >
+                      Buy Plans
+                    </Button>
+                    <Button 
+                      size="lg"
+                      className="rounded-full px-2.5 transition-all duration-300 bg-black hover:bg-black"
+                      onClick={() => navigate('/plans')}
+                    >
+                      <div className="relative w-4 h-4">
+                        <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                        <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+              </div>
 
-          <div className="w-full bg-card border rounded-lg overflow-hidden">
+              <div className="p-6 bg-card border rounded-lg">
+                <div className="text-muted-foreground text-sm">Withdrawal Balance</div>
+                <div className="text-3xl font-bold text-green-600 tracking-tight mt-2">
+                  ${withdrawalBalance.toLocaleString()}
+                </div>
+                <div className="text-sm text-muted-foreground mt-2">
+                  Available for withdrawal
+                </div>
+              </div>
+
+              <div className="p-6 bg-card border rounded-lg">
+                <div className="text-muted-foreground text-sm">Total Commissions</div>
+                <div className="text-3xl font-bold text-orange-600 tracking-tight mt-2">
+                  ${totalCommissions.toLocaleString()}
+                </div>
+                <div className="text-sm text-muted-foreground mt-2">
+                  Commission earned
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="relative bg-muted/50 rounded-lg overflow-hidden">
             <div className="bg-muted/30">
               <Marquee
                 gradient={false}
@@ -504,7 +510,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               </Marquee>
             </div>
           </div>
-
+          
           <Card className="border-dashed w-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium">Your Referral Link</CardTitle>
@@ -626,8 +632,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               </div>
             </DialogContent>
           </Dialog>
-
-          {renderStats()}
 
           <div>
             <h2 className="text-lg font-semibold mb-4">Your Progress</h2>

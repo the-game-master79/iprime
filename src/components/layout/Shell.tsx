@@ -26,7 +26,7 @@ import { usePwaInstall } from "@/hooks/use-pwa-install";
 import {
   BanknoteIcon, GanttChartIcon, LayoutDashboard, Menu, Package,
   Settings, Users, X, BellIcon, LogOut, DollarSign, Trophy,
-  ChevronLeft, HelpCircle, Download, InfoIcon
+  ChevronLeft, HelpCircle, Download, InfoIcon, User
 } from "lucide-react";
 
 // Types
@@ -135,15 +135,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         : (isCollapsed ? "w-20" : "w-64")
     )}
   >
-    <div className="flex h-14 items-center px-4">
-      <Link to="/" className="flex items-center gap-2">
+    <div className="flex h-14 items-center">
+      <Link to="/" className="flex items-center pl-4">
         <img 
-          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cloudforex.svg" 
           alt="cloudforex Logo" 
-          className={cn(
-            "h-8 transition-all duration-300",
-            isCollapsed && !isMobile && "w-8"
-          )} 
+          className="h-10 w-auto" 
         />
       </Link>
     </div>
@@ -202,8 +199,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
           <SidebarItem
             collapsed={isCollapsed && !isMobile}
-            icon={<Settings />}
-            label="Settings"
+            icon={<User />}
+            label="My Profile"
             href="/profile"
             active={location.pathname === '/profile'}
           />

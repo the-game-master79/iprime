@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Shield, Upload, Save, CreditCard, Check, ShieldAlert, AlertTriangle, Clock, Copy } from "lucide-react";
+import { User, Shield, Upload, Save, CreditCard, Check, ShieldAlert, AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Make sure this import exists
 import ShellLayout from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,6 @@ const isValidPostalCode = (code: string) => /^[A-Za-z0-9\s-]+$/.test(code);
 const Profile = () => {
   const { toast } = useToast();
   const [isUpdatingPersonal, setIsUpdatingPersonal] = useState(false);
-  const [isUpdatingSecurity, setIsUpdatingSecurity] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingKYC, setIsSubmittingKYC] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{
@@ -99,6 +98,9 @@ const Profile = () => {
   const [nameError, setNameError] = useState("");
   const [dobError, setDobError] = useState("");
   const [fileError, setFileError] = useState("");
+
+  // Add new state for tracking if details are set
+  const [basicDetailsSet, setBasicDetailsSet] = useState(false);
 
   const validateReferralCode = async (code: string) => {
     if (!code) {
@@ -199,14 +201,14 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     try {
-      // 1. Auth User Check
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) throw new Error(authError?.message || 'No authenticated user found');
 
-      // 2. Profile Data Fetch
+      // Get profile data including contact details
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
+          id,
           first_name,
           last_name,
           email,
@@ -226,21 +228,30 @@ const Profile = () => {
 
       if (profileError) throw profileError;
 
-      // 3. Data Mapping
+      // Set basicDetailsSet to true if required fields are filled
+      const hasSubmittedDetails = !!(
+        profile?.phone && 
+        profile?.address && 
+        profile?.city && 
+        profile?.country
+      );
+      setBasicDetailsSet(hasSubmittedDetails);
+
+      // Map profile data to form fields
       setUserData({
-        firstName: profile?.first_name ?? "",
-        lastName: profile?.last_name ?? "",
-        email: profile?.email ?? user.email ?? "",
-        phone: profile?.phone ?? "",
-        address: profile?.address ?? "",
-        city: profile?.city ?? "",
-        country: profile?.country ?? "",
+        firstName: profile?.first_name || "",
+        lastName: profile?.last_name || "",
+        email: profile?.email || user.email || "",
+        phone: profile?.phone || "",
+        address: profile?.address || "",
+        city: profile?.city || "",
+        country: profile?.country || "",
         kycStatus: profile?.kyc_status || 'pending',
-        fullName: profile?.full_name ?? "",
+        fullName: profile?.full_name || "",
         dateJoined: profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : new Date().toLocaleDateString(),
         lastLogin: profile?.last_login ? new Date(profile.last_login).toLocaleDateString() : "Never",
-        status: profile?.status ?? "active",
-        referred_by: profile?.referred_by ?? ""
+        status: profile?.status || "active",
+        referred_by: profile?.referred_by || ""
       });
 
       // After setting userData, fetch referrer name if exists
@@ -414,20 +425,6 @@ const Profile = () => {
     }
   };
 
-  const handleSecurityUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsUpdatingSecurity(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      toast({
-        title: "Security Settings Updated",
-        description: "Your security settings have been updated successfully.",
-      });
-      setIsUpdatingSecurity(false);
-    }, 1000);
-  };
-
   const handleFileSelect = (docType: 'front' | 'back', file: File | null) => {
     setSelectedFiles(prev => ({
       ...prev,
@@ -531,7 +528,7 @@ const Profile = () => {
   return (
     <ShellLayout>
       <PageHeader 
-        title="Profile & Settings" 
+        title="Profile & KYC" 
         description="Manage your personal information and account settings"
       />
 
@@ -559,13 +556,6 @@ const Profile = () => {
                   <Shield className="h-4 w-4" />
                   KYC Verification
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="security" 
-                  className="w-full justify-start gap-2 px-3"
-                >
-                  <Lock className="h-4 w-4" />
-                  Security
-                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -587,7 +577,9 @@ const Profile = () => {
                           <Input 
                             id="firstName" 
                             name="firstName"
-                            defaultValue={userData.firstName} 
+                            value={userData.firstName}
+                            readOnly
+                            className="bg-muted"
                           />
                         </div>
                         <div className="space-y-2">
@@ -595,7 +587,9 @@ const Profile = () => {
                           <Input 
                             id="lastName" 
                             name="lastName"
-                            defaultValue={userData.lastName} 
+                            value={userData.lastName}
+                            readOnly
+                            className="bg-muted"
                           />
                         </div>
                       </div>
@@ -607,7 +601,9 @@ const Profile = () => {
                             id="email" 
                             name="email"
                             type="email" 
-                            defaultValue={userData.email} 
+                            value={userData.email}
+                            readOnly
+                            className="bg-muted"
                           />
                         </div>
                         <div className="space-y-2">
@@ -615,7 +611,10 @@ const Profile = () => {
                           <Input 
                             id="phone" 
                             name="phone"
-                            defaultValue={userData.phone} 
+                            value={userData.phone}
+                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, phone: e.target.value}))}
+                            readOnly={basicDetailsSet}
+                            className={basicDetailsSet ? "bg-muted" : ""}
                           />
                         </div>
                       </div>
@@ -626,7 +625,10 @@ const Profile = () => {
                           <Input 
                             id="address" 
                             name="address"
-                            defaultValue={userData.address} 
+                            value={userData.address}
+                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, address: e.target.value}))}
+                            readOnly={basicDetailsSet}
+                            className={basicDetailsSet ? "bg-muted" : ""}
                           />
                         </div>
                         <div className="space-y-2">
@@ -634,7 +636,10 @@ const Profile = () => {
                           <Input 
                             id="city" 
                             name="city"
-                            defaultValue={userData.city} 
+                            value={userData.city}
+                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, city: e.target.value}))}
+                            readOnly={basicDetailsSet}
+                            className={basicDetailsSet ? "bg-muted" : ""}
                           />
                         </div>
                       </div>
@@ -644,7 +649,10 @@ const Profile = () => {
                         <Input 
                           id="country" 
                           name="country"
-                          defaultValue={userData.country} 
+                          value={userData.country}
+                          onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, country: e.target.value}))}
+                          readOnly={basicDetailsSet}
+                          className={basicDetailsSet ? "bg-muted" : ""}
                         />
                       </div>
 
@@ -711,18 +719,20 @@ const Profile = () => {
                         </div>
                       )}
                     </CardContent>
-                    <CardFooter>
-                      <Button type="submit" disabled={isUpdatingPersonal}>
-                        {isUpdatingPersonal ? (
-                          <>Processing...</>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </CardFooter>
+                    {!basicDetailsSet && (
+                      <CardFooter>
+                        <Button type="submit" disabled={isUpdatingPersonal}>
+                          {isUpdatingPersonal ? (
+                            <>Processing...</>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save Changes
+                            </>
+                          )}
+                        </Button>
+                      </CardFooter>
+                    )}
                   </form>
                 </Card>
               </TabsContent>
@@ -1056,48 +1066,6 @@ const Profile = () => {
                       </Button>
                     </CardFooter>
                   )}
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="security" className="space-y-6">
-                <Card>
-                  <form onSubmit={handleSecurityUpdate}>
-                    <CardHeader>
-                      <CardTitle>Security Settings</CardTitle>
-                      <CardDescription>
-                        Manage your password and security preferences
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="currentPassword">Current Password</Label>
-                        <Input id="currentPassword" type="password" />
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="newPassword">New Password</Label>
-                          <Input id="newPassword" type="password" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="confirmPassword">Confirm Password</Label>
-                          <Input id="confirmPassword" type="password" />
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <Button type="submit" disabled={isUpdatingSecurity}>
-                        {isUpdatingSecurity ? (
-                          <>Processing...</>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </CardFooter>
-                  </form>
                 </Card>
               </TabsContent>
             </div>
