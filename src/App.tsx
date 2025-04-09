@@ -36,72 +36,93 @@ const AdminPlans = lazy(() => import("@/pages/admin/plans/Plans"));
 const SupportManagePage = lazy(() => import("./pages/admin/support/SupportManagePage"));
 const AdminNotices = lazy(() => import("./pages/admin/notices/NoticesPage"));
 
-const queryClient = new QueryClient();
+// Create a stable QueryClient instance outside component
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+    }
+  }
+});
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <AdminAuthProvider>
-            <Suspense fallback={<LoadingSpinner />}>
+// Create a stable Providers component
+const Providers = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <AdminAuthProvider>
+              {children}
+            </AdminAuthProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
+
+const App = () => {
+  return (
+    <Providers>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/auth/login" element={<Login />} />
+          <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/callback" element={<Callback />} />
+
+          {/* Routes that can be loaded before auth check */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/plans" element={<Plans />} />
+          <Route path="/affiliate" element={<Affiliate />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/withdrawals" element={<Withdrawals />} />
+          <Route path="/rank" element={<MyRank />} />
+          
+          {/* Strictly protected routes */}
+          <Route path="/profile" element={
+            <AuthGuard requireAuth>
+              <Profile />
+            </AuthGuard>
+          } />
+          <Route path="/support" element={
+            <AuthGuard requireAuth>
+              <SupportPage />
+            </AuthGuard>
+          } />
+          
+          {/* Admin Routes */}
+          <Route
+            path="/admin/*"
+            element={
               <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Navigate to="/auth/login" replace />} />
-                <Route path="/auth/login" element={<Login />} />
-                <Route path="/auth/register" element={<Register />} />
-                <Route path="/auth/callback" element={<Callback />} />
-
-                {/* Routes that can be loaded before auth check */}
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/plans" element={<Plans />} />
-                <Route path="/affiliate" element={<Affiliate />} />
-                <Route path="/payments" element={<Payments />} />
-                <Route path="/withdrawals" element={<Withdrawals />} />
-                <Route path="/rank" element={<MyRank />} />
-                
-                {/* Strictly protected routes */}
-                <Route path="/profile" element={
-                  <AuthGuard requireAuth>
-                    <Profile />
-                  </AuthGuard>
-                } />
-                <Route path="/support" element={
-                  <AuthGuard requireAuth>
-                    <SupportPage />
-                  </AuthGuard>
-                } />
-                
-                {/* Admin Routes */}
-                <Route
-                  path="/admin/*"
-                  element={
-                    <Routes>
-                      <Route path="login" element={<AdminLogin />} />
-                      <Route path="dashboard" element={<AdminDashboard />} />
-                      <Route path="users" element={<UsersPage />} />
-                      <Route path="settings" element={<SettingsPage />} />
-                      <Route path="payments" element={<PaymentsPage />} />
-                      <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                      <Route path="deposits" element={<DepositsPage />} />
-                      <Route path="affiliates" element={<AffiliatesPage />} />
-                      <Route path="plans" element={<AdminPlans />} />
-                      <Route path="notices" element={<AdminNotices />} />
-                      <Route path="support" element={<SupportManagePage />} />
-                      <Route path="promotions" element={<PromotionsPage />} />
-                    </Routes>
-                  }
-                />
-                
-                <Route path="*" element={<NotFound />} />
+                <Route path="login" element={<AdminLogin />} />
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="payments" element={<PaymentsPage />} />
+                <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                <Route path="deposits" element={<DepositsPage />} />
+                <Route path="affiliates" element={<AffiliatesPage />} />
+                <Route path="plans" element={<AdminPlans />} />
+                <Route path="notices" element={<AdminNotices />} />
+                <Route path="support" element={<SupportManagePage />} />
+                <Route path="promotions" element={<PromotionsPage />} />
               </Routes>
-            </Suspense>
-            <Toaster />
-          </AdminAuthProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+            }
+          />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+      <Toaster />
+    </Providers>
+  );
+};
 
 export default App;

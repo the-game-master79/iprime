@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, PageTransition } from "@/components/ui-components";
 import { Check, DollarSign, Clock, Percent, ArrowRight } from "lucide-react";
@@ -27,6 +25,7 @@ interface Plan {
 interface PlanWithSubscription extends Plan {
   subscription_date?: string;
   actual_earnings?: number;
+  subscription_id: string; // Add this line
 }
 
 interface UserProfile {
@@ -139,6 +138,7 @@ const Plans = () => {
 
             return {
               ...subscription.plans,
+              subscription_id: subscription.id, // Add this line
               subscription_date: subscription.created_at,
               actual_earnings: totalEarnings
             };
@@ -401,7 +401,7 @@ const Plans = () => {
                       );
 
                       return (
-                        <TableRow key={plan.id}>
+                        <TableRow key={plan.subscription_id}> {/* Change this line */}
                           <TableCell className="font-medium">{plan.name}</TableCell>
                           <TableCell>${plan.investment.toLocaleString()}</TableCell>
                           <TableCell>{plan.duration_days} days</TableCell>

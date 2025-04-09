@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
@@ -52,7 +52,7 @@ interface SidebarItemProps {
 }
 
 // Notification components
-const NotificationsList = ({ notices, category }: { notices: Notice[], category: Notice['category'] }) => {
+const NotificationsList: React.FC<{ notices: Notice[], category: Notice['category'] }> = ({ notices, category }) => {
   const filteredNotices = notices.filter(n => n.category === category);
   
   if (filteredNotices.length === 0) {
@@ -72,7 +72,7 @@ const NotificationsList = ({ notices, category }: { notices: Notice[], category:
   );
 };
 
-const NotificationItem = ({ notice }: { notice: Notice }) => (
+const NotificationItem: React.FC<{ notice: Notice }> = ({ notice }) => (
   <DropdownMenuItem className="px-4 py-3 cursor-default">
     <div className="flex gap-3 w-full">
       <div className={`w-1.5 shrink-0 rounded-full ${
@@ -93,7 +93,7 @@ const NotificationItem = ({ notice }: { notice: Notice }) => (
 );
 
 // Sidebar components
-const SidebarItem = ({ icon, label, href, active, collapsed }: SidebarItemProps) => (
+const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, active, collapsed }) => (
   <Link to={href}>
     <Button
       variant={active ? "secondary" : "ghost"}
@@ -108,7 +108,25 @@ const SidebarItem = ({ icon, label, href, active, collapsed }: SidebarItemProps)
   </Link>
 );
 
-const Sidebar = ({ isCollapsed, isMobile, isMobileSidebarOpen, onLogout, location, canInstall, onInstall }: any) => (
+interface SidebarProps {
+  isCollapsed: boolean;
+  isMobile: boolean;
+  isMobileSidebarOpen: boolean;
+  onLogout: () => void;
+  location: any;
+  canInstall: boolean;
+  onInstall: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ 
+  isCollapsed, 
+  isMobile, 
+  isMobileSidebarOpen, 
+  onLogout, 
+  location, 
+  canInstall, 
+  onInstall 
+}) => (
   <aside
     className={cn(
       "fixed inset-y-0 z-50 flex h-full flex-col border-r bg-sidebar transition-transform duration-300 ease-in-out",
@@ -218,7 +236,7 @@ const Sidebar = ({ isCollapsed, isMobile, isMobileSidebarOpen, onLogout, locatio
   </aside>
 );
 
-export const ShellLayout = ({ children }: { children: React.ReactNode }) => {
+export const ShellLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // State management
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

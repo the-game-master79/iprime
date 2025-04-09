@@ -39,6 +39,7 @@ const MyRank = () => {
     nextRank: null,
     progress: 0
   });
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Utility functions
   const calculateRankProgress = (business: number, currentRank: Rank, nextRank: Rank | null): number => {
@@ -172,7 +173,17 @@ const MyRank = () => {
     }
   };
 
-  // Setup effects
+  // Consolidated effects
+  useEffect(() => {
+    const initUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    initUser();
+  }, []);
+
   useEffect(() => {
     fetchRanks();
   }, []);
@@ -185,51 +196,49 @@ const MyRank = () => {
   }, [totalBusiness, ranks]);
 
   useEffect(() => {
-    const initializeData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    if (!userId) return;
 
-      await fetchUserData(user.id);
-
-      // Setup real-time subscriptions
-      const channel = supabase
-        .channel('profile-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'profiles',
-            filter: `id=eq.${user.id}`,
-          },
-          async () => await fetchUserData(user.id)
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'transactions',
-            filter: `user_id=eq.${user.id} AND type=eq.rank_bonus`,
-          },
-          (payload) => {
-            toast({
-              title: "Rank Bonus Credited!",
-              description: payload.new.description,
-              variant: "success",
-            });
-            fetchUserData(user.id);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    const fetchData = async () => {
+      await fetchUserData(userId);
     };
 
-    initializeData();
-  }, [ranks]);
+    fetchData();
+
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${userId}`,
+        },
+        async () => await fetchUserData(userId)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${userId} AND type=eq.rank_bonus`,
+        },
+        (payload) => {
+          toast({
+            title: "Rank Bonus Credited!",
+            description: payload.new.description,
+            variant: "success",
+          });
+          fetchUserData(userId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, toast]);
 
   return (
     <ShellLayout>

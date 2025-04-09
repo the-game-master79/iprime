@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ArrowDownUp, CheckSquare, Download, Search, XSquare, DollarSign, Clock, CheckCircle } from "lucide-react";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -63,26 +63,29 @@ const AdminWithdrawalsPage = () => {
     .filter(w => w.status === "Pending")
     .reduce((sum, w) => sum + w.amount, 0);
 
-  // Filter withdrawals
-  const filteredWithdrawals = withdrawals.filter((withdrawal) => {
-    const matchesSearch = 
-      withdrawal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      withdrawal.crypto_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      withdrawal.wallet_address.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus ? withdrawal.status === filterStatus : true;
-    
-    return matchesSearch && matchesStatus;
-  });
+  // Memoize filtered withdrawals
+  const filteredWithdrawals = useMemo(() => {
+    return withdrawals.filter((withdrawal) => {
+      const matchesSearch = 
+        withdrawal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        withdrawal.crypto_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        withdrawal.wallet_address.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = filterStatus ? withdrawal.status === filterStatus : true;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [withdrawals, searchTerm, filterStatus]);
 
-  const handleSort = (field: string) => {
+  // Memoize sort handler
+  const handleSort = useCallback((field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
       setSortDirection("asc");
     }
-  };
+  }, [sortField, sortDirection]);
 
   const handleApprove = async (id: string) => {
     try {

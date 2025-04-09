@@ -5,7 +5,7 @@ import { Trophy, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,17 +23,17 @@ const MyRank = () => {
   const [loading, setLoading] = useState(true);
   const [totalBusiness, setTotalBusiness] = useState(0);
   const [totalBonusEarned, setTotalBonusEarned] = useState(0);
-  const [userRank, setUserRank] = useState<string>(''); // Add this state
+  const [userRank, setUserRank] = useState<string>(''); 
   const [currentRankData, setCurrentRankData] = useState<{
     rank: Rank | null;
     nextRank: Rank | null;
     progress: number;
   }>({ rank: null, nextRank: null, progress: 0 });
 
-  const calculateRank = (business: number, ranks: Rank[]) => {
+  const calculateRank = useCallback((business: number, ranks: Rank[]) => {
     const sortedRanks = [...ranks].sort((a, b) => a.business_amount - b.business_amount);
     
-    let currentRank: Rank | null = sortedRanks[0]; // Set default to lowest rank
+    let currentRank: Rank | null = sortedRanks[0]; 
     let nextRank: Rank | null = sortedRanks[0];
     
     for (let i = 0; i < sortedRanks.length; i++) {
@@ -45,7 +45,6 @@ const MyRank = () => {
       }
     }
 
-    // Rest of progress calculation remains the same
     let progress = 0;
     if (nextRank) {
       if (currentRank === nextRank) {
@@ -61,7 +60,7 @@ const MyRank = () => {
 
     progress = Math.max(0, Math.min(100, progress));
     return { currentRank, nextRank, progress };
-  };
+  }, []);
 
   const fetchRanks = async () => {
     try {
@@ -84,7 +83,6 @@ const MyRank = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get referral relationships with total invested amounts
       const { data: referrals, error: referralsError } = await supabase
         .from('referral_relationships')
         .select(`
@@ -97,7 +95,6 @@ const MyRank = () => {
 
       if (referralsError) throw referralsError;
 
-      // Calculate total business volume from team investments
       const teamBusiness = referrals.reduce((sum, ref) => 
         sum + (ref.referred?.total_invested || 0), 0
       );
@@ -139,11 +136,9 @@ const MyRank = () => {
 
       if (error) throw error;
 
-      // Set the user's current rank from profile
       setUserRank(profile.business_rank);
       setTotalBusiness(profile.business_volume || 0);
 
-      // Find the current rank object from ranks array
       const currentRank = ranks.find(r => r.title === profile.business_rank);
       if (currentRank) {
         const rankData = calculateRank(profile.business_volume || 0, ranks);
@@ -172,7 +167,6 @@ const MyRank = () => {
         variant: "success",
       });
 
-      // Refresh data
       await Promise.all([
         fetchTotalBusiness(),
         fetchUserProfile(user.id),
@@ -190,7 +184,6 @@ const MyRank = () => {
   };
 
   useEffect(() => {
-    // Move fetchRanks to its own useEffect
     fetchRanks();
   }, []);
 
@@ -223,7 +216,6 @@ const MyRank = () => {
             filter: `id=eq.${user.id}`,
           },
           async (payload) => {
-            // Refresh user profile when rank changes
             await fetchUserProfile(user.id);
           }
         )
@@ -241,7 +233,6 @@ const MyRank = () => {
               description: payload.new.description,
               variant: "success",
             });
-            // Refresh total business after bonus credit
             fetchTotalBusiness();
           }
         )
@@ -253,7 +244,11 @@ const MyRank = () => {
     };
 
     initializeData();
-  }, [ranks]);
+
+    return () => {
+      supabase.removeAllChannels();
+    };
+  }, []);
 
   return (
     <ShellLayout>

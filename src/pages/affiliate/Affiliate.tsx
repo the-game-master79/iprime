@@ -53,6 +53,8 @@ const Affiliate = () => {
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [currentReferrer, setCurrentReferrer] = useState<string | null>(null);
+  const [currentReferrerCode, setCurrentReferrerCode] = useState<string | null>(null);
   const [expandedLevel, setExpandedLevel] = useState<number | null>(1);
   const [teamData, setTeamData] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,13 +80,27 @@ const Affiliate = () => {
         if (user) {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('referral_code')
+            .select('referral_code, referred_by')
             .eq('id', user.id)
             .single();
             
           if (profile?.referral_code) {
-            setReferralCode(profile.referral_code); // Add this line
+            setReferralCode(profile.referral_code);
             setReferralLink(`${window.location.origin}/auth/register?ref=${profile.referral_code}`);
+          }
+
+          // Fetch referrer name if exists
+          if (profile?.referred_by) {
+            setCurrentReferrerCode(profile.referred_by);
+            const { data: referrer } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('referral_code', profile.referred_by)
+              .single();
+              
+            if (referrer) {
+              setCurrentReferrer(referrer.full_name);
+            }
           }
         }
       } catch (error) {
@@ -613,6 +629,22 @@ const Affiliate = () => {
                   <CardDescription>Share these details to earn commissions</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {currentReferrer && currentReferrerCode && (
+                    <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <Users className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-green-800">
+                            Referred by: <span className="font-medium">{currentReferrer}</span>
+                          </p>
+                          <p className="text-xs text-green-600">Referral Code: {currentReferrerCode}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-2">
                     <Label>Your Referral Code</Label>
                     <div className="flex space-x-2">
@@ -656,69 +688,77 @@ const Affiliate = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
-                      <div key={level} className="border rounded-lg overflow-hidden">
-                        <div
-                          className="flex items-center justify-between p-4 bg-muted cursor-pointer"
-                          onClick={() => toggleLevel(level)}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                              {level}
+                  {teamData.length > 0 ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
+                        <div key={level} className="border rounded-lg overflow-hidden">
+                          <div
+                            className="flex items-center justify-between p-4 bg-muted cursor-pointer"
+                            onClick={() => toggleLevel(level)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                                {level}
+                              </div>
+                              <div>
+                                <h3 className="font-medium">Level {level} Members</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {getTeamByLevel(level).length} members
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h3 className="font-medium">Level {level} Members</h3>
-                              <p className="text-sm text-muted-foreground">
-                                {getTeamByLevel(level).length} members
-                              </p>
-                            </div>
+                            {expandedLevels.includes(level) ? (
+                              <ChevronUp className="h-5 w-5" />
+                            ) : (
+                              <ChevronDown className="h-5 w-5" />
+                            )}
                           </div>
-                          {expandedLevels.includes(level) ? (
-                            <ChevronUp className="h-5 w-5" />
-                          ) : (
-                            <ChevronDown className="h-5 w-5" />
+
+                          {expandedLevels.includes(level) && (
+                            <div className="overflow-x-auto -mx-4 sm:mx-0">
+                              <div className="inline-block min-w-full align-middle">
+                                <table className="w-full divide-y divide-border">
+                                  <thead className="bg-muted/50">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Referred By</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Package</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Join Date</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Commissions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-background divide-y divide-border">
+                                    {getTeamByLevel(level).map((member) => (
+                                      <tr key={member.id} className="hover:bg-muted/50">
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.name}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.referrerName}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">${member.totalInvested.toLocaleString()}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.joinDate}</td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">
+                                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
+                                            ${member.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                            {member.status}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">${getCommissionForMember(member).toLocaleString()}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
                           )}
                         </div>
-
-                        {expandedLevels.includes(level) && (
-                          <div className="overflow-x-auto -mx-4 sm:mx-0">
-                            <div className="inline-block min-w-full align-middle">
-                              <table className="w-full divide-y divide-border">
-                                <thead className="bg-muted/50">
-                                  <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Referred By</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Package</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Join Date</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Commissions</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-background divide-y divide-border">
-                                  {getTeamByLevel(level).map((member) => (
-                                    <tr key={member.id} className="hover:bg-muted/50">
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.name}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.referrerName}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">${member.totalInvested.toLocaleString()}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">{member.joinDate}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">
-                                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                                          ${member.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                          {member.status}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-xs sm:text-sm">${getCommissionForMember(member).toLocaleString()}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      icon={<Users />}
+                      title="No Referrals Yet"
+                      description="Share your referral link to start building your team network"
+                    />
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

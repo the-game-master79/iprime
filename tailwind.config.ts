@@ -115,7 +115,10 @@ export default {
 				'slide-out-right': 'slide-out-right 0.3s ease-out',
 				'slide-in-left': 'slide-in-left 0.3s ease-out',
 				'slide-out-left': 'slide-out-left 0.3s ease-out',
-				'pulse-opacity': 'pulse-opacity 2s ease-in-out infinite'
+				'pulse-opacity': 'pulse-opacity 2s ease-in-out infinite',
+				'pulse-slow': 'pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'pulse-slower': 'pulse 10s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				'pulse-slowest': 'pulse 12s cubic-bezier(0.4, 0, 0.6, 1) infinite'
 			},
 			fontFamily: {
 				sans: ['Questrial', 'sans-serif'], // Removed other fallback fonts

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
@@ -12,14 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
 import ShellLayout from "@/components/layout/Shell";
-import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import Marquee from 'react-fast-marquee';
 import { Badge } from "@/components/ui/badge";
 
 // Icons
 import {
   DollarSign, Users, Mail, Star, Trophy, Copy, QrCode,
-  Briefcase, ArrowDownToLine, ArrowUpToLine
+  Briefcase, ArrowUpToLine
 } from "lucide-react";
 
 // Utilities
@@ -40,14 +39,17 @@ import type {
 const REFRESH_INTERVAL = 30000;
 const MIN_DISPLAY_AMOUNT = 0.01;
 
-const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
+interface DashboardContentProps {
+  loading: boolean;
+}
+
+const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // State management
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [referralLink, setReferralLink] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQrCode, setShowQrCode] = useState(false);
-  const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [activePlans, setActivePlans] = useState({ count: 0, amount: 0 });
   const [withdrawalBalance, setWithdrawalBalance] = useState(0);
   
@@ -98,7 +100,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
           .from('plans_subscriptions')
           .select(`
             id,
-            investment,
+            amount,
             status
           `)
           .eq('user_id', user.id)
@@ -113,12 +115,17 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
         setReferralLink(getReferralLink(profileData.data.referral_code));
       }
 
-      // Calculate subscribed plans stats from approved subscriptions
+      // Calculate total invested amount from approved subscriptions
       const approvedSubscriptions = plansData.data || [];
+      const totalAmount = approvedSubscriptions.reduce((sum, sub) => sum + (sub.amount || 0), 0);
+      
       setActivePlans({
         count: approvedSubscriptions.length,
-        amount: approvedSubscriptions.reduce((sum, sub) => sum + (sub.investment || 0), 0)
+        amount: totalAmount
       });
+      
+      // Set total invested amount
+      setTotalInvested(totalAmount);
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
@@ -411,7 +418,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
   // Render helper functions
   const renderStats = () => {
-    if (!(totalInvested > MIN_DISPLAY_AMOUNT || totalCommissions > MIN_DISPLAY_AMOUNT || totalReferrals.active > 0)) {
+    if (!(totalInvested > MIN_DISPLAY_AMOUNT || totalCommissions > MIN_DISPLAY_AMOUNT || totalReferrals.active > 0 || withdrawalBalance > 0)) {
       return null;
     }
 
@@ -419,11 +426,21 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       <div>
         <h2 className="text-lg font-semibold mb-4">Your Stats</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {withdrawalBalance > 0 && (
+            <StatCard
+              title="Withdrawal Balance"
+              value={`$${withdrawalBalance.toLocaleString()}`}
+              description="Available for withdrawal"
+              icon={<DollarSign className="h-4 w-4 text-green-500" />}
+              loading={isLoading}
+              className="w-full"
+            />
+          )}
           {totalInvested > MIN_DISPLAY_AMOUNT && (
             <StatCard
               title="Total Invested"
               value={`$${totalInvested.toLocaleString()}`}
-              description="Active investments"
+              description={`${activePlans.count} Active Plan${activePlans.count !== 1 ? 's' : ''}`}
               icon={<DollarSign className="h-4 w-4" />}
               loading={isLoading}
               className="w-full"
@@ -527,7 +544,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
           <div>
             <h2 className="text-lg font-semibold mb-4">Start earning in your account</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
                 variant="ghost"
                 className="h-32 relative overflow-hidden group w-full"
@@ -542,18 +559,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
               <Button
                 variant="ghost"
-                className="h-32 relative overflow-hidden group w-full"
-                onClick={() => setShowDepositDialog(true)}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 via-emerald-400/20 to-teal-500/20 group-hover:opacity-75 transition-opacity" />
-                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
-                  <ArrowDownToLine className="h-8 w-8 text-green-500" />
-                  <span className="font-bold">Deposit</span>
-                </div>
-              </Button>
-
-              <Button
-                variant="ghost"
                 className="h-32 relative overflow-hidden group w-full"  
                 onClick={() => navigate('/withdrawals')}
               >
@@ -561,11 +566,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                 <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
                   <ArrowUpToLine className="h-8 w-8 text-orange-500" />
                   <span className="font-bold">Withdraw</span>
-                  {withdrawalBalance > 0 && (
-                    <span className="absolute top-2 right-2 bg-white text-xs px-3 py-1.5 rounded-full shadow-sm border border-border/50 font-medium">
-                      Balance: ${withdrawalBalance.toLocaleString()}
-                    </span>
-                  )}
                 </div>
               </Button>
 
@@ -761,10 +761,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
         </div>
       </PageTransition>
-      <DepositDialog
-        open={showDepositDialog}
-        onOpenChange={setShowDepositDialog}
-      />
     </ShellLayout>
   );
 };
