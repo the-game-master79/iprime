@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader, PageTransition } from "@/components/ui-components";
-import { Check, DollarSign, Clock, Percent, ArrowRight } from "lucide-react";
+import { Check, DollarSign, Clock, Percent, ArrowRight, BadgeCheck, ArrowRightIcon, Circle, CheckCircle2 } from "lucide-react";
 import ShellLayout from "@/components/layout/Shell";
 import { supabase } from "@/lib/supabase";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { format } from "date-fns";
 
 interface Plan {
   id: string;
@@ -25,7 +28,9 @@ interface Plan {
 interface PlanWithSubscription extends Plan {
   subscription_date?: string;
   actual_earnings?: number;
-  subscription_id: string; // Add this line
+  subscription_id: string;
+  days_credited?: number;
+  last_earning_date?: string;
 }
 
 interface UserProfile {
@@ -35,24 +40,27 @@ interface UserProfile {
   total_invested: number;
 }
 
+const getRandomGradient = () => {
+  const gradients = [
+    'bg-gradient-to-r from-blue-500/20 to-purple-500/20',
+    'bg-gradient-to-r from-green-500/20 to-teal-500/20',
+    'bg-gradient-to-r from-orange-500/20 to-pink-500/20',
+    'bg-gradient-to-r from-indigo-500/20 to-cyan-500/20',
+    'bg-gradient-to-r from-rose-500/20 to-orange-500/20',
+  ];
+  return gradients[Math.floor(Math.random() * gradients.length)];
+};
+
 const Plans = () => {
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [investmentAmount, setInvestmentAmount] = useState(1000);
-  const [calculatedReturns, setCalculatedReturns] = useState({
-    monthly: 0,
-    total: 0,
-  });
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [investmentError, setInvestmentError] = useState<string | null>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [processingInvestment, setProcessingInvestment] = useState(false);
   const [showDepositDialog, setShowDepositDialog] = useState(false);
   const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<Plan | null>(null);
   const [subscribedPlans, setSubscribedPlans] = useState<PlanWithSubscription[]>([]);
 
-  // Fetch plans from Supabase
   useEffect(() => {
     const fetchPlans = async () => {
       try {
@@ -77,7 +85,6 @@ const Plans = () => {
     fetchPlans();
   }, []);
 
-  // Update fetchUserProfile function to use correct columns
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -100,130 +107,130 @@ const Plans = () => {
     fetchUserProfile();
   }, []);
 
-  // Update fetchSubscribedPlans function to use plans_subscriptions
+  const fetchSubscribedPlans = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: subscriptions, error: subsError } = await supabase
+        .from('plans_subscriptions')
+        .select(`
+          id,
+          plan_id,
+          created_at,
+          plans (*)
+        `)
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+
+      if (subsError) throw subsError;
+
+      const plansWithEarnings = await Promise.all(
+        subscriptions.map(async (subscription) => {
+          // Get earnings with dates
+          const { data: earnings, error: earningsError } = await supabase
+            .from('transactions')
+            .select('amount, created_at')
+            .eq('user_id', user.id)
+            .eq('type', 'investment_return')
+            .eq('reference_id', subscription.id)
+            .eq('status', 'Completed')
+            .order('created_at', { ascending: false });
+
+          if (earningsError) throw earningsError;
+
+          const totalEarnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+          const lastEarningDate = earnings?.[0]?.created_at;
+          const daysCredited = earnings?.length || 0;
+
+          return {
+            ...subscription.plans,
+            subscription_id: subscription.id,
+            subscription_date: subscription.created_at,
+            actual_earnings: totalEarnings,
+            days_credited: daysCredited,
+            last_earning_date: lastEarningDate
+          };
+        })
+      );
+
+      setSubscribedPlans(plansWithEarnings);
+    } catch (error) {
+      console.error('Error fetching subscribed plans:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchSubscribedPlans = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: subscriptions, error: subsError } = await supabase
-          .from('plans_subscriptions')
-          .select(`
-            id,
-            plan_id,
-            created_at,
-            plans (*)
-          `)
-          .eq('user_id', user.id)
-          .eq('status', 'approved');
-
-        if (subsError) throw subsError;
-
-        // For each subscription, get the total earnings from transactions
-        const plansWithEarnings = await Promise.all(
-          subscriptions.map(async (subscription) => {
-            // Fixed the transaction query to use proper filtering
-            const { data: earnings, error: earningsError } = await supabase
-              .from('transactions')
-              .select('amount')
-              .eq('user_id', user.id)
-              .eq('type', 'investment_return')
-              .eq('reference_id', subscription.id) // Changed from plan_id to subscription.id
-              .eq('status', 'Completed');
-
-            if (earningsError) throw earningsError;
-
-            const totalEarnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
-            return {
-              ...subscription.plans,
-              subscription_id: subscription.id, // Add this line
-              subscription_date: subscription.created_at,
-              actual_earnings: totalEarnings
-            };
-          })
-        );
-
-        setSubscribedPlans(plansWithEarnings);
-      } catch (error) {
-        console.error('Error fetching subscribed plans:', error);
-      }
-    };
-
     fetchSubscribedPlans();
   }, []);
 
-  // Calculate returns when plan or amount changes
-  useEffect(() => {
-    if (selectedPlan) {
-      const plan = plans.find((p) => p.id === selectedPlan);
-      if (plan) {
-        const monthlyReturn = (investmentAmount * plan.returns_percentage) / 100;
-        const totalMonths = plan.duration_days / 30;
-        const totalReturn = monthlyReturn * totalMonths;
-
-        setCalculatedReturns({
-          monthly: monthlyReturn,
-          total: totalReturn,
-        });
-      }
-    }
-  }, [selectedPlan, investmentAmount, plans]);
-
-  // Handle amount slider change
-  const handleAmountChange = (value: number[]) => {
-    setInvestmentAmount(value[0]);
-  };
-
-  // Update handleInvestClick function
   const handleInvestClick = (planId: string) => {
     const selectedPlanData = plans.find(p => p.id === planId);
     if (!selectedPlanData) return;
-    
+
     setSelectedPlan(planId);
     setSelectedPlanForDeposit(selectedPlanData);
-    setShowDepositDialog(true); // Open deposit dialog instead of confirm dialog
+    setShowDepositDialog(true);
   };
 
-  // Update handleInvestment function
-  const handleInvestment = async () => {
-    if (!selectedPlan || !userProfile) {
-      console.error("Error: Selected plan or user profile is missing.");
-      return;
-    }
-    setProcessingInvestment(true);
+  const calculateRefundAmount = (investment: number) => {
+    const forexFee = investment * 0.10;
+    const adminFee = investment * 0.05;
+    const refundAmount = investment - (forexFee + adminFee);
+    
+    return {
+      forexFee,
+      adminFee,
+      refundAmount
+    };
+  };
 
+  const handleCancelSubscription = async (plan: PlanWithSubscription) => {
     try {
-      const selectedPlanData = plans.find(p => p.id === selectedPlan);
-      if (!selectedPlanData) {
-        throw new Error("Selected plan data is missing.");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // First get the business volumes to be removed
+      const { data: businessVolumes, error: bvError } = await supabase
+        .from('business_volumes')
+        .select('id, user_id, amount')
+        .eq('subscription_id', plan.subscription_id);
+
+      if (bvError) throw bvError;
+
+      // Update subscription status to cancelled
+      const { error: updateError } = await supabase
+        .from('plans_subscriptions')
+        .update({ status: 'cancelled' })
+        .eq('id', plan.subscription_id);
+
+      if (updateError) throw updateError;
+
+      // Delete business volumes entries
+      if (businessVolumes && businessVolumes.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('business_volumes')
+          .delete()
+          .eq('subscription_id', plan.subscription_id);
+
+        if (deleteError) throw deleteError;
       }
 
-      // Call the stored procedure to create subscription and transaction
-      const { data, error } = await supabase.rpc('handle_plan_subscription', {
-        p_user_id: userProfile.id,
-        p_plan_id: selectedPlan,
-        p_amount: selectedPlanData.investment,
-        p_description: `Subscription to ${selectedPlanData.name} plan`,
-        p_method: 'crypto' // Or get this from the DepositDialog
-      });
-
-      if (error) throw error;
-
       toast({
-        title: "Success",
-        description: `Successfully subscribed to ${selectedPlanData.name} plan`,
-        variant: "default",
+        title: "Plan Cancelled",
+        description: "Your investment has been refunded to your withdrawal wallet with applicable fees deducted.",
+        variant: "default"
       });
 
-      setShowDepositDialog(false);
-      setInvestmentError(null);
+      fetchSubscribedPlans();
+
     } catch (error) {
-      console.error("Error processing subscription:", error);
-      setInvestmentError('Failed to process subscription. Please try again.');
-    } finally {
-      setProcessingInvestment(false);
+      console.error('Error cancelling subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -231,188 +238,323 @@ const Plans = () => {
     <ShellLayout>
       <PageTransition>
         <PageHeader 
-          title="Investment Plans" 
-          description="Select your plan, click on subscribe, complete payment and start earning!"
+          title="Choose Your Investment Plan" 
+          description="Select from our curated investment plans and start your journey to financial growth"
         />
         
-        <Tabs defaultValue="available">
-          <TabsList className="mb-6">
-            <TabsTrigger value="available">Available Plans</TabsTrigger>
-            <TabsTrigger value="subscribed" className="relative">
-              Subscribed Plans
-              {subscribedPlans.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {subscribedPlans.length}
-                </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="available" className="space-y-8">
+          <div className="flex items-center justify-between">
+            <TabsList className="w-[400px]">
+              <TabsTrigger value="available" className="flex-1">Available Plans</TabsTrigger>
+              <TabsTrigger value="subscribed" className="flex-1 relative">
+                My Investments
+                {subscribedPlans.length > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                    {subscribedPlans.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              </TabsList>
+          </div>
 
-          <TabsContent value="available">
-            <div className="grid gap-6">
-              {/* Plans Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {loading ? (
-                  // Loading state
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <Card key={i} className="border border-border/40 bg-card/60">
-                      <CardHeader className="pb-2">
-                        <div className="h-4 w-20 bg-muted/60 rounded animate-pulse mb-2" />
-                        <div className="h-6 w-32 bg-muted/60 rounded animate-pulse" />
-                        <div className="h-4 w-full bg-muted/60 rounded animate-pulse mt-2" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
-                          <div className="h-4 w-3/4 bg-muted/60 rounded animate-pulse" />
-                          <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <div className="h-9 w-full bg-muted/60 rounded animate-pulse" />
-                      </CardFooter>
-                    </Card>
-                  ))
-                ) : (
-                  // Active plans section
-                  plans.map((plan) => (
-                    <Card 
-                      key={plan.id}
-                      className={`relative overflow-hidden transition-all duration-300 ${
-                        selectedPlan === plan.id 
-                          ? "border-primary/50 shadow-md" 
-                          : "border-border/40 hover:border-primary/30 hover:shadow-sm"
-                      }`}
-                    >
-                      {plan.recommended && (
-                        <div className="absolute -right-12 top-6 rotate-45 bg-primary px-10 py-1 text-xs font-medium text-primary-foreground">
-                          Recommended
-                        </div>
-                      )}
-                      <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2">
+          <TabsContent value="available" className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="border border-border/40 bg-card/60">
+                    <CardHeader className="pb-2">
+                      <div className="h-4 w-20 bg-muted/60 rounded animate-pulse mb-2" />
+                      <div className="h-6 w-32 bg-muted/60 rounded animate-pulse" />
+                      <div className="h-4 w-full bg-muted/60 rounded animate-pulse mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
+                        <div className="h-4 w-3/4 bg-muted/60 rounded animate-pulse" />
+                        <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <div className="h-9 w-full bg-muted/60 rounded animate-pulse" />
+                    </CardFooter>
+                  </Card>
+                ))
+              ) : (
+                plans.map((plan) => (
+                  <Card 
+                    key={plan.id}
+                    className={cn(
+                      "relative transition-all duration-300 hover:shadow-lg overflow-hidden",
+                      selectedPlan === plan.id && "ring-2 ring-primary"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-0 right-0 w-[300px] h-[300px] -mr-32 -mt-32 rounded-full opacity-50 blur-3xl",
+                      getRandomGradient()
+                    )} />
+                    {plan.recommended && (
+                      <div className="absolute right-4 top-4 z-10">
+                        <BadgeCheck className="h-6 w-6 text-primary" />
+                      </div>
+                    )}
+                    <CardHeader className="space-y-2">
+                      <div>
+                        <CardTitle className="text-xl font-semibold">
                           {plan.name}
                         </CardTitle>
-                        <CardDescription className="mt-2">{plan.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <DollarSign className="h-5 w-5 text-primary" />
-                          </div>
+                        <CardDescription className="text-sm text-muted-foreground mt-1">
+                          {plan.description}
+                        </CardDescription>
+                      </div>
+                      <Separator className="my-2" />
+                      <div>
+                        <span className="text-sm text-muted-foreground">$</span>
+                        <span className="text-6xl font-bold text-foreground ml-0.5 tracking-tight">
+                          {plan.investment.toLocaleString()}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="rounded-lg border bg-card/50 p-4">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium">Package</p>
-                            <p className="text-sm text-muted-foreground">
-                              ${plan.investment.toLocaleString()}
-                            </p>
+                            <p className="text-sm text-muted-foreground">Daily ROI</p>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className="text-2xl font-semibold">{plan.returns_percentage}%</span>
+                              <span className="text-sm text-muted-foreground ml-1">
+                                (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
+                              </span>
+                            </div>
+                          </div>
+                          <ArrowRightIcon className="h-5 w-5 text-muted-foreground mx-2" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Total ROI</p>
+                            <div className="flex items-baseline gap-1 mt-1">
+                              <span className="text-2xl font-semibold">
+                                {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
+                              </span>
+                              <span className="text-sm text-muted-foreground ml-1">
+                                (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <Percent className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Daily ROI</p>
-                            <p className="text-sm text-muted-foreground">{plan.returns_percentage}% per day</p>
-                          </div>
-                        </div>
+                      </div>
 
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <ArrowRight className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Total ROI</p>
-                            <p className="text-sm text-muted-foreground">
-                              {(plan.returns_percentage * plan.duration_days).toFixed(2)}%
-                            </p>
+                      <div className="rounded-lg border bg-card/50 p-4">
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Duration</p>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-semibold">{plan.duration_days}</span>
+                            <span className="text-muted-foreground">days</span>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <Clock className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Duration</p>
-                            <p className="text-sm text-muted-foreground">
-                              {plan.duration_days} days
-                            </p>
-                          </div>
-                        </div>
+                      </div>
 
-                        <div className="pt-2">
-                          <p className="text-sm font-medium mb-2">Benefits:</p>
-                          <ul className="space-y-2">
-                            {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-sm">
-                                <Check className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                                <span>{benefit.trim()}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="flex flex-col gap-2">
-                        <Button 
-                          onClick={() => handleInvestClick(plan.id)}
-                          variant={selectedPlan === plan.id ? "default" : "outline"}
-                          className="w-full"
-                        >
-                          Subscribe Now
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                        {investmentError && selectedPlan === plan.id && (
-                          <p className="text-sm text-destructive">{investmentError}</p>
-                        )}
-                      </CardFooter>
-                    </Card>
-                  ))
-                )}
-              </div>
+                      <Button 
+                        className="w-full"
+                        size="lg"
+                        variant={selectedPlan === plan.id ? "default" : "outline"}
+                        onClick={() => handleInvestClick(plan.id)}
+                      >
+                        Invest Now
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+
+                      <div className="space-y-3">
+                        <p className="font-medium">What's included</p>
+                        <ul className="space-y-2">
+                          {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <div className="rounded-full bg-primary/10 p-1 mt-0.5">
+                                <CheckCircle2 className="h-4 w-4 text-primary/70" />
+                              </div>
+                              <span className="text-sm">{benefit.trim()}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </CardContent>
+                    
+                  </Card>
+                ))
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="subscribed">
             {subscribedPlans.length === 0 ? (
-              <p className="text-muted-foreground">You have not subscribed to any plans yet.</p>
+              <div className="text-center py-12">
+                <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                <h3 className="mt-4 text-lg font-medium">No Active Investments</h3>
+                <p className="mt-2 text-muted-foreground">
+                  You haven't subscribed to any investment plans yet.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-6"
+                  onClick={() => document.querySelector('[value="available"]')?.click()}
+                >
+                  View Available Plans
+                </Button>
+              </div>
             ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Plan Name</TableHead>
-                      <TableHead>Investment</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Remaining Duration</TableHead>
-                      <TableHead>Daily ROI</TableHead>
-                      <TableHead>Total Earnings</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscribedPlans.map((plan) => {
-                      const remainingDuration = Math.max(
-                        plan.duration_days - Math.floor(
-                          (Date.now() - new Date(plan.subscription_date || Date.now()).getTime()) / 
-                          (1000 * 60 * 60 * 24)
-                        ),
-                        0
-                      );
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {subscribedPlans.map((plan) => {
+                  const remainingDuration = Math.max(
+                    plan.duration_days - (plan.days_credited || 0),
+                    0
+                  );
 
-                      return (
-                        <TableRow key={plan.subscription_id}> {/* Change this line */}
-                          <TableCell className="font-medium">{plan.name}</TableCell>
-                          <TableCell>${plan.investment.toLocaleString()}</TableCell>
-                          <TableCell>{plan.duration_days} days</TableCell>
-                          <TableCell>{remainingDuration} days</TableCell>
-                          <TableCell>{plan.returns_percentage}%</TableCell>
-                          <TableCell>${(plan.actual_earnings || 0).toLocaleString()}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                  const progress = Math.min(
+                    ((plan.days_credited || 0) / plan.duration_days) * 100,
+                    100
+                  );
+
+                  return (
+                    <Card 
+                      key={plan.subscription_id}
+                      className="relative overflow-hidden"
+                    >
+                      <div className={cn(
+                        "absolute top-0 right-0 w-[300px] h-[300px] -mr-32 -mt-32 rounded-full opacity-50 blur-3xl",
+                        getRandomGradient()
+                      )} />
+                      
+                      <CardHeader className="space-y-2">
+                        <div>
+                          <CardTitle className="text-xl font-semibold">
+                            {plan.name}
+                          </CardTitle>
+                          <CardDescription className="text-sm text-muted-foreground mt-1">
+                            Subscribed on {format(new Date(plan.subscription_date || ''), 'do MMMM yyyy')}
+                          </CardDescription>
+                        </div>
+                        <Separator className="my-2" />
+                        <div>
+                          <span className="text-sm text-muted-foreground">$</span>
+                          <span className="text-6xl font-bold text-foreground ml-0.5 tracking-tight">
+                            {plan.investment.toLocaleString()}
+                          </span>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="space-y-6">
+                        <div className="rounded-lg border bg-card/50 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Daily ROI</p>
+                              <div className="flex items-baseline gap-1 mt-1">
+                                <span className="text-2xl font-semibold">{plan.returns_percentage}%</span>
+                                <span className="text-sm text-muted-foreground ml-1">
+                                  (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
+                                </span>
+                              </div>
+                            </div>
+                            <ArrowRightIcon className="h-5 w-5 text-muted-foreground mx-2" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">Your Profit</p>
+                              <div className="flex items-baseline gap-1 mt-1">
+                                <span className="text-2xl font-semibold">
+                                  ${(plan.actual_earnings || 0).toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="rounded-lg border bg-card/50 p-4">
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Duration</p>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-semibold">{plan.duration_days}</span>
+                                <span className="text-muted-foreground">days</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="rounded-lg border bg-card/50 p-4">
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Remaining</p>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-semibold">{remainingDuration}</span>
+                                <span className="text-muted-foreground">days</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-muted/50 rounded-lg p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Progress</span>
+                              <span className="font-medium">
+                                {Math.round(progress)}%
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="w-full">
+                              Cancel Subscription
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel Investment Plan</AlertDialogTitle>
+                              <AlertDialogDescription className="space-y-4">
+                                <p>Are you sure you want to cancel this investment plan? The refund will be processed with the following deductions:</p>
+                                
+                                {(() => {
+                                  const { forexFee, adminFee, refundAmount } = calculateRefundAmount(plan.investment);
+                                  return (
+                                    <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                                      <div className="flex justify-between">
+                                        <span>Original Investment:</span>
+                                        <span className="font-medium">${plan.investment.toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex justify-between text-destructive">
+                                        <span>Forex Fee (10%):</span>
+                                        <span>-${forexFee.toLocaleString()}</span>
+                                      </div>
+                                      <div className="flex justify-between text-destructive">
+                                        <span>Admin Fee (5%):</span>
+                                        <span>-${adminFee.toLocaleString()}</span>
+                                      </div>
+                                      <Separator className="my-2" />
+                                      <div className="flex justify-between font-medium">
+                                        <span>Final Refund Amount:</span>
+                                        <span>${refundAmount.toLocaleString()}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Keep Plan</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleCancelSubscription(plan)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Confirm Cancellation
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -422,17 +564,15 @@ const Plans = () => {
           open={showDepositDialog} 
           onOpenChange={setShowDepositDialog}
           selectedPlan={selectedPlanForDeposit}
-          onSuccess={() => {
-            setShowDepositDialog(false);
-          }}
+          onSuccess={() => setShowDepositDialog(false)}
         />
-
       </PageTransition>
     </ShellLayout>
   );
 };
 
 export default Plans;
+
 function toast({ title, description, variant }: { title: string; description: string; variant: string }) {
   const toastContainer = document.createElement("div");
   toastContainer.className = `toast toast-${variant}`;

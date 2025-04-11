@@ -48,27 +48,28 @@ const DepositsPage = () => {
 
   const handleVerify = async (id) => {
     try {
-      const { error } = await supabase
-        .from("plans_subscriptions")
-        .update({ status: "approved" })
-        .eq("id", id);
+      const { data, error } = await supabase
+        .rpc('approve_plan_subscription', { subscription_id: id });
 
       if (error) throw error;
+      
+      // Check the response from the function
+      if (!data.success) {
+        throw new Error(data.message);
+      }
 
-      toast.success("Plan subscription approved successfully");
+      toast.success(data.message || "Plan subscription approved successfully");
       fetchSubscriptions();
     } catch (error) {
       console.error("Error approving subscription:", error);
-      toast.error("Failed to approve subscription");
+      toast.error(error.message || "Failed to approve subscription");
     }
   };
 
   const handleReject = async (id) => {
     try {
       const { error } = await supabase
-        .from("plans_subscriptions")
-        .update({ status: "rejected" })
-        .eq("id", id);
+        .rpc('reject_plan_subscription', { subscription_id: id });
 
       if (error) throw error;
 

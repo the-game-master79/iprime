@@ -17,12 +17,13 @@ import Marquee from 'react-fast-marquee';
 // Icons
 import {
   DollarSign, Users, Mail, Star, Trophy, Copy, QrCode,
-  Briefcase, ArrowUpToLine, ArrowUpRight, ArrowRight
+  Briefcase, ArrowUpToLine, ArrowUpRight, ArrowRight, Check
 } from "lucide-react";
 
 // Utilities
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
+import { cn } from "@/lib/utils";
 
 // Types
 import type { 
@@ -42,6 +43,10 @@ interface DashboardContentProps {
   loading: boolean;
 }
 
+const ShimmerEffect = ({ className }: { className?: string }) => (
+  <div className={cn("animate-pulse bg-muted/50 rounded-lg", className)} />
+);
+
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -51,11 +56,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [showQrCode, setShowQrCode] = useState(false);
   const [activePlans, setActivePlans] = useState({ count: 0, amount: 0 });
   const [withdrawalBalance, setWithdrawalBalance] = useState(0);
+  const [investmentReturns, setInvestmentReturns] = useState(0);
+  const [withdrawalCommissions, setWithdrawalCommissions] = useState(0);
   
   // Business data
   const [totalInvested, setTotalInvested] = useState(0);
   const [totalReferrals, setTotalReferrals] = useState({ active: 0, total: 0 });
   const [totalCommissions, setTotalCommissions] = useState(0);
+  const [rankBonusTotal, setRankBonusTotal] = useState(0);
   const [businessRank, setBusinessRank] = useState<BusinessRankState>({
     currentRank: null,
     nextRank: null,
@@ -67,17 +75,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     currentRank: '',
     totalVolume: 0,
     rankBonus: 0,
-    nextRank: null,
+    nextRank: null as { title: string, bonus: number, business_amount: number } | null,
     progress: 0,
     targetVolume: 0
   });
 
   // Display data
   const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
-  const [leaderboard, setLeaderboard] = useState({
-    businessVolume: [] as LeaderboardEntry[],
-    referrals: [] as LeaderboardEntry[]
-  });
+
+  const [claimedRanks, setClaimedRanks] = useState<string[]>([]);
+  const [isClaimingBonus, setIsClaimingBonus] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -172,44 +179,65 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', user.id)
-        .eq('status', 'Completed')
-        .or('type.eq.commission,type.eq.rank_bonus');
+      const [commissionData, rankBonusData] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'Completed')
+          .eq('type', 'commission'),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'Completed')
+          .eq('type', 'rank_bonus')
+      ]);
 
-      if (error) throw error;
+      const commissions = commissionData.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+      const rankBonuses = rankBonusData.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
-      const total = (data || []).reduce((sum, tx) => sum + (tx.amount / 2), 0);
-      setTotalCommissions(total);
+      setTotalCommissions(commissions);
+      setRankBonusTotal(rankBonuses);
     } catch (error) {
       console.error('Error fetching commissions:', error);
     }
   };
 
-  const fetchLeaderboards = async () => {
+  const fetchWithdrawalStats = async () => {
     try {
-      const { data: businessVolumeData, error: businessVolumeError } = await supabase
-        .from('business_volume_display')
-        .select('*')
-        .order('serial_number', { ascending: true });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (businessVolumeError) throw businessVolumeError;
+      const [returnsData, commissionsData, refundsData] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('type', 'investment_return')
+          .eq('status', 'Completed'),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'Completed')
+          .or('type.eq.commission,type.eq.rank_bonus'),
+        supabase
+          .from('transactions')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('type', 'refund')
+          .eq('status', 'Completed')
+      ]);
 
-      const { data: recruitersData, error: recruitersError } = await supabase
-        .from('top_recruiters_display')
-        .select('*')
-        .order('serial_number', { ascending: true });
+      const totalReturns = returnsData.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+      const totalCommissions = commissionsData.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+      const totalRefunds = refundsData.data?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
 
-      if (recruitersError) throw recruitersError;
-
-      setLeaderboard({
-        businessVolume: businessVolumeData || [],
-        referrals: recruitersData || []
-      });
+      setInvestmentReturns(totalReturns + totalRefunds); // Include refunds in earnings
+      setWithdrawalCommissions(totalCommissions);
     } catch (error) {
-      console.error('Error fetching leaderboards:', error);
+      console.error('Error fetching withdrawal stats:', error);
     }
   };
 
@@ -245,18 +273,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get direct referral count first
-      const { data: referralCount, error: referralError } = await supabase
-        .from('referral_relationships')
-        .select('count')
-        .eq('referrer_id', user.id)
-        .eq('level', 1)
+      // Get user profile with direct count and business data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          direct_count,
+          total_business_volumes (
+            total_amount,
+            business_rank
+          )
+        `)
+        .eq('id', user.id)
         .single();
 
-      if (referralError) throw referralError;
+      if (profileError) throw profileError;
 
       // Only proceed if user has at least 2 direct referrals
-      const directCount = referralCount?.count || 0;
+      const directCount = profileData?.direct_count || 0;
       if (directCount < 2) {
         setBusinessStats({
           currentRank: 'New Member',
@@ -269,27 +302,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         return;
       }
 
-      // Get total business volume
-      const { data: businessData, error: businessError } = await supabase
-        .from('business_volumes')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (businessError) throw businessError;
-
-      const totalVolume = businessData?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-
-      // Get rank bonuses
-      const { data: rankBonuses, error: bonusError } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .eq('type', 'rank_bonus')
-        .eq('status', 'Completed');
-
-      if (bonusError) throw bonusError;
-
-      const totalRankBonus = rankBonuses?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+      const totalVolume = profileData?.total_business_volumes?.total_amount || 0;
+      const currentRankTitle = profileData?.total_business_volumes?.business_rank || 'New Member';
 
       // Get all ranks for progression tracking
       const { data: ranks, error: ranksError } = await supabase
@@ -300,31 +314,29 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (ranksError) throw ranksError;
 
       // Find current and next rank based on business volume
-      let currentRank = ranks[0];
-      let nextRank = null;
-
-      for (let i = 0; i < ranks.length; i++) {
-        if (totalVolume >= ranks[i].business_amount) {
-          currentRank = ranks[i];
-          nextRank = ranks[i + 1] || null;
-        } else {
-          break;
-        }
-      }
+      const currentRank = ranks.find(r => r.title === currentRankTitle) || ranks[0];
+      const currentRankIndex = ranks.findIndex(r => r.title === currentRankTitle);
+      const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
 
       // Calculate progress to next rank
       let progress = 0;
       if (nextRank) {
-        const remaining = nextRank.business_amount - currentRank.business_amount;
-        const achieved = totalVolume - currentRank.business_amount;
-        progress = Math.min(100, Math.max(0, (achieved / remaining) * 100));
+        // Calculate progress as percentage of total volume towards next rank's requirement
+        progress = Math.min(100, Math.max(0, (totalVolume / nextRank.business_amount) * 100));
+      } else {
+        // If at max rank, show 100% progress
+        progress = 100;
       }
 
       setBusinessStats({
         currentRank: currentRank.title,
         totalVolume: totalVolume,
-        rankBonus: totalRankBonus,
-        nextRank: nextRank?.title || null,
+        rankBonus: currentRank.bonus,
+        nextRank: nextRank ? {
+          title: nextRank.title,
+          bonus: nextRank.bonus,
+          business_amount: nextRank.business_amount
+        } : null,
         progress,
         targetVolume: nextRank ? nextRank.business_amount : currentRank.business_amount
       });
@@ -336,6 +348,68 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         description: "Failed to load business stats",
         variant: "destructive"
       });
+    }
+  };
+
+  const fetchClaimedRanks = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('description')
+        .eq('user_id', user.id)
+        .eq('type', 'rank_bonus')
+        .eq('status', 'Completed');
+
+      if (error) throw error;
+
+      const claimed = data
+        .map(tx => {
+          const match = tx.description.match(/bonus for (.+)$/);
+          return match ? match[1] : null;
+        })
+        .filter(Boolean) as string[];
+
+      setClaimedRanks(claimed);
+    } catch (error) {
+      console.error('Error fetching claimed ranks:', error);
+    }
+  };
+
+  const handleClaimBonus = async (rank: string) => {
+    try {
+      setIsClaimingBonus(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.rpc('claim_rank_bonus', {
+        rank_title: rank
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Bonus Claimed!",
+        description: `You've successfully claimed the bonus for ${rank}`,
+      });
+
+      // Refresh states
+      await Promise.all([
+        fetchBusinessStats(),
+        fetchWithdrawalStats()
+      ]);
+
+      setClaimedRanks(prev => [...prev, rank]);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to claim bonus",
+        variant: "destructive"
+      });
+    } finally {
+      setIsClaimingBonus(false);
     }
   };
 
@@ -379,8 +453,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         fetchUserProfile(),
         fetchReferralData(),
         fetchCommissions(),
-        fetchLeaderboards(),
-        fetchBusinessStats()
+        fetchBusinessStats(),
+        fetchWithdrawalStats(),
+        fetchClaimedRanks()
       ]);
       setIsLoading(false);
     };
@@ -419,14 +494,91 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     <ShellLayout>
       <PageTransition>
         <div className="space-y-4 sm:space-y-6">
-          <PageHeader 
-            title="Dashboard" 
-            description="Overview of your investments and affiliate performance"
-          />
-          
-          {totalInvested > 0 && (
-            <div className="grid grid-cols-2 gap-6">
-              <div className="row-span-2 p-6 bg-card border rounded-lg relative overflow-hidden">
+          <div className="relative bg-muted/50 rounded-lg overflow-hidden -mt-4 mb-2">
+            <div className="bg-muted/30">
+              <Marquee
+                gradient={false}
+                speed={50}
+                pauseOnHover={true}
+                className="py-3"
+              >
+                {marqueeUsers.map((user) => (
+                  <span key={user.id} className="mx-4 inline-flex items-center">
+                    <img
+                      src={`https://flagcdn.com/24x18/${user.country.toLowerCase()}.png`}
+                      alt={`${user.country} flag`}
+                      className="h-4 w-5 mr-2"
+                    />
+                    <span className="text-sm font-medium">{user.name}</span>
+                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      {user.plans}
+                    </span>
+                  </span>
+                ))}
+              </Marquee>
+            </div>
+          </div>
+
+          <div className="p-8 rounded-xl bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-blue-900/20 border shadow-sm">
+            <div className="flex items-start justify-between gap-8">
+              <div className="flex items-start gap-8">
+                <div className="shrink-0">
+                  <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 ring-4 ring-background flex items-center justify-center shadow-sm">
+                    {userProfile?.avatar_url ? (
+                      <img 
+                        src={userProfile.avatar_url} 
+                        alt="Profile" 
+                        className="h-20 w-20 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl font-semibold text-primary">
+                        {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold tracking-tight">
+                    Hello, {userProfile?.first_name} {userProfile?.last_name}
+                  </h2>
+                  <p className="text-muted-foreground/80 mt-1 text-lg">{userProfile?.email}</p>
+                </div>
+              </div>
+
+              <div className="hidden sm:block border border-dashed border-primary/20 rounded-lg p-4 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm min-w-[600px]">
+                <div className="text-sm font-medium text-muted-foreground mb-2">Your Referral Link</div>
+                <div className="relative">
+                  <Input
+                    readOnly
+                    value={referralLink}
+                    className="pr-20 font-mono text-sm bg-transparent border-primary/20 overflow-x-auto"
+                  />
+                  <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="hover:bg-primary/10 hover:text-primary transition-colors"
+                      onClick={handleShowQrCode}
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost" 
+                      className="hover:bg-primary/10 hover:text-primary transition-colors"
+                      onClick={handleCopyLink}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {activePlans.count > 0 ? (
+              <div className="lg:row-span-2 p-6 bg-card border rounded-lg relative overflow-hidden order-1">
                 <img 
                   src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cfwatermark.png"
                   alt="CloudForex Watermark"
@@ -452,7 +604,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     </Button>
                     <Button 
                       size="lg"
-                      className="rounded-full px-2.5 transition-all duration-300 bg-black hover:bg-black"
+                      className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
                       onClick={() => navigate('/plans')}
                     >
                       <div className="relative w-4 h-4">
@@ -463,306 +615,234 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   </div>
                 </div>
               </div>
-
-              <div className="p-6 bg-card border rounded-lg">
-                <div className="text-muted-foreground text-sm">Withdrawal Balance</div>
-                <div className="text-3xl font-bold text-green-600 tracking-tight mt-2">
-                  ${withdrawalBalance.toLocaleString()}
-                </div>
-                <div className="text-sm text-muted-foreground mt-2">
-                  Available for withdrawal
-                </div>
-              </div>
-
-              <div className="p-6 bg-card border rounded-lg">
-                <div className="text-muted-foreground text-sm">Total Commissions</div>
-                <div className="text-3xl font-bold text-orange-600 tracking-tight mt-2">
-                  ${totalCommissions.toLocaleString()}
-                </div>
-                <div className="text-sm text-muted-foreground mt-2">
-                  Commission earned
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="relative bg-muted/50 rounded-lg overflow-hidden">
-            <div className="bg-muted/30">
-              <Marquee
-                gradient={false}
-                speed={50}
-                pauseOnHover={true}
-                className="py-3"
-              >
-                {marqueeUsers.map((user) => (
-                  <span key={user.id} className="mx-4 inline-flex items-center">
-                    <img
-                      src={`https://flagcdn.com/24x18/${user.country.toLowerCase()}.png`}
-                      alt={`${user.country} flag`}
-                      className="h-4 w-5 mr-2"
-                    />
-                    <span className="text-sm font-medium">{user.name}</span>
-                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      {user.plans}
-                    </span>
-                  </span>
-                ))}
-              </Marquee>
-            </div>
-          </div>
-          
-          <Card className="border-dashed w-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Your Referral Link</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col w-full gap-4">
-                <div className="w-full">
-                  <div className="relative">
-                    <Input
-                      readOnly
-                      value={referralLink}
-                      className="pr-32 font-mono text-xs sm:text-sm bg-muted overflow-x-auto"
-                    />
-                    <div className="absolute right-0 top-0 h-full flex items-center">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="px-2 sm:px-3 hover:bg-muted"
-                        onClick={handleShowQrCode}
+            ) : (
+              <div className="lg:row-span-2 p-6 bg-card border rounded-lg relative order-1">
+                <div className="h-full flex flex-col items-center justify-center text-center">
+                  <div className="space-y-3">
+                    <div className="text-2xl font-semibold text-muted-foreground">No Plans Subscribed Yet</div>
+                    <p className="text-muted-foreground">Start your investment journey by subscribing to a plan</p>
+                    <div className="flex justify-center mt-6 hover-trigger">
+                      <Button 
+                        size="lg"
+                        className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
+                        onClick={() => navigate('/plans')}
                       >
-                        <QrCode className="h-4 w-4" />
+                        View Plans
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="px-2 sm:px-3 hover:bg-muted"
-                        onClick={handleCopyLink}
+                      <Button 
+                        size="lg"
+                        className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
+                        onClick={() => navigate('/plans')}
                       >
-                        <Copy className="h-4 w-4" />
+                        <div className="relative w-4 h-4">
+                          <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                          <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                        </div>
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
 
-          <div>
-            <h2 className="text-lg font-semibold mb-4">Start earning in your account</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button
-                variant="ghost"
-                className="h-32 relative overflow-hidden group w-full"
-                onClick={() => navigate('/plans')}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 via-indigo-400/20 to-violet-500/20 group-hover:opacity-75 transition-opacity" />
-                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
-                  <Briefcase className="h-8 w-8 text-blue-500" />
-                  <span className="font-bold">Buy a Plan</span>
-                </div>
-              </Button>
+            <div className="p-6 bg-card border rounded-lg relative order-3 lg:order-2">
+              <div className="text-muted-foreground text-sm">Total Commissions</div>
+              <div className="text-3xl font-bold text-orange-600 tracking-tight mt-2">
+                ${(totalCommissions + rankBonusTotal).toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                ${totalCommissions.toLocaleString()} Commissions & ${rankBonusTotal.toLocaleString()} Rank Bonus
+              </div>
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 hover-trigger hidden sm:block">
+                <Button 
+                  size="lg"
+                  className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10 bg-orange-600 hover:bg-orange-700 text-white" 
+                  onClick={() => navigate('/affiliate')}
+                >
+                  {totalCommissions > 0 || rankBonusTotal > 0 ? 'Earn More' : 'Start Earning'}
+                </Button>
+                <Button 
+                  size="lg"
+                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
+                  onClick={() => navigate('/affiliate')}
+                >
+                  <div className="relative w-4 h-4">
+                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                  </div>
+                </Button>
+              </div>
+              <div className="flex mt-4 sm:hidden hover-trigger">
+                <Button 
+                  className="rounded-full px-6 relative flex-1 after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10 bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={() => navigate('/affiliate')}
+                >
+                  {totalCommissions > 0 || rankBonusTotal > 0 ? 'Earn More' : 'Start Earning'}
+                </Button>
+                <Button 
+                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
+                  onClick={() => navigate('/affiliate')}
+                >
+                  <div className="relative w-4 h-4">
+                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                  </div>
+                </Button>
+              </div>
+            </div>
 
-              <Button
-                variant="ghost"
-                className="h-32 relative overflow-hidden group w-full"  
-                onClick={() => navigate('/withdrawals')}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-amber-400/20 to-yellow-500/20 group-hover:opacity-75 transition-opacity" />
-                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
-                  <ArrowUpToLine className="h-8 w-8 text-orange-500" />
-                  <span className="font-bold">Withdraw</span>
+            <div className="p-6 bg-card border rounded-lg relative order-2 lg:order-3">
+              <div className="text-muted-foreground text-sm">Withdrawal Balance</div>
+              <div className="text-3xl font-bold text-green-600 tracking-tight mt-2">
+                ${withdrawalBalance.toLocaleString()}
+              </div>
+              <div className="mt-3 text-sm text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>${investmentReturns.toLocaleString()} Earnings & ${withdrawalCommissions.toLocaleString()} Commissions</span>
                 </div>
-              </Button>
-
-              <Button
-                variant="ghost" 
-                className="h-32 relative overflow-hidden group w-full"
-                onClick={() => navigate('/affiliate')}
-              >
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-fuchsia-400/20 to-pink-500/20 group-hover:opacity-75 transition-opacity" />
-                <div className="relative flex flex-col items-start w-full pl-6 space-y-3">
-                  <Users className="h-8 w-8 text-purple-500" />
-                  <span className="font-bold">View Referrals</span>
-                  {totalReferrals && totalReferrals.total > 0 && (
-                    <span className="absolute top-2 right-2 bg-white text-xs px-3 py-1.5 rounded-full shadow-sm border border-border/50 font-medium">
-                      Downlines: {totalReferrals.total}
-                    </span>
-                  )}
-                </div>
-              </Button>
+              </div>
+              <div className="absolute right-6 top-1/2 -translate-y-1/2 hover-trigger hidden sm:block">
+                <Button 
+                  size="lg"
+                  className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
+                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
+                  style={{ backgroundColor: '#16a34a', color: 'white' }}
+                >
+                  {userProfile?.kyc_status === 'completed' ? 'Withdraw Now' : 'Submit KYC'}
+                </Button>
+                <Button 
+                  size="lg"
+                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
+                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
+                >
+                  <div className="relative w-4 h-4">
+                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                  </div>
+                </Button>
+              </div>
+              <div className="flex mt-4 sm:hidden hover-trigger">
+                <Button 
+                  className="rounded-full px-6 relative flex-1 after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10"
+                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
+                  style={{ backgroundColor: '#16a34a', color: 'white' }}
+                >
+                  {userProfile?.kyc_status === 'completed' ? 'Withdraw Now' : 'Submit KYC'}
+                </Button>
+                <Button 
+                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
+                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
+                >
+                  <div className="relative w-4 h-4">
+                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
+                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
+                  </div>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
-            <DialogContent className="w-[95vw] max-w-md mx-auto">
-              <DialogHeader className="text-center">
-                <DialogTitle>Your Referral QR Code</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col items-center gap-4 p-2 sm:p-6">
-                {qrCodeUrl && (
-                  <div className="p-2 sm:p-4 border-4 sm:border-8 border-primary rounded-xl sm:rounded-3xl">
-                    <img
-                      src={qrCodeUrl}
-                      alt="Referral QR Code"
-                      className="border-2 sm:border-4 border-black w-48 h-48 sm:w-64 sm:h-64 rounded-lg"
-                    />
+          <div>
+            <Card>
+              <CardContent className="p-6 bg-gradient-to-br from-white to-blue-50/50 dark:from-gray-900 dark:to-blue-900/20">
+                {userProfile?.direct_count && userProfile.direct_count >= 2 ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                      <div>
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">
+                          ${businessStats.totalVolume.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl sm:text-3xl font-bold text-primary">
+                          {businessStats.currentRank}
+                        </div>
+                        {businessStats.currentRank !== 'New Member' && (
+                          claimedRanks.includes(businessStats.currentRank) ? (
+                            <div className="flex items-center gap-1 text-green-600 text-sm font-medium px-3 py-1.5 rounded-md bg-green-50">
+                              <Check className="h-4 w-4" />
+                              <span>Claimed</span>
+                            </div>
+                          ) : (
+                            <Button 
+                              size="sm"
+                              onClick={() => handleClaimBonus(businessStats.currentRank)}
+                              disabled={isClaimingBonus}
+                            >
+                              {isClaimingBonus ? "Claiming..." : `Claim $${businessStats.rankBonus.toLocaleString()}`}
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </div>
+                    {businessStats.nextRank && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full transition-all duration-300"
+                                style={{ width: `${businessStats.progress}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center mt-2">
+                              <span className="text-sm text-muted-foreground">
+                                Next Rank: {businessStats.nextRank.title} (${businessStats.nextRank.bonus.toLocaleString()} Bonus)
+                              </span>
+                              <span className="text-xs font-medium text-primary">
+                                {Math.round(businessStats.progress)}% (${businessStats.totalVolume.toLocaleString()} / ${businessStats.nextRank.business_amount.toLocaleString()})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <Trophy className="h-5 w-5" />
+                      <h3 className="text-lg font-semibold">Unlock Rank Bonuses & Commissions</h3>
+                    </div>
+                    
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                      <p className="text-sm text-amber-800">
+                        Complete these requirements to start earning rank bonuses and team commissions:
+                      </p>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-sm
+                            ${userProfile?.direct_count >= 2 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-amber-200 text-amber-700'
+                            }`}
+                          >
+                            {userProfile?.direct_count || 0}
+                          </div>
+                          <span className="text-sm text-amber-800">
+                            Minimum 2 direct referrals required 
+                            {userProfile?.direct_count 
+                              ? ` (${userProfile.direct_count}/2)` 
+                              : ' (0/2)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2"
+                        onClick={() => navigate('/affiliate')}
+                      >
+                        Go to Affiliate Program
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
                   </div>
                 )}
-                <div className="w-full max-w-sm">
-                  <div className="relative">
-                    <Input
-                      readOnly
-                      value={referralLink}
-                      className="pr-16 text-xs sm:text-sm bg-muted/50 text-center overflow-x-auto"
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute right-0 top-0 h-full px-2 sm:px-3 hover:bg-muted"
-                      onClick={handleCopyLink}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground text-center">
-                  Scan this and Register your Downlines!
-                </p>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-4">Your Progress</h2>
-            <div className="grid grid-cols-1 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-primary" />
-                    Business Overview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="text-sm font-medium text-muted-foreground">Current Rank</div>
-                      <div className="text-2xl font-semibold text-primary">{businessStats.currentRank}</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="text-sm font-medium text-muted-foreground">Total Volume</div>
-                      <div className="text-2xl font-semibold">${businessStats.totalVolume.toLocaleString()}</div>
-                    </div>
-                    <div className="p-4 rounded-lg bg-muted/50">
-                      <div className="text-sm font-medium text-muted-foreground">Rank Bonus</div>
-                      <div className="text-2xl font-semibold text-green-600">${businessStats.rankBonus.toLocaleString()}</div>
-                    </div>
-                  </div>
-
-                  {businessStats.nextRank && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Progress to {businessStats.nextRank}</span>
-                        <span>{Math.round(businessStats.progress)}%</span>
-                      </div>
-                      <Progress value={businessStats.progress} className="h-2" />
-                      <p className="text-xs text-muted-foreground">
-                        Target: ${businessStats.targetVolume.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+              </CardContent>
+            </Card>
           </div>
-
-          <div>
-            <h2 className="text-lg font-semibold mb-4">Top Performers</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-medium flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-primary" />
-                    Top Business Volume
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm">
-                      <thead className="text-xs uppercase bg-muted/50">
-                        <tr>
-                          <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
-                          <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
-                          <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Volume</th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {leaderboard.businessVolume.map((leader) => (
-                          <tr key={leader.id} className="hover:bg-muted/50">
-                            <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
-                            <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                              {leader.name}
-                            </td>
-                            <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                              ${leader.volume?.toLocaleString()}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
-                              ${leader.income.toLocaleString()}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base font-medium flex items-center gap-2">
-                    <Users className="h-4 w-4 text-primary" />
-                    Top Recruiters
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm">
-                      <thead className="text-xs uppercase bg-muted/50">
-                        <tr>
-                          <th scope="col" className="px-2 py-2 sm:px-4">S/N</th>
-                          <th scope="col" className="px-2 py-2 sm:px-4 text-left">Name</th>
-                          <th scope="col" className="px-2 py-2 sm:px-4 text-right sm:text-left">Referrals</th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Income</th>
-                          <th scope="col" className="hidden sm:table-cell px-4 py-2">Rank</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {leaderboard.referrals.map((leader) => (
-                          <tr key={leader.id} className="hover:bg-muted/50">
-                            <td className="px-1 py-2 sm:px-4 text-center sm:text-left whitespace-nowrap">{leader.serial_number}</td>
-                            <td className="px-1 py-2 sm:px-4 font-medium truncate max-w-[80px] sm:max-w-none whitespace-nowrap">
-                              {leader.name}
-                            </td>
-                            <td className="px-1 py-2 sm:px-4 text-right sm:text-left whitespace-nowrap">
-                              {leader.referrals}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">
-                              ${leader.income.toLocaleString()}
-                            </td>
-                            <td className="hidden sm:table-cell px-4 py-2 whitespace-nowrap">{leader.rank}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
         </div>
       </PageTransition>
     </ShellLayout>

@@ -94,16 +94,22 @@ const NotificationItem: React.FC<{ notice: Notice }> = ({ notice }) => (
 
 // Sidebar components
 const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, href, active, collapsed }) => (
-  <Link to={href}>
+  <Link to={href} className="mb-2"> {/* Added mb-2 class for bottom margin */}
     <Button
       variant={active ? "secondary" : "ghost"}
       className={cn(
-        "w-full justify-start gap-2 transition-all",
-        collapsed && "justify-center px-0"
+        "w-full justify-start gap-3 h-12",
+        collapsed && "justify-center p-0",
+        active && "bg-primary/10 text-primary font-medium hover:bg-primary/15"
       )}
     >
-      <span>{icon}</span>
-      {!collapsed && <span>{label}</span>}
+      <div className={cn(
+        "flex items-center gap-3 flex-1",
+        collapsed && "justify-center"
+      )}>
+        <span className="flex h-5 w-5 items-center">{icon}</span>
+        {!collapsed && <span className="truncate">{label}</span>}
+      </div>
     </Button>
   </Link>
 );
@@ -129,25 +135,35 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => (
   <aside
     className={cn(
-      "fixed inset-y-0 z-50 flex h-full flex-col border-r bg-sidebar transition-transform duration-300 ease-in-out",
-      (isMobile)
-        ? `w-[280px] ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-        : (isCollapsed ? "w-20" : "w-64")
+      "fixed inset-y-0 z-50 flex h-full w-[280px] flex-col bg-card border-r shadow-sm transition-all duration-300",
+      isMobile ? `${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}` : 
+      isCollapsed ? "w-[80px]" : "w-[280px]"
     )}
   >
-    <div className="flex h-14 items-center">
-      <Link to="/" className="flex items-center pl-4">
-        <img 
-          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cloudforex.svg" 
-          alt="cloudforex Logo" 
-          className="h-10 w-auto" 
-        />
+    {/* Logo Section */}
+    <div className="flex h-[60px] items-center border-b px-6">
+      <Link to="/" className="flex items-center gap-3">
+        {isCollapsed ? (
+          <img 
+            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cflogo.svg" 
+            alt="CloudForex Logo" 
+            className="h-8 w-8 transition-all duration-200"
+          />
+        ) : (
+          <img 
+            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cloudforex.svg" 
+            alt="CloudForex Logo" 
+            className="h-8 w-auto transition-all duration-200"
+          />
+        )}
+        {!isCollapsed && <span className="text-lg font-semibold"></span>}
       </Link>
     </div>
-    
+
+    {/* Navigation Section */}
     <div className="flex-1 overflow-auto">
-      <ScrollArea className="h-full px-3">
-        <nav className="flex flex-col gap-2 py-4">
+      <ScrollArea className="h-full px-4">
+        <nav className="space-y-1 py-4">
           <SidebarItem
             collapsed={isCollapsed && !isMobile}
             icon={<LayoutDashboard />}
@@ -158,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <SidebarItem
             collapsed={isCollapsed && !isMobile}
             icon={<Trophy />}
-            label="My Rank"
+            label="Ranks"
             href="/rank"
             active={location.pathname === '/rank'}
           />
@@ -207,28 +223,31 @@ const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </ScrollArea>
     </div>
-    
+
+    {/* Footer Actions */}
     <div className="border-t p-4">
-      {canInstall && (
+      <div className="space-y-2">
+        {canInstall && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start gap-3"
+            onClick={onInstall}
+          >
+            <Download className="h-5 w-5" />
+            {(!isCollapsed || isMobile) && <span>Install App</span>}
+          </Button>
+        )}
         <Button 
           variant="ghost" 
           size="sm" 
-          className="w-full justify-start gap-2 mb-2"
-          onClick={onInstall}
+          className="w-full justify-start gap-3 text-red-500 hover:text-red-600 hover:bg-red-50"
+          onClick={onLogout}
         >
-          <Download className="h-4 w-4" />
-          {(!isCollapsed || isMobile) && <span>Install cloudforex</span>}
+          <LogOut className="h-5 w-5" />
+          {(!isCollapsed || isMobile) && <span>Logout</span>}
         </Button>
-      )}
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="w-full justify-start gap-2"
-        onClick={onLogout}
-      >
-        <LogOut className="h-4 w-4" />
-        {(!isCollapsed || isMobile) && <span>Logout</span>}
-      </Button>
+      </div>
     </div>
   </aside>
 );

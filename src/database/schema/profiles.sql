@@ -19,8 +19,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   level integer DEFAULT 0,
   current_level smallint DEFAULT 0,
   total_invested numeric DEFAULT 0,
-  business_volume numeric DEFAULT 0,
-  business_rank text DEFAULT 'New Member',
   role text DEFAULT 'user',
   withdrawal_wallet numeric DEFAULT 0,
   investment_wallet numeric DEFAULT 0,
@@ -32,7 +30,6 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- Add indexes for commonly queried columns
 CREATE INDEX IF NOT EXISTS idx_profiles_referral_code ON profiles(referral_code);
 CREATE INDEX IF NOT EXISTS idx_profiles_referred_by ON profiles(referred_by);
-CREATE INDEX IF NOT EXISTS idx_profiles_business_rank ON profiles(business_rank);
 
 -- Function to update direct referral count
 CREATE OR REPLACE FUNCTION update_direct_referral_count(p_user_id UUID)
@@ -89,3 +86,53 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Add trigger for default field initialization
+-- Function to initialize profile fields and set full name
+CREATE OR REPLACE FUNCTION initialize_profile_fields()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set required fields with defaults if not provided
+    NEW.status := COALESCE(NEW.status, 'active');
+    NEW.date_joined := COALESCE(NEW.date_joined, NOW());
+    NEW.created_at := COALESCE(NEW.created_at, NOW());
+    NEW.updated_at := COALESCE(NEW.updated_at, NOW());
+    NEW.kyc_status := COALESCE(NEW.kyc_status, 'pending');
+    NEW.level := COALESCE(NEW.level, 1);
+    NEW.current_level := COALESCE(NEW.current_level, 1);
+    NEW.total_invested := COALESCE(NEW.total_invested, 0);
+    NEW.role := COALESCE(NEW.role, 'user');
+    NEW.withdrawal_wallet := COALESCE(NEW.withdrawal_wallet, 0);
+    NEW.investment_wallet := COALESCE(NEW.investment_wallet, 0);
+    NEW.direct_count := COALESCE(NEW.direct_count, 0);
+    
+    -- Set full_name by concatenating first_name and last_name
+    NEW.full_name := TRIM(CONCAT(COALESCE(NEW.first_name, ''), ' ', COALESCE(NEW.last_name, '')));
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function to update full_name when first_name or last_name changes
+CREATE OR REPLACE FUNCTION update_full_name()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.full_name := TRIM(CONCAT(COALESCE(NEW.first_name, ''), ' ', COALESCE(NEW.last_name, '')));
+    NEW.updated_at := NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to update full_name when first_name or last_name changes
+DROP TRIGGER IF EXISTS update_full_name_trigger ON profiles;
+CREATE TRIGGER update_full_name_trigger
+    BEFORE UPDATE OF first_name, last_name ON profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_full_name();
+
+-- Create trigger for profile initialization
+DROP TRIGGER IF EXISTS initialize_profile ON profiles;
+CREATE TRIGGER initialize_profile
+    BEFORE INSERT ON profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION initialize_profile_fields();

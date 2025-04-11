@@ -44,12 +44,8 @@ const MyRank = () => {
   // Utility functions
   const calculateRankProgress = (business: number, currentRank: Rank, nextRank: Rank | null): number => {
     if (!nextRank) return 100;
-    if (currentRank === nextRank) {
-      return (business / nextRank.business_amount) * 100;
-    }
-    const remainingBusiness = nextRank.business_amount - currentRank.business_amount;
-    const achievedBusiness = business - currentRank.business_amount;
-    return Math.max(0, Math.min(100, (achievedBusiness / remainingBusiness) * 100));
+    // Calculate progress as percentage of total business towards next rank requirement
+    return Math.min(100, Math.max(0, (business / nextRank.business_amount) * 100));
   };
 
   const calculateRank = (business: number, ranks: Rank[]): CurrentRankData => {
@@ -87,11 +83,15 @@ const MyRank = () => {
 
   const fetchUserData = async (userId: string) => {
     try {
-      const [profileResponse, transactionsResponse] = await Promise.all([
+      const [businessDataResponse, transactionsResponse] = await Promise.all([
         supabase
-          .from('profiles')
-          .select('business_volume, direct_count')
-          .eq('id', userId)
+          .from('total_business_volumes')
+          .select(`
+            total_amount,
+            business_rank,
+            profiles!inner(direct_count)
+          `)
+          .eq('user_id', userId)
           .single(),
         supabase
           .from('transactions')
@@ -100,20 +100,21 @@ const MyRank = () => {
           .eq('type', 'rank_bonus')
       ]);
 
-      if (profileResponse.error) throw profileResponse.error;
+      if (businessDataResponse.error) throw businessDataResponse.error;
       if (transactionsResponse.error) throw transactionsResponse.error;
 
-      const hasMinimumReferrals = profileResponse.data.direct_count >= 2;
-      const businessVolume = hasMinimumReferrals ? (profileResponse.data.business_volume || 0) : 0;
-
+      const hasMinimumReferrals = businessDataResponse.data.profiles.direct_count >= 2;
+      const businessVolume = hasMinimumReferrals 
+        ? businessDataResponse.data.total_amount
+        : 0;
+      
       setTotalBusiness(businessVolume);
+      setUserRank(businessDataResponse.data.business_rank || 'New Member');
 
       // Set rank based on business volume if ranks are available
       if (ranks.length > 0 && hasMinimumReferrals) {
         const rankData = calculateRank(businessVolume, ranks);
-        setUserRank(rankData.rank?.title || 'New Member');
-      } else {
-        setUserRank('New Member');
+        setCurrentRankData(rankData);
       }
 
       // Update bonus data
@@ -150,11 +151,13 @@ const MyRank = () => {
         rank_title: rank.title
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message);
+      }
 
       toast({
         title: "Success", 
-        description: `Bonus claimed successfully for ${rank.title} rank!`,
+        description: `${rank.title} rank bonus of $${rank.bonus.toLocaleString()} has been added to your withdrawal wallet!`,
         variant: "success",
       });
 
@@ -242,116 +245,155 @@ const MyRank = () => {
 
   return (
     <ShellLayout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
-          title="My Rank"
-          description="Your position and achievements in the platform"
+          title="Ranks"
         />
 
-        <div className="grid gap-4 md:grid-cols-2 md:gap-8 mt-4">
-          <Card>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Current Rank Card */}
+          <Card className="relative overflow-hidden">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg font-medium">
                 <Trophy className="h-5 w-5 text-primary" />
-                Current Rank
+                Current Position
               </CardTitle>
-              <CardDescription>Your current position among all investors</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-primary">
-                  {loading 
-                    ? "Loading..." 
-                    : userRank || 'New Member'}
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-8 p-4 rounded-lg bg-muted">
-                  <div>
-                    <div className="text-muted-foreground text-sm">Total Bonus Earned</div>
-                    <div className="font-semibold">
-                      ${totalBonusEarned.toLocaleString()}
-                    </div>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-4xl font-bold text-primary">
+                    {loading ? "Loading..." : userRank || 'New Member'}
                   </div>
-                  <div>
-                    <div className="text-muted-foreground text-sm">Total Business Volume</div>
-                    <div className="font-semibold">${totalBusiness.toLocaleString()}</div>
+                  <p className="text-sm text-muted-foreground mt-1">Your current network rank</p>
+                </div>
+                <div className="pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">Total Business Volume</div>
+                  <div className="text-3xl font-bold mt-1">
+                    ${totalBusiness.toLocaleString()}
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Bonus Card */}
+          <Card className="relative overflow-hidden">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg font-medium">
                 <ArrowRight className="h-5 w-5 text-primary" />
-                Next Rank
+                Rank Bonuses
               </CardTitle>
-              <CardDescription>Progress towards your next rank</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-8 p-4 rounded-lg bg-muted">
+            <CardContent>
+              <div className="space-y-4">
                 <div>
-                  <div className="text-muted-foreground text-sm">Next Rank</div>
-                  <div className="font-semibold text-xl">
-                    {currentRankData.nextRank?.title || 'Maximum Rank Achieved'}
+                  <div className="text-4xl font-bold text-green-600">
+                    ${totalBonusEarned.toLocaleString()}
                   </div>
+                  <p className="text-sm text-muted-foreground mt-1">Total bonuses earned</p>
                 </div>
-                <div>
-                  <div className="text-muted-foreground text-sm">Next Bonus</div>
-                  <div className="font-semibold text-xl">
-                    ${currentRankData.nextRank?.bonus.toLocaleString() || currentRankData.rank?.bonus.toLocaleString() || '0'}
+                {currentRankData.nextRank && (
+                  <div className="pt-4 border-t">
+                    <div className="text-sm text-muted-foreground">Next Rank Bonus</div>
+                    <div className="text-3xl font-bold mt-1 text-primary">
+                      ${currentRankData.nextRank.bonus.toLocaleString()}
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>{Math.round(currentRankData.progress)}% (${totalBusiness.toLocaleString()})</span>
-                </div>
-                <Progress value={currentRankData.progress} className="w-full" />
-                <div className="text-sm text-muted-foreground">
-                  Target: ${currentRankData.nextRank?.business_amount.toLocaleString() || 'N/A'}
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="mt-8">
+        {/* Progress Card */}
+        <Card>
           <CardHeader>
-            <CardTitle>All Ranks</CardTitle>
-            <CardDescription>Overview of all available ranks and their requirements</CardDescription>
+            <CardTitle>Progress to Next Rank</CardTitle>
+            <CardDescription>
+              {currentRankData.nextRank 
+                ? `${Math.round(currentRankData.progress)}% towards ${currentRankData.nextRank.title}`
+                : 'Maximum rank achieved'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rank Name</TableHead>
-                  <TableHead>Team Business</TableHead>
-                  <TableHead>Bonus</TableHead>
-                  <TableHead>Additional Bonus</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+            <div className="space-y-2">
+              <Progress value={currentRankData.progress} className="h-2" />
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>${totalBusiness.toLocaleString()}</span>
+                <span>${currentRankData.nextRank?.business_amount.toLocaleString() || 'MAX'}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ranks Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Available Ranks</CardTitle>
+            <CardDescription>Your rank journey and achievements</CardDescription>
+          </CardHeader>
+          <CardContent className="px-0 sm:px-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading ranks...</TableCell>
+                    <TableHead>Level</TableHead>
+                    <TableHead className="hidden sm:table-cell">Target Volume</TableHead>
+                    <TableHead className="text-right sm:text-left">Bonus</TableHead>
+                    <TableHead className="hidden sm:table-cell">Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : ranks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center">No ranks found</TableCell>
-                  </TableRow>
-                ) : (
-                  ranks.map((rank) => (
-                    <TableRow key={rank.id}>
-                      <TableCell className="font-medium">{rank.title}</TableCell>
-                      <TableCell>${rank.business_amount.toLocaleString()}</TableCell>
-                      <TableCell>${rank.bonus.toLocaleString()}</TableCell>
-                      <TableCell>{rank.bonus_description}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6">Loading ranks...</TableCell>
+                    </TableRow>
+                  ) : ranks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-6">No ranks available</TableCell>
+                    </TableRow>
+                  ) : (
+                    ranks.map((rank) => (
+                      <TableRow key={rank.id}>
+                        <TableCell className="font-medium min-w-[120px]">
+                          <div className="space-y-1">
+                            <div>{rank.title}</div>
+                            <div className="sm:hidden text-xs text-muted-foreground">
+                              ${rank.business_amount.toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground line-clamp-2">{rank.bonus_description}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          ${rank.business_amount.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right sm:text-left">
+                          <div className="space-y-2">
+                            <span className="font-semibold text-primary">${rank.bonus.toLocaleString()}</span>
+                            <div className="sm:hidden">
+                              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
+                                ${currentRankData.rank?.id === rank.id 
+                                  ? 'bg-primary/20 text-primary' 
+                                  : currentRankData.nextRank?.id === rank.id
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : totalBusiness >= rank.business_amount
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-muted text-muted-foreground'}`}>
+                                {currentRankData.rank?.id === rank.id 
+                                  ? 'Current' 
+                                  : currentRankData.nextRank?.id === rank.id
+                                  ? 'Next'
+                                  : totalBusiness >= rank.business_amount
+                                  ? 'Achieved'
+                                  : 'Locked'}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
                             ${currentRankData.rank?.id === rank.id 
                               ? 'bg-primary/20 text-primary' 
                               : currentRankData.nextRank?.id === rank.id
@@ -362,34 +404,35 @@ const MyRank = () => {
                             {currentRankData.rank?.id === rank.id 
                               ? 'Current' 
                               : currentRankData.nextRank?.id === rank.id
-                              ? 'Next Rank'
+                              ? 'Next'
                               : totalBusiness >= rank.business_amount
                               ? 'Achieved'
                               : 'Locked'}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-right">
                           {totalBusiness >= rank.business_amount && ranks.indexOf(rank) !== 0 && (
                             claimedRanks.includes(rank.title) ? (
-                              <span className="text-sm text-muted-foreground">
-                                Claimed
-                              </span>
+                              <span className="text-sm text-muted-foreground">Claimed</span>
                             ) : (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleClaimBonus(rank)}
                                 disabled={claimingRank === rank.title}
+                                className="whitespace-nowrap"
                               >
-                                {claimingRank === rank.title ? 'Claiming...' : 'Claim'}
+                                {claimingRank === rank.title ? 'Claiming...' : 'Claim Bonus'}
                               </Button>
                             )
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

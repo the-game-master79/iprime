@@ -46,12 +46,6 @@ const Register = () => {
     }
   }, [searchParams]);
 
-  const maskEmail = (email: string) => {
-    const [username, domain] = email.split('@');
-    const maskedUsername = username.charAt(0) + '*'.repeat(username.length - 2) + username.charAt(username.length - 1);
-    return `${maskedUsername}@${domain}`;
-  };
-
   const validateReferralCode = async (code: string) => {
     if (!code) {
       setReferrerEmail(null);
@@ -59,20 +53,59 @@ const Register = () => {
     }
 
     try {
-      const { data: referrerProfile, error } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('referral_code', code)
-        .single();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .rpc('validate_referral_code', { 
+          p_referral_code: code,
+          p_user_id: user?.id || null
+        });
 
-      if (error || !referrerProfile) {
+      if (error) {
         setReferrerEmail(null);
+        if (error.code === '42P01') {
+          console.warn('MLM network tables not found:', error);
+          const { data: basicCheck } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .eq('referral_code', code)
+            .eq('status', 'active')
+            .single();
+
+          if (basicCheck) {
+            setReferrerEmail(basicCheck.email); // Show full email
+            return;
+          }
+        }
+        throw error;
+      }
+
+      if (!data?.is_valid) {
+        setReferrerEmail(null);
+        toast({
+          title: "Invalid Code",
+          description: data?.message || "Invalid referral code",
+          variant: "destructive"
+        });
         return;
       }
 
-      setReferrerEmail(maskEmail(referrerProfile.email));
+      const { data: referrerProfile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', data.referrer_id)
+        .single();
+
+      if (referrerProfile?.email) {
+        setReferrerEmail(referrerProfile.email); // Show full email
+      }
     } catch (error) {
       setReferrerEmail(null);
+      console.error('Error validating referral code:', error);
+      toast({
+        title: "Error",
+        description: "Unable to validate referral code",
+        variant: "destructive"
+      });
     }
   };
 
@@ -82,9 +115,8 @@ const Register = () => {
   }, [referralCode]);
 
   const validateEmail = (email: string) => {
-    const dotCount = (email.match(/\./g) || []).length;
-    const specialChars = /[!#$%^&*(),.?":{}|<>]/g.test(email);
-    return dotCount <= 2 && !specialChars;
+    // Simple email validation that allows shorter domains
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
   const validatePassword = (password: string) => {
@@ -98,55 +130,37 @@ const Register = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-
-    // Rate limit check
-    if (!checkRateLimit('register_limit', 2, 60)) {
-      toast.error("Too many registration attempts. Please try again in 1 minute.");
-      return;
-    }
-
-    // Email validation
-    if (!validateEmail(email)) {
-      toast.error("Invalid email format. Please check and try again.");
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const password = formData.get('password') as string;
-      const providedReferralCode = formData.get('referral') as string;
+      const formData = new FormData(e.currentTarget);
+      const email = formData.get('email') as string;
       const firstName = formData.get('first-name') as string;
       const lastName = formData.get('last-name') as string;
+      const providedReferralCode = formData.get('referral') as string;
+      const password = formData.get('password') as string;
 
-      // Store referrer profile data at a wider scope
-      let referrerData = null;
+      let referrerId: string | null = null;
 
-      // Validate referral code if provided
+      // Validate referral code and get referrer info
       if (providedReferralCode) {
-        const { data: referrerProfile, error: referralError } = await supabase
+        const { data: referrer, error: refError } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, referral_code')
           .eq('referral_code', providedReferralCode)
+          .eq('status', 'active')
           .single();
 
-        if (referralError || !referrerProfile) {
-          toast.error("Invalid referral code. Please check and try again.");
-          setReferrerEmail(null);
-          setIsLoading(false);
-          return;
+        if (refError || !referrer) {
+          throw new Error("Invalid referral code");
         }
-        referrerData = referrerProfile; // Store the referrer data
-        setReferrerEmail(maskEmail(referrerProfile.email));
+        referrerId = referrer.id;
       }
 
-      // Generate a unique referral code for the new user
+      // Generate unique referral code
       const newReferralCode = generateReferralCode();
 
-      // Register the user
+      // Create auth user
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -154,81 +168,43 @@ const Register = () => {
           data: {
             first_name: firstName,
             last_name: lastName,
-            full_name: `${firstName} ${lastName}`,
-            referred_by: providedReferralCode || null
+            referral_code: newReferralCode
           }
         }
       });
 
-      if (signUpError) {
-        if (signUpError.message.includes("User already registered")) {
-          toast.error("User already registered. Please proceed to login.", {
-            duration: 5000,
-            action: {
-              label: "Login",
-              onClick: () => navigate("/auth/login")
-            }
-          });
-        } else {
-          throw signUpError;
-        }
-        return;
-      }
+      if (signUpError) throw signUpError;
+      if (!authData.user) throw new Error("Failed to create user");
 
-      if (authData.user) {
-        // Create profile record
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            first_name: firstName,
-            last_name: lastName,
-            full_name: `${firstName} ${lastName}`,
-            email: email,
-            referred_by: providedReferralCode || null,
-            referral_code: newReferralCode,
-            status: 'active',
-            business_rank: 'New Member',
-            role: 'user'
-          });
+      // Create profile with referral info
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          referral_code: newReferralCode,
+          referred_by: providedReferralCode || null,
+          status: 'active',
+          direct_count: 0,
+          total_invested: 0,
+          withdrawal_wallet: 0,
+          investment_wallet: 0
+        });
 
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-          throw profileError;
-        }
+      if (profileError) throw profileError;
 
-        // Create referral relationship if there's a referrer
-        if (providedReferralCode && referrerData) {
-          // First check if relationship already exists
-          const { data: existingRelationship, error: checkError } = await supabase
-            .from('referral_relationships')
-            .select('id')
-            .eq('referrer_id', referrerData.id)
-            .eq('referred_id', authData.user.id)
-            .single();
+      // No need to manually create referral relationships
+      // The database trigger will handle this automatically
+      toast.success("Registration successful! Welcome to CloudForex");
+      navigate("/dashboard");
 
-          if (!existingRelationship && !checkError) {
-            // Only create if relationship doesn't exist
-            const { error: relationshipError } = await supabase
-              .from('referral_relationships')
-              .insert({
-                referrer_id: referrerData.id,
-                referred_id: authData.user.id,
-                level: 1
-              });
-
-            if (relationshipError) {
-              console.error("Referral relationship error:", relationshipError);
-            }
-          }
-        }
-
-        toast.success("Registration successful! Please check your email to verify your account.");
-        navigate("/auth/login");
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
-      toast.error("User already registered. Please log in.");
+      toast.error(error.message || "Registration failed. Please try again.");
+      // Cleanup on failure
+      await supabase.auth.signOut();
     } finally {
       setIsLoading(false);
     }

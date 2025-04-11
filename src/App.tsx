@@ -52,15 +52,15 @@ const queryClient = new QueryClient({
 const Providers = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <AdminAuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AdminAuthProvider>
+            <TooltipProvider>
               {children}
-            </AdminAuthProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+            </TooltipProvider>
+          </AdminAuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 };

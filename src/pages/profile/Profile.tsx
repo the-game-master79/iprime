@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom"; // Add this import
 import { User, Shield, Upload, Save, CreditCard, Check, ShieldAlert, AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Make sure this import exists
 import ShellLayout from "@/components/layout/Shell";
@@ -12,7 +13,6 @@ import { useToast } from "@/hooks/use-toast";
 import { KycFormData, DocumentType } from '@/types/kyc';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, subYears } from "date-fns"; // Add this import
-import { countries } from "@/data/countries"; // Add this import at the top
 
 // Add these validation helpers at the top of the file, before the Profile component
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -36,6 +36,7 @@ const isValidCity = (city: string) => /^[A-Za-z\s-]+$/.test(city);
 const isValidPostalCode = (code: string) => /^[A-Za-z0-9\s-]+$/.test(code);
 
 const Profile = () => {
+  const [searchParams] = useSearchParams(); // Add this line
   const { toast } = useToast();
   const [isUpdatingPersonal, setIsUpdatingPersonal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +60,6 @@ const Profile = () => {
     kycStatus: "pending",
     fullName: "",
     dateJoined: "",
-    lastLogin: "",
     status: "",
     referred_by: ""
   });
@@ -110,41 +110,49 @@ const Profile = () => {
 
     setIsValidatingCode(true);
     try {
-      // First get current user's referral code
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: currentUser } = await supabase
-        .from('profiles')
-        .select('referral_code')
-        .eq('id', user.id)
-        .single();
+      // Use the enhanced validation function
+      const { data, error } = await supabase
+        .rpc('validate_referral_code', { 
+          p_referral_code: code,
+          p_user_id: user.id 
+        });
 
-      // Check if user is trying to use their own code
-      if (currentUser?.referral_code === code) {
+      if (error) {
         setReferrerName(null);
         toast({
-          title: "Invalid Code",
-          description: "You cannot use your own referral code",
+          title: "Error",
+          description: error.message,
           variant: "destructive",
         });
         return;
       }
 
-      // Proceed with normal validation
-      const { data, error } = await supabase
+      if (!data.is_valid) {
+        setReferrerName(null);
+        toast({
+          title: "Invalid Code",
+          description: data.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get referrer's name if code is valid
+      const { data: referrerData } = await supabase
         .from('profiles')
         .select('full_name')
-        .eq('referral_code', code)
+        .eq('id', data.referrer_id)
         .single();
 
-      if (error || !data) {
-        setReferrerName(null);
-      } else {
-        setReferrerName(data.full_name);
+      if (referrerData) {
+        setReferrerName(referrerData.full_name);
       }
     } catch (error) {
       setReferrerName(null);
+      console.error('Error validating referral code:', error);
     } finally {
       setIsValidatingCode(false);
     }
@@ -219,7 +227,6 @@ const Profile = () => {
           kyc_status,
           full_name,
           date_joined,
-          last_login,
           status,
           referred_by
         `)
@@ -249,7 +256,6 @@ const Profile = () => {
         kycStatus: profile?.kyc_status || 'pending',
         fullName: profile?.full_name || "",
         dateJoined: profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : new Date().toLocaleDateString(),
-        lastLogin: profile?.last_login ? new Date(profile.last_login).toLocaleDateString() : "Never",
         status: profile?.status || "active",
         referred_by: profile?.referred_by || ""
       });
@@ -450,45 +456,63 @@ const Profile = () => {
         }
       }
 
+      // Create the storage path with user ID
+      const frontFileName = `${user.id}/front_${Date.now()}${getFileExtension(kycFormData.document_front.name)}`;
+      const backFileName = `${user.id}/back_${Date.now()}${getFileExtension(kycFormData.document_back.name)}`;
+
       // Upload front document
-      const frontFileName = `${user.id}/front_${Date.now()}.${kycFormData.document_front.name.split('.').pop()}`;
       const { error: frontError } = await supabase.storage
         .from('kyc_documents')
-        .upload(frontFileName, kycFormData.document_front);
+        .upload(frontFileName, kycFormData.document_front, {
+          cacheControl: '3600',
+          upsert: false
+        });
       if (frontError) throw frontError;
 
       // Upload back document
-      const backFileName = `${user.id}/back_${Date.now()}.${kycFormData.document_back.name.split('.').pop()}`;
       const { error: backError } = await supabase.storage
         .from('kyc_documents')
-        .upload(backFileName, kycFormData.document_back);
+        .upload(backFileName, kycFormData.document_back, {
+          cacheControl: '3600',
+          upsert: false
+        });
       if (backError) throw backError;
 
       // Get public URLs
       const frontUrl = supabase.storage.from('kyc_documents').getPublicUrl(frontFileName).data.publicUrl;
       const backUrl = supabase.storage.from('kyc_documents').getPublicUrl(backFileName).data.publicUrl;
 
-      // Create or update KYC record with all form data
+      // Create or update KYC record
       const { error: kycError } = await supabase
         .from('kyc')
         .upsert({
           user_id: user.id,
           document_front: frontUrl,
           document_back: backUrl,
-          status: 'pending', // Changed from 'processing' to 'pending'
+          status: 'processing', // Changed from 'pending' to 'processing'
           ...kycFormData,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
         });
 
       if (kycError) throw kycError;
 
-      // Update profile KYC status to processing (this table allows 'processing' status)
-      const { error: updateError } = await supabase
+      // Update profile KYC status to processing
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ kyc_status: 'processing' })
+        .update({ 
+          kyc_status: 'processing', // Changed from 'pending' to 'processing'
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (profileError) throw profileError;
+
+      // Update local state to processing
+      setUserData(prev => ({
+        ...prev,
+        kycStatus: 'processing' // Changed from 'pending' to 'processing'
+      }));
 
       toast({
         title: "Verification Submitted",
@@ -517,13 +541,22 @@ const Profile = () => {
       console.error('Error submitting KYC:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to submit verification",
+        description: error instanceof Error ? error.message : "Failed to submit verification",
         variant: "destructive",
       });
     } finally {
       setIsSubmittingKYC(false);
     }
   };
+
+  // Add this helper function
+  const getFileExtension = (filename: string) => {
+    const ext = filename.split('.').pop();
+    return ext ? `.${ext}` : '';
+  };
+
+  // Get the tab from URL or default to personal
+  const defaultTab = searchParams.get('tab') || 'personal';
 
   return (
     <ShellLayout>
@@ -537,7 +570,7 @@ const Profile = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <Tabs defaultValue="personal" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px,1fr]">
             {/* Vertical Tab List */}
             <div className="space-y-1">

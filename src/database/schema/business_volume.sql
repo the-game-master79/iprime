@@ -1,115 +1,89 @@
--- Create business volume table
-CREATE TABLE IF NOT EXISTS business_volumes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES profiles(id),
-    source_user_id UUID REFERENCES profiles(id),
-    amount DECIMAL NOT NULL,
-    subscription_id UUID REFERENCES plans_subscriptions(id),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT positive_amount CHECK (amount > 0)
+-- Drop existing objects
+DROP TRIGGER IF EXISTS after_business_volume_change ON business_volumes;
+DROP TRIGGER IF EXISTS update_total_volume_trigger ON business_volumes;
+DROP FUNCTION IF EXISTS update_profile_business_volume() CASCADE;
+DROP FUNCTION IF EXISTS update_total_business_volume() CASCADE;
+DROP FUNCTION IF EXISTS get_total_business_volume(UUID) CASCADE;
+DROP FUNCTION IF EXISTS has_minimum_direct_referrals(UUID) CASCADE;
+
+
+-- Create total_business_volumes table
+CREATE TABLE IF NOT EXISTS total_business_volumes (
+    user_id UUID PRIMARY KEY REFERENCES profiles(id),
+    total_amount DECIMAL NOT NULL DEFAULT 0,
+    business_rank TEXT DEFAULT 'New Member',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create function to get total business volume
-CREATE OR REPLACE FUNCTION get_total_business_volume(p_user_id UUID)
-RETURNS DECIMAL AS $$
-BEGIN
-    RETURN COALESCE((
-        SELECT SUM(amount)
-        FROM business_volumes
-        WHERE user_id = p_user_id
-    ), 0);
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Function to check if user has minimum direct referrals
-CREATE OR REPLACE FUNCTION has_minimum_direct_referrals(p_user_id UUID)
-RETURNS BOOLEAN AS $$
-BEGIN
-    RETURN EXISTS (
-        SELECT 1 FROM profiles 
-        WHERE id = p_user_id 
-        AND direct_count >= 2
-    );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create trigger to automatically update profiles.business_volume
-CREATE OR REPLACE FUNCTION update_profile_business_volume()
+-- Function to update total business volume
+CREATE OR REPLACE FUNCTION update_total_business_volume() 
 RETURNS TRIGGER AS $$
+DECLARE
+    affected_user_id UUID;
+    total_vol DECIMAL;
+    direct_refs INTEGER;
+    new_rank TEXT;
 BEGIN
-    -- Only update business_volume if user has minimum referrals based on direct_count
-    UPDATE profiles 
-    SET business_volume = CASE 
-        WHEN direct_count >= 2 THEN get_total_business_volume(NEW.user_id)
-        ELSE 0
-    END
-    WHERE id = NEW.user_id;
+    -- Determine affected user
+    affected_user_id := COALESCE(NEW.user_id, OLD.user_id);
     
+    -- Calculate total volume from unique subscriptions only
+    WITH unique_volumes AS (
+        SELECT DISTINCT ON (subscription_id) amount
+        FROM business_volumes
+        WHERE user_id = affected_user_id
+    )
+    SELECT COALESCE(SUM(amount), 0) INTO total_vol
+    FROM unique_volumes;
+    
+    -- Get direct referral count
+    SELECT direct_count INTO direct_refs
+    FROM profiles 
+    WHERE id = affected_user_id;
+    
+    -- Determine rank if qualified
+    IF direct_refs >= 2 THEN
+        SELECT title INTO new_rank
+        FROM ranks
+        WHERE business_amount <= total_vol
+        ORDER BY business_amount DESC
+        LIMIT 1;
+        
+        -- If no rank found, default to New Member
+        new_rank := COALESCE(new_rank, 'New Member');
+    ELSE
+        new_rank := 'New Member';
+    END IF;
+
+    -- Update or insert total volumes
+    INSERT INTO total_business_volumes (
+        user_id,
+        total_amount,
+        business_rank,
+        updated_at
+    ) VALUES (
+        affected_user_id,
+        total_vol,
+        new_rank,
+        NOW()
+    )
+    ON CONFLICT (user_id) DO UPDATE 
+    SET 
+        total_amount = EXCLUDED.total_amount,
+        business_rank = EXCLUDED.business_rank,
+        updated_at = EXCLUDED.updated_at;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop existing trigger first
-DROP TRIGGER IF EXISTS after_business_volume_change ON business_volumes;
-
--- Attach trigger to business_volumes table
-CREATE TRIGGER after_business_volume_change
-    AFTER INSERT OR DELETE OR UPDATE OF amount
-    ON business_volumes
+-- Create trigger for business volume changes
+CREATE TRIGGER update_total_business_volume_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON business_volumes
     FOR EACH ROW
-    EXECUTE FUNCTION update_profile_business_volume();
+    EXECUTE FUNCTION update_total_business_volume();
 
--- Function to distribute business volume to upline
-CREATE OR REPLACE FUNCTION distribute_business_volume(
-    p_subscription_id UUID,
-    p_investor_id UUID,
-    p_amount DECIMAL
-) RETURNS void AS $$
-DECLARE
-    current_user_id UUID;
-    current_referrer_code TEXT;
-BEGIN
-    -- Get initial referrer code
-    SELECT referred_by INTO current_referrer_code
-    FROM profiles
-    WHERE id = p_investor_id;
-
-    -- Distribute business volume up the chain
-    WHILE current_referrer_code IS NOT NULL LOOP
-        -- Get referrer's ID
-        SELECT id INTO current_user_id
-        FROM profiles
-        WHERE referral_code = current_referrer_code;
-
-        IF current_user_id IS NOT NULL THEN
-            -- Add business volume for tracking
-            INSERT INTO business_volumes (
-                user_id,
-                source_user_id,
-                amount,
-                subscription_id
-            ) VALUES (
-                current_user_id,
-                p_investor_id,
-                p_amount,
-                p_subscription_id
-            );
-
-            -- Update profile's business_volume only if they have minimum referrals
-            UPDATE profiles p
-            SET business_volume = CASE 
-                WHEN p.direct_count >= 2 THEN get_total_business_volume(p.id)
-                ELSE 0
-            END
-            WHERE p.id = current_user_id;
-
-            -- Move up the chain
-            SELECT referred_by INTO current_referrer_code
-            FROM profiles 
-            WHERE id = current_user_id;
-        ELSE
-            current_referrer_code = NULL;
-        END IF;
-    END LOOP;
-END;
-$$ LANGUAGE plpgsql;
+-- Indexes for performance
+CREATE INDEX idx_business_volumes_user_id ON business_volumes(user_id);
+CREATE INDEX idx_business_volumes_subscription ON business_volumes(subscription_id);
+CREATE INDEX idx_total_volumes_user ON total_business_volumes(user_id);
