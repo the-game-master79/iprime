@@ -18,7 +18,8 @@ export default defineConfig({
       'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
       'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
       'Content-Security-Policy': "img-src 'self' https: data: blob:",
-      'X-Content-Type-Options': 'nosniff'
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Type': 'text/javascript'
     },
     fs: {
       strict: false
