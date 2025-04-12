@@ -11,6 +11,22 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { 
+  Cpu, 
+  HardDrive, 
+  DatabaseZap, 
+  BarChart2, 
+  Send, 
+  MoveRight 
+} from "lucide-react";
 
 interface Plan {
   id: string;
@@ -241,6 +257,16 @@ const Plans = () => {
           title="Choose Your Investment Plan" 
           description="Select from our curated investment plans and start your journey to financial growth"
         />
+
+        <Alert className="mb-8 bg-muted border-primary/20">
+          <Info className="h-5 w-5 text-primary" />
+          <AlertTitle className="text-primary">Start earning with Plans</AlertTitle>
+          <AlertDescription className="mt-2 text-muted-foreground space-y-2">
+            <p>• Once you subscribe to a Plan, our bot gets activated and starts generating profits to your account.</p>
+            <p>• You can buy a plan by depositing the available Crypto Methods.</p>
+            <p>• You can close a plan anytime, and get your refunds. (Deductions Apply)</p>
+          </AlertDescription>
+        </Alert>
         
         <Tabs defaultValue="available" className="space-y-8">
           <div className="flex items-center justify-between">
@@ -257,125 +283,121 @@ const Plans = () => {
               </TabsList>
           </div>
 
-          <TabsContent value="available" className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <TabsContent value="available" className="space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i} className="border border-border/40 bg-card/60">
-                    <CardHeader className="pb-2">
-                      <div className="h-4 w-20 bg-muted/60 rounded animate-pulse mb-2" />
-                      <div className="h-6 w-32 bg-muted/60 rounded animate-pulse" />
-                      <div className="h-4 w-full bg-muted/60 rounded animate-pulse mt-2" />
+                    <CardHeader className="p-4 pb-2 space-y-2">
+                      <div className="h-3 w-16 bg-muted/60 rounded animate-pulse mb-1" />
+                      <div className="h-5 w-24 bg-muted/60 rounded animate-pulse" />
+                      <div className="h-3 w-full bg-muted/60 rounded animate-pulse mt-1" />
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
-                        <div className="h-4 w-3/4 bg-muted/60 rounded animate-pulse" />
-                        <div className="h-4 w-4/5 bg-muted/60 rounded animate-pulse" />
+                    <CardContent className="p-4 pt-2">
+                      <div className="space-y-3">
+                        <div className="h-3 w-4/5 bg-muted/60 rounded animate-pulse" />
+                        <div className="h-3 w-3/4 bg-muted/60 rounded animate-pulse" />
                       </div>
                     </CardContent>
-                    <CardFooter>
-                      <div className="h-9 w-full bg-muted/60 rounded animate-pulse" />
-                    </CardFooter>
                   </Card>
                 ))
               ) : (
                 plans.map((plan) => (
-                  <Card 
-                    key={plan.id}
-                    className={cn(
-                      "relative transition-all duration-300 hover:shadow-lg overflow-hidden",
-                      selectedPlan === plan.id && "ring-2 ring-primary"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0 right-0 w-[300px] h-[300px] -mr-32 -mt-32 rounded-full opacity-50 blur-3xl",
-                      getRandomGradient()
-                    )} />
-                    {plan.recommended && (
-                      <div className="absolute right-4 top-4 z-10">
-                        <BadgeCheck className="h-6 w-6 text-primary" />
-                      </div>
-                    )}
-                    <CardHeader className="space-y-2">
+                  <Card key={plan.id} className={cn(
+                    "relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40",
+                    selectedPlan === plan.id && "ring-1 ring-primary"
+                  )}>
+                    <CardHeader className="p-4 pb-2 space-y-2">
                       <div>
-                        <CardTitle className="text-xl font-semibold">
+                        <CardTitle className="text-base sm:text-lg font-medium">
                           {plan.name}
                         </CardTitle>
-                        <CardDescription className="text-sm text-muted-foreground mt-1">
+                        <CardDescription className="text-xs sm:text-sm mt-0.5 line-clamp-2">
                           {plan.description}
                         </CardDescription>
                       </div>
-                      <Separator className="my-2" />
-                      <div>
-                        <span className="text-sm text-muted-foreground">$</span>
-                        <span className="text-6xl font-bold text-foreground ml-0.5 tracking-tight">
+                      <div className="pt-1">
+                        <span className="text-xs text-muted-foreground">$</span>
+                        <span className="text-3xl sm:text-4xl font-bold tracking-tight">
                           {plan.investment.toLocaleString()}
                         </span>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="rounded-lg border bg-card/50 p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Daily ROI</p>
-                            <div className="flex items-baseline gap-1 mt-1">
-                              <span className="text-2xl font-semibold">{plan.returns_percentage}%</span>
-                              <span className="text-sm text-muted-foreground ml-1">
-                                (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
-                              </span>
+                    <CardContent className="p-4 pt-2 space-y-4">
+                      <div className="space-y-2">
+                        <div className="rounded border bg-card/50 p-3">
+                          <div className="flex items-center justify-between space-x-2 sm:space-x-4">
+                            <div>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground">Daily ROI</p>
+                              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
+                                <span className="text-sm sm:text-lg font-semibold">{plan.returns_percentage}%</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                  (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <ArrowRightIcon className="h-5 w-5 text-muted-foreground mx-2" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Total ROI</p>
-                            <div className="flex items-baseline gap-1 mt-1">
-                              <span className="text-2xl font-semibold">
-                                {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
-                              </span>
-                              <span className="text-sm text-muted-foreground ml-1">
-                                (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
-                              </span>
+                            <Separator orientation="vertical" className="h-8" />
+                            <div>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground">Total ROI</p>
+                              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
+                                <span className="text-sm sm:text-lg font-semibold">
+                                  {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
+                                </span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                  (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="rounded-lg border bg-card/50 p-4">
-                        <div className="space-y-2">
-                          <p className="text-sm text-muted-foreground">Duration</p>
+                        <div className="rounded border bg-card/50 p-3">
+                          <p className="text-xs text-muted-foreground">Duration</p>
                           <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-semibold">{plan.duration_days}</span>
-                            <span className="text-muted-foreground">days</span>
+                            <span className="text-base sm:text-lg font-semibold">{plan.duration_days}</span>
+                            <span className="text-xs text-muted-foreground">days</span>
                           </div>
                         </div>
+
+                        <div className={cn(
+                          "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
+                          getRandomGradient()
+                        )} />
                       </div>
 
                       <Button 
-                        className="w-full"
-                        size="lg"
-                        variant={selectedPlan === plan.id ? "default" : "outline"}
+                        className="w-full text-xs sm:text-sm h-8 sm:h-9"
+                        variant="default"
                         onClick={() => handleInvestClick(plan.id)}
                       >
                         Invest Now
-                        <ArrowRight className="ml-2 h-5 w-5" />
+                        <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
 
-                      <div className="space-y-3">
-                        <p className="font-medium">What's included</p>
-                        <ul className="space-y-2">
-                          {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <div className="rounded-full bg-primary/10 p-1 mt-0.5">
-                                <CheckCircle2 className="h-4 w-4 text-primary/70" />
-                              </div>
-                              <span className="text-sm">{benefit.trim()}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="benefits">
+                          <AccordionTrigger className="text-xs font-medium py-1">
+                            View Plan Benefits
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <ul className="space-y-2.5 pt-2">
+                              {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
+                                <li key={idx} className="flex items-start gap-2">
+                                  {idx === 0 && <Cpu className="h-4 w-4 text-primary shrink-0" />}
+                                  {idx === 1 && <HardDrive className="h-4 w-4 text-primary shrink-0" />}
+                                  {idx === 2 && <DatabaseZap className="h-4 w-4 text-primary shrink-0" />}
+                                  {idx === 3 && <BarChart2 className="h-4 w-4 text-primary shrink-0" />}
+                                  {idx === 4 && <Send className="h-4 w-4 text-primary shrink-0" />}
+                                  {idx === 5 && <MoveRight className="h-4 w-4 text-primary shrink-0" />}
+                                  <span className="text-xs leading-tight">{benefit.trim()}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+
                     </CardContent>
-                    
                   </Card>
                 ))
               )}
@@ -399,7 +421,7 @@ const Plans = () => {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                 {subscribedPlans.map((plan) => {
                   const remainingDuration = Math.max(
                     plan.duration_days - (plan.days_credited || 0),
@@ -414,98 +436,98 @@ const Plans = () => {
                   return (
                     <Card 
                       key={plan.subscription_id}
-                      className="relative overflow-hidden"
+                      className="relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40"
                     >
-                      <div className={cn(
-                        "absolute top-0 right-0 w-[300px] h-[300px] -mr-32 -mt-32 rounded-full opacity-50 blur-3xl",
-                        getRandomGradient()
-                      )} />
-                      
-                      <CardHeader className="space-y-2">
+                      <CardHeader className="p-4 pb-2 space-y-2">
                         <div>
-                          <CardTitle className="text-xl font-semibold">
+                          <CardTitle className="text-base sm:text-lg font-medium">
                             {plan.name}
                           </CardTitle>
-                          <CardDescription className="text-sm text-muted-foreground mt-1">
+                          <CardDescription className="text-xs sm:text-sm mt-0.5">
                             Subscribed on {format(new Date(plan.subscription_date || ''), 'do MMMM yyyy')}
                           </CardDescription>
                         </div>
-                        <Separator className="my-2" />
-                        <div>
-                          <span className="text-sm text-muted-foreground">$</span>
-                          <span className="text-6xl font-bold text-foreground ml-0.5 tracking-tight">
+                        <div className="pt-1">
+                          <span className="text-xs text-muted-foreground">$</span>
+                          <span className="text-3xl sm:text-4xl font-bold tracking-tight">
                             {plan.investment.toLocaleString()}
                           </span>
                         </div>
                       </CardHeader>
-
-                      <CardContent className="space-y-6">
-                        <div className="rounded-lg border bg-card/50 p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm text-muted-foreground">Daily ROI</p>
-                              <div className="flex items-baseline gap-1 mt-1">
-                                <span className="text-2xl font-semibold">{plan.returns_percentage}%</span>
-                                <span className="text-sm text-muted-foreground ml-1">
-                                  (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
-                                </span>
+                      <CardContent className="p-4 pt-2 space-y-4">
+                        <div className="space-y-2">
+                          <div className="rounded border bg-card/50 p-3">
+                            <div className="flex items-center justify-between space-x-2 sm:space-x-4">
+                              <div>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">Daily ROI</p>
+                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
+                                  <span className="text-sm sm:text-lg font-semibold">{plan.returns_percentage}%</span>
+                                  <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                    (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <ArrowRightIcon className="h-5 w-5 text-muted-foreground mx-2" />
-                            <div>
-                              <p className="text-sm text-muted-foreground">Your Profit</p>
-                              <div className="flex items-baseline gap-1 mt-1">
-                                <span className="text-2xl font-semibold">
-                                  ${(plan.actual_earnings || 0).toLocaleString()}
-                                </span>
+                              <Separator orientation="vertical" className="h-8" />
+                              <div>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">Your Profit</p>
+                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
+                                  <span className="text-sm sm:text-lg font-semibold">
+                                    ${(plan.actual_earnings || 0).toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="rounded-lg border bg-card/50 p-4">
+                          <div className="rounded border bg-card/50 p-3">
+                            <div className="flex items-center justify-between space-x-2 sm:space-x-4">
+                              <div>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-base sm:text-lg font-semibold">{plan.duration_days}</span>
+                                  <span className="text-xs text-muted-foreground">days</span>
+                                </div>
+                              </div>
+                              <Separator orientation="vertical" className="h-8" />
+                              <div>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">Remaining</p>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-base sm:text-lg font-semibold">{remainingDuration}</span>
+                                  <span className="text-xs text-muted-foreground">days</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded border bg-card/50 p-3">
                             <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Duration</p>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-semibold">{plan.duration_days}</span>
-                                <span className="text-muted-foreground">days</span>
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">Progress</span>
+                                <span className="text-[10px] sm:text-xs font-medium">{Math.round(progress)}%</span>
+                              </div>
+                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-primary"
+                                  style={{ width: `${progress}%` }}
+                                />
                               </div>
                             </div>
                           </div>
-                          
-                          <div className="rounded-lg border bg-card/50 p-4">
-                            <div className="space-y-2">
-                              <p className="text-sm text-muted-foreground">Remaining</p>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-semibold">{remainingDuration}</span>
-                                <span className="text-muted-foreground">days</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="w-full bg-muted/50 rounded-lg p-4">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Progress</span>
-                              <span className="font-medium">
-                                {Math.round(progress)}%
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                          </div>
+                          <div className={cn(
+                            "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
+                            getRandomGradient()
+                          )} />
                         </div>
 
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="destructive" className="w-full">
-                              Cancel Subscription
+                            <Button 
+                              variant="destructive" 
+                              className="w-full text-xs sm:text-sm h-8 sm:h-9"
+                            >
+                              Cancel Plan
+                              <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>

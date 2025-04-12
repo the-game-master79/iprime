@@ -636,7 +636,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
                         onClick={() => navigate('/plans')}
                       >
-                        View Plans
+                        Deposit
                       </Button>
                       <Button 
                         size="lg"

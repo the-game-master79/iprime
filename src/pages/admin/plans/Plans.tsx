@@ -23,11 +23,20 @@ interface Plan {
   status: 'active' | 'inactive';
 }
 
+const validateBenefits = (benefits: string) => {
+  const items = benefits.split('•').filter(Boolean);
+  if (items.length !== 6) {
+    return 'Exactly 6 benefits are required, separated by • symbol';
+  }
+  return null;
+};
+
 const Plans = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [benefitsCount, setBenefitsCount] = useState(0);
 
   useEffect(() => {
     fetchPlans();
@@ -78,6 +87,16 @@ const Plans = () => {
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
+    const benefits = formData.get('benefits') as string;
+    
+    // Validate benefits
+    const benefitsError = validateBenefits(benefits);
+    if (benefitsError) {
+      toast.error(benefitsError);
+      setIsLoading(false);
+      return;
+    }
+
     const planData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
@@ -115,6 +134,11 @@ const Plans = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBenefitsChange = (value: string) => {
+    const items = value.split('•').filter(Boolean);
+    setBenefitsCount(items.length);
   };
 
   return (
@@ -180,15 +204,24 @@ const Plans = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="benefits">Benefits (one per line)</Label>
+                      <Label htmlFor="benefits" className="flex justify-between">
+                        <span>Benefits (6 items, separated by •)</span>
+                        <span className={`text-sm ${benefitsCount === 6 ? 'text-green-500' : 'text-amber-500'}`}>
+                          {benefitsCount}/6 benefits added
+                        </span>
+                      </Label>
                       <Textarea
                         id="benefits"
                         name="benefits"
                         defaultValue={editingPlan?.benefits}
-                        placeholder="- First benefit&#10;- Second benefit&#10;- Third benefit"
-                        className="min-h-[100px]"
+                        placeholder="CPU Benefit • GPU Benefit • RAM Benefit • Trade Symbol Benefit • Support Benefit • Progress Benefit"
+                        className={`min-h-[120px] ${benefitsCount !== 6 ? 'border-amber-500' : 'border-green-500'}`}
                         required
+                        onChange={(e) => handleBenefitsChange(e.target.value)}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Enter exactly 6 benefits, one for each category: CPU, GPU, RAM, Trade Symbol, Support, and Progress
+                      </p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">

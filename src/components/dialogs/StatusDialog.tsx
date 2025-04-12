@@ -12,6 +12,7 @@ import * as React from "react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { motion, AnimatePresence } from "framer-motion";
 
 // Add this formatter function at the top level before the component
 const formatProfit = (value: number): string => {
@@ -54,7 +55,7 @@ interface StatusDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Custom Progress component with its own context
+// Move Progress component outside
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
@@ -75,6 +76,93 @@ const Progress = React.forwardRef<
 ));
 Progress.displayName = ProgressPrimitive.Root.displayName;
 
+// Move MetricCard component outside
+const MetricCard = React.memo(({ 
+  icon: Icon, 
+  label, 
+  value, 
+  progress 
+}: { 
+  icon: any;
+  label: string;
+  value: number;
+  progress: number;
+}) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="flex items-center gap-3 p-3 rounded-lg bg-card hover:bg-accent/5 transition-colors"
+  >
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+      <Icon className="h-5 w-5 text-primary" />
+    </div>
+    <div className="space-y-1 flex-1">
+      <p className="text-sm font-medium">{label}</p>
+      <div className="flex items-center gap-3">
+        <Progress value={progress} className="h-1.5 flex-1" />
+        <span className="text-sm font-medium min-w-[3rem] text-right">{value}%</span>
+      </div>
+    </div>
+  </motion.div>
+));
+MetricCard.displayName = "MetricCard";
+
+// Modify ProfitCard component
+const ProfitCard = React.memo(({ 
+  title, 
+  value, 
+  icon: Icon, 
+  color = "text-primary",
+  chartData 
+}: { 
+  title: string;
+  value: string | number;
+  icon: any;
+  color?: string;
+  chartData: number[];
+}) => {
+  // Calculate progress based on recent values
+  const progress = React.useMemo(() => {
+    if (!chartData.length) return 0;
+    const min = Math.min(...chartData);
+    const max = Math.max(...chartData);
+    const latest = chartData[chartData.length - 1];
+    const range = max - min;
+    return range === 0 ? 50 : ((latest - min) / range) * 100;
+  }, [chartData]);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="p-4 rounded-xl bg-card border shadow-sm"
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <p className="text-sm text-muted-foreground">{title}</p>
+          <p className={cn("text-2xl font-bold mt-1", color)}>{value}</p>
+        </div>
+        <Icon className={cn("h-5 w-5", color)} />
+      </div>
+      <Progress value={progress} className="h-1" />
+    </motion.div>
+  );
+});
+ProfitCard.displayName = "ProfitCard";
+
+// Move CustomTooltip component outside
+const CustomTooltip = React.memo(({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border bg-background p-2 shadow-sm">
+        <p className="text-sm font-medium">${payload[0].value.toFixed(2)}</p>
+      </div>
+    );
+  }
+  return null;
+});
+CustomTooltip.displayName = "CustomTooltip";
+
 export function StatusDialog({ open, onOpenChange }: StatusDialogProps) {
   const [currentProfit, setCurrentProfit] = useState(200); // Start from $200
   const [profitHistory, setProfitHistory] = useState<number[]>([]);
@@ -84,6 +172,11 @@ export function StatusDialog({ open, onOpenChange }: StatusDialogProps) {
   const [cpuUsage, setCpuUsage] = useState(76);
   const [gpuUsage, setGpuUsage] = useState(76);
   const [performanceScore, setPerformanceScore] = useState(76);
+
+  // Add state for profit progress tracking
+  const [profitProgress, setProfitProgress] = useState<number[]>([]);
+  const [payoutProgress, setPayoutProgress] = useState<number[]>([]);
+  const [ppsProgress, setPpsProgress] = useState<number[]>([]);
 
   // Reset states when dialog opens
   useEffect(() => {
@@ -211,178 +304,113 @@ export function StatusDialog({ open, onOpenChange }: StatusDialogProps) {
     time: `${index}s` // Add time labels
   }));
 
-  // Custom tooltip formatter
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border bg-background p-2 shadow-sm">
-          <p className="text-sm font-medium">${payload[0].value.toFixed(2)}</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            Trading Bot Status
-          </DialogTitle>
-          <DialogDescription>
-            Real-time performance metrics of our automated trading system
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-[min(90vw,680px)] h-[85vh] max-h-[800px] p-0 overflow-hidden rounded-xl">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Trading Bot Status
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              Real-time performance metrics of our automated trading system
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-6 py-4">
-          {/* Add new metrics container before existing summary cards */}
-          <Card className="p-4">
-            <h3 className="text-sm font-medium mb-4">System Metrics</h3>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Cpu className="h-4 w-4 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">CPU Usage</p>
-                  <div className="flex items-center gap-2">
-                    <Progress value={cpuUsage} className="h-1 w-20" />
-                    <span className="text-sm font-medium">{cpuUsage}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Monitor className="h-4 w-4 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">GPU Usage</p>
-                  <div className="flex items-center gap-2">
-                    <Progress value={gpuUsage} className="h-1 w-20" />
-                    <span className="text-sm font-medium">{gpuUsage}%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Gauge className="h-4 w-4 text-primary" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Performance</p>
-                  <div className="flex items-center gap-2">
-                    <Progress value={performanceScore} className="h-1 w-20" />
-                    <span className="text-sm font-medium">{performanceScore}%</span>
-                  </div>
-                </div>
-              </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-primary/10">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricCard icon={Cpu} label="CPU Usage" value={cpuUsage} progress={cpuUsage} />
+              <MetricCard icon={Monitor} label="GPU Usage" value={gpuUsage} progress={gpuUsage} />
+              <MetricCard icon={Gauge} label="Performance" value={performanceScore} progress={performanceScore} />
             </div>
-          </Card>
 
-          {/* Summary Cards */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            <Card className="p-4 space-y-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm text-muted-foreground">Bot's Profit</p>
-                  <p className="text-2xl font-bold">{formatProfit(currentProfit)}</p>
-                </div>
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              </div>
-              <Progress value={85} className="h-1" />
-            </Card>
-            
-            <Card className="p-4 space-y-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm text-muted-foreground">Bot's Payout</p>
-                  <p className="text-2xl font-bold">{formatProfit(currentPayout)}</p>
-                </div>
-                <DollarSign className="h-4 w-4 text-primary" />
-              </div>
-              <Progress value={65} className="h-1" />
-            </Card>
-            
-            <Card className="p-4 space-y-2">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm text-muted-foreground">Profit/Second</p>
-                  <p className={cn(
-                    "text-2xl font-bold",
-                    currentPPS >= 0 ? "text-green-500" : "text-red-500"
-                  )}>
-                    ${currentPPS.toFixed(4)}
-                  </p>
-                </div>
-                <Activity className="h-4 w-4 text-blue-500" />
-              </div>
-              <Progress value={75} className="h-1" />
-            </Card>
-          </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ProfitCard 
+                title="Bot's Profit" 
+                value={formatProfit(currentProfit)}
+                icon={TrendingUp}
+                color="text-green-500"
+                chartData={profitHistory}
+              />
+              <ProfitCard 
+                title="Bot's Payout"
+                value={formatProfit(currentPayout)}
+                icon={DollarSign}
+                chartData={profitHistory.map(p => p * 0.65)}
+              />
+              <ProfitCard 
+                title="Profit/Second"
+                value={`$${currentPPS.toFixed(4)}`}
+                icon={Activity}
+                color={currentPPS >= 0 ? "text-green-500" : "text-red-500"}
+                chartData={profitPerSecond}
+              />
+            </div>
 
-          {/* Charts */}
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2">
-            {/* Profit Chart */}
-            <Card className="p-4 space-y-2">
-              <h3 className="font-medium text-sm">Profit Trend</h3>
-              <div className="h-[120px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={profitChartData}>
-                    <Line 
-                      type="natural" 
-                      dataKey="value" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={false}
-                      tension={0.4}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <Card className="p-4 space-y-3">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Profit Trend
+                </h3>
+                <div className="h-[160px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={profitChartData}>
+                      <Line 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        dot={false}
+                        animationDuration={300}
+                      />
+                      <Tooltip 
+                        content={<CustomTooltip />}
+                        cursor={{ stroke: 'hsl(var(--muted))' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
 
-            {/* PPS Chart */}
-            <Card className="p-4 space-y-2">
-              <h3 className="font-medium text-sm">Profit/Second</h3>
-              <div className="h-[120px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={ppsChartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-                    <XAxis
-                      dataKey="time"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                      interval="preserveEnd"
-                    />
-                    <YAxis
-                      width={35}
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={10}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `$${value}`}
-                      domain={[0, 'dataMax + 0.5']}
-                    />
-                    <Line
-                      type="natural"
-                      dataKey="value"
-                      stroke="rgb(34 197 94)"
-                      strokeWidth={2}
-                      dot={false}
-                      tension={0.4}
-                      animationDuration={300}
-                      animationEasing="ease-in-out"
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
+              <Card className="p-4 space-y-3">
+                <h3 className="font-medium text-sm flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Profit/Second
+                </h3>
+                <div className="h-[160px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={ppsChartData}>
+                      <XAxis
+                        dataKey="time"
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        width={35}
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={10}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="rgb(34 197 94)"
+                        strokeWidth={2}
+                        dot={false}
+                        animationDuration={300}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       </DialogContent>
