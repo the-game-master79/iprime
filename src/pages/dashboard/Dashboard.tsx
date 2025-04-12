@@ -7,12 +7,9 @@ import { getReferralLink } from "@/lib/utils";
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
 import ShellLayout from "@/components/layout/Shell";
-import Marquee from 'react-fast-marquee';
 
 // Icons
 import {
@@ -46,6 +43,61 @@ interface DashboardContentProps {
 const ShimmerEffect = ({ className }: { className?: string }) => (
   <div className={cn("animate-pulse bg-muted/50 rounded-lg", className)} />
 );
+
+const TradingViewWidget = () => {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const script = document.createElement('script');
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      symbols: [
+        {"proName": "FOREXCOM:SPXUSD","title": "S&P 500 Index"},
+        {"proName": "FOREXCOM:NSXUSD","title": "US 100 Cash CFD"},
+        {"proName": "BITSTAMP:BTCUSD","title": "Bitcoin"},
+        {"proName": "BITSTAMP:ETHUSD","title": "Ethereum"},
+        {"description": "Sensex","proName": "BSE:SENSEX"},
+        {"description": "GBP/USD","proName": "FX:GBPUSD"},
+        {"description": "EUR/USD","proName": "FX:EURUSD"},
+        {"description": "Solana","proName": "COINBASE:SOLUSD"},
+        {"description": "Gold","proName": "FXOPEN:XAUUSD"},
+        {"description": "Silver","proName": "CAPITALCOM:SILVER"},
+        {"description": "SPY ETF Trust","proName": "AMEX:SPY"},
+        {"description": "Vanguard S&F 500","proName": "AMEX:VOO"},
+        {"description": "TRUMP/USDT","proName": "BINANCE:TRUMPUSDT"},
+        {"description": "XRP","proName": "CRYPTO:XRPUSD"},
+        {"description": "TONCOIN","proName": "OKX:TONUSDT"},
+        {"description": "EUR/GBP","proName": "OANDA:USDJPY"},
+        {"description": "USD/CNH","proName": "FX:USDCNH"},
+        {"description": "EUR/GBP","proName": "FX:EURGBP"},
+        {"description": "USD/CHF","proName": "OANDA:USDCHF"},
+      ],
+      showSymbolLogo: true,
+      isTransparent: false,
+      displayMode: "adaptive",
+      colorTheme: "light",
+      locale: "en"
+    });
+
+    container.appendChild(script);
+
+    return () => {
+      if (container.contains(script)) {
+        container.removeChild(script);
+      }
+    };
+  }, []);
+
+  return (
+    <div className="tradingview-widget-container">
+      <div ref={containerRef} className="tradingview-widget-container__widget" />
+    </div>
+  );
+};
 
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // State management
@@ -81,8 +133,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   });
 
   // Display data
-  const [marqueeUsers, setMarqueeUsers] = useState<MarqueeUser[]>([]);
-
   const [claimedRanks, setClaimedRanks] = useState<string[]>([]);
   const [isClaimingBonus, setIsClaimingBonus] = useState(false);
 
@@ -238,33 +288,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setWithdrawalCommissions(totalCommissions);
     } catch (error) {
       console.error('Error fetching withdrawal stats:', error);
-    }
-  };
-
-  const fetchMarqueeData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('new_users_marquee')
-        .select('*')
-        .order('joined_time', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      const formattedUsers = data.map(user => ({
-        ...user,
-        joined_time: formatJoinedTime(new Date(user.joined_time))
-      }));
-
-      const randomIndex = Math.floor(Math.random() * formattedUsers.length);
-      const rotatedUsers = [
-        ...formattedUsers.slice(randomIndex),
-        ...formattedUsers.slice(0, randomIndex)
-      ];
-
-      setMarqueeUsers(rotatedUsers);
-    } catch (error) {
-      console.error('Error fetching marquee users:', error);
     }
   };
 
@@ -448,7 +471,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   // Effects
   useEffect(() => {
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
     const initializeDashboard = async () => {
+      if (!mounted) return;
+      
       await Promise.all([
         fetchUserProfile(),
         fetchReferralData(),
@@ -461,32 +489,32 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     };
 
     initializeDashboard();
-  }, []);
 
-  // Auto-refresh marquee data
-  useEffect(() => {
-    fetchMarqueeData();
-    const interval = setInterval(fetchMarqueeData, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('profile-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${userProfile?.id}`,
-        },
-        () => fetchBusinessStats()
-      )
-      .subscribe();
+    if (userProfile?.id) {
+      channel = supabase
+        .channel('profile-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userProfile.id}`,
+          },
+          () => {
+            if (mounted) {
+              fetchBusinessStats();
+            }
+          }
+        )
+        .subscribe();
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      mounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [userProfile?.id]);
 
@@ -495,27 +523,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       <PageTransition>
         <div className="space-y-4 sm:space-y-6">
           <div className="relative bg-muted/50 rounded-lg overflow-hidden -mt-4 mb-2">
-            <div className="bg-muted/30">
-              <Marquee
-                gradient={false}
-                speed={50}
-                pauseOnHover={true}
-                className="py-3"
-              >
-                {marqueeUsers.map((user) => (
-                  <span key={user.id} className="mx-4 inline-flex items-center">
-                    <img
-                      src={`https://flagcdn.com/24x18/${user.country.toLowerCase()}.png`}
-                      alt={`${user.country} flag`}
-                      className="h-4 w-5 mr-2"
-                    />
-                    <span className="text-sm font-medium">{user.name}</span>
-                    <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                      {user.plans}
-                    </span>
-                  </span>
-                ))}
-              </Marquee>
+            <div className="relative">
+              <TradingViewWidget />
             </div>
           </div>
 

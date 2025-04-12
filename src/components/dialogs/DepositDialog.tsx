@@ -12,10 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import * as SelectPrimitive from "@radix-ui/react-select"; // Add this import
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { Copy } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode"; // Add this import
 
@@ -249,157 +250,201 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
     }
   }, [cryptoType, network, depositMethods]);
 
+  // Update the calculate function to use 3 decimals
+  const calculateCryptoAmount = (investment: number, symbol: string) => {
+    const price = cryptoPrices[symbol.toLowerCase()]?.usd || 0;
+    return price > 0 ? (investment / price).toFixed(3) : '0';
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[525px] rounded-lg max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Complete Plan Subscription</DialogTitle>
-          {selectedPlan && (
-            <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-2">
-              <p className="text-sm text-muted-foreground">You're subscribing to {selectedPlan.name}</p>
-              <p className="text-2xl font-bold">${selectedPlan.investment.toLocaleString()}</p>
-            </div>
-          )}
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto pr-2">
-          <div className="grid gap-6 py-4">
-            {/* Main container with relative positioning for the connecting line */}
-            <div className="relative">
-              {/* Vertical connecting line - lower z-index */}
-              <div className="absolute left-4 top-8 bottom-0 w-[1px] border-l-2 border-dashed border-gray-200 -z-10" />
-
-              {/* Step 1: Select Cryptocurrency */}
-              <div className="grid gap-6 relative">
-                <div className="relative grid gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
-                      1
-                    </div>
-                    <div className="grid gap-1">
-                      <Label htmlFor="crypto-type">Select Cryptocurrency</Label>
-                    </div>
+      <DialogContent className="sm:max-w-[680px] max-h-[90vh] p-0 overflow-hidden bg-white rounded-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-background/10 pointer-events-none rounded-2xl" />
+        
+        <div className="flex flex-col">
+          <DialogHeader className="p-6 pb-0 relative shrink-0">
+            <DialogTitle className="text-2xl tracking-tight">Plan Subscription</DialogTitle>
+            {selectedPlan && (
+              <div className="mt-4 p-6 bg-gradient-to-r from-primary/5 via-muted/10 to-secondary/5 rounded-xl border border-primary/10 backdrop-blur-sm">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-semibold">{selectedPlan.name}</h3>
                   </div>
-                  <Select 
-                    onValueChange={(value) => {
-                      setCryptoType(value);
-                      setNetwork("");
-                      setAmount("");
-                    }} 
-                    value={cryptoType}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-lg font-medium text-muted-foreground">
+                        ${selectedPlan.investment.toLocaleString()}
+                      </span>
+                    </div>
+                    {cryptoType && (
+                      <div className="text-right">
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-2xl font-bold text-primary">
+                            {calculateCryptoAmount(selectedPlan.investment, cryptoType)}
+                          </p>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {cryptoType.toUpperCase()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogHeader>
+
+          <div className="px-6 py-4 relative scrollbar-thin scrollbar-thumb-primary/10 scrollbar-track-transparent hover:scrollbar-thumb-primary/20">
+            <div className="space-y-6">
+              {/* Step 1: Cryptocurrency Selection */}
+              <div className="relative">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                    {!cryptoType ? '1' : '✓'}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Select Cryptocurrency</h3>
+                    <p className="text-sm text-muted-foreground">Choose your preferred payment method</p>
+                  </div>
+                </div>
+                
+                <Select value={cryptoType} onValueChange={(value) => {
+                  setCryptoType(value);
+                  setNetwork("");
+                }}>
+                  <SelectTrigger className="w-full rounded-xl border-primary/20 hover:border-primary/40 transition-colors">
+                    <SelectValue placeholder="Select cryptocurrency" />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="max-h-[300px] overflow-y-auto p-2 rounded-xl border-primary/20"
+                    position="popper"
+                    sideOffset={4}
                   >
-                    <SelectTrigger id="crypto-type">
-                      <SelectValue placeholder="Select cryptocurrency" />
-                    </SelectTrigger>
-                    <SelectContent>
+                    <div className="grid grid-cols-1 gap-2">
                       {availableCryptos.map((symbol) => {
                         const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
                         if (!crypto) return null;
+                        const price = cryptoPrices[symbol.toLowerCase()]?.usd || 0;
                         
                         return (
-                          <SelectItem key={symbol} value={symbol}>
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-2">
+                          <SelectItem 
+                            key={symbol} 
+                            value={symbol} 
+                            className="p-4 rounded-lg hover:bg-primary/5 focus:bg-primary/5 cursor-pointer transition-colors border border-transparent hover:border-primary/10 data-[highlighted]:bg-primary/5"
+                          >
+                            <div className="flex items-center justify-between w-full gap-6">
+                              <div className="flex items-center gap-4">
                                 {crypto.logo_url && (
-                                  <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-5 h-5" />
+                                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted/50 p-1.5 flex items-center justify-center">
+                                    <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-7 h-7" />
+                                  </div>
                                 )}
-                                <span>{crypto.crypto_name}</span>
+                                <div className="space-y-1">
+                                  <p className="font-medium">{crypto.crypto_name}</p>
+                                  <p className="text-xs text-muted-foreground">{symbol.toUpperCase()}</p>
+                                </div>
                               </div>
-                              <div className="flex-shrink-0 ml-4">
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                  ${(cryptoPrices[symbol.toLowerCase()]?.usd || 0).toLocaleString()}
-                                </span>
-                              </div>
+                              <p className="text-sm font-semibold text-primary">
+                                ${price.toLocaleString()}
+                              </p>
                             </div>
                           </SelectItem>
                         );
                       })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Step 2: Select Network */}
-                {cryptoType && (
-                  <div className="relative grid gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-10">
-                        2
+              {cryptoType && (
+                <>
+                  {/* Step 2: Network Selection */}
+                  <div className="relative">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                        {!network ? '2' : '✓'}
                       </div>
-                      <div className="grid gap-1">
-                        <Label htmlFor="network">Select Network</Label>
+                      <div>
+                        <h3 className="font-semibold">Select Network</h3>
+                        <p className="text-sm text-muted-foreground">Choose the transaction network</p>
                       </div>
                     </div>
-                    <Select onValueChange={setNetwork} value={network}>
-                      <SelectTrigger id="network">
+
+                    <Select value={network} onValueChange={setNetwork}>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select network" />
                       </SelectTrigger>
                       <SelectContent>
                         {availableNetworks.map((net) => (
-                          <SelectItem key={net} value={net}>
+                          <SelectItem key={net} value={net} className="p-3">
                             {net}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
 
-                {/* Step 3: Deposit Details */}
-                {cryptoType && network && (
-                  <div className="relative grid gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-background text-sm font-medium relative z-20">
-                        3
+                  {/* Step 3: Only show when both crypto and network are selected */}
+                  {network && (
+                    <div className="relative animate-in fade-in slide-in-from-left-5 duration-200">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                          3
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">Deposit Details</h3>
+                          <p className="text-sm text-muted-foreground">Scan QR code or copy the address</p>
+                        </div>
                       </div>
-                      <div className="grid gap-1">
-                        <Label>Deposit Address</Label>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border p-4 bg-background relative z-10 break-all">
-                      <div className="flex justify-center mb-4">
-                        {qrCodeUrl && (
-                          <div className="p-2 sm:p-4">
-                            <img
-                              src={qrCodeUrl}
-                              alt="Deposit QR Code"
-                              className="w-40 h-40"
-                            />
+
+                      <div className="rounded-xl border bg-card p-6 space-y-6">
+                        <div className="flex justify-center">
+                          {qrCodeUrl && (
+                            <div className="p-4 bg-white rounded-lg shadow-sm">
+                              <img src={qrCodeUrl} alt="Deposit QR Code" className="w-48 h-48" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-sm">Deposit Address</Label>
+                          <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3 font-mono text-sm">
+                            <code className="flex-1 break-all">
+                              {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
+                            </code>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <code className="flex-1 rounded bg-muted p-2 text-sm overflow-x-auto whitespace-pre-wrap">
-                            {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
-                          </code>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        </div>
 
-        <Button 
-          className="w-full mt-2 flex-shrink-0" 
-          disabled={!cryptoType || !network}
-          onClick={async () => {
-            if (selectedPlan) {
-              await handleSubmit(selectedPlan.investment);
-              onSuccess?.();
-            }
-          }}
-        >
-          Complete Subscription
-        </Button>
+          <div className="p-6 bg-gradient-to-t from-muted/20 via-background/5 to-transparent border-t relative shrink-0">
+            <Button 
+              className="w-full relative bg-gradient-to-r from-primary via-primary/90 to-primary hover:from-primary/90 hover:via-primary hover:to-primary/90 rounded-xl"
+              size="lg"
+              disabled={!cryptoType || !network}
+              onClick={async () => {
+                if (selectedPlan) {
+                  await handleSubmit(selectedPlan.investment);
+                  onSuccess?.();
+                }
+              }}
+            >
+              Confirm Subscription
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

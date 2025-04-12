@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { InfoDialog } from "@/components/dialogs/InfoDialog";
+import { StatusDialog } from "@/components/dialogs/StatusDialog";
 
 // Hooks
 import { useBreakpoints } from "@/hooks/use-breakpoints";
@@ -253,21 +254,28 @@ const Sidebar: React.FC<SidebarProps> = ({
 );
 
 export const ShellLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // State management
+  // Move PWA hook after other hooks
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isMobile, isTablet } = useBreakpoints();
+  // ...other state hooks...
+  
+  // Use PWA hook
+  const pwaSupport = usePwaInstall();
+  const canInstall = pwaSupport.canInstall;
+  const install = pwaSupport.install;
+
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [performanceData, setPerformanceData] = useState<{ value: number }[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userBalance, setUserBalance] = useState<number>(0);
 
   // Hooks
-  const { isMobile, isTablet } = useBreakpoints();
   const location = useLocation();
   const { logout } = useAuth();
-  const { canInstall, install } = usePwaInstall();
 
   // Effects
   useEffect(() => {
@@ -467,6 +475,14 @@ export const ShellLayout: React.FC<{ children: React.ReactNode }> = ({ children 
           
           <div className="flex-1" />
 
+          <div 
+            className="flex items-center gap-2 mr-2 bg-black/5 backdrop-blur-sm px-3 py-1.5 rounded-full cursor-pointer hover:bg-black/10 transition-colors"
+            onClick={() => setStatusDialogOpen(true)}
+          >
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs font-medium text-green-500">Bot is Live</span>
+          </div>
+
           <Button 
             variant="ghost"
             size="icon"
@@ -543,6 +559,11 @@ export const ShellLayout: React.FC<{ children: React.ReactNode }> = ({ children 
           <DepositDialog 
             open={depositDialogOpen} 
             onOpenChange={setDepositDialogOpen} 
+          />
+
+          <StatusDialog
+            open={statusDialogOpen}
+            onOpenChange={setStatusDialogOpen}
           />
         </header>
         

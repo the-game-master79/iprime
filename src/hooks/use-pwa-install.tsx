@@ -1,17 +1,25 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-export function usePwaInstall() {
-  const [canInstall, setCanInstall] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+interface PWAInstallHook {
+  canInstall: boolean;
+  install: () => Promise<void>;
+}
 
-  useEffect(() => {
+export function usePwaInstall(): PWAInstallHook {
+  const [canInstall, setCanInstall] = React.useState(false);
+  const [deferredPrompt, setDeferredPrompt] = React.useState<BeforeInstallPromptEvent | null>(null);
+
+  React.useEffect(() => {
+    // Only run in browser environment
+    if (typeof window === 'undefined') return;
+
     const handler = (e: Event) => {
-      // Remove e.preventDefault() to allow default banner
+      e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setCanInstall(true);
     };
@@ -20,11 +28,8 @@ export function usePwaInstall() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const install = async () => {
-    if (!deferredPrompt) {
-      // If no deferred prompt, let the browser handle it
-      return;
-    }
+  const install = React.useCallback(async () => {
+    if (!deferredPrompt) return;
     
     try {
       await deferredPrompt.prompt();
@@ -36,7 +41,7 @@ export function usePwaInstall() {
     } finally {
       setDeferredPrompt(null);
     }
-  };
+  }, [deferredPrompt]);
 
   return { canInstall, install };
 }
