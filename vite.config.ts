@@ -36,12 +36,20 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: undefined
+        manualChunks: {
+          vendor: ['/src/main.tsx', '/src/App.tsx'],
+          react: ['react', 'react-dom'],
+        }
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    modulePreload: {
+      polyfill: true
+    }
   }
 });
