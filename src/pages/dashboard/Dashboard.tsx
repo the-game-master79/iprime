@@ -3,33 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { getReferralLink } from "@/lib/utils";
+import { format } from "date-fns";
 
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageTransition, PageHeader, StatCard } from "@/components/ui-components";
-import ShellLayout from "@/components/layout/Shell";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // Icons
 import {
-  DollarSign, Users, Mail, Star, Trophy, Copy, QrCode,
-  Briefcase, ArrowUpToLine, ArrowUpRight, ArrowRight, Check
+Copy, QrCode,
 } from "lucide-react";
+import { PlusCircle, ArrowCircleUpRight, ShoppingCart, ShareNetwork } from "@phosphor-icons/react";
 
 // Utilities
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
+import { useBreakpoints } from "@/hooks/use-breakpoints";
 
 // Types
 import type { 
-  MarqueeUser, 
   Rank, 
-  LeaderboardEntry, 
-  Plan,
   BusinessRankState,
-  UserProfile 
+  UserProfile, 
+  Transaction
 } from "@/types/dashboard"; // You'll need to create this types file
 
 // Constants
@@ -44,62 +46,8 @@ const ShimmerEffect = ({ className }: { className?: string }) => (
   <div className={cn("animate-pulse bg-muted/50 rounded-lg", className)} />
 );
 
-const TradingViewWidget = () => {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const script = document.createElement('script');
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      symbols: [
-        {"proName": "FOREXCOM:SPXUSD","title": "S&P 500 Index"},
-        {"proName": "FOREXCOM:NSXUSD","title": "US 100 Cash CFD"},
-        {"proName": "BITSTAMP:BTCUSD","title": "Bitcoin"},
-        {"proName": "BITSTAMP:ETHUSD","title": "Ethereum"},
-        {"description": "Sensex","proName": "BSE:SENSEX"},
-        {"description": "GBP/USD","proName": "FX:GBPUSD"},
-        {"description": "EUR/USD","proName": "FX:EURUSD"},
-        {"description": "Solana","proName": "COINBASE:SOLUSD"},
-        {"description": "Gold","proName": "FXOPEN:XAUUSD"},
-        {"description": "Silver","proName": "CAPITALCOM:SILVER"},
-        {"description": "SPY ETF Trust","proName": "AMEX:SPY"},
-        {"description": "Vanguard S&F 500","proName": "AMEX:VOO"},
-        {"description": "TRUMP/USDT","proName": "BINANCE:TRUMPUSDT"},
-        {"description": "XRP","proName": "CRYPTO:XRPUSD"},
-        {"description": "TONCOIN","proName": "OKX:TONUSDT"},
-        {"description": "EUR/GBP","proName": "OANDA:USDJPY"},
-        {"description": "USD/CNH","proName": "FX:USDCNH"},
-        {"description": "EUR/GBP","proName": "FX:EURGBP"},
-        {"description": "USD/CHF","proName": "OANDA:USDCHF"},
-      ],
-      showSymbolLogo: true,
-      isTransparent: false,
-      displayMode: "adaptive",
-      colorTheme: "light",
-      locale: "en"
-    });
-
-    container.appendChild(script);
-
-    return () => {
-      if (container.contains(script)) {
-        container.removeChild(script);
-      }
-    };
-  }, []);
-
-  return (
-    <div className="tradingview-widget-container">
-      <div ref={containerRef} className="tradingview-widget-container__widget" />
-    </div>
-  );
-};
-
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
+  const { isMobile } = useBreakpoints();
   // State management
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -110,6 +58,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [withdrawalBalance, setWithdrawalBalance] = useState(0);
   const [investmentReturns, setInvestmentReturns] = useState(0);
   const [withdrawalCommissions, setWithdrawalCommissions] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [ranks, setRanks] = useState<Rank[]>([]);
   
   // Business data
   const [totalInvested, setTotalInvested] = useState(0);
@@ -138,6 +88,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Add these state variables with the other states
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const ITEMS_PER_PAGE = 10;
 
   // Data fetching functions
   const fetchUserProfile = async () => {
@@ -325,8 +281,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         return;
       }
 
-      const totalVolume = profileData?.total_business_volumes?.total_amount || 0;
-      const currentRankTitle = profileData?.total_business_volumes?.business_rank || 'New Member';
+      const totalVolume = profileData?.total_business_volumes?.[0]?.total_amount || 0;
+      const currentRankTitle = profileData?.total_business_volumes?.[0]?.business_rank || 'New Member';
 
       // Get all ranks for progression tracking
       const { data: ranks, error: ranksError } = await supabase
@@ -469,6 +425,61 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
+  // Update fetchTransactions function
+  const fetchTransactions = async (pageNumber = 1) => {
+    try {
+      setIsLoadingMore(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const from = (pageNumber - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      const { data, error, count } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+      
+      if (pageNumber === 1) {
+        setTransactions(data || []);
+      } else {
+        setTransactions(prev => [...prev, ...(data || [])]);
+      }
+      
+      setHasMore((count || 0) > to + 1);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Add load more handler
+  const handleLoadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      setPage(prev => prev + 1);
+      fetchTransactions(page + 1);
+    }
+  };
+
+  const fetchRanks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('ranks')
+        .select('*')
+        .order('business_amount', { ascending: true });
+
+      if (error) throw error;
+      setRanks(data || []);
+    } catch (error) {
+      console.error('Error fetching ranks:', error);
+    }
+  };
+
   // Effects
   useEffect(() => {
     let mounted = true;
@@ -518,343 +529,339 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     };
   }, [userProfile?.id]);
 
+  useEffect(() => {
+    fetchTransactions();
+    fetchRanks();
+  }, [userProfile?.id]);
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    toast({
+      title: "Copied",
+      description: "Transaction ID copied to clipboard",
+    });
+  };
+
+  const handleTradeClick = () => {
+    // If mobile, go to select page first, otherwise go to main trade view
+    navigate(isMobile ? '/trade/select' : '/trade');
+  };
+
   return (
-    <ShellLayout>
-      <PageTransition>
-        <div className="space-y-4 sm:space-y-6">
-          <div className="relative bg-muted/50 rounded-lg overflow-hidden -mt-4 mb-2">
-            <div className="relative">
-              <TradingViewWidget />
+    <div className="bg-muted/30"> {/* Removed min-h-screen */}
+      {/* Header */}
+      <header className="flex items-center justify-between py-4 mt-4">
+        <div className="container mx-auto px-4 sm:px-4 pr-0 sm:pr-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <img 
+                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg"
+                alt="CloudForex" 
+                className="h-12 w-auto" 
+              />
             </div>
-          </div>
-
-          <div className="p-8 rounded-xl bg-gradient-to-br from-white to-blue-50 dark:from-gray-900 dark:to-blue-900/20 border shadow-sm">
-            <div className="flex items-start justify-between gap-8">
-              <div className="flex items-start gap-8">
-                <div className="shrink-0">
-                  <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 ring-4 ring-background flex items-center justify-center shadow-sm">
-                    {userProfile?.avatar_url ? (
-                      <img 
-                        src={userProfile.avatar_url} 
-                        alt="Profile" 
-                        className="h-20 w-20 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl font-semibold text-primary">
-                        {userProfile?.first_name?.[0]}{userProfile?.last_name?.[0]}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold tracking-tight">
-                    Hello, {userProfile?.first_name} {userProfile?.last_name}
-                  </h2>
-                  <p className="text-muted-foreground/80 mt-1 text-lg">{userProfile?.email}</p>
-                </div>
-              </div>
-
-              <div className="hidden sm:block border border-dashed border-primary/20 rounded-lg p-4 bg-white/50 dark:bg-gray-950/50 backdrop-blur-sm min-w-[600px]">
-                <div className="text-sm font-medium text-muted-foreground mb-2">Your Referral Link</div>
-                <div className="relative">
-                  <Input
-                    readOnly
-                    value={referralLink}
-                    className="pr-20 font-mono text-sm bg-transparent border-primary/20 overflow-x-auto"
+            <div className="flex items-center gap-2 sm:gap-6">
+              <button
+                onClick={handleTradeClick}
+                className="order-2 sm:order-1 flex items-center gap-3 px-4 py-2 sm:rounded-lg rounded-l-lg bg-[#FFA500] text-white hover:bg-[#FFA500]/90 transition-colors scale-on-hover"
+              >
+                <div className="sm:flex items-center gap-2 hidden">
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
+                    alt="CloudTrade"
+                    className="h-6 w-auto" 
                   />
-                  <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="hover:bg-primary/10 hover:text-primary transition-colors"
-                      onClick={handleShowQrCode}
-                    >
-                      <QrCode className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost" 
-                      className="hover:bg-primary/10 hover:text-primary transition-colors"
-                      onClick={handleCopyLink}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <ArrowCircleUpRight weight="bold" className="h-5 w-5 slide-from-left" />
                 </div>
-              </div>
+                <div className="sm:hidden">
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
+                    alt="CloudTrade"
+                    className="h-6 w-auto" 
+                  />
+                </div>
+              </button>
+              
+              <Avatar 
+                className="order-1 sm:order-2 cursor-pointer bg-primary"
+                onClick={() => navigate('/profile')}
+              >
+                <AvatarImage src={userProfile?.avatar_url} />
+                <AvatarFallback>{userProfile?.first_name?.[0] || 'U'}</AvatarFallback>
+              </Avatar>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {activePlans.count > 0 ? (
-              <div className="lg:row-span-2 p-6 bg-card border rounded-lg relative overflow-hidden order-1">
-                <img 
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cfwatermark.png"
-                  alt="CloudForex Watermark"
-                  className="absolute -top-8 -right-8 w-48 h-48 opacity-10 select-none pointer-events-none object-contain"
-                />
-                <div className="relative z-10 flex flex-col h-full">
-                  <div>
-                    <div className="text-muted-foreground text-base">Total Invested</div>
-                    <div className="text-7xl font-bold text-primary tracking-tight mt-3">
-                      ${totalInvested.toLocaleString()}
-                    </div>
-                    <div className="text-base text-muted-foreground mt-3">
-                      Across {activePlans.count} Active Plan{activePlans.count !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                  <div className="flex mt-auto hover-trigger">
-                    <Button 
-                      size="lg"
-                      className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
-                      onClick={() => navigate('/plans')}
-                    >
-                      Buy Plans
-                    </Button>
-                    <Button 
-                      size="lg"
-                      className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                      onClick={() => navigate('/plans')}
-                    >
-                      <div className="relative w-4 h-4">
-                        <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                        <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                      </div>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="lg:row-span-2 p-6 bg-card border rounded-lg relative order-1">
-                <div className="h-full flex flex-col items-center justify-center text-center">
-                  <div className="space-y-3">
-                    <div className="text-2xl font-semibold text-muted-foreground">No Plans Subscribed Yet</div>
-                    <p className="text-muted-foreground">Start your investment journey by subscribing to a plan</p>
-                    <div className="flex justify-center mt-6 hover-trigger">
-                      <Button 
-                        size="lg"
-                        className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
-                        onClick={() => navigate('/plans')}
-                      >
-                        Deposit
-                      </Button>
-                      <Button 
-                        size="lg"
-                        className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                        onClick={() => navigate('/plans')}
-                      >
-                        <div className="relative w-4 h-4">
-                          <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                          <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                        </div>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="p-6 bg-card border rounded-lg relative order-3 lg:order-2">
-              <div className="text-muted-foreground text-sm">Total Commissions</div>
-              <div className="text-3xl font-bold text-orange-600 tracking-tight mt-2">
-                ${(totalCommissions + rankBonusTotal).toLocaleString()}
-              </div>
-              <div className="text-sm text-muted-foreground mt-2">
-                ${totalCommissions.toLocaleString()} Commissions & ${rankBonusTotal.toLocaleString()} Rank Bonus
-              </div>
-              <div className="absolute right-6 top-1/2 -translate-y-1/2 hover-trigger hidden sm:block">
-                <Button 
-                  size="lg"
-                  className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10 bg-orange-600 hover:bg-orange-700 text-white" 
-                  onClick={() => navigate('/affiliate')}
-                >
-                  {totalCommissions > 0 || rankBonusTotal > 0 ? 'Earn More' : 'Start Earning'}
-                </Button>
-                <Button 
-                  size="lg"
-                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                  onClick={() => navigate('/affiliate')}
-                >
-                  <div className="relative w-4 h-4">
-                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                  </div>
-                </Button>
-              </div>
-              <div className="flex mt-4 sm:hidden hover-trigger">
-                <Button 
-                  className="rounded-full px-6 relative flex-1 after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10 bg-orange-600 hover:bg-orange-700 text-white"
-                  onClick={() => navigate('/affiliate')}
-                >
-                  {totalCommissions > 0 || rankBonusTotal > 0 ? 'Earn More' : 'Start Earning'}
-                </Button>
-                <Button 
-                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                  onClick={() => navigate('/affiliate')}
-                >
-                  <div className="relative w-4 h-4">
-                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                  </div>
-                </Button>
-              </div>
-            </div>
-
-            <div className="p-6 bg-card border rounded-lg relative order-2 lg:order-3">
-              <div className="text-muted-foreground text-sm">Withdrawal Balance</div>
-              <div className="text-3xl font-bold text-green-600 tracking-tight mt-2">
-                ${withdrawalBalance.toLocaleString()}
-              </div>
-              <div className="mt-3 text-sm text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>${investmentReturns.toLocaleString()} Earnings & ${withdrawalCommissions.toLocaleString()} Commissions</span>
-                </div>
-              </div>
-              <div className="absolute right-6 top-1/2 -translate-y-1/2 hover-trigger hidden sm:block">
-                <Button 
-                  size="lg"
-                  className="rounded-full px-6 relative after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10" 
-                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
-                  style={{ backgroundColor: '#16a34a', color: 'white' }}
-                >
-                  {userProfile?.kyc_status === 'completed' ? 'Withdraw Now' : 'Submit KYC'}
-                </Button>
-                <Button 
-                  size="lg"
-                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
-                >
-                  <div className="relative w-4 h-4">
-                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                  </div>
-                </Button>
-              </div>
-              <div className="flex mt-4 sm:hidden hover-trigger">
-                <Button 
-                  className="rounded-full px-6 relative flex-1 after:absolute after:h-full after:w-px after:right-0 after:top-0 after:bg-primary-foreground/10"
-                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
-                  style={{ backgroundColor: '#16a34a', color: 'white' }}
-                >
-                  {userProfile?.kyc_status === 'completed' ? 'Withdraw Now' : 'Submit KYC'}
-                </Button>
-                <Button 
-                  className="rounded-full px-3.5 transition-all duration-300 bg-black hover:bg-black"
-                  onClick={() => navigate(userProfile?.kyc_status === 'completed' ? '/withdrawals' : '/profile?tab=kyc')}
-                >
-                  <div className="relative w-4 h-4">
-                    <ArrowUpRight className="absolute inset-0 transition-opacity duration-300 opacity-100 hover-trigger:opacity-0 text-white" />
-                    <ArrowRight className="absolute inset-0 transition-opacity duration-300 opacity-0 hover-trigger:opacity-100 text-white" />
-                  </div>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <Card>
-              <CardContent className="p-6 bg-gradient-to-br from-white to-blue-50/50 dark:from-gray-900 dark:to-blue-900/20">
-                {userProfile?.direct_count && userProfile.direct_count >= 2 ? (
-                  <>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                      <div>
-                        <div className="text-2xl sm:text-3xl font-bold text-primary">
-                          ${businessStats.totalVolume.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl sm:text-3xl font-bold text-primary">
-                          {businessStats.currentRank}
-                        </div>
-                        {businessStats.currentRank !== 'New Member' && (
-                          claimedRanks.includes(businessStats.currentRank) ? (
-                            <div className="flex items-center gap-1 text-green-600 text-sm font-medium px-3 py-1.5 rounded-md bg-green-50">
-                              <Check className="h-4 w-4" />
-                              <span>Claimed</span>
-                            </div>
-                          ) : (
-                            <Button 
-                              size="sm"
-                              onClick={() => handleClaimBonus(businessStats.currentRank)}
-                              disabled={isClaimingBonus}
-                            >
-                              {isClaimingBonus ? "Claiming..." : `Claim $${businessStats.rankBonus.toLocaleString()}`}
-                            </Button>
-                          )
-                        )}
-                      </div>
-                    </div>
-                    {businessStats.nextRank && (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary rounded-full transition-all duration-300"
-                                style={{ width: `${businessStats.progress}%` }}
-                              />
-                            </div>
-                            <div className="flex justify-between items-center mt-2">
-                              <span className="text-sm text-muted-foreground">
-                                Next Rank: {businessStats.nextRank.title} (${businessStats.nextRank.bonus.toLocaleString()} Bonus)
-                              </span>
-                              <span className="text-xs font-medium text-primary">
-                                {Math.round(businessStats.progress)}% (${businessStats.totalVolume.toLocaleString()} / ${businessStats.nextRank.business_amount.toLocaleString()})
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-amber-600">
-                      <Trophy className="h-5 w-5" />
-                      <h3 className="text-lg font-semibold">Unlock Rank Bonuses & Commissions</h3>
-                    </div>
-                    
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-                      <p className="text-sm text-amber-800">
-                        Complete these requirements to start earning rank bonuses and team commissions:
-                      </p>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className={`h-5 w-5 rounded-full flex items-center justify-center text-sm
-                            ${userProfile?.direct_count >= 2 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-amber-200 text-amber-700'
-                            }`}
-                          >
-                            {userProfile?.direct_count || 0}
-                          </div>
-                          <span className="text-sm text-amber-800">
-                            Minimum 2 direct referrals required 
-                            {userProfile?.direct_count 
-                              ? ` (${userProfile.direct_count}/2)` 
-                              : ' (0/2)'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-2"
-                        onClick={() => navigate('/affiliate')}
-                      >
-                        Go to Affiliate Program
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </div>
-      </PageTransition>
-    </ShellLayout>
+      </header>
+
+      <main className="py-6 min-h-screen">
+        <div className="container pb-20"> {/* Added bottom padding */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* Quick Actions Container */}
+            <div className="p-4 sm:p-8 rounded-[1rem] bg-primary shadow-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {/* Deposit */}
+                <div onClick={() => navigate('/deposit')} className="cursor-pointer group">
+                  <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
+                    <PlusCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                  </div>
+                  <div className="w-full flex items-center justify-center">
+                    <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Deposit</span>
+                  </div>
+                </div>
+
+                {/* Withdraw */} 
+                <div onClick={() => navigate('/withdrawals')} className="cursor-pointer group">
+                  <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
+                    <ArrowCircleUpRight className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                  </div>
+                  <div className="w-full flex items-center justify-center">
+                    <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Withdraw</span>
+                  </div>
+                </div>
+
+                {/* Buy Plans */}
+                <div onClick={() => navigate('/plans')} className="cursor-pointer group">
+                  <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
+                    <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                  </div>
+                  <div className="w-full flex items-center justify-center">
+                    <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Buy Plans</span>
+                  </div>
+                </div>
+
+                {/* Refer */}
+                <div onClick={() => navigate('/affiliate')} className="cursor-pointer group">
+                  <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
+                    <ShareNetwork className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                  </div>
+                  <div className="w-full flex items-center justify-center">
+                    <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Refer</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Referral Section */}
+              <div className="mt-8 border-t border-white/10 pt-6">
+                <div className="flex flex-col md:flex-row gap-6 items-center">
+                  <div className="flex-1 w-full">
+                    <div className="text-white/80 text-sm mb-2">Your Referral Link</div>
+                    <div className="relative">
+                      <Input
+                        readOnly
+                        value={referralLink}
+                        className="pr-20 font-mono text-sm bg-white/10 border-white/20 text-white"
+                      />
+                      <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="hover:bg-white/10 text-white"
+                          onClick={handleShowQrCode}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost" 
+                          className="hover:bg-white/10 text-white"
+                          onClick={handleCopyLink}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  {qrCodeUrl && (
+                    <div className="h-24 w-24 bg-white p-2 rounded-lg">
+                      <img src={qrCodeUrl} alt="QR Code" className="w-full h-full" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+
+            {/* Balance Containers */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
+                <div className="text-6xl font-bold tracking-tight">
+                  ${withdrawalBalance.toLocaleString()}
+                </div>
+                <div className="text-muted-foreground text-sm mt-2">Available Balance</div>
+              </div>
+
+              <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
+                <div className="text-6xl font-bold tracking-tight">
+                  ${totalInvested.toLocaleString()}
+                </div>
+                <div 
+                  onClick={() => navigate('/plans')} 
+                  className="text-sm text-muted-foreground mt-2 cursor-pointer hover:text-primary transition-colors"
+                >
+                  {activePlans.count} Plan{activePlans.count !== 1 ? 's' : ''} Active
+                </div>
+              </div>
+            </div>
+
+            <Tabs defaultValue="transactions" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 rounded-xl mb-4">
+                <TabsTrigger value="transactions" className="rounded-l-xl">Transactions</TabsTrigger>
+                <TabsTrigger value="ranks" className="rounded-r-xl">Your Rank</TabsTrigger>
+              </TabsList>
+
+              <TabsContent 
+                value="transactions" 
+                className="space-y-3 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
+              >
+                <div className="overflow-y-auto">
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No transactions found
+                    </div>
+                  ) : (
+                    <div className="space-y-4"> {/* Added vertical spacing */}
+                      <Accordion type="multiple" className="space-y-3">
+                        {Object.entries(
+                          transactions.reduce((groups, tx) => {
+                            const date = new Date(tx.created_at).toLocaleDateString();
+                            if (!groups[date]) groups[date] = [];
+                            groups[date].push(tx);
+                            return groups;
+                          }, {} as Record<string, any[]>)
+                        ).map(([date, txs]) => (
+                          <AccordionItem key={date} value={date} className="border rounded-lg overflow-hidden">
+                            <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                              <div className="flex justify-between items-center w-full">
+                                <span className="font-medium">{format(new Date(date), 'do MMMM yyyy')}</span>
+                                <Badge variant="secondary" className="ml-auto mr-4 text-xs">
+                                  {txs.length} Transactions
+                                </Badge>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4">
+                              <div className="space-y-3">
+                                {txs.map((tx) => (
+                                  <div key={tx.id} className="relative bg-white border rounded-lg p-4">
+                                    <div className="space-y-3">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-muted-foreground">{tx.id}</span>
+                                        <div className={`h-2.5 w-2.5 rounded-full ${
+                                          tx.status === 'Completed' ? 'bg-green-500' : 
+                                          tx.status === 'Pending' ? 'bg-yellow-500' : 
+                                          tx.status === 'Processing' ? 'bg-blue-500' : 
+                                          'bg-red-500'
+                                        }`} />
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-6 w-6 p-0 hover:bg-background"
+                                          onClick={() => handleCopyId(tx.id)}
+                                        >
+                                          <Copy className="h-3 w-3" />
+                                          <span className="sr-only">Copy ID</span>
+                                        </Button>
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <span className={`text-2xl font-semibold ${
+                                          tx.type === 'deposit' || tx.type === 'commission' || tx.type === 'investment_return' 
+                                            ? 'text-green-600' 
+                                            : tx.type === 'withdrawal' || tx.type === 'investment' 
+                                            ? 'text-red-600' 
+                                            : 'text-blue-600'
+                                        }`}>
+                                          ${tx.amount.toLocaleString()}
+                                        </span>
+                                        <Badge variant="outline" className="font-normal">
+                                          {tx.type.replace(/_/g, ' ')}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                      
+                      {hasMore && (
+                        <div className="py-4 text-center sticky bottom-0 bg-background/95 backdrop-blur-sm">
+                          <Button
+                            variant="outline"
+                            onClick={handleLoadMore}
+                            disabled={isLoadingMore}
+                            className="w-full sm:w-auto"
+                          >
+                            {isLoadingMore ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                                Loading...
+                              </>
+                            ) : (
+                              'Load More'
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent 
+                value="ranks" 
+                className="space-y-4 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
+              >
+                <div className="max-h-[600px] overflow-y-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {ranks.map((rank) => (
+                      <Card key={rank.title} className={cn(
+                        "relative overflow-hidden",
+                        businessStats.totalVolume >= rank.business_amount && "bg-primary/5 border-primary"
+                      )}>
+                        <CardContent className="p-6">
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-2">
+                                <h3 className="font-semibold text-lg">{rank.title}</h3>
+                                <div className="space-y-1">
+                                  <div className="text-sm text-muted-foreground">
+                                    Volume Required
+                                  </div>
+                                  <div className="text-xl font-medium">
+                                    ${rank.business_amount.toLocaleString()}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right space-y-2">
+                                {businessStats.totalVolume >= rank.business_amount ? (
+                                  <Badge variant="success">Achieved</Badge>
+                                ) : (
+                                  <Badge variant="secondary">
+                                    ${(rank.business_amount - businessStats.totalVolume).toLocaleString()} more
+                                  </Badge>
+                                )}
+                                <div className="text-xl font-semibold text-green-600">
+                                  +${rank.bonus.toLocaleString()}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Rank Bonus
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 

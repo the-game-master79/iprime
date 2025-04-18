@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { 
-  Download, Search, Receipt, CreditCard, Copy, DollarSign,
-  ArrowUpCircle, ArrowDownCircle
+  Download, Search, Receipt, Copy, DollarSign,
+  ArrowUpCircle, ArrowDownCircle, ArrowLeft
 } from "lucide-react";
-import ShellLayout from "@/components/layout/Shell";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,13 @@ import {
 import { PageHeader, StatCard } from "@/components/ui-components";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 
 interface Transaction {
   id: string;
@@ -36,6 +43,7 @@ interface Transaction {
 
 const Payments = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -119,6 +127,13 @@ const Payments = () => {
     return types[type] || type;
   };
 
+  const truncateId = (id: string) => {
+    if (window.innerWidth < 640 && id.length > 8) {
+      return `${id.slice(0, 8)}...`;
+    }
+    return id;
+  };
+
   const filteredTransactions = transactions.filter(tx => {
     if (tx.type === 'investment' && tx.method === 'system') return false;
 
@@ -136,123 +151,149 @@ const Payments = () => {
     });
   };
 
-  return (
-    <ShellLayout>
-      <div className="space-y-6">
-        <PageHeader 
-          title="Transactions" 
-          description="View and manage your payment history"
-          action={
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Export History
-            </Button>
-          }
-        />
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).toUpperCase();
+  };
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            title="Total Invested"
-            value={`$${stats.deposits.toLocaleString()}`}
-            icon={<ArrowDownCircle className="h-4 w-4" />}
-            description="Total investment deposits"
-          />
-          <StatCard
-            title="Total Withdrawn"
-            value={`$${stats.withdrawals.toLocaleString()}`}
-            icon={<ArrowUpCircle className="h-4 w-4" />}
-            description="Completed withdrawals"
-          />
-          <StatCard
-            title="Commission Earned"
-            value={`$${stats.commissions.toLocaleString()}`}
-            icon={<DollarSign className="h-4 w-4" />}
-            description="Total referral earnings"
-          />
-          <StatCard
-            title="Active Plans"
-            value={stats.activePlans || "0"}
-            icon={<Receipt className="h-4 w-4" />}
-            description="Current investments"
-          />
+  return (
+    <div className="container max-w-7xl p-4 md:p-6">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 mb-8">
+        <div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        <div>
+          </div>
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Transactions</h1>
+        </div>
+      </div>
+
+      {/* Stats Grid - Existing code */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="border border-black p-4 rounded-lg flex flex-col">
+          <div className="text-4xl font-bold text-green-600 mb-2">
+            ${stats.deposits.toLocaleString()}
+          </div>
+          <div className="text-sm font-medium">Active Plans Value</div>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-col md:flex-row justify-between gap-4">
-            <CardTitle>Transaction History</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search transactions..."
-                  className="pl-8 w-full md:w-[200px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="processing">Processing</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="deposit">Deposits</SelectItem>
-                    <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                    <SelectItem value="commission">Commissions</SelectItem>
-                    <SelectItem value="investment">Investments</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="relative overflow-x-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Transaction ID</th>
-                    <th className="px-4 py-3 text-left font-medium">Date</th>
-                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                    <th className="px-4 py-3 text-left font-medium">Amount</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                          <span className="text-muted-foreground">Loading transactions...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                        No transactions found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredTransactions.map((tx) => (
-                      <tr key={tx.id}>
-                        <td className="px-4 py-3">
+        <div className="border border-black p-4 rounded-lg flex flex-col">
+          <div className="text-4xl font-bold text-red-600 mb-2">
+            ${stats.withdrawals.toLocaleString()}
+          </div>
+          <div className="text-sm font-medium">Withdrawals</div>
+        </div>
+
+        <div className="border border-black p-4 rounded-lg flex flex-col">
+          <div className="text-4xl font-bold mb-2">
+            ${stats.commissions.toLocaleString()}
+          </div>
+          <div className="text-sm font-medium">Commissions</div>
+        </div>
+
+        <div className="border border-black p-4 rounded-lg flex flex-col">
+          <div className="text-4xl font-bold mb-2">$0.00</div>
+          <div className="text-sm font-medium">Trade P&L</div>
+        </div>
+      </div>
+
+      {/* Filters Section */}
+      <div className="space-y-4 sm:space-y-0 sm:flex sm:justify-between sm:items-center mb-6">
+        <div className="relative w-full sm:w-[300px]">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search transactions..."
+            className="pl-8 w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="deposit">Deposits</SelectItem>
+              <SelectItem value="withdrawal">Withdrawals</SelectItem>
+              <SelectItem value="commission">Commissions</SelectItem>
+              <SelectItem value="investment">Investments</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Transactions List */}
+      {isLoading ? (
+        <div className="text-center py-8">
+          <div className="flex flex-col items-center gap-2">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="text-muted-foreground">Loading transactions...</span>
+          </div>
+        </div>
+      ) : filteredTransactions.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          No transactions found
+        </div>
+      ) : (
+        <Accordion type="multiple" className="space-y-3">
+          {Object.entries(
+            filteredTransactions.reduce((groups, tx) => {
+              const date = new Date(tx.created_at).toLocaleDateString();
+              if (!groups[date]) groups[date] = [];
+              groups[date].push(tx);
+              return groups;
+            }, {} as Record<string, Transaction[]>)
+          ).map(([date, txs]) => (
+            <AccordionItem key={date} value={date} className="border rounded-lg overflow-hidden">
+              <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
+                <div className="flex justify-between items-center w-full">
+                  <span className="font-medium">{formatDate(date)}</span>
+                  <Badge variant="secondary" className="ml-auto mr-4 text-xs">
+                    {txs.length} Transactions
+                  </Badge>
+                </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="space-y-3">
+                    {txs.map((tx) => (
+                      <div key={tx.id} className="relative bg-white border rounded-lg p-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{tx.id}</span>
+                            <span className="text-sm font-medium text-muted-foreground hidden sm:block">{tx.id}</span>
+                            <span className="text-sm font-medium text-muted-foreground sm:hidden">{truncateId(tx.id)}</span>
+                            <div className={`h-2.5 w-2.5 rounded-full ${
+                              tx.status === 'Completed' ? 'bg-green-500' : 
+                              tx.status === 'Pending' ? 'bg-yellow-500' : 
+                              tx.status === 'Processing' ? 'bg-blue-500' : 
+                              'bg-red-500'
+                            }`} />
                             <Button
                               variant="ghost"
                               size="sm"
@@ -263,40 +304,39 @@ const Payments = () => {
                               <span className="sr-only">Copy ID</span>
                             </Button>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {new Date(tx.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          {getTransactionType(tx.type)}
-                        </td>
-                        <td className="px-4 py-3 font-medium">
-                          <span className={`text-${
-                            tx.type === 'deposit' || tx.type === 'commission' || tx.type === 'investment_return' ? 'green' : 
-                            tx.type === 'withdrawal' || tx.type === 'investment' ? 'red' : 
-                            'blue'}-600`}>
-                            ${tx.amount.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                            ${tx.status === 'Completed' ? 'bg-green-100 text-green-800' : 
-                              tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 
-                              tx.status === 'Processing' ? 'bg-blue-100 text-blue-800' : 
-                              'bg-red-100 text-red-800'}`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-2xl font-semibold ${
+                              tx.type === 'deposit' || tx.type === 'commission' || tx.type === 'investment_return' 
+                                ? 'text-green-600' 
+                                : tx.type === 'withdrawal' || tx.type === 'investment' 
+                                ? 'text-red-600' 
+                                : 'text-blue-600'
+                            }`}>
+                              ${tx.amount.toLocaleString()}
+                            </span>
+                            <Badge 
+                              variant={
+                                tx.type === 'deposit' ? 'default' :
+                                tx.type === 'withdrawal' ? 'secondary' :
+                                tx.type === 'commission' ? 'outline' :
+                                'secondary'
+                              }
+                              className="font-normal"
+                            >
+                              {getTransactionType(tx.type)}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
       </div>
-    </ShellLayout>
+    </div>
   );
 };
 

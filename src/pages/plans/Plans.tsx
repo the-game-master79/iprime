@@ -1,24 +1,25 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { PageHeader, PageTransition } from "@/components/ui-components";
 import { Check, DollarSign, Clock, Percent, ArrowRight, BadgeCheck, ArrowRightIcon, Circle, CheckCircle2 } from "lucide-react";
-import ShellLayout from "@/components/layout/Shell";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase"; // Removed ShellLayout
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { Topbar } from "@/components/shared/Topbar"; // Added Topbar import
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { 
   Cpu, 
   HardDrive, 
@@ -251,13 +252,10 @@ const Plans = () => {
   };
 
   return (
-    <ShellLayout>
-      <PageTransition>
-        <PageHeader 
-          title="Choose Your Investment Plan" 
-          description="Select from our curated investment plans and start your journey to financial growth"
-        />
+    <div className="min-h-screen bg-background">
+      <Topbar title="Buy Plans" />
 
+      <div className="container py-6 px-4">
         <Alert className="mb-8 bg-muted border-primary/20">
           <Info className="h-5 w-5 text-primary" />
           <AlertTitle className="text-primary">Start earning with Plans</AlertTitle>
@@ -284,7 +282,7 @@ const Plans = () => {
           </div>
 
           <TabsContent value="available" className="space-y-4">
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
               {loading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Card key={i} className="border border-border/40 bg-card/60">
@@ -328,12 +326,10 @@ const Plans = () => {
                         <div className="rounded border bg-card/50 p-3">
                           <div className="flex items-center justify-between space-x-2 sm:space-x-4">
                             <div>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">Daily ROI</p>
-                              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                <span className="text-sm sm:text-lg font-semibold">{plan.returns_percentage}%</span>
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">
-                                  (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
-                                </span>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-sm sm:text-lg font-semibold">{plan.duration_days}</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground">days</span>
                               </div>
                             </div>
                             <Separator orientation="vertical" className="h-8" />
@@ -351,14 +347,6 @@ const Plans = () => {
                           </div>
                         </div>
 
-                        <div className="rounded border bg-card/50 p-3">
-                          <p className="text-xs text-muted-foreground">Duration</p>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-base sm:text-lg font-semibold">{plan.duration_days}</span>
-                            <span className="text-xs text-muted-foreground">days</span>
-                          </div>
-                        </div>
-
                         <div className={cn(
                           "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
                           getRandomGradient()
@@ -366,7 +354,7 @@ const Plans = () => {
                       </div>
 
                       <Button 
-                        className="w-full text-xs sm:text-sm h-8 sm:h-9"
+                        className="w-full text-xs sm:text-sm h-8 sm:h-9 mb-2"
                         variant="default"
                         onClick={() => handleInvestClick(plan.id)}
                       >
@@ -374,28 +362,38 @@ const Plans = () => {
                         <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
 
-                      <Accordion type="single" collapsible>
-                        <AccordionItem value="benefits">
-                          <AccordionTrigger className="text-xs font-medium py-1">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button 
+                            className="w-full text-xs sm:text-sm h-8 sm:h-9"
+                            variant="secondary"
+                          >
                             View Plan Benefits
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <ul className="space-y-2.5 pt-2">
-                              {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
-                                <li key={idx} className="flex items-start gap-2">
-                                  {idx === 0 && <Cpu className="h-4 w-4 text-primary shrink-0" />}
-                                  {idx === 1 && <HardDrive className="h-4 w-4 text-primary shrink-0" />}
-                                  {idx === 2 && <DatabaseZap className="h-4 w-4 text-primary shrink-0" />}
-                                  {idx === 3 && <BarChart2 className="h-4 w-4 text-primary shrink-0" />}
-                                  {idx === 4 && <Send className="h-4 w-4 text-primary shrink-0" />}
-                                  {idx === 5 && <MoveRight className="h-4 w-4 text-primary shrink-0" />}
-                                  <span className="text-xs leading-tight">{benefit.trim()}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
+                            <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{plan.name} Benefits</DialogTitle>
+                            <DialogDescription>
+                              Detailed benefits breakdown for this investment plan
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ul className="space-y-4 mt-4">
+                            {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
+                              <li key={idx} className="flex items-start gap-3">
+                                {idx === 0 && <Cpu className="h-5 w-5 text-primary shrink-0" />}
+                                {idx === 1 && <HardDrive className="h-5 w-5 text-primary shrink-0" />}
+                                {idx === 2 && <DatabaseZap className="h-5 w-5 text-primary shrink-0" />}
+                                {idx === 3 && <BarChart2 className="h-5 w-5 text-primary shrink-0" />}
+                                {idx === 4 && <Send className="h-5 w-5 text-primary shrink-0" />}
+                                {idx === 5 && <MoveRight className="h-5 w-5 text-primary shrink-0" />}
+                                <span className="text-sm">{benefit.trim()}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </DialogContent>
+                      </Dialog>
 
                     </CardContent>
                   </Card>
@@ -415,7 +413,10 @@ const Plans = () => {
                 <Button
                   variant="outline"
                   className="mt-6"
-                  onClick={() => document.querySelector('[value="available"]')?.click()}
+                  onClick={() => {
+                    const availableTab = document.querySelector('[value="available"]') as HTMLElement | null;
+                    availableTab?.click();
+                  }}
                 >
                   View Available Plans
                 </Button>
@@ -459,41 +460,22 @@ const Plans = () => {
                           <div className="rounded border bg-card/50 p-3">
                             <div className="flex items-center justify-between space-x-2 sm:space-x-4">
                               <div>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">Daily ROI</p>
-                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                  <span className="text-sm sm:text-lg font-semibold">{plan.returns_percentage}%</span>
-                                  <span className="text-[10px] sm:text-xs text-muted-foreground">
-                                    (${((plan.investment * plan.returns_percentage) / 100).toFixed(2)})
-                                  </span>
-                                </div>
-                              </div>
-                              <Separator orientation="vertical" className="h-8" />
-                              <div>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">Your Profit</p>
-                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                  <span className="text-sm sm:text-lg font-semibold">
-                                    ${(plan.actual_earnings || 0).toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="rounded border bg-card/50 p-3">
-                            <div className="flex items-center justify-between space-x-2 sm:space-x-4">
-                              <div>
                                 <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
                                 <div className="flex items-baseline gap-1">
-                                  <span className="text-base sm:text-lg font-semibold">{plan.duration_days}</span>
-                                  <span className="text-xs text-muted-foreground">days</span>
+                                  <span className="text-sm sm:text-lg font-semibold">{plan.duration_days}</span>
+                                  <span className="text-[10px] sm:text-xs text-muted-foreground">days</span>
                                 </div>
                               </div>
                               <Separator orientation="vertical" className="h-8" />
                               <div>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">Remaining</p>
-                                <div className="flex items-baseline gap-1">
-                                  <span className="text-base sm:text-lg font-semibold">{remainingDuration}</span>
-                                  <span className="text-xs text-muted-foreground">days</span>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground">Total ROI</p>
+                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
+                                  <span className="text-sm sm:text-lg font-semibold">
+                                    {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
+                                  </span>
+                                  <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                    (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -588,8 +570,8 @@ const Plans = () => {
           selectedPlan={selectedPlanForDeposit}
           onSuccess={() => setShowDepositDialog(false)}
         />
-      </PageTransition>
-    </ShellLayout>
+      </div>
+    </div>
   );
 };
 

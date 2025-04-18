@@ -58,3 +58,12 @@ export interface UserProfile {
   created_at: string;
   [key: string]: any; // For additional fields
 }
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: string;
+  status: string;
+  created_at: string;
+}

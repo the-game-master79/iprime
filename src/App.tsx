@@ -13,6 +13,11 @@ import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
 import { lazy, Suspense } from "react";
 import LoadingSpinner from "@/components/ui/loading-spinner";
+import DepositPage from "@/pages/deposit/DepositPage";
+// Removed duplicate import of Trade
+import SelectPairs from "./pages/trade/SelectPairs";
+import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard"; // Adjust the path if necessary
+import { ChartView } from "@/pages/trade/ChartView";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -23,6 +28,9 @@ const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
 const Profile = lazy(() => import("./pages/profile/Profile"));
 const MyRank = lazy(() => import("@/pages/dashboard/MyRank"));
 const SupportPage = lazy(() => import("./pages/support/SupportPage"));
+const Trade = lazy(() => import("./pages/trade/Trade"));
+const AdminDepositsPage = lazy(() => import("./pages/admin/deposits/AdminDepositsPage"));
+const PlansSubscriptionPage = lazy(() => import("./pages/admin/deposits/DepositsPage")); // Rename to clarify purpose
 
 // Lazy load admin routes
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -83,7 +91,34 @@ const App = () => {
           <Route path="/payments" element={<Payments />} />
           <Route path="/withdrawals" element={<Withdrawals />} />
           <Route path="/rank" element={<MyRank />} />
+          <Route path="/deposit" element={<DepositPage />} />
           
+          {/* Trade Routes */}
+          <Route path="/trade/chart/:pair" element={
+            <AuthGuard requireAuth>
+              <TradeRouteGuard />
+              <ChartView />
+            </AuthGuard>
+          } />
+          <Route path="/trade/select" element={
+            <AuthGuard requireAuth>
+              <TradeRouteGuard />
+              <SelectPairs />
+            </AuthGuard>
+          } />
+          <Route path="/trade/:pair" element={
+            <AuthGuard requireAuth>
+              <TradeRouteGuard />
+              <Trade />
+            </AuthGuard>
+          } />
+          <Route path="/trade" element={
+            <AuthGuard requireAuth>
+              <TradeRouteGuard />
+              <Trade />
+            </AuthGuard>
+          } />
+
           {/* Strictly protected routes */}
           <Route path="/profile" element={
             <AuthGuard requireAuth>
@@ -107,7 +142,8 @@ const App = () => {
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="payments" element={<PaymentsPage />} />
                 <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                <Route path="deposits" element={<DepositsPage />} />
+                <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
+                <Route path="deposits" element={<AdminDepositsPage />} />
                 <Route path="affiliates" element={<AffiliatesPage />} />
                 <Route path="plans" element={<AdminPlans />} />
                 <Route path="notices" element={<AdminNotices />} />

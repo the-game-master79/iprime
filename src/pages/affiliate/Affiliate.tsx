@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Copy, Users, ChevronRight, LineChart, BarChart, Users2 } from "lucide-react";
-import ShellLayout from "@/components/layout/Shell";
+import { Copy, Users, LineChart, BarChart, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { Topbar } from "@/components/shared/Topbar";
 import {
   Accordion,
   AccordionContent,
@@ -14,7 +14,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/ui-components";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TeamMember {
@@ -276,81 +275,50 @@ const Affiliate = () => {
   };
 
   return (
-    <ShellLayout>
-        <PageHeader 
-          title="Affiliate Program"
-          description="Join our affiliate program and earn commissions by referring new members" 
-        />
+    <div>
+      <Topbar title="Affiliate Program" />
 
-        {/* Stats Overview */}
-        <div className="px-4 md:px-8 lg:container mb-6">
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
-            <Card className="bg-primary/5">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Total Referrals</div>
-                    <div className="text-xl sm:text-2xl font-bold">{teamData.length}</div>
-                  </div>
+      {/* Stats Overview */}
+      <div className="px-4 md:px-8 lg:container mb-6 mt-6">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
+          <Card className="border-black">
+            <CardContent className="p-4 sm:p-6">
+              <div>
+                <div className="text-xl sm:text-2xl font-bold">{teamData.length}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Total Referrals</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-black">
+            <CardContent className="p-4 sm:p-6">
+              <div>
+                <div className="text-xl sm:text-2xl font-bold">${totalCommissions.toLocaleString()}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Commission Earned</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-black">
+            <CardContent className="p-4 sm:p-6">
+              <div>
+                <div className="text-xl sm:text-2xl font-bold">${totalBusiness.toLocaleString()}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Business Volume</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`border-black ${
+            teamData.filter(m => m.level === 1).length === 0 
+              ? 'from-orange-50 to-orange-100/50' 
+              : 'from-green-50 to-green-100/50'
+          }`}>
+            <CardContent className="p-4 sm:p-6">
+              <div>
+                <div className="text-xl sm:text-2xl font-bold">
+                  {teamData.filter(m => m.level === 1).length}/2
                 </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-green-100 flex items-center justify-center">
-                    <LineChart className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Commission Earned</div>
-                    <div className="text-xl sm:text-2xl font-bold">${totalCommissions.toLocaleString()}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg ${
-                    totalBusiness > 0 
-                      ? 'bg-blue-600' 
-                      : 'bg-blue-100'
-                    } flex items-center justify-center`}>
-                    <BarChart className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Business Volume</div>
-                    <div className="text-xl sm:text-2xl font-bold">
-                      ${totalBusiness.toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className={`bg-gradient-to-br ${
-              teamData.filter(m => m.level === 1).length === 0 
-                ? 'from-orange-50 to-orange-100/50' 
-                : 'from-green-50 to-green-100/50'
-            }`}>
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-lg ${
-                    teamData.filter(m => m.level === 1).length === 0 
-                      ? 'bg-orange-600' 
-                      : 'bg-green-600'
-                    } flex items-center justify-center`}>
-                    <Users className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm text-muted-foreground">Direct Referrals</div>
-                    <div className="text-xl sm:text-2xl font-bold">
-                      {teamData.filter(m => m.level === 1).length}/2
-                    </div>
-                  </div>
-                </div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Direct Referrals</div>
                 {!eligibility.hasDirectReferrals && (
                   <p className={`text-xs mt-3 rounded-full px-3 py-1 ${
                     teamData.filter(m => m.level === 1).length === 0
@@ -360,205 +328,200 @@ const Affiliate = () => {
                     {2 - teamData.filter(m => m.level === 1).length} more to activate commissions
                   </p>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="px-2 md:px-8 lg:container">
+        <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
+          {/* Left Sidebar - Only visible on desktop */}
+          <div className="hidden lg:block space-y-4 sm:space-y-6">
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle>Share</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label>Referral Code</Label>
+                  <div className="flex gap-2">
+                    <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
+                    <Button variant="outline" size="icon" onClick={() => {
+                      navigator.clipboard.writeText(referralCode);
+                      toast({ title: "Copied!", description: "Referral code copied" });
+                    }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className={`text-xs ${
+                    teamData.filter(m => m.level === 1).length >= 2 
+                      ? 'text-green-600' 
+                      : 'text-amber-600'
+                  }`}>
+                    Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Referral Link</Label>
+                  <div className="flex gap-2">
+                    <Input value={referralLink} readOnly className="font-mono text-sm bg-muted" />
+                    <Button variant="outline" size="icon" onClick={copyReferralLink}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {currentReferrer && (
+                  <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Users className="h-4 w-4" />
+                      <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="px-2 md:px-8 lg:container">
-          <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
-            {/* Left Sidebar - Only visible on desktop */}
-            <div className="hidden lg:block space-y-4 sm:space-y-6">
-              {/* Share Section */}
-              <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-lg">Share & Earn</CardTitle>
-                  <CardDescription>Use these to invite new members</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Referral Code</Label>
-                    <div className="flex gap-2">
-                      <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
-                      <Button variant="outline" size="icon" onClick={() => {
-                        navigator.clipboard.writeText(referralCode);
-                        toast({ title: "Copied!", description: "Referral code copied" });
-                      }}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className={`text-xs ${
-                      teamData.filter(m => m.level === 1).length >= 2 
-                        ? 'text-green-600' 
-                        : 'text-amber-600'
-                    }`}>
-                      Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
-                    </p>
+          {/* Mobile Share Section - Only visible on mobile */}
+          <div className="lg:hidden space-y-4">
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle>Share</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label>Referral Code</Label>
+                  <div className="flex gap-2">
+                    <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
+                    <Button variant="outline" size="icon" onClick={() => {
+                      navigator.clipboard.writeText(referralCode);
+                      toast({ title: "Copied!", description: "Referral code copied" });
+                    }}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
+                  <p className={`text-xs ${
+                    teamData.filter(m => m.level === 1).length >= 2 
+                      ? 'text-green-600' 
+                      : 'text-amber-600'
+                  }`}>
+                    Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
+                  </p>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label>Referral Link</Label>
-                    <div className="flex gap-2">
-                      <Input value={referralLink} readOnly className="font-mono text-sm text-xs bg-muted" />
-                      <Button variant="outline" size="icon" onClick={copyReferralLink}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                <div className="space-y-2">
+                  <Label>Referral Link</Label>
+                  <div className="flex gap-2">
+                    <Input value={referralLink} readOnly className="font-mono text-sm bg-muted" />
+                    <Button variant="outline" size="icon" onClick={copyReferralLink}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {currentReferrer && (
+                  <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Users className="h-4 w-4" />
+                      <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
                     </div>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-                  {currentReferrer && (
-                    <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
-                      <div className="flex items-center gap-2 text-green-800">
-                        <Users className="h-4 w-4" />
-                        <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
-                      </div>
+          {/* Main Content Area */}
+          <div className="space-y-4 sm:space-y-6 w-full">
+            {/* Network Structure */}
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <CardTitle>Network Structure</CardTitle>
+                  
+                  {/* Team Status Legends */}
+                  {teamData.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                      <Select
+                        value={legendType}
+                        onValueChange={(value) => setLegendType(value as "investments" | "directCount")}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Select legend type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="investments">Investment Status</SelectItem>
+                          <SelectItem value="directCount">Direct Referrals</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {legendType === "investments" ? (
+                        <div className="flex flex-wrap gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500" />
+                            <span className="text-sm text-muted-foreground">Active Plans</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                            <span className="text-sm text-muted-foreground">No Plans</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500" />
+                            <span className="text-sm text-muted-foreground">Inactive</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500" />
+                            <span className="text-sm text-muted-foreground">2+ Direct Referrals</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                            <span className="text-sm text-muted-foreground"> 2 Direct Referrals</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Mobile Share Section - Only visible on mobile */}
-            <div className="lg:hidden space-y-4">
-              <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="text-lg">Share & Earn</CardTitle>
-                  <CardDescription>Use these to invite new members</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6 space-y-4">
-                  <div className="space-y-2">
-                    <Label>Referral Code</Label>
-                    <div className="flex gap-2">
-                      <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
-                      <Button variant="outline" size="icon" onClick={() => {
-                        navigator.clipboard.writeText(referralCode);
-                        toast({ title: "Copied!", description: "Referral code copied" });
-                      }}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className={`text-xs ${
-                      teamData.filter(m => m.level === 1).length >= 2 
-                        ? 'text-green-600' 
-                        : 'text-amber-600'
-                    }`}>
-                      Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 sm:px-6">
+                {teamData.length === 0 ? (
+                  <div className="text-center p-6 border-2 border-dashed rounded-lg mx-4 sm:mx-6 mb-4">
+                    <Users2 className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
+                    <h3 className="font-medium text-muted-foreground">No Team Members Yet</h3>
+                    <p className="text-sm text-muted-foreground mt-1 mb-3">
+                      Start building your network by sharing your referral code
                     </p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Referral Link</Label>
-                    <div className="flex gap-2">
-                      <Input value={referralLink} readOnly className="font-mono text-sm text-xs bg-muted" />
-                      <Button variant="outline" size="icon" onClick={copyReferralLink}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {currentReferrer && (
-                    <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
-                      <div className="flex items-center gap-2 text-green-800">
-                        <Users className="h-4 w-4" />
-                        <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="space-y-4 sm:space-y-6 w-full">
-              {/* Replaced Tabs with direct content */}
-              <Card>
-                <CardHeader className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <CardTitle>Team Overview</CardTitle>
-                      <CardDescription>View and manage your referral network</CardDescription>
-                    </div>
-                    
-                    {/* Team Status Legends */}
-                    {teamData.length > 0 && (
-                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-                        <Select
-                          value={legendType}
-                          onValueChange={(value) => setLegendType(value as "investments" | "directCount")}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select legend type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="investments">Investment Status</SelectItem>
-                            <SelectItem value="directCount">Direct Referrals</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        {legendType === "investments" ? (
-                          <div className="flex flex-wrap gap-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-green-500" />
-                              <span className="text-sm text-muted-foreground">Active Plans</span>
+                ) : (
+                  <Accordion type="single" collapsible className="w-full divide-y">
+                    {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
+                      <AccordionItem value={`level-${level}`} key={level} className="border-none">
+                        <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline">
+                          <div className="flex items-center gap-3">
+                            <div className={`flex h-7 w-7 items-center justify-center rounded 
+                              ${level === 1 ? 'bg-primary/20' : 
+                                level === 2 ? 'bg-blue-100' : 
+                                level === 3 ? 'bg-purple-100' : 
+                                'bg-gray-100'}`}>
+                              <Users className={`h-4 w-4 
+                                ${level === 1 ? 'text-primary' : 
+                                  level === 2 ? 'text-blue-600' : 
+                                  level === 3 ? 'text-purple-600' : 
+                                  'text-gray-600'}`} />
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-amber-500" />
-                              <span className="text-sm text-muted-foreground">No Plans</span>
+                            <div>
+                              <p className="font-medium text-sm text-left">Level {level}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {teamData.filter(m => m.level === level).length} members
+                              </p>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-red-500" />
-                              <span className="text-sm text-muted-foreground">Inactive</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-green-500" />
-                              <span className="text-sm text-muted-foreground">2+ Direct Referrals</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-amber-500" />
-                              <span className="text-sm text-muted-foreground"> 2 Direct Referrals</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 sm:px-6">
-                  {teamData.length === 0 ? (
-                    <div className="text-center p-6 border-2 border-dashed rounded-lg mx-4 sm:mx-6 mb-4">
-                      <Users2 className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-                      <h3 className="font-medium text-muted-foreground">No Team Members Yet</h3>
-                      <p className="text-sm text-muted-foreground mt-1 mb-3">
-                        Start building your network by sharing your referral code
-                      </p>
-                    </div>
-                  ) : (
-                    <Accordion type="single" collapsible className="w-full divide-y">
-                      {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
-                        <AccordionItem value={`level-${level}`} key={level} className="border-none">
-                          <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline">
-                            <div className="flex items-center gap-3">
-                              <div className={`flex h-7 w-7 items-center justify-center rounded 
-                                ${level === 1 ? 'bg-primary/20' : 
-                                  level === 2 ? 'bg-blue-100' : 
-                                  level === 3 ? 'bg-purple-100' : 
-                                  'bg-gray-100'}`}>
-                                <Users className={`h-4 w-4 
-                                  ${level === 1 ? 'text-primary' : 
-                                    level === 2 ? 'text-blue-600' : 
-                                    level === 3 ? 'text-purple-600' : 
-                                    'text-gray-600'}`} />
-                              </div>
-                              <div>
-                                <p className="font-medium text-sm text-left">Level {level}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {teamData.filter(m => m.level === level).length} members
-                                </p>
-                              </div>
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="px-4 sm:px-6 pb-4">
@@ -631,41 +594,41 @@ const Affiliate = () => {
                       ))}
                     </Accordion>
                   )}
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
 
-              {/* Commission Rates - Mobile & Desktop */}
-              <Card>
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="commission-rates">
-                    <AccordionTrigger className="px-4 sm:px-6">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-base sm:text-lg">Commission Rates</CardTitle>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="px-4 sm:px-6 pb-4 space-y-2">
-                        {commissionStructure.map((level) => (
-                          <div 
-                            key={level.level} 
-                            className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">Level {level.level}</span>
-                              <span className="text-xs text-muted-foreground">{level.description}</span>
-                            </div>
-                            <span className="font-medium text-green-600">{level.percentage}%</span>
+            {/* Commission Rates - Mobile & Desktop */}
+            <Card>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="commission-rates">
+                  <AccordionTrigger className="px-4 sm:px-6">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base sm:text-lg">Commission Rates</CardTitle>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="px-4 sm:px-6 pb-4 space-y-2">
+                      {commissionStructure.map((level) => (
+                        <div 
+                          key={level.level} 
+                          className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">Level {level.level}</span>
+                            <span className="text-xs text-muted-foreground">{level.description}</span>
                           </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </Card>
-            </div>
+                          <span className="font-medium text-green-600">{level.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </Card>
           </div>
         </div>
-    </ShellLayout>
+      </div>
+    </div>
   );
 };
 

@@ -157,9 +157,16 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
-                    to="/admin/deposits" 
+                    to="/admin/plans-subscription" 
                     icon={<ArrowDownToLine className="h-5 w-5" />} 
                     label="Plans Subscription" 
+                    active={location.pathname === '/admin/plans-subscription'} 
+                    collapsed={!sidebarOpen} 
+                  />
+                  <SidebarLink 
+                    to="/admin/deposits" 
+                    icon={<ArrowDownToLine className="h-5 w-5" />} 
+                    label="Deposits" 
                     active={location.pathname === '/admin/deposits'} 
                     collapsed={!sidebarOpen} 
                   />
@@ -169,7 +176,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     label="Promotions"
                     active={location.pathname === '/admin/promotions'}
                     collapsed={!sidebarOpen}
-                    />
+                  />
                     <SidebarLink 
                       to="/admin/plans" 
                       icon={<Briefcase className="h-5 w-5" />} 

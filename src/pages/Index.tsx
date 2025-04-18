@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { PageTransition, FeatureCard } from "@/components/ui-components";
 import {
@@ -8,7 +8,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ArrowRight, Cpu, Brain, Cloud, Shield, ChevronDown, Globe, Bolt, Clock, Users, Gift, Mail } from "lucide-react";
-import banner from "@/assets/banner.svg";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +19,7 @@ import Marquee from "react-fast-marquee";
 
 const Index = () => {
   const [showContact, setShowContact] = useState(false);
+  const navigate = useNavigate();
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -137,12 +137,12 @@ const Index = () => {
                     </Button>
                   </Link>
                 </div>
+                <img 
+                  src="/banner.webp" 
+                  alt="Cloud Forex Trading" 
+                  className="w-full rounded-xl mx-auto my-8" 
+                />
               </div>
-              <img 
-                src="/banner.webp" 
-                alt="Cloud Forex Trading" 
-                className="w-full rounded-xl mx-auto my-8" 
-              />
               <div className="pt-8 md:pt-12 animate-bounce">
                 <Link to="#features" className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary mx-auto">
                   <ChevronDown className="h-6 w-6" />

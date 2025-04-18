@@ -89,7 +89,7 @@ const AdminWithdrawalsPage = () => {
 
   const handleApprove = async (id: string) => {
     try {
-      // Get withdrawal details first
+      // First get withdrawal details
       const { data: withdrawal, error: fetchError } = await supabase
         .from('withdrawals')
         .select('*')
@@ -98,7 +98,26 @@ const AdminWithdrawalsPage = () => {
 
       if (fetchError) throw fetchError;
 
-      // Update withdrawal status - this will trigger notifications
+      // Then get user's profile data separately
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('withdrawal_wallet')
+        .eq('id', withdrawal.user_id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Check if user has sufficient balance
+      if (!profile?.withdrawal_wallet || profile.withdrawal_wallet < withdrawal.amount) {
+        toast({
+          title: "Error",
+          description: "User has insufficient balance for this withdrawal",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update status - the trigger will handle the balance update
       const { error: updateError } = await supabase
         .from('withdrawals')
         .update({ 
@@ -114,7 +133,7 @@ const AdminWithdrawalsPage = () => {
         description: `Withdrawal ${id} has been approved and user has been notified.`,
       });
 
-      fetchWithdrawals();
+      fetchWithdrawals(); // Refresh data
     } catch (error) {
       console.error('Error approving withdrawal:', error);
       toast({

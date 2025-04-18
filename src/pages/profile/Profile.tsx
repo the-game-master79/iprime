@@ -1,18 +1,16 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom"; // Add this import
-import { User, Shield, Upload, Save, CreditCard, Check, ShieldAlert, AlertTriangle, Clock } from "lucide-react";
+import { User, Shield, Upload, Save, CreditCard, Check, ShieldAlert, AlertTriangle, Clock, ArrowLeft, LogOut, Sun, Moon } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Make sure this import exists
-import ShellLayout from "@/components/layout/Shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/ui-components";
 import { useToast } from "@/hooks/use-toast";
 import { KycFormData, DocumentType } from '@/types/kyc';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, subYears } from "date-fns"; // Add this import
+import { countries as countryList } from "@/data/countries"; // Rename import to avoid conflict
+import { Topbar } from "@/components/shared/Topbar";
 
 // Add these validation helpers at the top of the file, before the Profile component
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -34,6 +32,9 @@ const isValidCity = (city: string) => /^[A-Za-z\s-]+$/.test(city);
 
 // Add validation helpers at the top
 const isValidPostalCode = (code: string) => /^[A-Za-z0-9\s-]+$/.test(code);
+
+// Add phone validation helper
+const isValidPhone = (phone: string) => /^\d+$/.test(phone);
 
 const Profile = () => {
   const [searchParams] = useSearchParams(); // Add this line
@@ -89,7 +90,6 @@ const Profile = () => {
   const [kycData, setKycData] = useState<any>(null);
 
   // Add new state for location dropdowns
-  const [countries, setCountries] = useState<Array<{code: string, name: string}>>([]);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [cityError, setCityError] = useState("");
   const [postalError, setPostalError] = useState("");
@@ -98,9 +98,19 @@ const Profile = () => {
   const [nameError, setNameError] = useState("");
   const [dobError, setDobError] = useState("");
   const [fileError, setFileError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // Add new state for tracking if details are set
   const [basicDetailsSet, setBasicDetailsSet] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      window.location.href = '/auth/login';
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
+  };
 
   const validateReferralCode = async (code: string) => {
     if (!code) {
@@ -276,20 +286,39 @@ const Profile = () => {
 
       if (kycData?.[0]) {
         setKycData(kycData[0]);
-        setKycFormData({
-          full_name: kycData[0].full_name || "",
-          date_of_birth: kycData[0].date_of_birth || "",
-          address: kycData[0].address || "",
-          city: kycData[0].city || "",
-          state: kycData[0].state || "",
-          country: kycData[0].country || "",
-          document_type: kycData[0].document_type || "passport",
-          document_number: kycData[0].document_number || "",
-          document_front: null,
-          document_back: null,
-          occupation: kycData[0].occupation || "",
-          postal_code: kycData[0].postal_code || ""
-        });
+        // Only set KYC form data if status is not rejected
+        if (profile?.kyc_status !== 'rejected') {
+          setKycFormData({
+            full_name: kycData[0].full_name || "",
+            date_of_birth: kycData[0].date_of_birth || "",
+            address: kycData[0].address || "",
+            city: kycData[0].city || "",
+            state: kycData[0].state || "",
+            country: kycData[0].country || "",
+            document_type: kycData[0].document_type || "passport",
+            document_number: kycData[0].document_number || "",
+            document_front: null,
+            document_back: null,
+            occupation: kycData[0].occupation || "",
+            postal_code: kycData[0].postal_code || ""
+          });
+        } else {
+          // Reset form if KYC was rejected
+          setKycFormData({
+            full_name: "",
+            date_of_birth: "",
+            address: "",
+            city: "",
+            state: "",
+            country: "",
+            document_type: "passport",
+            document_number: "",
+            document_front: null,
+            document_back: null,
+            occupation: "",
+            postal_code: ""
+          });
+        }
       }
 
     } catch (error) {
@@ -306,17 +335,6 @@ const Profile = () => {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Replace the fetchCountries function
-  const fetchCountries = async () => {
-    try {
-      // Using local country data instead of API
-      const formattedCountries = countries.sort((a, b) => a.name.localeCompare(b.name));
-      setCountries(formattedCountries);
-    } catch (error) {
-      console.error('Error fetching countries:', error);
     }
   };
 
@@ -378,32 +396,46 @@ const Profile = () => {
     setKycFormData(prev => ({...prev, postal_code: value}));
   };
 
+  // Add phone validation handler
+  const handlePhoneChange = (value: string) => {
+    if (!isValidPhone(value)) {
+      setPhoneError("Only numbers are allowed");
+    } else {
+      setPhoneError("");
+    }
+    setUserData(prev => ({...prev, phone: value}));
+  };
+
   useEffect(() => {
     fetchProfile();
-    fetchCountries();
   }, []);
 
   const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields before submission
+    if (!userData.phone || !userData.address || !userData.city || !userData.country) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsUpdatingPersonal(true);
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      const form = e.target as HTMLFormElement;
       const updates = {
-        first_name: form.firstName.value,
-        last_name: form.lastName.value,
-        email: form.email.value,
-        phone: form.phone.value,
-        address: form.address.value,
-        city: form.city.value,
-        country: form.country.value,
+        phone: userData.phone,
+        address: userData.address,
+        city: userData.city,
+        country: userData.country,
         updated_at: new Date().toISOString()
       };
-
-      console.log('Updating profile with:', updates);
 
       const { error } = await supabase
         .from('profiles')
@@ -412,13 +444,16 @@ const Profile = () => {
 
       if (error) throw error;
 
-      // Refresh profile data after update
-      await fetchProfile();
+      setBasicDetailsSet(true);
 
       toast({
         title: "Profile Updated",
         description: "Your personal information has been updated successfully.",
       });
+
+      // Refresh profile data
+      await fetchProfile();
+
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({
@@ -482,14 +517,20 @@ const Profile = () => {
       const frontUrl = supabase.storage.from('kyc_documents').getPublicUrl(frontFileName).data.publicUrl;
       const backUrl = supabase.storage.from('kyc_documents').getPublicUrl(backFileName).data.publicUrl;
 
-      // Create or update KYC record
+      // First try to delete any existing KYC record
+      await supabase
+        .from('kyc')
+        .delete()
+        .eq('user_id', user.id);
+
+      // Then create new KYC record
       const { error: kycError } = await supabase
         .from('kyc')
-        .upsert({
+        .insert({
           user_id: user.id,
           document_front: frontUrl,
           document_back: backUrl,
-          status: 'processing', // Changed from 'pending' to 'processing'
+          status: 'processing',
           ...kycFormData,
           updated_at: new Date().toISOString(),
           created_at: new Date().toISOString()
@@ -497,11 +538,11 @@ const Profile = () => {
 
       if (kycError) throw kycError;
 
-      // Update profile KYC status to processing
+      // Rest of the function remains the same
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
-          kyc_status: 'processing', // Changed from 'pending' to 'processing'
+          kyc_status: 'processing',
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -511,7 +552,7 @@ const Profile = () => {
       // Update local state to processing
       setUserData(prev => ({
         ...prev,
-        kycStatus: 'processing' // Changed from 'pending' to 'processing'
+        kycStatus: 'processing'
       }));
 
       toast({
@@ -519,7 +560,7 @@ const Profile = () => {
         description: "Your documents have been submitted for verification. This usually takes 1-2 business days.",
       });
 
-      // Reset form
+      // Reset form and fetch updated profile
       setKycFormData({
         full_name: "",
         date_of_birth: "",
@@ -559,227 +600,226 @@ const Profile = () => {
   const defaultTab = searchParams.get('tab') || 'personal';
 
   return (
-    <ShellLayout>
-      <PageHeader 
-        title="Profile & KYC" 
-        description="Manage your personal information and account settings"
-      />
+    <div className="min-h-screen bg-muted/30">
+      <Topbar title="Profile & KYC" />
 
-      {isLoading ? (
-        <div className="flex items-center justify-center h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : (
-        <Tabs defaultValue={defaultTab} className="space-y-6">
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-[280px,1fr]">
-            {/* Vertical Tab List */}
-            <div className="space-y-1">
-              <TabsList className="flex flex-col h-auto w-full bg-muted p-1 gap-1">
-                <TabsTrigger 
-                  value="personal" 
-                  className="w-full justify-start gap-2 px-3"
-                >
-                  <User className="h-4 w-4" />
-                  Personal Info
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="kyc" 
-                  className="w-full justify-start gap-2 px-3"
-                >
-                  <Shield className="h-4 w-4" />
-                  KYC Verification
-                </TabsTrigger>
-              </TabsList>
+      <main className="py-6">
+        <div className="container">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-[400px]">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
+          ) : (
+            <Tabs defaultValue={defaultTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-8">
+                <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                <TabsTrigger value="kyc">KYC Verification</TabsTrigger>
+              </TabsList>
 
-            {/* Tab Content */}
-            <div className="space-y-6">
-              <TabsContent value="personal" className="space-y-6 m-0">
-                <Card>
-                  <form onSubmit={handlePersonalInfoUpdate}>
-                    <CardHeader>
-                      <CardTitle>Personal Information</CardTitle>
-                      <CardDescription>
-                        Update your personal details and contact information
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName">First Name</Label>
-                          <Input 
-                            id="firstName" 
-                            name="firstName"
-                            value={userData.firstName}
-                            readOnly
-                            className="bg-muted"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName">Last Name</Label>
-                          <Input 
-                            id="lastName" 
-                            name="lastName"
-                            value={userData.lastName}
-                            readOnly
-                            className="bg-muted"
-                          />
-                        </div>
-                      </div>
+              <TabsContent value="personal" className="space-y-6">
+                <div className="grid gap-6">
+                  {/* Basic Info Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-1 col-span-1">
+                      <p className="text-sm text-muted-foreground">First Name</p>
+                      <p className="font-medium">{userData.firstName}</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-1 col-span-1">
+                      <p className="text-sm text-muted-foreground">Last Name</p>
+                      <p className="font-medium">{userData.lastName}</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-1">
+                      <p className="text-sm text-muted-foreground">Email</p>
+                      <p className="font-medium">{userData.email}</p>
+                    </div>
+                  </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input 
-                            id="email" 
-                            name="email"
-                            type="email" 
-                            value={userData.email}
-                            readOnly
-                            className="bg-muted"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input 
-                            id="phone" 
-                            name="phone"
-                            value={userData.phone}
-                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, phone: e.target.value}))}
-                            readOnly={basicDetailsSet}
-                            className={basicDetailsSet ? "bg-muted" : ""}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="address">Address</Label>
-                          <Input 
-                            id="address" 
-                            name="address"
-                            value={userData.address}
-                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, address: e.target.value}))}
-                            readOnly={basicDetailsSet}
-                            className={basicDetailsSet ? "bg-muted" : ""}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="city">City</Label>
-                          <Input 
-                            id="city" 
-                            name="city"
-                            value={userData.city}
-                            onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, city: e.target.value}))}
-                            readOnly={basicDetailsSet}
-                            className={basicDetailsSet ? "bg-muted" : ""}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="country">Country</Label>
-                        <Input 
-                          id="country" 
-                          name="country"
-                          value={userData.country}
-                          onChange={basicDetailsSet ? undefined : (e) => setUserData(prev => ({...prev, country: e.target.value}))}
-                          readOnly={basicDetailsSet}
-                          className={basicDetailsSet ? "bg-muted" : ""}
-                        />
-                      </div>
-
-                      {/* Add Referral Section if user doesn't have a referrer */}
-                      {userData.referred_by ? (
-                        <div className="space-y-2 pt-4 border-t">
-                          <h3 className="font-medium">Referral Information</h3>
-                          <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                                <Check className="h-5 w-5 text-green-600" />
-                              </div>
-                              <div>
-                                <p className="text-sm text-green-800">
-                                  Referred by: <span className="font-medium">{currentReferrerName}</span>
-                                </p>
-                                <p className="text-xs text-green-600">Referral Code: {userData.referred_by}</p>
-                              </div>
-                            </div>
+                  {/* Rest of the personal info form */}
+                  <form onSubmit={handlePersonalInfoUpdate} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="relative">
+                        {basicDetailsSet ? (
+                          <div className="p-4 bg-muted/50 rounded-lg">
+                            <p className="text-sm text-muted-foreground">Phone Number</p>
+                            <p className="font-medium">+{userData.phone}</p>
                           </div>
+                        ) : (
+                          <>
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+                              <span className="text-muted-foreground">+</span>
+                            </div>
+                            <Input 
+                              id="phone" 
+                              name="phone"
+                              value={userData.phone}
+                              onChange={(e) => handlePhoneChange(e.target.value)}
+                              className={`pl-7 ${phoneError ? "border-red-500" : ""}`}
+                              placeholder="Phone Number"
+                              type="tel"
+                            />
+                            {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
+                          </>
+                        )}
+                      </div>
+                      {basicDetailsSet ? (
+                        <div className="p-4 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">Address</p>
+                          <p className="font-medium">{userData.address}</p>
                         </div>
                       ) : (
-                        <div className="space-y-2 pt-4 border-t">
-                          <h3 className="font-medium">Add Referral Code</h3>
-                          <p className="text-sm text-muted-foreground">
-                            If someone referred you to our platform, you can add their referral code here
-                          </p>
-                          <div className="flex gap-2">
-                            <div className="flex-1 space-y-2">
-                              <Input
-                                placeholder="Enter referral code"
-                                value={referralCode}
-                                onChange={(e) => {
-                                  setReferralCode(e.target.value);
-                                  validateReferralCode(e.target.value);
-                                }}
-                              />
-                              {isValidatingCode && (
-                                <p className="text-sm text-muted-foreground">
-                                  <Clock className="h-3 w-3 inline mr-1" />
-                                  Validating code...
-                                </p>
-                              )}
-                              {referralCode && !isValidatingCode && referrerName && (
-                                <p className="text-sm text-green-600">
-                                  <Check className="h-3 w-3 inline mr-1" />
-                                  Referred by: {referrerName}
-                                </p>
-                              )}
-                              {referralCode && !isValidatingCode && !referrerName && (
-                                <p className="text-sm text-red-600">
-                                  <AlertTriangle className="h-3 w-3 inline mr-1" />
-                                  Invalid referral code. Please check and try again.
-                                </p>
-                              )}
-                            </div>
-                            <Button 
-                              onClick={handleReferralSubmit}
-                              disabled={!referralCode || !referrerName || isSubmittingReferral}
-                            >
-                              {isSubmittingReferral ? "Adding..." : "Add Referral"}
-                            </Button>
-                          </div>
-                        </div>
+                        <Input 
+                          id="address" 
+                          name="address"
+                          value={userData.address}
+                          onChange={(e) => setUserData(prev => ({...prev, address: e.target.value}))}
+                          placeholder="Address"
+                        />
                       )}
-                    </CardContent>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {basicDetailsSet ? (
+                        <div className="p-4 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">City</p>
+                          <p className="font-medium">{userData.city}</p>
+                        </div>
+                      ) : (
+                        <Input 
+                          id="city" 
+                          name="city"
+                          value={userData.city}
+                          onChange={(e) => setUserData(prev => ({...prev, city: e.target.value}))}
+                          placeholder="City"
+                        />
+                      )}
+                      {basicDetailsSet ? (
+                        <div className="p-4 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">Country</p>
+                          <p className="font-medium">{userData.country}</p>
+                        </div>
+                      ) : (
+                        <Select
+                          value={userData.country}
+                          onValueChange={(value) => setUserData(prev => ({...prev, country: value}))}
+                          disabled={basicDetailsSet}
+                        >
+                          <SelectTrigger className={basicDetailsSet ? "bg-muted" : ""}>
+                            <SelectValue placeholder="Select your country">
+                              {userData.country && countryList[0].find(c => c.name === userData.country) && (
+                                <div className="flex items-center gap-2">
+                                  <img
+                                    src={`https://flagcdn.com/w20/${countryList[0].find(c => c.name === userData.country)?.code.toLowerCase()}.png`}
+                                    alt={`${userData.country} flag`}
+                                    className="h-4 w-auto object-contain"
+                                  />
+                                  <span>{userData.country}</span>
+                                </div>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {countryList[0].map((country) => (
+                              <SelectItem key={`personal-${country.code}`} value={country.name}>
+                                <div className="flex items-center gap-2">
+                                  <img
+                                    src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                                    alt={`${country.name} flag`}
+                                    className="h-4 w-auto object-contain"
+                                  />
+                                  <span>{country.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+
                     {!basicDetailsSet && (
-                      <CardFooter>
-                        <Button type="submit" disabled={isUpdatingPersonal}>
-                          {isUpdatingPersonal ? (
-                            <>Processing...</>
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-2" />
-                              Save Changes
-                            </>
-                          )}
-                        </Button>
-                      </CardFooter>
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdatingPersonal || !userData.phone || !userData.address || !userData.city || !userData.country} 
+                        className="mt-6"
+                      >
+                        {isUpdatingPersonal ? "Processing..." : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
                     )}
                   </form>
-                </Card>
+
+                  {/* Add Referral Section if user doesn't have a referrer */}
+                  {userData.referred_by ? (
+                    <div className="space-y-2 pt-4 border-t">
+                      <h3 className="font-medium">Referral Information</h3>
+                      <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <Check className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-green-800">
+                              Referred by: <span className="font-medium">{currentReferrerName}</span>
+                            </p>
+                            <p className="text-xs text-green-600">Referral Code: {userData.referred_by}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pt-4 border-t">
+                      <h3 className="font-medium">Add Referral Code</h3>
+                      <p className="text-sm text-muted-foreground">
+                        If someone referred you to our platform, you can add their referral code here
+                      </p>
+                      <div className="flex gap-2">
+                        <div className="flex-1 space-y-2">
+                          <Input
+                            placeholder="Enter referral code"
+                            value={referralCode}
+                            onChange={(e) => {
+                              setReferralCode(e.target.value);
+                              validateReferralCode(e.target.value);
+                            }}
+                          />
+                          {isValidatingCode && (
+                            <p className="text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3 inline mr-1" />
+                              Validating code...
+                            </p>
+                          )}
+                          {referralCode && !isValidatingCode && referrerName && (
+                            <p className="text-sm text-green-600">
+                              <Check className="h-3 w-3 inline mr-1" />
+                              Referred by: {referrerName}
+                            </p>
+                          )}
+                          {referralCode && !isValidatingCode && !referrerName && (
+                            <p className="text-sm text-red-600">
+                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              Invalid referral code. Please check and try again.
+                            </p>
+                          )}
+                        </div>
+                        <Button 
+                          onClick={handleReferralSubmit}
+                          disabled={!referralCode || !referrerName || isSubmittingReferral}
+                        >
+                          {isSubmittingReferral ? "Adding..." : "Add Referral"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
-              <TabsContent value="kyc" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>KYC Verification</CardTitle>
-                    <CardDescription>
-                      Complete identity verification to unlock full platform features
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {isLoadingKyc ? (
+              <TabsContent value="kyc">
+                {/* KYC content */}
+                <div className="space-y-6">
+                  {isLoadingKyc ? (
                       <div className="flex items-center justify-center p-4">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       </div>
@@ -874,25 +914,21 @@ const Profile = () => {
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <User className="h-4 w-4 text-blue-600" />
                             </div>
-                            <div>
-                              <h3 className="text-lg font-medium">1. Personal Details</h3>
-                              <p className="text-sm text-muted-foreground">Provide your basic information</p>
-                            </div>
+                            <h3 className="text-lg font-medium">Personal Details</h3>
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor="full_name">Full Name (as per document)</Label>
                               <Input
                                 id="full_name"
                                 value={kycFormData.full_name}
                                 onChange={handleNameChange}
                                 className={nameError ? "border-red-500" : ""}
+                                placeholder="Full Name (as per the document)"
                               />
                               {nameError && <p className="text-xs text-red-500">{nameError}</p>}
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="date_of_birth">Date of Birth</Label>
                               <Input
                                 id="date_of_birth"
                                 type="date"
@@ -900,67 +936,75 @@ const Profile = () => {
                                 value={kycFormData.date_of_birth}
                                 onChange={handleDobChange}
                                 className={dobError ? "border-red-500" : ""}
+                                placeholder="Date of Birth"
                               />
                               {dobError && <p className="text-xs text-red-500">{dobError}</p>}
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="address">Residential Address</Label>
                             <Input
                               id="address"
                               value={kycFormData.address}
                               onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
-                              placeholder="Enter your full residential address"
+                              placeholder="Your residential address"
                               className="w-full"
                             />
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor="country">Country</Label>
-                              <Input
-                                id="country"
-                                type="text"
-                                placeholder="Enter your country"
+                              <Select
                                 value={kycFormData.country}
-                                onChange={(e) => setKycFormData(prev => ({
-                                  ...prev,
-                                  country: e.target.value
-                                }))}
-                              />
+                                onValueChange={(value) => setKycFormData(prev => ({...prev, country: value}))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Your country" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {countryList[0].map((country) => (
+                                    <SelectItem key={`kyc-${country.code}`} value={country.name}>
+                                      <div className="flex items-center gap-2">
+                                        <img
+                                          src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                                          alt={`${country.name} flag`}
+                                          className="h-4 w-auto object-contain"
+                                        />
+                                        <span>{country.name}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="state">State/Province</Label>
                               <Input
                                 id="state"
                                 value={kycFormData.state}
                                 onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
-                                placeholder="Enter state or province"
+                                placeholder="Your state or province"
                               />
                             </div>
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor="city">City</Label>
                               <Input
                                 id="city"
                                 value={kycFormData.city}
                                 onChange={(e) => handleCityChange(e.target.value)}
-                                placeholder="Enter city name"
+                                placeholder="Your city name"
                                 className={cityError ? "border-red-500" : ""}
                               />
                               {cityError && <p className="text-xs text-red-500">{cityError}</p>}
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="postal_code">Postal Code</Label>
                               <Input
                                 id="postal_code"
                                 value={kycFormData.postal_code}
                                 onChange={(e) => handlePostalChange(e.target.value)}
-                                placeholder="Enter postal code"
+                                placeholder="Your postal code"
                                 className={postalError ? "border-red-500" : ""}
                               />
                               {postalError && <p className="text-xs text-red-500">{postalError}</p>}
@@ -974,15 +1018,11 @@ const Profile = () => {
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <CreditCard className="h-4 w-4 text-blue-600" />
                             </div>
-                            <div>
-                              <h3 className="text-lg font-medium">2. Document Identification</h3>
-                              <p className="text-sm text-muted-foreground">Provide your identification details</p>
-                            </div>
+                            <h3 className="text-lg font-medium">Document Identification</h3>
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor="document_type">Document Type</Label>
                               <Select 
                                 value={kycFormData.document_type}
                                 onValueChange={(value: DocumentType) => 
@@ -1001,23 +1041,21 @@ const Profile = () => {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="document_number">Document Number</Label>
                               <Input
                                 id="document_number"
                                 value={kycFormData.document_number}
                                 onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
-                                placeholder="Enter document number"
+                                placeholder="Your document number"
                               />
                             </div>
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="occupation">Occupation</Label>
                             <Input
                               id="occupation"
                               value={kycFormData.occupation}
                               onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
-                              placeholder="Enter your occupation"
+                              placeholder="Your occupation"
                             />
                           </div>
                         </div>
@@ -1028,10 +1066,7 @@ const Profile = () => {
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <Upload className="h-4 w-4 text-blue-600" />
                             </div>
-                            <div>
-                              <h3 className="text-lg font-medium">3. Document Upload</h3>
-                              <p className="text-sm text-muted-foreground">Upload your identification documents</p>
-                            </div>
+                            <h3 className="text-lg font-medium">Document Upload</h3>
                           </div>
 
                           <div className="rounded-lg border border-dashed p-4 bg-muted/50">
@@ -1047,7 +1082,6 @@ const Profile = () => {
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <Label htmlFor="idFront">Document Front</Label>
                               <Input 
                                 id="idFront" 
                                 type="file" 
@@ -1063,7 +1097,6 @@ const Profile = () => {
                             </div>
 
                             <div className="space-y-2">
-                              <Label htmlFor="idBack">Document Back</Label>
                               <Input 
                                 id="idBack" 
                                 type="file" 
@@ -1082,14 +1115,13 @@ const Profile = () => {
                         </div>
                       </div>
                     )}
-                  </CardContent>
                   {/* Update button visibility condition */}
                   {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
-                    <CardFooter>
+                    <div className="mt-8">
                       <Button 
                         onClick={handleSubmitKYC} 
                         disabled={isSubmittingKYC || !selectedFiles.front || !selectedFiles.back}
-                        className={userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}
+                        className={`w-full ${userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : ''}`}
                       >
                         {isSubmittingKYC ? (
                           <>Processing...</>
@@ -1097,17 +1129,28 @@ const Profile = () => {
                           <>{userData.kycStatus === 'rejected' ? 'Submit Again' : 'Submit for Verification'}</>
                         )}
                       </Button>
-                    </CardFooter>
+                    </div>
                   )}
-                </Card>
+                </div>
               </TabsContent>
-            </div>
-          </div>
-        </Tabs>
-      )}
-    </ShellLayout>
+            </Tabs>
+          )}
+        </div>
+      </main>
+
+      {/* Add logout button at the bottom */}
+      <div className="container mx-auto py-6 border-t mt-8">
+        <Button 
+          variant="destructive" 
+          onClick={handleLogout}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+      </div>
+    </div>
   );
 };
 
 export default Profile;
-

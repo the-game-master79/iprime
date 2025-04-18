@@ -27,7 +27,7 @@ import { usePwaInstall } from "@/hooks/use-pwa-install";
 import {
   BanknoteIcon, GanttChartIcon, LayoutDashboard, Menu, Package,
   Settings, Users, X, BellIcon, LogOut, DollarSign, Trophy,
-  ChevronLeft, HelpCircle, Download, InfoIcon, User
+  ChevronLeft, HelpCircle, Download, InfoIcon, User, LineChart
 } from "lucide-react";
 
 // Types
@@ -171,6 +171,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             label="Dashboard"
             href="/dashboard"
             active={location.pathname === '/dashboard'}
+          />
+          <SidebarItem
+            collapsed={isCollapsed && !isMobile}
+            icon={<LineChart className="h-5 w-5" />} 
+            label="Trade"
+            href="/trade"
+            active={location.pathname === '/trade'}
           />
           <SidebarItem
             collapsed={isCollapsed && !isMobile}
