@@ -5,8 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, TrendingUp, CandlestickChart, Globe } from "lucide-react";
+import { Search, TrendingUp, CandlestickChart, Globe, AlertTriangle } from "lucide-react";
 import { Topbar } from "@/components/shared/Topbar";
+import { Badge } from "@/components/ui/badge";
+import { isForexTradingTime } from "@/lib/utils";
 
 // Add TradingMade API Key from env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
@@ -111,12 +113,34 @@ const SelectPairs = () => {
     );
 
     cryptoWs.onopen = () => {
-      const subscribeMsg = {
-        method: "SUBSCRIBE",
-        params: cryptoPairs.map(symbol => `${symbol}@ticker`),
-        id: 1
-      };
-      cryptoWs.send(JSON.stringify(subscribeMsg));
+      // Wait for connection to be established
+      setTimeout(() => {
+        if (cryptoWs?.readyState === WebSocket.OPEN) {
+          const subscribeMsg = {
+            method: "SUBSCRIBE",
+            params: cryptoPairs.map(symbol => `${symbol}@ticker`),
+            id: 1
+          };
+          try {
+            cryptoWs.send(JSON.stringify(subscribeMsg));
+          } catch (err) {
+            console.error('Failed to send subscription message:', err);
+            // Attempt to reconnect on failure
+            cryptoWs?.close();
+            setTimeout(initializeCryptoWebSocket, 2000);
+          }
+        }
+      }, 1000); // Add 1s delay to ensure connection is ready
+    };
+
+    // Add error handler
+    cryptoWs.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    // Add close handler with reconnect logic
+    cryptoWs.onclose = () => {
+      setTimeout(initializeCryptoWebSocket, 2000); // Retry after 2s
     };
 
     cryptoWs.onmessage = (event) => {
@@ -161,7 +185,6 @@ const SelectPairs = () => {
       for (let i = 0; i < forexPairs.length; i += 10) {
         const batch = forexPairs.slice(i, i + 10);
         if (forexWs?.readyState === WebSocket.OPEN) {
-          console.log('Subscribing to batch:', batch);
           const subscribeMsg = {
             userKey: tradermadeApiKey,
             symbol: batch.join(','),
@@ -193,6 +216,14 @@ const SelectPairs = () => {
       }, 10000);
     };
 
+    forexWs.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    forexWs.onclose = () => {
+      setTimeout(initializeForexWebSocket, 2000); // Retry after 2s
+    };
+
     forexWs.onmessage = (event) => {
       try {
         // Skip non-JSON messages like "Connected" and "User Key..."
@@ -221,21 +252,33 @@ const SelectPairs = () => {
           });
         }
       } catch (error) {
-        // Only log error for unexpected cases
-        if (error instanceof SyntaxError) {
-          console.debug('Received non-JSON message:', event.data);
-        } else {
+        // Silently handle expected non-JSON messages
+        if (!(error instanceof SyntaxError)) {
+          // Only log unexpected errors
           console.error('Error handling forex message:', error);
         }
       }
     };
   };
 
+  // Add market status check
+  const isForexClosed = !isForexTradingTime();
+  const forexMarketStatus = isForexClosed ? "Closed" : "Open";
+
   return (
     <div className="min-h-screen bg-background">
       <Topbar title="Select Market" />
       
       <div className="container max-w-2xl mx-auto px-4 py-6">
+        {activeTab === 'forex' && isForexClosed && (
+          <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <span className="text-sm text-yellow-700">
+              Forex market is closed during weekends. Trading will resume on Monday.
+            </span>
+          </div>
+        )}
+
         <div className="space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
@@ -248,29 +291,42 @@ const SelectPairs = () => {
           </div>
 
           <Tabs defaultValue="crypto" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="crypto" className="flex items-center gap-2">
-                <CandlestickChart className="h-4 w-4" />
-                Cryptocurrency
-              </TabsTrigger>
-              <TabsTrigger value="forex" className="flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Forex
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="crypto" className="flex items-center gap-2">
+                  <CandlestickChart className="h-4 w-4" />
+                  Cryptocurrency
+                </TabsTrigger>
+                <TabsTrigger value="forex" className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  Forex
+                  {activeTab === 'forex' && (
+                    <Badge variant={isForexClosed ? "destructive" : "success"} className="ml-2">
+                      {forexMarketStatus}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <ScrollArea className="h-[calc(100vh-280px)] mt-4">
               <div className="grid gap-2">
                 {filteredPairs.map((pair) => {
                   const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
                   const priceAnimation = priceAnimations[pair.symbol];
+                  const isForexPair = pair.symbol.includes('FX:');
+                  const isDisabled = isForexPair && isForexClosed;
                   
                   return (
                     <Button
                       key={pair.symbol}
                       variant="outline"
-                      className="h-auto p-4 w-full"
-                      onClick={() => handlePairSelect(pair.symbol)}
+                      className={cn(
+                        "h-auto p-4 w-full",
+                        isDisabled && "opacity-50 cursor-not-allowed"
+                      )}
+                      onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
+                      disabled={isDisabled}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-3">

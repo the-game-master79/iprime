@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useParams, Navigate, useLocation } from "react-router-dom";
+import { isForexTradingTime } from "@/lib/utils";
 
 // Change process.env to import.meta.env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
@@ -409,6 +410,10 @@ const TradingPanel = ({
   const [selectedLeverage, setSelectedLeverage] = useState(leverage);
   const [marginError, setMarginError] = useState<string | null>(null);
 
+  const isForexPair = selectedPair.includes('FX:');
+  const isTradeDisabled = isForexPair && !isForexTradingTime();
+  const disabledMessage = isTradeDisabled ? "Forex trading is closed during weekends" : "";
+
   // Remove the WebSocket connection and use pairPrices directly
   const priceData = pairPrices[selectedPair] || { price: '0', change: '0', bid: '0', ask: '0' };
 
@@ -751,6 +756,9 @@ const TradingPanel = ({
 
       {/* Action Buttons */}
       <div className="p-4 border-t bg-white">
+        {isTradeDisabled && (
+          <p className="text-xs text-red-500 mb-2">{disabledMessage}</p>
+        )}
         <div className="space-y-2 mb-4">
           {marginError && (
             <p className="text-xs text-red-500">{marginError}</p>
@@ -759,7 +767,7 @@ const TradingPanel = ({
         <div className="grid grid-cols-2 gap-3">
           <Button 
             className="h-14 font-medium bg-green-600 hover:bg-green-700"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
+            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice) || isTradeDisabled}
             onClick={() => handleTrade('buy')}
           >
             <div className="space-y-0.5">
@@ -776,7 +784,7 @@ const TradingPanel = ({
           <Button 
             variant="outline" 
             className="h-14 font-medium border-red-600 text-red-600 hover:bg-red-50"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
+            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice) || isTradeDisabled}
             onClick={() => handleTrade('sell')}
           >
             <div className="space-y-0.5">

@@ -681,17 +681,19 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
               <div className="bg-muted rounded-lg px-4 py-2 cursor-pointer hover:bg-muted/70 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">P&L (Live)</div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent sheet from opening
-                      handleCloseAllTrades();
-                    }}
-                    className="h-6 px-2 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
-                  >
-                    Close All
-                  </Button>
+                  {openTradesCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent sheet from opening
+                        handleCloseAllTrades();
+                      }}
+                      className="h-6 px-2 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                    >
+                      Close All
+                    </Button>
+                  )}
                 </div>
                 <div
                   className={cn(

@@ -2,13 +2,15 @@ const CACHE_NAME = 'cloudforex-v1';
 const STATIC_CACHE = 'static-v1';
 const DYNAMIC_CACHE = 'dynamic-v1';
 
+// Optimize cache list
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/src/main.tsx',
   '/manifest.json',
-  'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//favicon-32x32.png',
-  'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//favicon-16x16.png'
+  // Add critical CSS/JS
+  '/src/styles/critical.css',
+  '/src/styles/globals.css'
 ];
 
 self.addEventListener('install', (event) => {
@@ -34,54 +36,55 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    event.respondWith(fetch(event.request));
+  // Skip non-GET/non-HTTP requests
+  if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
     return;
   }
 
-  // Custom caching strategies based on request type
-  if (event.request.url.includes('hcaptcha.com')) {
-    // Network first for hCaptcha
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match(event.request))
-    );
+  const url = new URL(event.request.url);
+  
+  // Cache-first for static assets
+  if (STATIC_ASSETS.includes(url.pathname)) {
+    event.respondWith(cacheFirst(event.request));
     return;
   }
 
-  if (event.request.url.includes('vercel')) {
-    // Cache first for Vercel scripts
-    event.respondWith(
-      caches.match(event.request)
-        .then(response => {
-          return response || fetch(event.request)
-            .then(fetchRes => {
-              return caches.open(STATIC_CACHE)
-                .then(cache => {
-                  cache.put(event.request.url, fetchRes.clone());
-                  return fetchRes;
-                });
-            });
-        })
-    );
+  // Network-first for API calls
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(networkFirst(event.request));
     return;
   }
 
-  // Default stale-while-revalidate strategy
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        const fetchPromise = fetch(event.request)
-          .then(networkResponse => {
-            if (networkResponse.ok) {
-              const responseToCache = networkResponse.clone();
-              caches.open(DYNAMIC_CACHE)
-                .then(cache => cache.put(event.request, responseToCache));
-            }
-            return networkResponse;
-          });
-        return cachedResponse || fetchPromise;
-      })
-  );
+  // Stale-while-revalidate for everything else
+  event.respondWith(staleWhileRevalidate(event.request));
 });
+
+// Optimized cache strategies
+async function cacheFirst(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  const cached = await cache.match(request);
+  return cached || networkFirst(request);
+}
+
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    const cache = await caches.open(DYNAMIC_CACHE);
+    cache.put(request, response.clone());
+    return response;
+  } catch (error) {
+    return caches.match(request);
+  }
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(DYNAMIC_CACHE);
+  const cached = await cache.match(request);
+  
+  const networkPromise = fetch(request).then(response => {
+    cache.put(request, response.clone());
+    return response;
+  });
+
+  return cached || networkPromise;
+}

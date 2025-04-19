@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
 
 // Types
 import type { 
@@ -48,6 +49,8 @@ const ShimmerEffect = ({ className }: { className?: string }) => (
 
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const { isMobile } = useBreakpoints();
+  const { canInstall, install } = usePwaInstall(); // Add hook
+
   // State management
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -802,6 +805,37 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                               'Load More'
                             )}
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Replace the download app button */}
+                      {canInstall && (
+                        <div className="mt-6 flex justify-center">
+                          <button
+                            onClick={install}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full hover:bg-primary/90 transition-colors shadow-lg"
+                          >
+                            <img
+                              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg"
+                              alt="CloudForex"
+                              className="h-5 w-auto"
+                            />
+                            <span className="font-medium">Download our app</span>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-5 w-5"
+                            >
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="7 10 12 15 17 10" />
+                              <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                          </button>
                         </div>
                       )}
                     </div>

@@ -56,3 +56,20 @@ export const getReferralLink = (referralCode: string) => {
   const baseUrl = window.location.origin;
   return `${baseUrl}/auth/register?ref=${referralCode}`;
 };
+
+// Check if forex trading is available
+export function isForexTradingTime(): boolean {
+  const now = new Date();
+  const utcDay = now.getUTCDay();
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const utcTime = utcHours * 60 + utcMinutes;
+
+  // Friday 22:30 UTC (1350 minutes) to Monday 15:30 UTC (930 minutes)
+  if (utcDay === 5 && utcTime >= 1350) return false; // After Friday 22:30
+  if (utcDay === 6) return false; // Saturday
+  if (utcDay === 0) return false; // Sunday
+  if (utcDay === 1 && utcTime < 930) return false; // Before Monday 15:30
+
+  return true;
+}
