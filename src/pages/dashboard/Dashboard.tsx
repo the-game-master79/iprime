@@ -741,7 +741,15 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                             <AccordionItem key={date} value={date} className="border rounded-lg overflow-hidden">
                               <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
                                 <div className="flex justify-between items-center w-full">
-                                  <span className="font-medium">{format(new Date(date), 'do MMMM yyyy')}</span>
+                                  <span className="font-medium">
+                                    {(() => {
+                                      try {
+                                        return format(new Date(date), 'do MMMM yyyy')
+                                      } catch (e) {
+                                        return 'Invalid Date'
+                                      }
+                                    })()}
+                                  </span>
                                   <Badge variant="secondary" className="ml-auto mr-4 text-xs">
                                     {txs.length} Transactions
                                   </Badge>
