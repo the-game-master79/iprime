@@ -39,6 +39,14 @@ import type {
 const REFRESH_INTERVAL = 30000;
 const MIN_DISPLAY_AMOUNT = 0.01;
 
+// Add this helper function before the component
+const isRankEligible = (currentRank: string, targetRank: string, ranks: Rank[]) => {
+  const sortedRanks = [...ranks].sort((a, b) => a.business_amount - b.business_amount);
+  const currentRankIndex = sortedRanks.findIndex(r => r.title === currentRank);
+  const targetRankIndex = sortedRanks.findIndex(r => r.title === targetRank);
+  return targetRankIndex <= currentRankIndex;
+};
+
 interface DashboardContentProps {
   loading: boolean;
 }
@@ -88,6 +96,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // Display data
   const [claimedRanks, setClaimedRanks] = useState<string[]>([]);
   const [isClaimingBonus, setIsClaimingBonus] = useState(false);
+  const [claimingRank, setClaimingRank] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -127,7 +136,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setUserProfile(profileData.data);
       setWithdrawalBalance(profileData.data?.withdrawal_wallet || 0);
       if (profileData.data?.referral_code) {
-        setReferralLink(getReferralLink(profileData.data.referral_code));
+        // Update referral link to include tab ID
+        setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}&tab=register`);
       }
 
       // Calculate total invested amount from approved subscriptions
@@ -255,37 +265,17 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user profile with direct count and business data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          direct_count,
-          total_business_volumes (
-            total_amount,
-            business_rank
-          )
-        `)
-        .eq('id', user.id)
+      // Get total business volume and rank directly from total_business_volumes
+      const { data: volumeData, error: volumeError } = await supabase
+        .from('total_business_volumes')
+        .select('total_amount, business_rank')
+        .eq('user_id', user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (volumeError) throw volumeError;
 
-      // Only proceed if user has at least 2 direct referrals
-      const directCount = profileData?.direct_count || 0;
-      if (directCount < 2) {
-        setBusinessStats({
-          currentRank: 'New Member',
-          totalVolume: 0,
-          rankBonus: 0,
-          nextRank: null,
-          progress: 0,
-          targetVolume: 0
-        });
-        return;
-      }
-
-      const totalVolume = profileData?.total_business_volumes?.[0]?.total_amount || 0;
-      const currentRankTitle = profileData?.total_business_volumes?.[0]?.business_rank || 'New Member';
+      const businessVolume = volumeData?.total_amount || 0;
+      const currentRankTitle = volumeData?.business_rank || 'New Member';
 
       // Get all ranks for progression tracking
       const { data: ranks, error: ranksError } = await supabase
@@ -295,7 +285,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
       if (ranksError) throw ranksError;
 
-      // Find current and next rank based on business volume
+      // Find current and next rank based on stored rank title
       const currentRank = ranks.find(r => r.title === currentRankTitle) || ranks[0];
       const currentRankIndex = ranks.findIndex(r => r.title === currentRankTitle);
       const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
@@ -303,24 +293,24 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       // Calculate progress to next rank
       let progress = 0;
       if (nextRank) {
-        // Calculate progress as percentage of total volume towards next rank's requirement
-        progress = Math.min(100, Math.max(0, (totalVolume / nextRank.business_amount) * 100));
+        const progressCalc = ((businessVolume - currentRank.business_amount) / 
+          (nextRank.business_amount - currentRank.business_amount)) * 100;
+        progress = Math.min(100, Math.max(0, progressCalc));
       } else {
-        // If at max rank, show 100% progress
         progress = 100;
       }
 
       setBusinessStats({
-        currentRank: currentRank.title,
-        totalVolume: totalVolume,
-        rankBonus: currentRank.bonus,
+        currentRank: currentRankTitle,
+        totalVolume: businessVolume,
+        rankBonus: currentRank?.bonus || 0,
         nextRank: nextRank ? {
           title: nextRank.title,
           bonus: nextRank.bonus,
           business_amount: nextRank.business_amount
         } : null,
         progress,
-        targetVolume: nextRank ? nextRank.business_amount : currentRank.business_amount
+        targetVolume: nextRank ? nextRank.business_amount : currentRank?.business_amount || 0
       });
 
     } catch (error) {
@@ -395,6 +385,47 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
+  const handleClaimRankBonus = async (rank: Rank) => {
+    try {
+      setClaimingRank(rank.title);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { error } = await supabase.rpc('claim_rank_bonus', {
+        rank_title: rank.title
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      toast({
+        title: "Success", 
+        description: `${rank.title} rank bonus of $${rank.bonus.toLocaleString()} has been added to your withdrawal wallet!`,
+        variant: "success",
+      });
+
+      setClaimedRanks(prev => [...prev, rank.title]);
+      
+      // Refresh states
+      await Promise.all([
+        fetchBusinessStats(),
+        fetchWithdrawalStats(),
+        fetchClaimedRanks()
+      ]);
+
+    } catch (error: any) {
+      console.error('Error claiming bonus:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to claim bonus",
+        variant: "destructive"
+      });
+    } finally {
+      setClaimingRank(null);
+    }
+  };
+
   const formatJoinedTime = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
@@ -415,7 +446,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   const handleShowQrCode = async () => {
     try {
-      const qrDataUrl = await QRCode.toDataURL(referralLink);
+      const referralUrl = `${window.location.origin}/auth/login?ref=${userProfile?.referral_code}&tab=register`;
+      const qrDataUrl = await QRCode.toDataURL(referralUrl);
       setQrCodeUrl(qrDataUrl);
       setShowQrCode(true);
     } catch (error) {
@@ -691,7 +723,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
 
               {/* Balance Containers */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
                   <div className="text-6xl font-bold tracking-tight">
                     ${withdrawalBalance.toLocaleString()}
@@ -709,6 +741,43 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   >
                     {activePlans.count} Plan{activePlans.count !== 1 ? 's' : ''} Active
                   </div>
+                </div>
+
+                {/* Redesigned Rank Status Container */}
+                <div className="p-6 rounded-xl bg-white border shadow-sm">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="text-sm text-muted-foreground">Current Rank</div>
+                      <div className="text-xl font-semibold mt-1">
+                        {businessStats.currentRank || 'New Member'}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="text-sm text-muted-foreground">Next Rank</div>
+                      <div className="text-xl font-semibold mt-1">
+                        {businessStats.nextRank?.title || 'Maximum'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {businessStats.nextRank && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>${businessStats.totalVolume.toLocaleString()}</span>
+                        <span>${businessStats.nextRank.business_amount.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div 
+                          className="bg-primary h-1.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${businessStats.progress}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-muted-foreground text-center">
+                        {Math.round(businessStats.progress)}% Progress to Next Rank
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -815,6 +884,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                           </div>
                         )}
 
+                        {!hasMore && transactions.length > 0 && (
+                          <div className="py-4 text-center text-sm text-muted-foreground">
+                            End of your Transactions
+                          </div>
+                        )}
+
                         {/* Replace the download app button */}
                         {canInstall && (
                           <div className="mt-6 flex justify-center">
@@ -877,7 +952,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                                 </div>
                                 <div className="text-right space-y-2">
                                   {businessStats.totalVolume >= rank.business_amount ? (
-                                    <Badge variant="success">Achieved</Badge>
+                                    <>
+                                      {!claimedRanks.includes(rank.title) && 
+                                       rank.title !== 'New Member' && 
+                                       isRankEligible(businessStats.currentRank, rank.title, ranks) ? (
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          onClick={() => handleClaimRankBonus(rank)}
+                                          disabled={claimingRank === rank.title}
+                                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                                        >
+                                          {claimingRank === rank.title ? 'Claiming...' : 'Claim Bonus'}
+                                        </Button>
+                                      ) : (
+                                        <Badge variant="success">Achieved</Badge>
+                                      )}
+                                    </>
                                   ) : (
                                     <Badge variant="secondary">
                                       ${(rank.business_amount - businessStats.totalVolume).toLocaleString()} more

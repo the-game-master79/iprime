@@ -31,43 +31,46 @@ BEGIN
         RAISE EXCEPTION 'Invalid rank';
     END IF;
 
-    -- Verify rank eligibility
-    IF user_data.business_rank != rank_title THEN
-        RAISE EXCEPTION 'You are not currently at this rank';
+    -- Verify rank eligibility based on total volume instead of current rank
+    IF user_data.total_amount < rank_details.business_amount THEN
+        RAISE EXCEPTION 'Insufficient business volume for this rank';
     END IF;
 
-    -- Check if bonus already claimed
-    IF EXISTS (
-        SELECT 1 
-        FROM transactions t
-        WHERE t.user_id = current_user_id
-        AND t.type = 'rank_bonus'
-        AND t.description LIKE '%bonus for ' || rank_title || '%'
-    ) THEN
-        RAISE EXCEPTION 'Bonus already claimed for this rank';
+    -- Check if user has surpassed this rank's business volume
+    IF user_data.total_amount >= rank_details.business_amount THEN
+        -- Check if bonus already claimed
+        IF EXISTS (
+            SELECT 1 
+            FROM transactions t
+            WHERE t.user_id = current_user_id
+            AND t.type = 'rank_bonus'
+            AND t.description LIKE '%bonus for ' || rank_title || '%'
+        ) THEN
+            RAISE EXCEPTION 'Bonus already claimed for this rank';
+        END IF;
+
+        -- Begin transaction
+        BEGIN
+            -- Add rank bonus to withdrawal wallet
+            UPDATE profiles 
+            SET withdrawal_wallet = COALESCE(withdrawal_wallet, 0) + rank_details.bonus
+            WHERE id = current_user_id;
+
+            -- Record the bonus transaction
+            INSERT INTO transactions (
+                user_id,
+                amount,
+                type,
+                status,
+                description
+            ) VALUES (
+                current_user_id,
+                rank_details.bonus,
+                'rank_bonus',
+                'Completed',
+                'Rank bonus for ' || rank_title
+            );
+        END;
     END IF;
-
-    -- Begin transaction
-    BEGIN
-        -- Add rank bonus to withdrawal wallet
-        UPDATE profiles 
-        SET withdrawal_wallet = COALESCE(withdrawal_wallet, 0) + rank_details.bonus
-        WHERE id = current_user_id;
-
-        -- Record the bonus transaction
-        INSERT INTO transactions (
-            user_id,
-            amount,
-            type,
-            status,
-            description
-        ) VALUES (
-            current_user_id,
-            rank_details.bonus,
-            'rank_bonus',
-            'Completed',
-            'Rank bonus for ' || rank_title
-        );
-    END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

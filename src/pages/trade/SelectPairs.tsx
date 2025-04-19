@@ -52,6 +52,7 @@ const SelectPairs = () => {
   const [activeTab, setActiveTab] = useState("crypto");
   const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down'>>({});
+  const [isPageVisible, setIsPageVisible] = useState(document.visibilityState === 'visible');
 
   const filteredPairs = TRADING_PAIRS[activeTab as keyof typeof TRADING_PAIRS].filter(pair =>
     pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -63,6 +64,34 @@ const SelectPairs = () => {
     const encodedPair = encodeURIComponent(pair);
     navigate(`/trade/chart/${encodedPair}`);
   };
+
+  // Add visibility change handler
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const visible = document.visibilityState === 'visible';
+      setIsPageVisible(visible);
+      
+      if (visible) {
+        // Reinitialize WebSockets when page becomes visible
+        if (activeTab === "crypto") {
+          initializeCryptoWebSocket();
+        } else if (activeTab === "forex" && tradermadeApiKey) {
+          initializeForexWebSocket();
+        }
+      } else {
+        // Cleanup WebSockets when page is hidden
+        if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
+        if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
+        clearInterval(heartbeatInterval);
+        clearInterval(priceRefreshInterval);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [activeTab]);
 
   // Add price animation effect
   useEffect(() => {
@@ -89,11 +118,13 @@ const SelectPairs = () => {
     let forexWs: WebSocket | null = null;
     let priceRefreshInterval: NodeJS.Timeout | undefined;
 
-    // Only initialize WebSocket based on active tab
-    if (activeTab === "crypto") {
-      initializeCryptoWebSocket();
-    } else if (activeTab === "forex" && tradermadeApiKey) {
-      initializeForexWebSocket();
+    // Only initialize WebSocket if page is visible
+    if (isPageVisible) {
+      if (activeTab === "crypto") {
+        initializeCryptoWebSocket();
+      } else if (activeTab === "forex" && tradermadeApiKey) {
+        initializeForexWebSocket();
+      }
     }
 
     return () => {
@@ -102,12 +133,23 @@ const SelectPairs = () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       if (priceRefreshInterval) clearInterval(priceRefreshInterval);
     };
-  }, [activeTab]); // Add activeTab as dependency
+  }, [activeTab, isPageVisible]); // Add isPageVisible as dependency
 
   const initializeCryptoWebSocket = () => {
-    if (cryptoWs?.readyState === WebSocket.OPEN) return;
+    if (cryptoWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
     
     cryptoWs = new WebSocket('wss://stream.binance.com:9443/ws');
+
+    let reconnectAttempt = 0;
+    const maxReconnectAttempts = 5;
+    
+    const reconnect = () => {
+      if (reconnectAttempt < maxReconnectAttempts && isPageVisible) {
+        reconnectAttempt++;
+        setTimeout(initializeCryptoWebSocket, Math.min(1000 * reconnectAttempt, 5000));
+      }
+    };
+
     const cryptoPairs = TRADING_PAIRS.crypto.map(pair => 
       pair.symbol.toLowerCase().replace('binance:', '')
     );
@@ -127,7 +169,7 @@ const SelectPairs = () => {
             console.error('Failed to send subscription message:', err);
             // Attempt to reconnect on failure
             cryptoWs?.close();
-            setTimeout(initializeCryptoWebSocket, 2000);
+            reconnect();
           }
         }
       }, 1000); // Add 1s delay to ensure connection is ready
@@ -136,11 +178,12 @@ const SelectPairs = () => {
     // Add error handler
     cryptoWs.onerror = (error) => {
       console.error('WebSocket error:', error);
+      reconnect();
     };
 
     // Add close handler with reconnect logic
     cryptoWs.onclose = () => {
-      setTimeout(initializeCryptoWebSocket, 2000); // Retry after 2s
+      reconnect();
     };
 
     cryptoWs.onmessage = (event) => {
@@ -165,7 +208,7 @@ const SelectPairs = () => {
 
   const initializeForexWebSocket = () => {
     let forexWs: WebSocket | null = null; // Declare forexWs within the function scope
-    if (forexWs?.readyState === WebSocket.OPEN) return;
+    if (forexWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
 
     forexWs = new WebSocket('wss://marketdata.tradermade.com/feedadv');
 

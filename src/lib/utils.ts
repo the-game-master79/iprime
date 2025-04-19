@@ -54,7 +54,7 @@ export function truncateText(text: string, length: number): string {
 
 export const getReferralLink = (referralCode: string) => {
   const baseUrl = window.location.origin;
-  return `${baseUrl}/auth/register?ref=${referralCode}`;
+  return `${baseUrl}/auth/login?ref=${referralCode}`;
 };
 
 // Check if forex trading is available
