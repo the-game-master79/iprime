@@ -1,4 +1,5 @@
-const CACHE_NAME = 'cloudforex-v1';
+const CACHE_VERSION = 'v1.0.0';
+const CACHE_NAME = `cloudforex-${CACHE_VERSION}`;
 const STATIC_CACHE = 'static-v1';
 const DYNAMIC_CACHE = 'dynamic-v1';
 
@@ -26,13 +27,16 @@ self.addEventListener('activate', (event) => {
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
-          if (key !== STATIC_CACHE && key !== DYNAMIC_CACHE) {
+          // Delete any old caches
+          if (key !== CACHE_NAME) {
             return caches.delete(key);
           }
         })
       );
     })
   );
+  // Immediately claim any clients
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -41,50 +45,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const url = new URL(event.request.url);
-  
-  // Cache-first for static assets
-  if (STATIC_ASSETS.includes(url.pathname)) {
-    event.respondWith(cacheFirst(event.request));
-    return;
-  }
-
-  // Network-first for API calls
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
-
-  // Stale-while-revalidate for everything else
-  event.respondWith(staleWhileRevalidate(event.request));
+  event.respondWith(
+    caches.open(CACHE_NAME).then(cache => {
+      return fetch(event.request)
+        .then(response => {
+          // Update cache with new response
+          cache.put(event.request, response.clone());
+          return response;
+        })
+        .catch(() => {
+          // Fallback to cache if network fails
+          return cache.match(event.request);
+        });
+    })
+  );
 });
-
-// Optimized cache strategies
-async function cacheFirst(request) {
-  const cache = await caches.open(STATIC_CACHE);
-  const cached = await cache.match(request);
-  return cached || networkFirst(request);
-}
-
-async function networkFirst(request) {
-  try {
-    const response = await fetch(request);
-    const cache = await caches.open(DYNAMIC_CACHE);
-    cache.put(request, response.clone());
-    return response;
-  } catch (error) {
-    return caches.match(request);
-  }
-}
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(DYNAMIC_CACHE);
-  const cached = await cache.match(request);
-  
-  const networkPromise = fetch(request).then(response => {
-    cache.put(request, response.clone());
-    return response;
-  });
-
-  return cached || networkPromise;
-}

@@ -6,8 +6,6 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { AuthProvider } from '@/contexts/AuthContext';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
-import Callback from "./pages/auth/Callback";
 import AdminLogin from "./pages/admin/Login";
 import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
@@ -17,6 +15,7 @@ import DepositPage from "@/pages/deposit/DepositPage";
 import SelectPairs from "./pages/trade/SelectPairs";
 import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { ChartView } from "@/pages/trade/ChartView";
+import { useCacheFlush } from '@/hooks/use-cache-flush';
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -49,7 +48,6 @@ const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
     }
   }
 });
@@ -72,6 +70,9 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
+  // Add cache flush hook at the top level
+  useCacheFlush();
+
   return (
     <Providers>
       <Suspense fallback={<LoadingSpinner />}>
@@ -79,8 +80,6 @@ const App = () => {
           {/* Public Routes */}
           <Route path="/" element={<Navigate to="/auth/login" replace />} />
           <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/register" element={<Register />} />
-          <Route path="/auth/callback" element={<Callback />} />
 
           {/* Routes that can be loaded before auth check */}
           <Route path="/dashboard" element={<Dashboard />} />
