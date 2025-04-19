@@ -14,11 +14,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TradesSheet } from "@/components/shared/TradesSheet";
 
 const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
   const effectiveLeverage = isJPYPair(pair) ? leverage * 2 : leverage;
@@ -219,7 +217,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [userBalance, setUserBalance] = useState(0);
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [marginUtilized, setMarginUtilized] = useState(0);
-  const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
+  const [isPageVisible, setIsPageVisible] = useState(true);
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -283,10 +281,29 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   }, [trades, defaultPair]);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      const visible = document.visibilityState === 'visible';
+      setIsPageVisible(visible);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isPageVisible) return;
+
     let connections: { [key: string]: WebSocket } = {};
     let heartbeats: { [key: string]: NodeJS.Timeout } = {};
 
     const connectWebSocket = (pair: string) => {
+      if (connections[pair]?.readyState === WebSocket.OPEN) {
+        connections[pair].close();
+        if (heartbeats[pair]) clearInterval(heartbeats[pair]);
+      }
+
       if (pair.includes('BINANCE:')) {
         const ws = new WebSocket('wss://stream.binance.com:9443/ws');
         const symbol = pair.replace('BINANCE:', '').toLowerCase();
@@ -365,7 +382,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       Object.values(connections).forEach(ws => ws.readyState === WebSocket.OPEN && ws.close());
       Object.values(heartbeats).forEach(clearInterval);
     };
-  }, [activePairs]);
+  }, [activePairs, isPageVisible]);
 
   useEffect(() => {
     const total = trades
@@ -643,10 +660,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     }
   }
 
-  const filteredTrades = useMemo(() => {
-    return trades.filter(trade => trade.status === activeTab);
-  }, [trades, activeTab]);
-
   return (
     <div className="h-screen bg-background flex flex-col">
       <Topbar title={formattedPairName} />
@@ -706,141 +719,15 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                 </div>
               </div>
 
-              <Sheet open={showTradesSheet} onOpenChange={setShowTradesSheet}>
-                <SheetContent side="right" className="w-full sm:w-[540px] flex flex-col p-0">
-                  <div className="px-6 py-4 border-b">
-                    <SheetHeader>
-                      <SheetTitle>Trades</SheetTitle>
-                    </SheetHeader>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto">
-                    <div className="px-6">
-                      <Tabs defaultValue="open" onValueChange={(value) => setActiveTab(value as 'open' | 'pending' | 'closed')}>
-                        <TabsList className="grid w-full grid-cols-3 mb-4 sticky top-0 bg-background z-10">
-                          <TabsTrigger value="open">
-                            Open ({trades.filter(t => t.status === 'open').length})
-                          </TabsTrigger>
-                          <TabsTrigger value="pending">
-                            Pending ({trades.filter(t => t.status === 'pending').length})
-                          </TabsTrigger>
-                          <TabsTrigger value="closed">
-                            Closed ({trades.filter(t => t.status === 'closed').length})
-                          </TabsTrigger>
-                        </TabsList>
+              <TradesSheet
+                open={showTradesSheet}
+                onOpenChange={setShowTradesSheet}
+                trades={trades}
+                pairPrices={pairPrices}
+                onCloseTrade={handleCloseTrade}
+                calculatePnL={calculatePnL}
+              />
 
-                        <div className="space-y-4 pb-4">
-                          {filteredTrades.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                              <div className="text-muted-foreground mb-2">No {activeTab} trades</div>
-                              <p className="text-sm text-muted-foreground">
-                                Your {activeTab} trades will appear here
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-6">
-                              {activeTab === 'closed' ? (
-                                // Show date grouped trades for closed tab
-                                groupTradesByDate(filteredTrades).map(([date, group]) => (
-                                  <div key={date} className="space-y-2">
-                                    <div className="flex items-center justify-between px-4">
-                                      <div className="flex items-center gap-2">
-                                        <div className="font-medium">{date}</div>
-                                        <Badge variant="outline" className="h-5 text-xs">
-                                          {group.trades.length} trades
-                                        </Badge>
-                                      </div>
-                                      <div className={cn(
-                                        "font-mono text-sm font-medium",
-                                        group.totalPnL > 0 ? "text-green-500" : "text-red-500"
-                                      )}>
-                                        ${group.totalPnL.toFixed(2)}
-                                      </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      {group.trades.map(trade => (
-                                        <div key={trade.id} className="flex items-center justify-between p-4 border rounded-lg">
-                                          <div>
-                                            <div className="font-medium">{trade.pair.split(':')[1]}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                              {trade.type.toUpperCase()} {trade.lots} Lots @ ${trade.openPrice}
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-4">
-                                            <div className={cn(
-                                              "font-mono",
-                                              trade.pnl > 0 ? "text-green-500" : "text-red-500"
-                                            )}>
-                                              ${trade.pnl?.toFixed(2)}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))
-                              ) : (
-                                // Show regular list for open/pending tabs
-                                <div className="space-y-2">
-                                  {filteredTrades.map(trade => {
-                                    const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
-                                    const pnl = trade.status === 'closed' ? trade.pnl : calculatePnL(trade, currentPrice);
-                                    
-                                    return (
-                                      <div key={trade.id} className="flex items-center justify-between p-4 border rounded-lg">
-                                        <div>
-                                          <div className="font-medium">{trade.pair.split(':')[1]}</div>
-                                          <div className="text-sm text-muted-foreground">
-                                            {trade.type.toUpperCase()} {trade.lots} Lots @ ${trade.openPrice}
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                          <div className={cn(
-                                            "font-mono",
-                                            pnl > 0 ? "text-green-500" : "text-red-500"
-                                          )}>
-                                            ${pnl.toFixed(2)}
-                                          </div>
-                                          {trade.status === 'open' && (
-                                            <Button
-                                              variant="destructive"
-                                              size="sm"
-                                              onClick={() => {
-                                                handleCloseTrade(trade.id);
-                                                setShowTradesSheet(false);
-                                              }}
-                                            >
-                                              Close
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </Tabs>
-                    </div>
-                  </div>
-
-                  <div className="border-t px-6 py-4 bg-background mt-auto">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Current Price:
-                        <span className="ml-2 font-mono">
-                          ${formatPrice(pairPrices[defaultPair]?.price)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Margin Used: ${marginUtilized.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
             </div>
           </div>
         </div>

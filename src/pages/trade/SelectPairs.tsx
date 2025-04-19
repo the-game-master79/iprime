@@ -9,9 +9,62 @@ import { Search, TrendingUp, CandlestickChart, Globe, AlertTriangle } from "luci
 import { Topbar } from "@/components/shared/Topbar";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { TradesSheet } from "@/components/shared/TradesSheet";
+import { useToast } from "@/hooks/use-toast"; // Add this import
 
 // Add TradingMade API Key from env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
+
+// Add helper functions for P&L calculation
+const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
+
+const isJPYPair = (pair: string): boolean => {
+  const symbol = pair.replace('FX:', '').replace('/', '');
+  return FOREX_PAIRS_JPY.includes(symbol);
+};
+
+const getPipValue = (pair: string) => {
+  if (pair.includes('BINANCE:')) {
+    return 0.00001; // Crypto uses 5 decimals standard
+  }
+  // Remove FX: prefix and /
+  const symbol = pair.replace('FX:', '').replace('/', '');
+  // JPY pairs use 0.01 as pip value, others use 0.0001
+  return FOREX_PAIRS_JPY.includes(symbol) ? 0.01 : 0.0001;
+};
+
+const calculatePnL = (trade: Trade, currentPrice: number) => {
+  const isCrypto = trade.pair.includes('BINANCE:');
+  
+  if (isCrypto) {
+    // For crypto, calculate P&L in USDT terms
+    // 1 lot = 1 unit of base currency
+    const positionSize = trade.lots;
+    const priceDifference = trade.type === 'buy' 
+      ? currentPrice - trade.openPrice
+      : trade.openPrice - currentPrice;
+    return priceDifference * positionSize;
+  }
+  
+  // For forex, calculate based on standard lot size and pip value
+  // 1 standard lot = 100,000 units of base currency
+  const standardLotSize = 100000;
+  const totalUnits = trade.lots * standardLotSize;
+  
+  // Get pip value and calculate pip movement
+  const pipValue = getPipValue(trade.pair);
+  const priceDifference = trade.type === 'buy'
+    ? currentPrice - trade.openPrice
+    : trade.openPrice - currentPrice;
+  const pips = priceDifference / pipValue;
+  
+  // Calculate P&L
+  if (isJPYPair(trade.pair)) {
+    return (totalUnits * pipValue * pips) / currentPrice;
+  }
+  return totalUnits * pipValue * pips;
+};
 
 // Replace the TRADING_PAIRS constant
 const TRADING_PAIRS = {
@@ -46,13 +99,36 @@ interface PriceData {
   ask?: string;
 }
 
+interface Trade {
+  id: string;
+  pair: string;
+  type: 'buy' | 'sell';
+  status: 'open' | 'pending' | 'closed';
+  openPrice: number;
+  lots: number;
+  leverage: number;
+  orderType: 'market' | 'limit';
+  limitPrice?: number;
+  openTime: number;
+}
+
 const SelectPairs = () => {
+  const { toast } = useToast(); // Add this hook
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("crypto");
   const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down'>>({});
   const [isPageVisible, setIsPageVisible] = useState(document.visibilityState === 'visible');
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [totalPnL, setTotalPnL] = useState(0);
+  const [showTradesSheet, setShowTradesSheet] = useState(false);
+
+  // Move WebSocket references to component level
+  let cryptoWs: WebSocket | null = null;
+  let forexWs: WebSocket | null = null;
+  let heartbeatInterval: NodeJS.Timeout | undefined;
+  let priceRefreshInterval: NodeJS.Timeout | undefined;
 
   const filteredPairs = TRADING_PAIRS[activeTab as keyof typeof TRADING_PAIRS].filter(pair =>
     pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,16 +184,54 @@ const SelectPairs = () => {
     return () => clearTimeout(timer);
   }, [pairPrices]);
 
-  // WebSocket connection for price updates
-  let cryptoWs: WebSocket | null = null;
-
-  let heartbeatInterval: NodeJS.Timeout | undefined;
-  let priceRefreshInterval: NodeJS.Timeout | undefined;
-
+  // Add trades fetch effect
   useEffect(() => {
-    let forexWs: WebSocket | null = null;
-    let priceRefreshInterval: NodeJS.Timeout | undefined;
+    const fetchTrades = async () => {
+      const { data: { user } } = await supabase.auth.getUser(); 
+      if (!user) return;
 
+      const { data: userTrades } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'open');
+
+      if (userTrades) {
+        setTrades(userTrades.map(trade => ({
+          id: trade.id,
+          pair: trade.pair,
+          type: trade.type,
+          status: trade.status,
+          openPrice: trade.open_price,
+          lots: trade.lots,
+          leverage: trade.leverage,
+          orderType: trade.order_type,
+          limitPrice: trade.limit_price,
+          openTime: new Date(trade.created_at).getTime()
+        })));
+      }
+    };
+
+    fetchTrades();
+  }, []);
+
+  // Calculate P&L effect
+  useEffect(() => {
+    if (!trades.length) return;
+
+    const total = trades.reduce((sum, trade) => {
+      const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      if (!currentPrice) return sum;
+
+      const pnl = calculatePnL(trade, currentPrice);
+      return sum + (pnl || 0); 
+    }, 0);
+
+    setTotalPnL(total);
+  }, [trades, pairPrices]);
+
+  // WebSocket connection for price updates
+  useEffect(() => {
     // Only initialize WebSocket if page is visible
     if (isPageVisible) {
       if (activeTab === "crypto") {
@@ -207,7 +321,6 @@ const SelectPairs = () => {
   };
 
   const initializeForexWebSocket = () => {
-    let forexWs: WebSocket | null = null; // Declare forexWs within the function scope
     if (forexWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
 
     forexWs = new WebSocket('wss://marketdata.tradermade.com/feedadv');
@@ -304,15 +417,75 @@ const SelectPairs = () => {
     };
   };
 
+  // Add close trade handler
+  const handleCloseTrade = async (tradeId: string) => {
+    try {
+      const trade = trades.find(t => t.id === tradeId);
+      if (!trade) return;
+
+      const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      const pnl = calculatePnL(trade, closePrice);
+
+      const { error: closeError } = await supabase
+        .rpc('close_trade', {
+          p_trade_id: tradeId,
+          p_close_price: closePrice,
+          p_pnl: pnl
+        });
+
+      if (closeError) throw closeError;
+
+      // Update local state
+      setTrades(prevTrades =>
+        prevTrades.map(t =>
+          t.id === tradeId ? { ...t, status: 'closed', pnl } : t
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: `Trade closed with P&L: $${pnl.toFixed(2)}`,
+      });
+    } catch (error) {
+      console.error('Error closing trade:', error);
+      toast({
+        title: "Error",
+        description: "Failed to close trade"
+      });
+    }
+  };
+
   // Add market status check
   const isForexClosed = !isForexTradingTime();
   const forexMarketStatus = isForexClosed ? "Closed" : "Open";
 
   return (
     <div className="min-h-screen bg-background">
-      <Topbar title="Select Market" />
+      <Topbar title="All Pairs" />
       
-      <div className="container max-w-2xl mx-auto px-4 py-6">
+      <div className="container max-w-2xl mx-auto px-4 py-6 pb-20">
+        {/* Update stats container to be clickable */}
+        <div 
+          className="mb-6 p-4 bg-muted/50 rounded-lg border cursor-pointer hover:bg-muted/70 transition-colors"
+          onClick={() => setShowTradesSheet(true)}
+        >
+          <div className="flex justify-between items-center">
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Open Positions</div>
+              <div className="text-2xl font-semibold">{trades.length}</div>
+            </div>
+            <div className="space-y-1 text-right">
+              <div className="text-sm text-muted-foreground">Total P&L</div>
+              <div className={cn(
+                "text-2xl font-semibold font-mono",
+                totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
+              )}>
+                ${totalPnL.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {activeTab === 'forex' && isForexClosed && (
           <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -418,9 +591,20 @@ const SelectPairs = () => {
             </ScrollArea>
           </Tabs>
         </div>
+
+        {/* Add TradesSheet component */}
+        <TradesSheet
+          open={showTradesSheet}
+          onOpenChange={setShowTradesSheet}
+          trades={trades}
+          pairPrices={pairPrices}
+          onCloseTrade={handleCloseTrade}
+          calculatePnL={calculatePnL}
+        />
       </div>
     </div>
   );
 };
 
 export default SelectPairs;
+
