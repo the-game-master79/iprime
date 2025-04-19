@@ -16,6 +16,7 @@ import SelectPairs from "./pages/trade/SelectPairs";
 import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { ChartView } from "@/pages/trade/ChartView";
 import { useCacheFlush } from '@/hooks/use-cache-flush';
+import Index from "./pages/Index";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -78,7 +79,8 @@ const App = () => {
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/home" element={<Index />} />
           <Route path="/auth/login" element={<Login />} />
 
           {/* Routes that can be loaded before auth check */}
