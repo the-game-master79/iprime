@@ -732,7 +732,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <Accordion type="multiple" className="space-y-3">
                           {Object.entries(
                             transactions.reduce((groups, tx) => {
-                              const date = new Date(tx.created_at).toLocaleDateString();
+                              const date = new Date(tx.created_at).toISOString().split('T')[0];
                               if (!groups[date]) groups[date] = [];
                               groups[date].push(tx);
                               return groups;
@@ -742,13 +742,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                               <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
                                 <div className="flex justify-between items-center w-full">
                                   <span className="font-medium">
-                                    {(() => {
-                                      try {
-                                        return format(new Date(date), 'do MMMM yyyy')
-                                      } catch (e) {
-                                        return 'Invalid Date'
-                                      }
-                                    })()}
+                                    {format(new Date(date), 'dd MMM yyyy').toUpperCase()}
                                   </span>
                                   <Badge variant="secondary" className="ml-auto mr-4 text-xs">
                                     {txs.length} Transactions
