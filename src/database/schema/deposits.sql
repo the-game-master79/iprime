@@ -184,17 +184,28 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Enable RLS
 ALTER TABLE deposits ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
-CREATE POLICY "Users can create their own deposits"
-ON deposits FOR INSERT TO authenticated
-WITH CHECK (auth.uid() = user_id);
+-- Drop existing policies
+DROP POLICY IF EXISTS "Admin users have full access" ON deposits;
+DROP POLICY IF EXISTS "Users can view their own deposits" ON deposits;
+
+-- Create updated policies
+CREATE POLICY "Admin users have full access to deposits"
+ON deposits FOR ALL TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND role = 'admin'
+    )
+);
 
 CREATE POLICY "Users can view their own deposits"
 ON deposits FOR SELECT TO authenticated
 USING (auth.uid() = user_id);
 
-CREATE POLICY "Admin users have full access"
-ON deposits FOR ALL TO authenticated
+-- Create policy for admin selection with join
+CREATE POLICY "Admin can view deposits with profiles"
+ON deposits FOR SELECT TO authenticated
 USING (
     EXISTS (
         SELECT 1 FROM profiles

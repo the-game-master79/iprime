@@ -18,6 +18,11 @@ interface Deposit {
   transaction_hash: string | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  profiles?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
 }
 
 const AdminDepositsPage = () => {
@@ -37,7 +42,14 @@ const AdminDepositsPage = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('deposits')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -111,7 +123,10 @@ const AdminDepositsPage = () => {
   const filteredDeposits = deposits.filter(deposit =>
     deposit.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deposit.crypto_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    deposit.crypto_symbol?.toLowerCase().includes(searchTerm.toLowerCase())
+    deposit.crypto_symbol?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deposit.profiles?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deposit.profiles?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deposit.profiles?.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calculate statistics
@@ -202,7 +217,16 @@ const AdminDepositsPage = () => {
                 filteredDeposits.map((deposit) => (
                   <TableRow key={deposit.id}>
                     <TableCell className="font-medium">{deposit.id}</TableCell>
-                    <TableCell>{deposit.user_id}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium">
+                          {deposit.profiles?.first_name} {deposit.profiles?.last_name}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {deposit.profiles?.email}
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>${deposit.amount.toLocaleString()}</TableCell>
                     <TableCell>
                       {deposit.crypto_name} ({deposit.crypto_symbol})
