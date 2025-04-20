@@ -44,8 +44,8 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
             {!isMobile && (
               <Link to="/" className="flex items-center gap-2">
                 <img 
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
-                  alt="CloudForex Logo" 
+                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade-1.svg" 
+                  alt="CloudTrade Logo" 
                   className="h-8 w-auto" 
                 />
               </Link>
@@ -72,7 +72,7 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
             <Button 
               onClick={() => navigate('/deposit')} 
               size={isMobile ? "sm" : "default"}
-              className="h-8 md:h-10"
+              className="h-8 md:h-10 bg-[#FFA500] text-black hover:bg-[#FFA500]/90"
             >
               <PlusCircle className="h-4 w-4" />
               {!isMobile && <span className="ml-2">Deposit</span>}

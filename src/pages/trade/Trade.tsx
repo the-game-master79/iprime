@@ -16,36 +16,24 @@ import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { isForexTradingTime } from "@/lib/utils";
-import { TrendingUp, Menu } from "lucide-react";
+import { TrendingUp, Menu, AlertTriangle } from "lucide-react";
+
+// Add these interfaces near the top after existing imports
+interface TradingPair {
+  symbol: string;
+  name: string;
+  short_name: string;
+  type: 'crypto' | 'forex';
+  min_leverage: number;
+  max_leverage: number;
+  leverage_options: number[];
+  is_active: boolean;
+  max_lots: number;
+  image_url?: string;
+}
 
 // Change process.env to import.meta.env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
-
-// TradingView ticker pairs
-const TRADING_PAIRS = {
-  crypto: [
-    { symbol: 'BINANCE:BTCUSDT', name: 'Bitcoin', shortName: 'BTC' },
-    { symbol: 'BINANCE:ETHUSDT', name: 'Ethereum', shortName: 'ETH' },
-    { symbol: 'BINANCE:SOLUSDT', name: 'Solana', shortName: 'SOL' },
-    { symbol: 'BINANCE:DOGEUSDT', name: 'Dogecoin', shortName: 'DOGE' },
-    { symbol: 'BINANCE:ADAUSDT', name: 'Cardano', shortName: 'ADA' },
-    { symbol: 'BINANCE:BNBUSDT', name: 'BNB', shortName: 'BNB' },
-    { symbol: 'BINANCE:DOTUSDT', name: 'Polkadot', shortName: 'DOT' },
-    { symbol: 'BINANCE:TRXUSDT', name: 'TRON', shortName: 'TRX' },
-  ],
-  forex: [
-    { symbol: 'FX:EUR/USD', name: 'EUR/USD', shortName: 'EURUSD' },
-    { symbol: 'FX:USD/JPY', name: 'USD/JPY', shortName: 'USDJPY' },
-    { symbol: 'FX:GBP/USD', name: 'GBP/USD', shortName: 'GBPUSD' },
-    { symbol: 'FX:AUD/USD', name: 'AUD/USD', shortName: 'AUDUSD' },
-    { symbol: 'FX:USD/CAD', name: 'USD/CAD', shortName: 'USDCAD' },
-    { symbol: 'FX:USD/CHF', name: 'USD/CHF', shortName: 'USDCHF' }, 
-    { symbol: 'FX:GBP/JPY', name: 'GBP/JPY', shortName: 'GBPJPY' },
-    { symbol: 'FX:EUR/JPY', name: 'EUR/JPY', shortName: 'EURJPY' },
-    { symbol: 'FX:EUR/GBP', name: 'EUR/GBP', shortName: 'EURGBP' },
-    { symbol: 'FX:EUR/CHF', name: 'EUR/CHF', shortName: 'EURCHF' },
-  ]
-};
 
 // Add this helper function at the top level
 const parseMessage = (message: string) => {
@@ -182,13 +170,15 @@ const TradeSidebar = ({
   onPairSelect,
   isOpen,
   pairPrices,
-  isMobile = false
+  isMobile = false,
+  tradingPairs
 }: { 
   selectedPair: string, 
   onPairSelect: (pair: string) => void,
   isOpen: boolean,
   pairPrices: Record<string, PriceData>,
-  isMobile?: boolean
+  isMobile?: boolean,
+  tradingPairs: TradingPair[]
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("crypto");
@@ -215,13 +205,16 @@ const TradeSidebar = ({
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     // Select first pair when tab changes
-    const firstPair = TRADING_PAIRS[tab as keyof typeof TRADING_PAIRS][0].symbol;
-    onPairSelect(firstPair);
+    const firstPair = tradingPairs.find(p => p.type === tab)?.symbol;
+    if (firstPair) {
+      onPairSelect(firstPair);
+    }
   };
 
-  const filteredPairs = TRADING_PAIRS[activeTab as keyof typeof TRADING_PAIRS].filter(pair =>
-    pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    pair.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPairs = tradingPairs.filter(pair =>
+    pair.type === activeTab &&
+    (pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    pair.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const navigate = useNavigate();
@@ -284,9 +277,9 @@ const TradeSidebar = ({
                       onClick={() => handlePairSelect(pair.symbol)}
                     >
                       <div className="flex items-center gap-3">
-                        {pair.symbol.includes('BINANCE:') ? (
+                        {pair.image_url ? (
                           <img 
-                            src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${symbol}.png`}
+                            src={pair.image_url}
                             alt={pair.name}
                             className="h-8 w-8"
                             onError={(e) => {
@@ -294,13 +287,11 @@ const TradeSidebar = ({
                             }}
                           />
                         ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <TrendUp className="h-5 w-5 text-primary" />
-                          </div>
+                          <TrendingUp className="h-5 w-5 text-primary" />
                         )}
                         <div className="flex flex-col items-start gap-0.5">
                           <span className="font-semibold">{pair.name}</span>
-                          <span className="text-xs text-muted-foreground">{pair.shortName}</span>
+                          <span className="text-xs text-muted-foreground">{pair.short_name}</span>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
@@ -344,11 +335,19 @@ const TradeSidebar = ({
                     >
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                          <TrendingUp className="h-5 w-5 text-primary" />
+                          {pair.image_url ? (
+                            <img 
+                              src={pair.image_url}
+                              alt={pair.name}
+                              className="h-6 w-6"
+                            />
+                          ) : (
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                          )}
                         </div>
                         <div className="flex flex-col items-start gap-0.5">
                           <span className="font-semibold">{pair.name}</span>
-                          <span className="text-xs text-muted-foreground">{pair.shortName}</span>
+                          <span className="text-xs text-muted-foreground">{pair.short_name}</span>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
@@ -393,13 +392,15 @@ interface TradingPanelProps {
     limitPrice?: string;
   }) => void;
   userBalance: number;
+  tradingPairs: TradingPair[];
 }
 
 const TradingPanel = ({ 
   selectedPair, 
   pairPrices,
   onTrade,
-  userBalance
+  userBalance,
+  tradingPairs
 }: TradingPanelProps) => {
   const [lots, setLots] = useState("0.01");
   const [lotsError, setLotsError] = useState("");
@@ -414,6 +415,8 @@ const TradingPanel = ({
   const isForexPair = selectedPair.includes('FX:');
   const isTradeDisabled = isForexPair && !isForexTradingTime();
   const disabledMessage = isTradeDisabled ? "Forex trading is closed during weekends" : "";
+
+  const isForexClosed = isForexPair && !isForexTradingTime();
 
   // Remove the WebSocket connection and use pairPrices directly
   const priceData = pairPrices[selectedPair] || { price: '0', change: '0', bid: '0', ask: '0' };
@@ -541,8 +544,25 @@ const TradingPanel = ({
     });
   };
 
+  // Get current pair's leverage options and limits
+  const currentPair = useMemo(() => 
+    tradingPairs.find(p => p.symbol === selectedPair), 
+    [selectedPair, tradingPairs]
+  );
+
   return (
     <div className="w-80 border-l bg-white flex flex-col">
+      {isForexClosed && (
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50/50 border border-yellow-200/50">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <span className="text-sm text-yellow-700">
+              Forex market is closed. Trading resumes Monday.
+            </span>
+          </div>
+        </div>
+      )}
+      
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-medium">{selectedPair.split(':')[1]}</h2>
@@ -618,7 +638,7 @@ const TradingPanel = ({
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <label className="text-sm font-medium">Volume (Lots)</label>
-            <span className="text-xs text-muted-foreground">Max: 200</span>
+            <span className="text-xs text-muted-foreground">Max: {currentPair?.max_lots || 0}</span>
           </div>
           <div className="relative">
             <Input
@@ -657,74 +677,30 @@ const TradingPanel = ({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              {/* No Risk Section */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <h4 className="font-medium">No Risk</h4>
-                    <p className="text-sm text-muted-foreground">1x - 50x leverage</p>
+              {currentPair && (
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <div className="flex-1">
+                      <h4 className="font-medium">Available Leverage</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {currentPair.min_leverage}x - {currentPair.max_leverage}x
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">Safe</Badge>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 5, 10, 20, 50].map((value) => (
-                    <Button
-                      key={value}
-                      variant={selectedLeverage === value.toString() ? "default" : "outline"} 
-                      size="sm"
-                      onClick={() => setSelectedLeverage(value.toString())}
-                    >
-                      {value}x
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Medium Risk Section */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <h4 className="font-medium">Medium Risk</h4>
-                    <p className="text-sm text-muted-foreground">50x - 200x leverage</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {currentPair.leverage_options.map((value) => (
+                      <Button
+                        key={value}
+                        variant={selectedLeverage === value.toString() ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedLeverage(value.toString())}
+                      >
+                        {value}x
+                      </Button>
+                    ))}
                   </div>
-                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Caution</Badge>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[100, 200].map((value) => (
-                    <Button
-                      key={value}
-                      variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedLeverage(value.toString())}
-                    >
-                      {value}x
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* High Risk Section */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <h4 className="font-medium">High Risk</h4>
-                    <p className="text-sm text-muted-foreground">500x - 2000x leverage</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-red-100 text-red-800">High Risk</Badge>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[500, 1000, 2000].map((value) => (
-                    <Button
-                      key={value}
-                      variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedLeverage(value.toString())}
-                    >
-                      {value}x
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
             <div className="flex justify-end pt-4 border-t">
               <Button
@@ -893,8 +869,16 @@ const TradingActivity = ({
   const filteredTrades = useMemo(() => {
     return trades
       .filter(trade => trade.status === activeTab)
-      .sort((a, b) => b.openTime - a.openTime); // Show newest first
-  }, [trades, activeTab]);
+      .sort((a, b) => b.openTime - a.openTime) // Show newest first
+      .map(trade => {
+        const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+        // Only calculate P&L for open/closed trades, set to 0 for pending
+        const pnl = trade.status === 'pending' ? 0 : 
+                   trade.status === 'closed' ? trade.pnl || 0 :
+                   calculatePnL(trade, currentPrice);
+        return { ...trade, currentPrice, pnl };
+      });
+  }, [trades, activeTab, currentPrices]);
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
@@ -1095,7 +1079,7 @@ const Trade = () => {
 
   // Initialize selected pair state
   const [selectedPair, setSelectedPair] = useState(
-    pair ? decodeURIComponent(pair) : TRADING_PAIRS.crypto[0].symbol
+    pair ? decodeURIComponent(pair) : ''
   );
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
@@ -1105,10 +1089,9 @@ const Trade = () => {
   const chartInstanceRef = useRef<any>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
 
-  // Add mobile redirect at the top of component
-  // if (isMobile) {
-  //   return <Navigate to="/trade/select" />;
-  // }
+  // Add new state for trading pairs
+  const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Add WebSocket handling logic
   useEffect(() => {
@@ -1120,7 +1103,7 @@ const Trade = () => {
       if (cryptoWs?.readyState === WebSocket.OPEN) return;
 
       cryptoWs = new WebSocket(BINANCE_WS_URL);
-      const cryptoPairs = TRADING_PAIRS.crypto.map(pair => 
+      const cryptoPairs = tradingPairs.filter(pair => pair.type === 'crypto').map(pair => 
         pair.symbol.toLowerCase().replace('binance:', '')
       );
 
@@ -1163,7 +1146,7 @@ const Trade = () => {
     // Initialize forex WebSocket with batch processing only
     if (tradermadeApiKey) {
       forexWs = new WebSocket(TRADERMADE_WS_URL);
-      const forexPairs = TRADING_PAIRS.forex.map(pair => formatForexSymbol(pair.symbol));
+      const forexPairs = tradingPairs.filter(pair => pair.type === 'forex').map(pair => formatForexSymbol(pair.symbol));
 
       forexWs.onopen = () => {
         console.log('Forex WebSocket opened');
@@ -1240,7 +1223,7 @@ const Trade = () => {
       if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
       if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
-  }, []);
+  }, [tradingPairs]);
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -1325,12 +1308,14 @@ const Trade = () => {
   // Add this effect after other effects
   useEffect(() => {
     // Set first pairs in tabs
-    const firstCryptoPair = TRADING_PAIRS.crypto[0].symbol;
-    const firstForexPair = TRADING_PAIRS.forex[0].symbol;
+    const firstCryptoPair = tradingPairs.find(p => p.type === 'crypto')?.symbol;
+    const firstForexPair = tradingPairs.find(p => p.type === 'forex')?.symbol;
     
     // Update selectedPair based on active tab
-    setSelectedPair(firstCryptoPair);
-  }, []);
+    if (!selectedPair && firstCryptoPair) {
+      setSelectedPair(firstCryptoPair);
+    }
+  }, [tradingPairs, selectedPair]);
 
   const formatTradingViewSymbol = (symbol: string) => {
     if (symbol.includes('BINANCE:')) {
@@ -1499,6 +1484,37 @@ const Trade = () => {
     fetchTrades();
   }, []);
 
+  // Add effect to fetch trading pairs
+  useEffect(() => {
+    const fetchTradingPairs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trading_pairs')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        
+        // Set first pair as default if no pair selected
+        if (!selectedPair && data.length > 0) {
+          const firstCryptoPair = data.find(p => p.type === 'crypto');
+          if (firstCryptoPair) {
+            setSelectedPair(firstCryptoPair.symbol);
+          }
+        }
+        
+        setTradingPairs(data);
+      } catch (error) {
+        console.error('Error fetching trading pairs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTradingPairs();
+  }, [selectedPair]);
+
   // If mobile, redirect to /trade/select to show pairs selection
   // if (isMobile) {
   //   return <Navigate to="/trade/select" />;
@@ -1530,7 +1546,7 @@ const Trade = () => {
               {isSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
 
-            {TRADING_PAIRS[selectedPair.includes('BINANCE:') ? 'crypto' : 'forex'].map((pair) => {
+            {tradingPairs.filter(pair => pair.type === (selectedPair.includes('BINANCE:') ? 'crypto' : 'forex')).map((pair) => {
               const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
               return (
                 <Button
@@ -1543,9 +1559,9 @@ const Trade = () => {
                   onClick={() => setSelectedPair(pair.symbol)}
                 >
                   <div className="flex items-center gap-2">
-                    {pair.symbol.includes('BINANCE:') ? (
+                    {pair.image_url ? (
                       <img 
-                        src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.shortName.toLowerCase()}.png`}
+                        src={pair.image_url}
                         alt={pair.name}
                         className="h-5 w-5"
                       />
@@ -1553,7 +1569,7 @@ const Trade = () => {
                       <TrendingUp className="h-4 w-4" />
                     )}
                     <div className="flex flex-col items-start text-left">
-                      <span className="text-sm font-medium">{pair.shortName}</span>
+                      <span className="text-sm font-medium">{pair.short_name}</span>
                       <span className={cn(
                         "text-xs",
                         parseFloat(priceData.change) < 0 ? "text-red-500" : "text-green-500"
@@ -1572,7 +1588,11 @@ const Trade = () => {
             "flex-1 relative min-h-0 transition-all duration-300",
             isSidebarOpen ? "mt-[300px]" : "mt-0"
           )}>
-            <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
+            <div className="absolute inset-0 p-3"> {/* Add padding */}
+              <div className="w-full h-full rounded-xl border overflow-hidden bg-card"> {/* Add rounded corners */}
+                <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
+              </div>
+            </div>
           </div>
 
           {/* Trading Panel Sheet */}
@@ -1613,6 +1633,7 @@ const Trade = () => {
                     pairPrices={pairPrices}
                     onTrade={handleTrade}
                     userBalance={userBalance}
+                    tradingPairs={tradingPairs}
                   />
                 </TabsContent>
                 <TabsContent value="orders" className="m-0 p-4 h-full">
@@ -1633,13 +1654,16 @@ const Trade = () => {
             onPairSelect={setSelectedPair}
             isOpen={isSidebarOpen}
             pairPrices={pairPrices}
+            tradingPairs={tradingPairs}
           />
           
           <div className="flex flex-1">
             {/* Main content with chart and activity */}
             <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex-1 relative min-h-0">
-                <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
+              <div className="flex-1 relative min-h-0 p-3"> {/* Add padding */}
+                <div className="w-full h-full rounded-xl border overflow-hidden bg-card"> {/* Add rounded corners */}
+                  <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
+                </div>
               </div>
               <TradingActivity trades={trades} currentPrices={pairPrices} onCloseTrade={handleCloseTrade} />
             </div>
@@ -1651,6 +1675,7 @@ const Trade = () => {
             pairPrices={pairPrices}
             onTrade={handleTrade}
             userBalance={userBalance}
+            tradingPairs={tradingPairs}
           />
         </div>
       )}

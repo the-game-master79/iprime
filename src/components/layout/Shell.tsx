@@ -352,7 +352,7 @@ export const ShellLayout: React.FC<{ children: React.ReactNode }> = ({ children 
               filter: `id=eq.${user.id}`,
             },
             (payload) => {
-              setUserBalance(payload.new.withdrawal_wallet || 0);
+              setUserBalance((payload.new as { withdrawal_wallet: number }).withdrawal_wallet || 0);
             }
           )
           .subscribe();

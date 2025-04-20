@@ -19,17 +19,23 @@ function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) 
         "autosize": true,
         "symbol": symbol,
         "interval": "1",
-        "timezone": Intl.DateTimeFormat().resolvedOptions().timeZone,
+        "timezone": "Etc/UTC",
         "theme": theme,
         "style": "1",
         "locale": "en",
-        "hide_legend": true,
-        "hide_side_toolbar": false,
         "enable_publishing": false,
-        "allow_symbol_change": true,
+        "hide_top_toolbar": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": false,
         "save_image": false,
         "support_host": "https://www.tradingview.com",
-        "container_id": "tradingview_chart"
+        "container_id": "tradingview_chart",
+        "hide_volume": false,
+        "calendar": false,
+        "details": false,
+        "hotlist": false,
+        "width": "100%",
+        "height": "100%"
       });
 
       container.current.appendChild(script);
@@ -43,11 +49,22 @@ function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) 
   }, [symbol, theme]);
 
   return (
-    <div className="tradingview-widget-container w-full h-full relative" ref={container}>
+    <div className="tradingview-widget-container flex flex-col h-full w-full relative" ref={container}>
       <div 
         id="tradingview_chart" 
-        className="absolute inset-0"
+        className="flex-1 w-full"
+        style={{ height: "calc(100% - 32px)" }}
       />
+      <div className="tradingview-widget-copyright h-8 px-2 flex items-center text-xs text-muted-foreground">
+        <a 
+          href="https://www.tradingview.com/" 
+          rel="noopener nofollow" 
+          target="_blank"
+          className="hover:text-primary"
+        >
+          Track all markets on TradingView
+        </a>
+      </div>
     </div>
   );
 }

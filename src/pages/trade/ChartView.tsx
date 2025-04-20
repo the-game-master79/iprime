@@ -154,9 +154,21 @@ const groupTradesByDate = (trades: Trade[]) => {
   );
 };
 
+// Add this interface near the top after existing imports
+interface TradingPairInfo {
+  symbol: string;
+  name: string;
+  leverage_options: number[];
+  max_leverage: number;
+  min_leverage: number;
+}
+
 export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, leverage = 100 }: ChartViewProps) => {
   const { pair } = useParams<{ pair?: string }>();
   const navigate = useNavigate();
+
+  // Add new state for trading pair info
+  const [pairInfo, setPairInfo] = useState<TradingPairInfo | null>(null);
 
   useEffect(() => {
     if (!pair) {
@@ -660,6 +672,28 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     }
   }
 
+  // Add this effect to fetch trading pair info
+  useEffect(() => {
+    const fetchPairInfo = async () => {
+      if (!defaultPair) return;
+      
+      const { data, error } = await supabase
+        .from('trading_pairs')
+        .select('symbol, name, leverage_options, max_leverage, min_leverage')
+        .eq('symbol', defaultPair)
+        .single();
+
+      if (error) {
+        console.error('Error fetching pair info:', error);
+        return;
+      }
+
+      setPairInfo(data);
+    };
+
+    fetchPairInfo();
+  }, [defaultPair]);
+
   return (
     <div className="h-screen bg-background flex flex-col">
       <Topbar title={formattedPairName} />
@@ -842,57 +876,14 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                     <div className="space-y-2">
                       <div className="flex items-center">
                         <div className="flex-1">
-                          <h4 className="font-medium">No Risk</h4>
-                          <p className="text-sm text-muted-foreground">1x - 50x leverage</p>
+                          <h4 className="font-medium">Available Leverage</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {pairInfo?.min_leverage}x - {pairInfo?.max_leverage}x
+                          </p>
                         </div>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">Safe</Badge>
                       </div>
                       <div className="grid grid-cols-5 gap-2">
-                        {[1, 2, 5, 10, 20, 50].map((value) => (
-                          <Button
-                            key={value}
-                            variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedLeverage(value.toString())}
-                          >
-                            {value}x
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <div className="flex-1">
-                          <h4 className="font-medium">Medium Risk</h4>
-                          <p className="text-sm text-muted-foreground">50x - 200x leverage</p>
-                        </div>
-                        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Caution</Badge>
-                      </div>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[100, 200].map((value) => (
-                          <Button
-                            key={value}
-                            variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedLeverage(value.toString())}
-                          >
-                            {value}x
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <div className="flex-1">
-                          <h4 className="font-medium">High Risk</h4>
-                          <p className="text-sm text-muted-foreground">500x - 2000x leverage</p>
-                        </div>
-                        <Badge variant="secondary" className="bg-red-100 text-red-800">High Risk</Badge>
-                      </div>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[500, 1000, 2000].map((value) => (
+                        {pairInfo?.leverage_options.map((value) => (
                           <Button
                             key={value}
                             variant={selectedLeverage === value.toString() ? "default" : "outline"}

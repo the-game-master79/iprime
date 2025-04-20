@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -66,31 +66,17 @@ const calculatePnL = (trade: Trade, currentPrice: number) => {
   return totalUnits * pipValue * pips;
 };
 
-// Replace the TRADING_PAIRS constant
-const TRADING_PAIRS = {
-  crypto: [
-    { symbol: 'BINANCE:BTCUSDT', name: 'Bitcoin', shortName: 'BTC' },
-    { symbol: 'BINANCE:ETHUSDT', name: 'Ethereum', shortName: 'ETH' },
-    { symbol: 'BINANCE:SOLUSDT', name: 'Solana', shortName: 'SOL' },
-    { symbol: 'BINANCE:DOGEUSDT', name: 'Dogecoin', shortName: 'DOGE' },
-    { symbol: 'BINANCE:ADAUSDT', name: 'Cardano', shortName: 'ADA' },
-    { symbol: 'BINANCE:BNBUSDT', name: 'BNB', shortName: 'BNB' },
-    { symbol: 'BINANCE:DOTUSDT', name: 'Polkadot', shortName: 'DOT' },
-    { symbol: 'BINANCE:TRXUSDT', name: 'TRON', shortName: 'TRX' },
-  ],
-  forex: [
-    { symbol: 'FX:EUR/USD', name: 'EUR/USD', shortName: 'EURUSD' },
-    { symbol: 'FX:USD/JPY', name: 'USD/JPY', shortName: 'USDJPY' },
-    { symbol: 'FX:GBP/USD', name: 'GBP/USD', shortName: 'GBPUSD' },
-    { symbol: 'FX:AUD/USD', name: 'AUD/USD', shortName: 'AUDUSD' },
-    { symbol: 'FX:USD/CAD', name: 'USD/CAD', shortName: 'USDCAD' },
-    { symbol: 'FX:USD/CHF', name: 'USD/CHF', shortName: 'USDCHF' },
-    { symbol: 'FX:GBP/JPY', name: 'GBP/JPY', shortName: 'GBPJPY' },
-    { symbol: 'FX:EUR/JPY', name: 'EUR/JPY', shortName: 'EURJPY' },
-    { symbol: 'FX:EUR/GBP', name: 'EUR/GBP', shortName: 'EURGBP' },
-    { symbol: 'FX:EUR/CHF', name: 'EUR/CHF', shortName: 'EURCHF' },
-  ]
-};
+// Add interface for trading pair
+interface TradingPair {
+  symbol: string;
+  name: string;
+  short_name: string;
+  type: 'crypto' | 'forex';
+  min_leverage: number;
+  max_leverage: number;
+  leverage_options: number[];
+  is_active: boolean;
+}
 
 interface PriceData {
   price: string;
@@ -123,6 +109,8 @@ const SelectPairs = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [totalPnL, setTotalPnL] = useState(0);
   const [showTradesSheet, setShowTradesSheet] = useState(false);
+  const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Move WebSocket references to component level
   let cryptoWs: WebSocket | null = null;
@@ -130,10 +118,54 @@ const SelectPairs = () => {
   let heartbeatInterval: NodeJS.Timeout | undefined;
   let priceRefreshInterval: NodeJS.Timeout | undefined;
 
-  const filteredPairs = TRADING_PAIRS[activeTab as keyof typeof TRADING_PAIRS].filter(pair =>
-    pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    pair.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Add effect to fetch trading pairs from database
+  useEffect(() => {
+    const fetchTradingPairs = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trading_pairs')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        setTradingPairs(data);
+        
+        // Initialize WebSocket connections after getting pairs
+        if (isPageVisible) {
+          if (activeTab === "crypto") {
+            initializeCryptoWebSocket();
+          } else if (activeTab === "forex" && tradermadeApiKey) {
+            initializeForexWebSocket();
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching trading pairs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTradingPairs();
+
+    // Cleanup function
+    return () => {
+      if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
+      if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
+      clearInterval(heartbeatInterval);
+      clearInterval(priceRefreshInterval);
+    };
+  }, []); // Empty dependency array since we only want to fetch once on mount
+
+  const filteredPairs = useMemo(() => {
+    return tradingPairs
+      .filter(pair => pair.type === activeTab)
+      .filter(pair => 
+        pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pair.short_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+  }, [tradingPairs, activeTab, searchQuery]);
 
   const handlePairSelect = (pair: string) => {
     // Format the pair correctly for the URL
@@ -233,7 +265,7 @@ const SelectPairs = () => {
   // WebSocket connection for price updates
   useEffect(() => {
     // Only initialize WebSocket if page is visible
-    if (isPageVisible) {
+    if (isPageVisible && tradingPairs.length > 0) {
       if (activeTab === "crypto") {
         initializeCryptoWebSocket();
       } else if (activeTab === "forex" && tradermadeApiKey) {
@@ -247,11 +279,18 @@ const SelectPairs = () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       if (priceRefreshInterval) clearInterval(priceRefreshInterval);
     };
-  }, [activeTab, isPageVisible]); // Add isPageVisible as dependency
+  }, [activeTab, isPageVisible, tradingPairs]); // Add tradingPairs to dependencies
 
   const initializeCryptoWebSocket = () => {
     if (cryptoWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
     
+    const cryptoPairs = tradingPairs
+      .filter(pair => pair.type === 'crypto')
+      .map(pair => pair.symbol.toLowerCase().replace('binance:', ''));
+
+    // Only initialize if we have pairs to subscribe to
+    if (cryptoPairs.length === 0) return;
+      
     cryptoWs = new WebSocket('wss://stream.binance.com:9443/ws');
 
     let reconnectAttempt = 0;
@@ -263,10 +302,6 @@ const SelectPairs = () => {
         setTimeout(initializeCryptoWebSocket, Math.min(1000 * reconnectAttempt, 5000));
       }
     };
-
-    const cryptoPairs = TRADING_PAIRS.crypto.map(pair => 
-      pair.symbol.toLowerCase().replace('binance:', '')
-    );
 
     cryptoWs.onopen = () => {
       // Wait for connection to be established
@@ -323,6 +358,13 @@ const SelectPairs = () => {
   const initializeForexWebSocket = () => {
     if (forexWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
 
+    const forexPairs = tradingPairs
+      .filter(pair => pair.type === 'forex')
+      .map(pair => pair.symbol.replace('FX:', '').replace('/', ''));
+
+    // Only initialize if we have pairs to subscribe to  
+    if (forexPairs.length === 0) return;
+
     forexWs = new WebSocket('wss://marketdata.tradermade.com/feedadv');
 
     forexWs.onopen = async () => {
@@ -333,9 +375,9 @@ const SelectPairs = () => {
       }));
 
       // Subscribe to pairs in batches of 10
-      const forexPairs = TRADING_PAIRS.forex.map(pair => 
-        pair.symbol.replace('FX:', '').replace('/', '')
-      );
+      const forexPairs = tradingPairs
+        .filter(pair => pair.type === 'forex')
+        .map(pair => pair.symbol.replace('FX:', '').replace('/', ''));
       
       // Subscribe in batches of 10
       for (let i = 0; i < forexPairs.length; i += 10) {
@@ -560,7 +602,7 @@ const SelectPairs = () => {
                           {pair.symbol.includes('BINANCE:') ? (
                             <div className="relative h-10 w-10 rounded-full bg-primary/10 p-1.5">
                               <img 
-                                src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.shortName.toLowerCase()}.png`}
+                                src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.short_name.toLowerCase()}.png`}
                                 alt={pair.name}
                                 className="h-full w-full"
                                 onError={(e) => {
@@ -575,7 +617,7 @@ const SelectPairs = () => {
                           )}
                           <div className="flex flex-col min-w-0">
                             <span className="font-semibold truncate">{pair.name}</span>
-                            <span className="text-sm text-muted-foreground">{pair.shortName}</span>
+                            <span className="text-sm text-muted-foreground">{pair.short_name}</span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-0.5">
