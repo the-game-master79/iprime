@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, TrendingUp, CandlestickChart, Globe, X, Menu } from "lucide-react";
+import { MagnifyingGlass, TrendUp, ChartLine, Globe, X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { TradingLayout } from "@/components/layout/TradingLayout";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
@@ -16,6 +16,7 @@ import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { isForexTradingTime } from "@/lib/utils";
+import { TrendingUp, Menu } from "lucide-react";
 
 // Change process.env to import.meta.env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
@@ -242,7 +243,7 @@ const TradeSidebar = ({
       <div className="flex flex-col h-full">
         <div className="p-3 border-b">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
             <Input
               placeholder="Search markets..."
               className="pl-9 h-9 text-sm bg-muted/30 border-0 focus-visible:ring-1"
@@ -255,7 +256,7 @@ const TradeSidebar = ({
         <Tabs defaultValue="crypto" className="flex-1 flex flex-col">
           <TabsList className="h-11 p-1 bg-muted/30 border-b">
             <TabsTrigger value="crypto" onClick={() => handleTabChange("crypto")} className="flex-1 text-xs">
-              <CandlestickChart className="h-3.5 w-3.5 mr-2" />
+              <ChartLine className="h-3.5 w-3.5 mr-2" />
               Crypto
             </TabsTrigger>
             <TabsTrigger value="forex" onClick={() => handleTabChange("forex")} className="flex-1 text-xs">
@@ -294,7 +295,7 @@ const TradeSidebar = ({
                           />
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <TrendingUp className="h-5 w-5 text-primary" />
+                            <TrendUp className="h-5 w-5 text-primary" />
                           </div>
                         )}
                         <div className="flex flex-col items-start gap-0.5">

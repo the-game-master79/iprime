@@ -2,10 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, TrendingUp, CandlestickChart, Globe, AlertTriangle } from "lucide-react";
+import { TrendingUp, CandlestickChart, Globe, AlertTriangle } from "lucide-react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { Topbar } from "@/components/shared/Topbar";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
@@ -460,73 +460,83 @@ const SelectPairs = () => {
   const forexMarketStatus = isForexClosed ? "Closed" : "Open";
 
   return (
-    <div className="min-h-screen bg-background">
-      <Topbar title="All Pairs" />
-      
-      <div className="container max-w-2xl mx-auto px-4 py-6 pb-20">
-        {/* Update stats container to be clickable */}
-        <div 
-          className="mb-6 p-4 bg-muted/50 rounded-lg border cursor-pointer hover:bg-muted/70 transition-colors"
-          onClick={() => setShowTradesSheet(true)}
-        >
-          <div className="flex justify-between items-center">
-            <div className="space-y-1">
-              <div className="text-sm text-muted-foreground">Open Positions</div>
-              <div className="text-2xl font-semibold">{trades.length}</div>
-            </div>
-            <div className="space-y-1 text-right">
-              <div className="text-sm text-muted-foreground">Total P&L</div>
-              <div className={cn(
-                "text-2xl font-semibold font-mono",
-                totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
-              )}>
-                ${totalPnL.toFixed(2)}
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b">
+        <Topbar title="Markets" />
+        
+        {/* Stats Card */}
+        <div className="px-4 py-3">
+          <div 
+            className="relative overflow-hidden bg-card rounded-xl border shadow-sm transition-all 
+                     hover:shadow-md active:scale-[0.99] cursor-pointer"
+            onClick={() => setShowTradesSheet(true)}
+          >
+            <div className="p-4 flex justify-between items-center">
+              <div className="space-y-1.5">
+                <div className="text-sm font-medium text-muted-foreground">Positions</div>
+                <div className="text-2xl font-bold tracking-tight">{trades.length}</div>
+              </div>
+              <div className="space-y-1.5 text-right">
+                <div className="text-sm font-medium text-muted-foreground">Total P&L</div>
+                <div className={cn(
+                  "text-2xl font-bold font-mono tracking-tight",
+                  totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
+                )}>
+                  ${totalPnL.toFixed(2)}
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
+      <div className="container max-w-2xl mx-auto px-4 py-4 pb-20">
         {activeTab === 'forex' && isForexClosed && (
-          <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-            <span className="text-sm text-yellow-700">
-              Forex market is closed during weekends. Trading will resume on Monday.
-            </span>
+          <div className="mb-4 animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50/50 border border-yellow-200/50 backdrop-blur-sm">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <span className="text-sm font-medium text-yellow-700">
+                Forex market is closed. Trading resumes Monday.
+              </span>
+            </div>
           </div>
         )}
 
         <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search markets..."
-              className="pl-9 h-10"
+              className="pl-9 h-11 rounded-xl bg-background/50"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <Tabs defaultValue="crypto" onValueChange={setActiveTab}>
-            <div className="flex items-center justify-between mb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="crypto" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-2 h-11 rounded-xl p-1">
+              <TabsTrigger value="crypto" className="rounded-lg">
+                <div className="flex items-center gap-2">
                   <CandlestickChart className="h-4 w-4" />
-                  Cryptocurrency
-                </TabsTrigger>
-                <TabsTrigger value="forex" className="flex items-center gap-2">
+                  <span className="font-medium">Crypto</span>
+                </div>
+              </TabsTrigger>
+              <TabsTrigger value="forex" className="rounded-lg">
+                <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  Forex
+                  <span className="font-medium">Forex</span>
                   {activeTab === 'forex' && (
-                    <Badge variant={isForexClosed ? "destructive" : "success"} className="ml-2">
+                    <Badge variant={isForexClosed ? "destructive" : "success"} 
+                           className="ml-1.5 h-5">
                       {forexMarketStatus}
                     </Badge>
                   )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
+                </div>
+              </TabsTrigger>
+            </TabsList>
 
-            <ScrollArea className="h-[calc(100vh-280px)] mt-4">
-              <div className="grid gap-2">
+            <ScrollArea className="h-[calc(100vh-280px)] mt-4 -mx-4 px-4">
+              <div className="grid gap-3 pb-4">
                 {filteredPairs.map((pair) => {
                   const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
                   const priceAnimation = priceAnimations[pair.symbol];
@@ -534,40 +544,43 @@ const SelectPairs = () => {
                   const isDisabled = isForexPair && isForexClosed;
                   
                   return (
-                    <Button
+                    <button
                       key={pair.symbol}
-                      variant="outline"
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
                       className={cn(
-                        "h-auto p-4 w-full",
+                        "w-full text-left bg-card hover:bg-accent rounded-xl border p-4",
+                        "transition-all duration-200 active:scale-[0.98]",
+                        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                         isDisabled && "opacity-50 cursor-not-allowed"
                       )}
-                      onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
-                      disabled={isDisabled}
                     >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
                           {pair.symbol.includes('BINANCE:') ? (
-                            <img 
-                              src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.shortName.toLowerCase()}.png`}
-                              alt={pair.name}
-                              className="h-8 w-8"
-                              onError={(e) => {
-                                e.currentTarget.src = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/generic.png';
-                              }}
-                            />
+                            <div className="relative h-10 w-10 rounded-full bg-primary/10 p-1.5">
+                              <img 
+                                src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.shortName.toLowerCase()}.png`}
+                                alt={pair.name}
+                                className="h-full w-full"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/generic.png';
+                                }}
+                              />
+                            </div>
                           ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                              <TrendingUp className="h-4 w-4 text-primary" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                              <TrendingUp className="h-5 w-5 text-primary" />
                             </div>
                           )}
-                          <div className="flex flex-col items-start gap-0.5">
-                            <span className="font-medium">{pair.name}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold truncate">{pair.name}</span>
                             <span className="text-sm text-muted-foreground">{pair.shortName}</span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-0.5">
                           <span className={cn(
-                            "font-mono font-medium transition-colors duration-300",
+                            "text-base font-semibold font-mono tracking-tight transition-colors duration-300",
                             priceAnimation === 'up' ? "text-green-500" : 
                             priceAnimation === 'down' ? "text-red-500" : 
                             "text-foreground"
@@ -575,7 +588,7 @@ const SelectPairs = () => {
                             {priceData.bid}
                           </span>
                           <span className={cn(
-                            "text-xs px-1.5 py-0.5 rounded-full",
+                            "text-xs px-2 py-0.5 rounded-full font-medium",
                             parseFloat(priceData.change) < 0 
                               ? "bg-red-500/10 text-red-500" 
                               : "bg-green-500/10 text-green-500"
@@ -584,7 +597,7 @@ const SelectPairs = () => {
                           </span>
                         </div>
                       </div>
-                    </Button>
+                    </button>
                   );
                 })}
               </div>
@@ -592,7 +605,6 @@ const SelectPairs = () => {
           </Tabs>
         </div>
 
-        {/* Add TradesSheet component */}
         <TradesSheet
           open={showTradesSheet}
           onOpenChange={setShowTradesSheet}

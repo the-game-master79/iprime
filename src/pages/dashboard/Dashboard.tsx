@@ -16,7 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 // Icons
 import {
-Copy, QrCode,
+Copy, QrCode, Receipt, Trophy
 } from "lucide-react";
 import { PlusCircle, ArrowCircleUpRight, ShoppingCart, ShareNetwork } from "@phosphor-icons/react";
 
@@ -45,6 +45,13 @@ const isRankEligible = (currentRank: string, targetRank: string, ranks: Rank[]) 
   const currentRankIndex = sortedRanks.findIndex(r => r.title === currentRank);
   const targetRankIndex = sortedRanks.findIndex(r => r.title === targetRank);
   return targetRankIndex <= currentRankIndex;
+};
+
+// Add this utility function after the imports
+const getBalanceTextSize = (amount: number): string => {
+  if (amount >= 1000000000) return 'text-3xl sm:text-4xl'; // Billions
+  if (amount >= 1000000) return 'text-4xl sm:text-5xl';    // Millions
+  return 'text-5xl sm:text-6xl';                           // Default
 };
 
 interface DashboardContentProps {
@@ -402,7 +409,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Success", 
         description: `${rank.title} rank bonus of $${rank.bonus.toLocaleString()} has been added to your withdrawal wallet!`,
-        variant: "success",
+        variant: "default",
       });
 
       setClaimedRanks(prev => [...prev, rank.title]);
@@ -725,14 +732,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               {/* Balance Containers */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
-                  <div className="text-6xl font-bold tracking-tight">
+                  <div className={cn(
+                    "font-bold tracking-tight transition-all",
+                    getBalanceTextSize(withdrawalBalance)
+                  )}>
                     ${withdrawalBalance.toLocaleString()}
                   </div>
                   <div className="text-muted-foreground text-sm mt-2">Available Balance</div>
                 </div>
 
                 <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
-                  <div className="text-6xl font-bold tracking-tight">
+                  <div className={cn(
+                    "font-bold tracking-tight transition-all",
+                    getBalanceTextSize(totalInvested)
+                  )}>
                     ${totalInvested.toLocaleString()}
                   </div>
                   <div 
@@ -783,8 +796,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
               <Tabs defaultValue="transactions" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 rounded-xl mb-4">
-                  <TabsTrigger value="transactions" className="rounded-l-xl">Transactions</TabsTrigger>
-                  <TabsTrigger value="ranks" className="rounded-r-xl">Your Rank</TabsTrigger>
+                  <TabsTrigger value="transactions" className="rounded-l-xl">
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Transactions
+                  </TabsTrigger>
+                  <TabsTrigger value="ranks" className="rounded-r-xl">
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Your Rank
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent 

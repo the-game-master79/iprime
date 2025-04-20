@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS trading_pairs (
     quote_currency TEXT,
     min_leverage INTEGER DEFAULT 1,
     max_leverage INTEGER DEFAULT 2000,
+    leverage_options INTEGER[] DEFAULT '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[],
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     display_order INTEGER DEFAULT 0,
@@ -46,29 +47,29 @@ CREATE TRIGGER update_trading_pairs_timestamp
     EXECUTE FUNCTION update_trading_pairs_updated_at();
 
 -- Insert initial trading pairs
-INSERT INTO trading_pairs (symbol, name, short_name, type, pip_value, base_currency, quote_currency, display_order, max_lots, min_leverage, max_leverage, image_url)
+INSERT INTO trading_pairs (symbol, name, short_name, type, pip_value, base_currency, quote_currency, display_order, max_lots, min_leverage, max_leverage, leverage_options, image_url)
 VALUES 
-    -- Crypto pairs (lower max lots due to higher value, higher leverage)
-    ('BINANCE:BTCUSDT', 'Bitcoin', 'BTC', 'crypto', 0.00001, 'BTC', 'USDT', 1, 10, 1, 100, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/btc.svg'),
-    ('BINANCE:ETHUSDT', 'Ethereum', 'ETH', 'crypto', 0.00001, 'ETH', 'USDT', 2, 20, 1, 100, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eth.svg'),
-    ('BINANCE:SOLUSDT', 'Solana', 'SOL', 'crypto', 0.00001, 'SOL', 'USDT', 3, 50, 1, 200, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/sol.svg'),
-    ('BINANCE:DOGEUSDT', 'Dogecoin', 'DOGE', 'crypto', 0.00001, 'DOGE', 'USDT', 4, 100, 1, 500, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/doge.svg'),
-    ('BINANCE:ADAUSDT', 'Cardano', 'ADA', 'crypto', 0.00001, 'ADA', 'USDT', 5, 100, 1, 500, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ada.svg'),
-    ('BINANCE:BNBUSDT', 'BNB', 'BNB', 'crypto', 0.00001, 'BNB', 'USDT', 6, 20, 1, 100, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/bnb.svg'),
-    ('BINANCE:DOTUSDT', 'Polkadot', 'DOT', 'crypto', 0.00001, 'DOT', 'USDT', 7, 50, 1, 200, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/dot.svg'),
-    ('BINANCE:TRXUSDT', 'TRON', 'TRX', 'crypto', 0.00001, 'TRX', 'USDT', 8, 100, 1, 500, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/trx.svg'),
+    -- Crypto pairs (lower max lots due to higher value, lower leverage options)
+    ('BINANCE:BTCUSDT', 'Bitcoin', 'BTC', 'crypto', 0.00001, 'BTC', 'USDT', 1, 10, 1, 100, '{1,2,5,10,20,50,100}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/btc.svg'),
+    ('BINANCE:ETHUSDT', 'Ethereum', 'ETH', 'crypto', 0.00001, 'ETH', 'USDT', 2, 20, 1, 100, '{1,2,5,10,20,50,100}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eth.svg'),
+    ('BINANCE:SOLUSDT', 'Solana', 'SOL', 'crypto', 0.00001, 'SOL', 'USDT', 3, 50, 1, 200, '{1,2,5,10,20,50,100,200}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/sol.svg'),
+    ('BINANCE:DOGEUSDT', 'Dogecoin', 'DOGE', 'crypto', 0.00001, 'DOGE', 'USDT', 4, 100, 1, 500, '{1,2,5,10,20,50,100,200,500}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/doge.svg'),
+    ('BINANCE:ADAUSDT', 'Cardano', 'ADA', 'crypto', 0.00001, 'ADA', 'USDT', 5, 100, 1, 500, '{1,2,5,10,20,50,100,200,500}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ada.svg'),
+    ('BINANCE:BNBUSDT', 'BNB', 'BNB', 'crypto', 0.00001, 'BNB', 'USDT', 6, 20, 1, 100, '{1,2,5,10,20,50,100}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/bnb.svg'),
+    ('BINANCE:DOTUSDT', 'Polkadot', 'DOT', 'crypto', 0.00001, 'DOT', 'USDT', 7, 50, 1, 200, '{1,2,5,10,20,50,100,200}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/dot.svg'),
+    ('BINANCE:TRXUSDT', 'TRON', 'TRX', 'crypto', 0.00001, 'TRX', 'USDT', 8, 100, 1, 500, '{1,2,5,10,20,50,100,200,500}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/trx.svg'),
     
-    -- Forex pairs (standard leverage limits)
-    ('FX:EUR/USD', 'EUR/USD', 'EURUSD', 'forex', 0.0001, 'EUR', 'USD', 1, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-usd.svg'),
-    ('FX:USD/JPY', 'USD/JPY', 'USDJPY', 'forex', 0.01, 'USD', 'JPY', 2, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-jpy.svg'),
-    ('FX:GBP/USD', 'GBP/USD', 'GBPUSD', 'forex', 0.0001, 'GBP', 'USD', 3, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/gbp-usd.svg'),
-    ('FX:AUD/USD', 'AUD/USD', 'AUDUSD', 'forex', 0.0001, 'AUD', 'USD', 4, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/aud-usd.svg'),
-    ('FX:USD/CAD', 'USD/CAD', 'USDCAD', 'forex', 0.0001, 'USD', 'CAD', 5, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-cad.svg'),
-    ('FX:USD/CHF', 'USD/CHF', 'USDCHF', 'forex', 0.0001, 'USD', 'CHF', 6, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-chf.svg'),
-    ('FX:GBP/JPY', 'GBP/JPY', 'GBPJPY', 'forex', 0.01, 'GBP', 'JPY', 7, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/gbp-jpy.svg'),
-    ('FX:EUR/JPY', 'EUR/JPY', 'EURJPY', 'forex', 0.01, 'EUR', 'JPY', 8, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-jpy.svg'),
-    ('FX:EUR/GBP', 'EUR/GBP', 'EURGBP', 'forex', 0.0001, 'EUR', 'GBP', 9, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-gbp.svg'),
-    ('FX:EUR/CHF', 'EUR/CHF', 'EURCHF', 'forex', 0.0001, 'EUR', 'CHF', 10, 200, 1, 2000, 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-chf.svg')
+    -- Forex pairs (full leverage options)
+    ('FX:EUR/USD', 'EUR/USD', 'EURUSD', 'forex', 0.0001, 'EUR', 'USD', 1, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-usd.svg'),
+    ('FX:USD/JPY', 'USD/JPY', 'USDJPY', 'forex', 0.01, 'USD', 'JPY', 2, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-jpy.svg'),
+    ('FX:GBP/USD', 'GBP/USD', 'GBPUSD', 'forex', 0.0001, 'GBP', 'USD', 3, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/gbp-usd.svg'),
+    ('FX:AUD/USD', 'AUD/USD', 'AUDUSD', 'forex', 0.0001, 'AUD', 'USD', 4, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/aud-usd.svg'),
+    ('FX:USD/CAD', 'USD/CAD', 'USDCAD', 'forex', 0.0001, 'USD', 'CAD', 5, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-cad.svg'),
+    ('FX:USD/CHF', 'USD/CHF', 'USDCHF', 'forex', 0.0001, 'USD', 'CHF', 6, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usd-chf.svg'),
+    ('FX:GBP/JPY', 'GBP/JPY', 'GBPJPY', 'forex', 0.01, 'GBP', 'JPY', 7, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/gbp-jpy.svg'),
+    ('FX:EUR/JPY', 'EUR/JPY', 'EURJPY', 'forex', 0.01, 'EUR', 'JPY', 8, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-jpy.svg'),
+    ('FX:EUR/GBP', 'EUR/GBP', 'EURGBP', 'forex', 0.0001, 'EUR', 'GBP', 9, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-gbp.svg'),
+    ('FX:EUR/CHF', 'EUR/CHF', 'EURCHF', 'forex', 0.0001, 'EUR', 'CHF', 10, 200, 1, 2000, '{1,2,5,10,20,50,100,200,500,1000,2000}'::INTEGER[], 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eur-chf.svg')
 ON CONFLICT (symbol) DO UPDATE SET
     name = EXCLUDED.name,
     short_name = EXCLUDED.short_name,
@@ -80,6 +81,7 @@ ON CONFLICT (symbol) DO UPDATE SET
     max_lots = EXCLUDED.max_lots,
     min_leverage = EXCLUDED.min_leverage,
     max_leverage = EXCLUDED.max_leverage,
+    leverage_options = EXCLUDED.leverage_options,
     image_url = EXCLUDED.image_url;
 
 -- Enable RLS
