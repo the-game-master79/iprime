@@ -7,7 +7,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/magicui/*": ["./src/components/magicui/*"]
     },
     "noImplicitAny": false,
     "noUnusedParameters": false,

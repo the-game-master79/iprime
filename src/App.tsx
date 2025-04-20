@@ -17,6 +17,9 @@ import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { ChartView } from "@/pages/trade/ChartView";
 import { useCacheFlush } from '@/hooks/use-cache-flush';
 import Index from "./pages/Index";
+import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
+import TermsOfService from "@/pages/legal/TermsOfService";
+import Contact from "@/pages/contact/Contact";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -41,6 +44,12 @@ const AdminPlans = lazy(() => import("@/pages/admin/plans/Plans"));
 const SettingsPage = lazy(() => import("./pages/admin/settings/SettingsPage"));
 const SupportManagePage = lazy(() => import("./pages/admin/support/SupportManagePage"));
 const AdminNotices = lazy(() => import("./pages/admin/notices/NoticesPage"));
+
+// Add new lazy imports
+const TradingPage = lazy(() => import("@/pages/trading/TradingPage"));
+const InvestingPage = lazy(() => import("@/pages/investing/InvestingPage")); 
+const PartnersPage = lazy(() => import("@/pages/partners/PartnersPage"));
+const CompanyPage = lazy(() => import("@/pages/company/CompanyPage"));
 
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
@@ -79,8 +88,19 @@ const App = () => {
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/" element={<Index />} />
           <Route path="/home" element={<Index />} />
+          
+          {/* Add new public routes */}
+          <Route path="/trading" element={<TradingPage />} />
+          <Route path="/investing" element={<InvestingPage />} />
+          <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/company" element={<CompanyPage />} />
+          <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+          <Route path="/legal/terms" element={<TermsOfService />} />
+          <Route path="/contact" element={<Contact />} />
+
+          {/* Auth Routes */}
           <Route path="/auth/login" element={<Login />} />
 
           {/* Routes that can be loaded before auth check */}
