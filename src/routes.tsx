@@ -4,6 +4,7 @@ import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 const Trade = lazy(() => import("@/pages/trade/Trade"));
 const SelectPairs = lazy(() => import("@/pages/trade/SelectPairs"));
 const ChartView = lazy(() => import("@/pages/trade/ChartView"));
+const MarginCalculator = lazy(() => import("@/pages/trading/MarginCalculator"));
 
 const routes = [
   // ...existing code...
@@ -44,6 +45,10 @@ const routes = [
         <ChartView />
       </>
     ),
+  },
+  {
+    path: "/trading/calculator",
+    element: <MarginCalculator />,
   },
 
   // ...existing code...

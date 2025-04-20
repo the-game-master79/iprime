@@ -20,6 +20,8 @@ import Index from "./pages/Index";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
+import { HelmetProvider } from 'react-helmet-async';
+import MarginCalculator from "@/pages/trading/MarginCalculator";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -84,99 +86,102 @@ const App = () => {
   useCacheFlush();
 
   return (
-    <Providers>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Index />} />
-          <Route path="/home" element={<Index />} />
-          
-          {/* Add new public routes */}
-          <Route path="/trading" element={<TradingPage />} />
-          <Route path="/investing" element={<InvestingPage />} />
-          <Route path="/partners" element={<PartnersPage />} />
-          <Route path="/company" element={<CompanyPage />} />
-          <Route path="/legal/privacy" element={<PrivacyPolicy />} />
-          <Route path="/legal/terms" element={<TermsOfService />} />
-          <Route path="/contact" element={<Contact />} />
+    <HelmetProvider>
+      <Providers>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/home" element={<Index />} />
+            
+            {/* Add new public routes */}
+            <Route path="/trading" element={<TradingPage />} />
+            <Route path="/investing" element={<InvestingPage />} />
+            <Route path="/partners" element={<PartnersPage />} />
+            <Route path="/company" element={<CompanyPage />} />
+            <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+            <Route path="/legal/terms" element={<TermsOfService />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/margin-calculator" element={<MarginCalculator />} />
 
-          {/* Auth Routes */}
-          <Route path="/auth/login" element={<Login />} />
+            {/* Auth Routes */}
+            <Route path="/auth/login" element={<Login />} />
 
-          {/* Routes that can be loaded before auth check */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/plans" element={<Plans />} />
-          <Route path="/affiliate" element={<Affiliate />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/withdrawals" element={<Withdrawals />} />
-          <Route path="/rank" element={<MyRank />} />
-          <Route path="/deposit" element={<DepositPage />} />
-          
-          {/* Trade Routes */}
-          <Route path="/trade/chart/:pair" element={
-            <AuthGuard requireAuth>
-              <TradeRouteGuard />
-              <ChartView />
-            </AuthGuard>
-          } />
-          <Route path="/trade/select" element={
-            <AuthGuard requireAuth>
-              <TradeRouteGuard />
-              <SelectPairs />
-            </AuthGuard>
-          } />
-          <Route path="/trade/:pair" element={
-            <AuthGuard requireAuth>
-              <TradeRouteGuard />
-              <Trade />
-            </AuthGuard>
-          } />
-          <Route path="/trade" element={
-            <AuthGuard requireAuth>
-              <TradeRouteGuard />
-              <Trade />
-            </AuthGuard>
-          } />
+            {/* Routes that can be loaded before auth check */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/plans" element={<Plans />} />
+            <Route path="/affiliate" element={<Affiliate />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/withdrawals" element={<Withdrawals />} />
+            <Route path="/rank" element={<MyRank />} />
+            <Route path="/deposit" element={<DepositPage />} />
+            
+            {/* Trade Routes */}
+            <Route path="/trade/chart/:pair" element={
+              <AuthGuard requireAuth>
+                <TradeRouteGuard />
+                <ChartView />
+              </AuthGuard>
+            } />
+            <Route path="/trade/select" element={
+              <AuthGuard requireAuth>
+                <TradeRouteGuard />
+                <SelectPairs />
+              </AuthGuard>
+            } />
+            <Route path="/trade/:pair" element={
+              <AuthGuard requireAuth>
+                <TradeRouteGuard />
+                <Trade />
+              </AuthGuard>
+            } />
+            <Route path="/trade" element={
+              <AuthGuard requireAuth>
+                <TradeRouteGuard />
+                <Trade />
+              </AuthGuard>
+            } />
 
-          {/* Strictly protected routes */}
-          <Route path="/profile" element={
-            <AuthGuard requireAuth>
-              <Profile />
-            </AuthGuard>
-          } />
-          <Route path="/support" element={
-            <AuthGuard requireAuth>
-              <SupportPage />
-            </AuthGuard>
-          } />
-          
-          {/* Admin Routes */}
-          <Route
-            path="/admin/*"
-            element={
-              <Routes>
-                <Route path="login" element={<AdminLogin />} />
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="payments" element={<PaymentsPage />} />
-                <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                <Route path="deposits" element={<AdminDepositsPage />} />
-                <Route path="plans" element={<AdminPlans />} />
-                <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
-                <Route path="affiliates" element={<AffiliatesPage />} />
-                <Route path="notices" element={<AdminNotices />} />
-                <Route path="support" element={<SupportManagePage />} />
-                <Route path="promotions" element={<PromotionsPage />} />
-              </Routes>
-            }
-          />
-          
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-      <Toaster />
-    </Providers>
+            {/* Strictly protected routes */}
+            <Route path="/profile" element={
+              <AuthGuard requireAuth>
+                <Profile />
+              </AuthGuard>
+            } />
+            <Route path="/support" element={
+              <AuthGuard requireAuth>
+                <SupportPage />
+              </AuthGuard>
+            } />
+            
+            {/* Admin Routes */}
+            <Route
+              path="/admin/*"
+              element={
+                <Routes>
+                  <Route path="login" element={<AdminLogin />} />
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="payments" element={<PaymentsPage />} />
+                  <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                  <Route path="deposits" element={<AdminDepositsPage />} />
+                  <Route path="plans" element={<AdminPlans />} />
+                  <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
+                  <Route path="affiliates" element={<AffiliatesPage />} />
+                  <Route path="notices" element={<AdminNotices />} />
+                  <Route path="support" element={<SupportManagePage />} />
+                  <Route path="promotions" element={<PromotionsPage />} />
+                </Routes>
+              }
+            />
+            
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
+      </Providers>
+    </HelmetProvider>
   );
 };
 

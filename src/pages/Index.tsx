@@ -20,6 +20,7 @@ import { Fire, Brain, Cpu, Globe, ShieldStar, Users, Gift, Envelope, Lightning, 
 import { Navbar } from "@/components/shared/Navbar";
 import { Hero } from "@/components/shared/Hero";
 import { Companies } from "@/components/shared/Companies";
+import { SEO } from "@/components/shared/SEO";
 
 const Index = () => {
   const [showContact, setShowContact] = useState(false);
@@ -40,6 +41,11 @@ const Index = () => {
 
   return (
     <PageTransition>
+      <SEO
+        title="Advanced Trading Platform"
+        description="Experience next-gen cloud forex trading with AI-powered analytics and 4X CPU boost technology for lightning-fast execution."
+        keywords="cloud forex, AI trading, advanced trading platform, forex trading, cryptocurrency trading"
+      />
       <div className="flex min-h-screen flex-col bg-[#F3F4F6] tracking-tight overflow-hidden">
         {/* Magic Gradient Orb - Add this before header */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">

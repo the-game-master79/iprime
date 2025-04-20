@@ -4,10 +4,16 @@ import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
 import { Companies } from "@/components/shared/Companies";
+import { SEO } from "@/components/shared/SEO";
 
 const PartnersPage = () => {
   return (
     <PageTransition>
+      <SEO
+        title="Partner Program"
+        description="Join CloudForex's lucrative partner program. Earn up to 34% commission and unlock exclusive benefits by referring traders to our advanced trading platform."
+        keywords="forex affiliate program, trading referral program, forex partnership, high commission trading affiliate"
+      />
       <div className="min-h-screen bg-[#F3F4F6]">
         {/* Magic Gradient Background */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
@@ -36,12 +42,20 @@ const PartnersPage = () => {
           {/* Partner Benefits */}
           <section className="py-16">
             <div className="container max-w-[1200px] mx-auto px-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-4">
+                  <Lightning className="w-4 h-4 mr-2" weight="fill" />
+                  Partner Benefits
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-bold">Why Partner With Us</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                   {
                     icon: <Handshake className="h-8 w-8" weight="fill" />,
                     title: "High Commissions",
-                    description: "Earn up to 50% commission on referred trades"
+                    description: "Earn up to 34% commission on referred trades"
                   },
                   {
                     icon: <Users className="h-8 w-8" weight="fill" />,
@@ -58,15 +72,17 @@ const PartnersPage = () => {
                     title: "Exclusive Benefits",
                     description: "Access special rewards and bonuses"
                   }
-                ].map((benefit, index) => (
-                  <div key={index} className="bg-white p-2 rounded-2xl border">
-                    <div className="border rounded-xl p-6">
-                      <div className="flex flex-col gap-4">
-                        <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <div className="text-primary">{benefit.icon}</div>
+                ].map((benefit, i) => (
+                  <div key={i} className="relative bg-white p-2 rounded-2xl border">
+                    <div className="h-full w-full border rounded-xl p-6">
+                      <div className="space-y-4">
+                        <div className="w-full h-24 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-transparent flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.02)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-white/20 before:bg-gradient-to-br before:from-white/10 before:to-transparent">
+                          <div className="relative w-16 h-16 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary/10">
+                            <div className="text-primary">{benefit.icon}</div>
+                          </div>
                         </div>
-                        <h3 className="text-xl font-semibold">{benefit.title}</h3>
-                        <p className="text-muted-foreground">{benefit.description}</p>
+                        <h3 className="font-semibold text-xl text-center">{benefit.title}</h3>
+                        <p className="text-muted-foreground text-center">{benefit.description}</p>
                       </div>
                     </div>
                   </div>

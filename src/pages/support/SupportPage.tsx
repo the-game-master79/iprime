@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { SEO } from "@/components/shared/SEO";
 
 const supportIssues = [
   { value: "deposit", label: "Deposit Issues" },
@@ -238,6 +239,11 @@ const SupportPage = () => {
 
   return (
     <ShellLayout>
+      <SEO
+        title="Support Center"
+        description="Get help and support for your CloudForex account. Access our knowledge base and contact our support team."
+        keywords="trading support, customer service, help center, trading assistance"
+      />
       <PageHeader
         title="Support Center"
         description="Get help with your account and investments"
