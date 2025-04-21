@@ -948,64 +948,88 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   value="ranks" 
                   className="space-y-4 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
                 >
-                  <div className="max-h-[600px] overflow-y-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {ranks.map((rank) => (
-                        <Card key={rank.title} className={cn(
-                          "relative overflow-hidden",
-                          businessStats.totalVolume >= rank.business_amount && "bg-primary/5 border-primary"
+                  <div className="space-y-3">
+                    {ranks.map((rank) => (
+                      <Card 
+                        key={rank.title} 
+                        className={cn(
+                          "transition-all duration-200 hover:shadow-md",
+                          businessStats.totalVolume >= rank.business_amount 
+                            ? "bg-primary/5 border-primary" 
+                            : "hover:border-primary/50 bg-muted/30"
+                        )}
+                      >
+                        <CardContent className={cn(
+                          "p-4 sm:p-6",
+                          businessStats.totalVolume < rank.business_amount && "opacity-60"
                         )}>
-                          <CardContent className="p-6">
-                            <div className="space-y-4">
-                              <div className="flex justify-between items-start">
-                                <div className="space-y-2">
-                                  <h3 className="font-semibold text-lg">{rank.title}</h3>
-                                  <div className="space-y-1">
-                                    <div className="text-sm text-muted-foreground">
-                                      Volume Required
-                                    </div>
-                                    <div className="text-xl font-medium">
-                                      ${rank.business_amount.toLocaleString()}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right space-y-2">
-                                  {businessStats.totalVolume >= rank.business_amount ? (
-                                    <>
-                                      {!claimedRanks.includes(rank.title) && 
-                                       rank.title !== 'New Member' && 
-                                       isRankEligible(businessStats.currentRank, rank.title, ranks) ? (
-                                        <Button
-                                          size="sm"
-                                          variant="default"
-                                          onClick={() => handleClaimRankBonus(rank)}
-                                          disabled={claimingRank === rank.title}
-                                          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                                        >
-                                          {claimingRank === rank.title ? 'Claiming...' : 'Claim Bonus'}
-                                        </Button>
-                                      ) : (
-                                        <Badge variant="success">Achieved</Badge>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <Badge variant="secondary">
-                                      ${(rank.business_amount - businessStats.totalVolume).toLocaleString()} more
-                                    </Badge>
-                                  )}
-                                  <div className="text-xl font-semibold text-green-600">
-                                    +${rank.bonus.toLocaleString()}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Rank Bonus
-                                  </div>
-                                </div>
+                            {/* Rank Icon & Title */}
+                            <div className="flex items-center gap-6">
+                            <div className="flex-shrink-0">
+                              <div className={cn(
+                                "h-16 w-16 rounded-full flex items-center justify-center",
+                                businessStats.totalVolume >= rank.business_amount
+                                  ? "bg-primary/20"
+                                  : "bg-muted/50"
+                              )}>
+                                <Trophy className={cn(
+                                  "h-8 w-8",
+                                  businessStats.totalVolume >= rank.business_amount
+                                    ? "text-primary"
+                                    : "text-muted-foreground/40"
+                                )} />
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+
+                            {/* Rank Details */}
+                            <div className="flex-grow space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-semibold">{rank.title}</h3>
+                                <Badge variant={businessStats.totalVolume >= rank.business_amount ? "success" : "secondary"} className="ml-2">
+                                  {businessStats.totalVolume >= rank.business_amount ? 'Achieved' : 'Locked'}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {businessStats.totalVolume >= rank.business_amount 
+                                  ? `$${businessStats.totalVolume.toLocaleString()} Business Achieved`
+                                  : `Required Volume: $${rank.business_amount.toLocaleString()}`
+                                }
+                              </div>
+                              <div className="h-2 w-full bg-muted rounded-full mt-2">
+                                <div 
+                                  className="h-2 bg-primary rounded-full transition-all duration-500"
+                                  style={{ 
+                                    width: `${Math.min(100, (businessStats.totalVolume / rank.business_amount) * 100)}%` 
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Bonus & Action */}
+                            <div className="flex-shrink-0 text-right space-y-2 min-w-[150px]">
+                              <div className="text-2xl font-bold text-green-600">
+                                +${rank.bonus.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-muted-foreground">Rank Bonus</div>
+                              {businessStats.totalVolume >= rank.business_amount && 
+                               !claimedRanks.includes(rank.title) && 
+                               rank.title !== 'New Member' && 
+                               isRankEligible(businessStats.currentRank, rank.title, ranks) && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleClaimRankBonus(rank)}
+                                  disabled={claimingRank === rank.title}
+                                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                                >
+                                  {claimingRank === rank.title ? 'Claiming...' : 'Claim Bonus'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 </TabsContent>
               </Tabs>

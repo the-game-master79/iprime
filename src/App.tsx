@@ -6,7 +6,6 @@ import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { AuthProvider } from '@/contexts/AuthContext';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
-import AdminLogin from "./pages/admin/Login";
 import { AuthGuard } from '@/components/AuthGuard';
 import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
 import { lazy, Suspense } from "react";
@@ -22,6 +21,7 @@ import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
 import MarginCalculator from "@/pages/trading/MarginCalculator";
+import { adminRoutes } from "@/routes/admin";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -33,19 +33,6 @@ const Profile = lazy(() => import("./pages/profile/Profile"));
 const MyRank = lazy(() => import("@/pages/dashboard/MyRank"));
 const SupportPage = lazy(() => import("./pages/support/SupportPage"));
 const Trade = lazy(() => import("./pages/trade/Trade"));
-
-// Admin routes
-const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
-const UsersPage = lazy(() => import("./pages/admin/users/UsersPage"));
-const AffiliatesPage = lazy(() => import("./pages/admin/affiliates/AffiliatesPage"));
-const PaymentsPage = lazy(() => import("./pages/admin/payments/PaymentsPage"));
-const AdminWithdrawalsPage = lazy(() => import("./pages/admin/withdrawals/AdminWithdrawalsPage"));
-const AdminDepositsPage = lazy(() => import("./pages/admin/deposits/AdminDepositsPage"));
-const PlansSubscriptionPage = lazy(() => import("./pages/admin/plans-subscription/PlansSubscriptionPage"));
-const AdminPlans = lazy(() => import("@/pages/admin/plans/Plans"));
-const SettingsPage = lazy(() => import("./pages/admin/settings/SettingsPage"));
-const SupportManagePage = lazy(() => import("./pages/admin/support/SupportManagePage"));
-const AdminNotices = lazy(() => import("./pages/admin/notices/NoticesPage"));
 
 // Add new lazy imports
 const TradingPage = lazy(() => import("@/pages/trading/TradingPage"));
@@ -155,26 +142,9 @@ const App = () => {
             } />
             
             {/* Admin Routes */}
-            <Route
-              path="/admin/*"
-              element={
-                <Routes>
-                  <Route path="login" element={<AdminLogin />} />
-                  <Route path="dashboard" element={<AdminDashboard />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="payments" element={<PaymentsPage />} />
-                  <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                  <Route path="deposits" element={<AdminDepositsPage />} />
-                  <Route path="plans" element={<AdminPlans />} />
-                  <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
-                  <Route path="affiliates" element={<AffiliatesPage />} />
-                  <Route path="notices" element={<AdminNotices />} />
-                  <Route path="support" element={<SupportManagePage />} />
-                  <Route path="promotions" element={<PromotionsPage />} />
-                </Routes>
-              }
-            />
+            {adminRoutes.map((route) => (
+              <Route key={route.path} path={route.path} element={route.element} />
+            ))}
             
             <Route path="*" element={<NotFound />} />
           </Routes>
