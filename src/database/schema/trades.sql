@@ -1,13 +1,57 @@
--- Remove redundant columns if they exist
-ALTER TABLE trades 
-DROP COLUMN IF EXISTS execution_price,
-DROP COLUMN IF EXISTS bid_price,
-DROP COLUMN IF EXISTS ask_price;
+-- Drop existing objects first
+DROP TRIGGER IF EXISTS check_margin_before_trade ON trades;
+DROP FUNCTION IF EXISTS check_margin_utilization() CASCADE;
 
--- Drop old index
-DROP INDEX IF EXISTS idx_trades_limit_prices;
+-- Add margin amount column
+ALTER TABLE trades
+ADD COLUMN IF NOT EXISTS margin_amount DECIMAL DEFAULT 0;
 
--- Keep single focused index for limit orders
-CREATE INDEX IF NOT EXISTS idx_limit_orders
-ON trades(status, order_type, limit_price) 
-WHERE status = 'pending' AND order_type = 'limit';
+-- Add margin utilization tracking trigger
+CREATE OR REPLACE FUNCTION check_margin_utilization()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_total_margin DECIMAL;
+  v_user_balance DECIMAL;
+BEGIN
+  -- Get user's current margin utilization
+  SELECT COALESCE(SUM(margin_amount), 0)
+  INTO v_total_margin
+  FROM trades 
+  WHERE user_id = NEW.user_id 
+  AND status IN ('open', 'pending')
+  -- Only count margin for trades that are not being closed
+  AND id != NEW.id;  -- Exclude current trade
+
+  -- Get user's withdrawal balance
+  SELECT withdrawal_wallet
+  INTO v_user_balance
+  FROM profiles
+  WHERE id = NEW.user_id;
+
+  -- Only add margin for new positions, not for closing trades
+  IF NEW.status = 'open' OR NEW.status = 'pending' THEN
+    v_total_margin := v_total_margin + NEW.margin_amount;
+  END IF;
+
+  -- Check if total margin would exceed balance
+  IF v_total_margin > v_user_balance THEN
+    RAISE EXCEPTION 'Total margin ($%.2f) would exceed available balance ($%.2f)', 
+      v_total_margin, 
+      v_user_balance;
+  END IF;
+
+  -- If validation passes, allow trade
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger
+CREATE TRIGGER check_margin_before_trade
+  BEFORE INSERT OR UPDATE ON trades
+  FOR EACH ROW
+  EXECUTE FUNCTION check_margin_utilization();
+
+-- Add index on margin_amount for faster calculations
+CREATE INDEX IF NOT EXISTS idx_trades_margin
+ON trades(user_id, status, margin_amount)
+WHERE status IN ('open', 'pending');

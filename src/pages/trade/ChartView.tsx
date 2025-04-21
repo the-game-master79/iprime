@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Topbar } from "@/components/shared/Topbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,9 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { TradesSheet } from "@/components/shared/TradesSheet";
+import { useLimitOrders } from '@/hooks/use-limit-orders';
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
   const effectiveLeverage = isJPYPair(pair) ? leverage * 2 : leverage;
@@ -112,6 +115,7 @@ interface Trade {
   limitPrice?: number;
   openTime: number;
   pnl?: number;
+  margin_amount?: number;
 }
 
 interface PairPrices {
@@ -162,6 +166,9 @@ interface TradingPairInfo {
   max_leverage: number;
   min_leverage: number;
 }
+
+// Add margin call threshold constant (80%)
+const MARGIN_CALL_THRESHOLD = 0.8;
 
 export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, leverage = 100 }: ChartViewProps) => {
   const { pair } = useParams<{ pair?: string }>();
@@ -230,6 +237,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [marginUtilized, setMarginUtilized] = useState(0);
   const [isPageVisible, setIsPageVisible] = useState(true);
+  const [marginCallAlerts, setMarginCallAlerts] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -277,7 +285,8 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         orderType: trade.order_type,
         limitPrice: trade.limit_price,
         openTime: new Date(trade.created_at).getTime(),
-        pnl: trade.pnl || 0
+        pnl: trade.pnl || 0,
+        margin_amount: trade.margin_amount || 0
       }));
 
       setTrades(formattedTrades);
@@ -553,6 +562,19 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return null;
   };
 
+  // Add handler for executed trades
+  const handleLimitOrderExecuted = useCallback((tradeId: string) => {
+    setTrades(prev => prev.map(t => 
+      t.id === tradeId
+        ? { ...t, status: 'open', openPrice: t.limitPrice || 0 }
+        : t
+    ));
+  }, []);
+
+  // Use the limit orders hook
+  useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
+
+  // Update handleTrade function to handle limit orders
   async function handleTrade(type: 'buy' | 'sell') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -565,27 +587,57 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         return;
       }
 
+      // Add limit price validation
+      if (orderType === 'limit') {
+        const limitPriceValue = parseFloat(limitPrice);
+        const currentPrice = type === 'buy' 
+          ? parseFloat(pairPrices[defaultPair]?.ask || '0')
+          : parseFloat(pairPrices[defaultPair]?.bid || '0');
+
+        // Validate that limit price is reasonable
+        if (type === 'buy' && limitPriceValue >= currentPrice) {
+          toast({
+            variant: "destructive",
+            title: "Invalid Limit Price",
+            description: "Buy limit price must be below current market price"
+          });
+          return;
+        }
+
+        if (type === 'sell' && limitPriceValue <= currentPrice) {
+          toast({
+            variant: "destructive", 
+            title: "Invalid Limit Price",
+            description: "Sell limit price must be above current market price"
+          });
+          return;
+        }
+      }
+
       const lotSize = parseFloat(lots);
       const price = type === 'buy' 
         ? parseFloat(pairPrices[defaultPair]?.ask || '0')
         : parseFloat(pairPrices[defaultPair]?.bid || '0');
       const leverageValue = parseFloat(selectedLeverage);
 
-      // Calculate new trade margin
-      const newTradeMargin = calculateRequiredMargin(
+      // Calculate margin amount for the new trade
+      const marginAmount = calculateRequiredMargin(
         price,
-        lotSize, 
+        lotSize,
         leverageValue,
         defaultPair.includes('BINANCE:'),
         defaultPair
       );
 
+      // Get current margin utilization from existing trades
+      const currentMarginUtilization = calculateTotalMarginUtilization(trades);
+      
       // Check if total margin would exceed balance
-      if (marginUtilized + newTradeMargin > userBalance) {
+      if (currentMarginUtilization + marginAmount > userBalance) {
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Insufficient balance. Total margin would exceed available balance.",
+          title: "Insufficient Margin",
+          description: `Total margin (${(currentMarginUtilization + marginAmount).toFixed(2)}) would exceed available balance (${userBalance.toFixed(2)}). Please close some positions first.`
         });
         return;
       }
@@ -622,6 +674,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         orderType,
         limitPrice: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : null,
         openTime: Date.now(),
+        margin_amount: marginAmount // Add margin amount
       };
 
       const { data: trade, error } = await supabase
@@ -635,7 +688,8 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
           lots: lotSize,
           leverage: leverageValue,
           order_type: orderType,
-          limit_price: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : null
+          limit_price: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : null,
+          margin_amount: marginAmount // Add margin amount
         }])
         .select()
         .single();
@@ -646,16 +700,21 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       setTrades(prev => [{
         ...tradeData,
         id: trade.id,
-        pnl: 0
+        pnl: 0,
+        margin_amount: marginAmount
       } as Trade, ...prev]);
 
-      // Calculate and subtract margin from balance
-      const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
-      setUserBalance(prev => prev - margin);
+      // Only deduct margin for market orders
+      if (orderType === 'market') {
+        const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
+        setUserBalance(prev => prev - margin);
+      }
 
       toast({
-        title: "Trade Opened",
-        description: `Successfully opened ${type.toUpperCase()} position for ${defaultPair} @ $${price}`,
+        title: orderType === 'market' ? "Trade Opened" : "Limit Order Placed",
+        description: orderType === 'market'
+          ? `Successfully opened ${type.toUpperCase()} position for ${defaultPair} @ $${price}`
+          : `Successfully placed ${type.toUpperCase()} limit order for ${defaultPair} @ $${limitPrice}`,
       });
 
       // Reset trade panel
@@ -694,10 +753,46 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     fetchPairInfo();
   }, [defaultPair]);
 
+  // Add effect to check margin levels
+  useEffect(() => {
+    const checkMarginLevels = () => {
+      const alerts: {[key: string]: boolean} = {};
+      const totalMargin = calculateTotalMarginUtilization(trades);
+      
+      if (totalMargin >= (userBalance * MARGIN_CALL_THRESHOLD)) {
+        trades
+          .filter(t => t.status === 'open')
+          .forEach(trade => {
+            alerts[trade.id] = true;
+          });
+      }
+
+      setMarginCallAlerts(alerts);
+    };
+
+    // Check margin levels every 5 seconds
+    const interval = setInterval(checkMarginLevels, 5000);
+    return () => clearInterval(interval);
+  }, [trades, pairPrices, userBalance]);
+
   return (
     <div className="h-screen bg-background flex flex-col">
       <Topbar title={formattedPairName} />
       
+      {/* Add margin call alerts */}
+      {Object.keys(marginCallAlerts).length > 0 && (
+        <div className="bg-red-50 border-b border-red-100">
+          <div className="container mx-auto px-4 py-2">
+            <Alert variant="destructive" className="border-red-500/30">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-700">
+                Warning: One or more positions are nearing margin call level. Consider adding funds or reducing position sizes.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </div>
+      )}
+
       <div className="bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-14">
@@ -952,4 +1047,10 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       </div>
     </div>
   );
+};
+
+const calculateTotalMarginUtilization = (trades: Trade[]) => {
+  return trades
+    .filter(t => t.status === 'open' || t.status === 'pending')
+    .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
 };

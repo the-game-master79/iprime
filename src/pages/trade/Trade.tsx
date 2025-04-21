@@ -17,6 +17,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { isForexTradingTime } from "@/lib/utils";
 import { TrendingUp, Menu, AlertTriangle } from "lucide-react";
+import { useLimitOrders } from '@/hooks/use-limit-orders';
 
 // Add these interfaces near the top after existing imports
 interface TradingPair {
@@ -1397,12 +1398,49 @@ const Trade = () => {
     try {
       const { type, orderType, lots, leverage, limitPrice } = params;
       
+      // Calculate new trade's margin requirement
+      const calculatedExecutionPrice = orderType === 'market'
+        ? (type === 'buy' 
+            ? parseFloat(pairPrices[selectedPair]?.ask || '0')
+            : parseFloat(pairPrices[selectedPair]?.bid || '0'))
+        : parseFloat(limitPrice || '0');
+
+      const newMarginRequired = calculateRequiredMargin(
+        calculatedExecutionPrice,
+        parseFloat(lots),
+        parseInt(leverage),
+        selectedPair.includes('BINANCE:'),
+        selectedPair
+      );
+
+      // Calculate current total margin utilization
+      const currentMarginUtilization = calculateTotalMarginUtilization(trades);
+      
+      // Check if total margin would exceed balance
+      if (currentMarginUtilization + newMarginRequired > userBalance) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Margin",
+          description: `Total margin (${(currentMarginUtilization + newMarginRequired).toFixed(2)}) would exceed available balance (${userBalance.toFixed(2)}). Please close some positions first.`
+        });
+        return;
+      }
+
       // For limit orders, use the limit price as the initial open price
       const executionPrice = orderType === 'market'
         ? (type === 'buy' 
             ? parseFloat(pairPrices[selectedPair]?.ask || '0')
             : parseFloat(pairPrices[selectedPair]?.bid || '0'))
         : parseFloat(limitPrice || '0'); // Use limit price for limit orders
+
+      // Calculate margin amount
+      const marginAmount = calculateRequiredMargin(
+        executionPrice,
+        parseFloat(lots),
+        parseInt(leverage),
+        selectedPair.includes('BINANCE:'),
+        selectedPair
+      );
 
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -1423,11 +1461,12 @@ const Trade = () => {
           pair: selectedPair,
           type,
           status: orderType === 'market' ? 'open' : 'pending',
-          open_price: executionPrice, // Always set an open price
+          open_price: executionPrice,
           lots: parseFloat(lots),
           leverage: parseInt(leverage),
           order_type: orderType,
-          limit_price: orderType === 'limit' ? parseFloat(limitPrice || '0') : null
+          limit_price: orderType === 'limit' ? parseFloat(limitPrice || '0') : null,
+          margin_amount: marginAmount // Add margin amount to trade record
         })
         .select()
         .single();
@@ -1462,11 +1501,12 @@ const Trade = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create trade"
+        description: "Total margin will exceed available balance. Please exit positions first to free up margin!"
       });
     }
   };
 
+// ...existing code...
 const handleCloseTrade = async (tradeId: string) => {
   try {
     const trade = trades.find(t => t.id === tradeId);
@@ -1486,11 +1526,7 @@ const handleCloseTrade = async (tradeId: string) => {
       if (error) throw error;
 
       // Update local state
-      setTrades(prev => prev.map(t => 
-        t.id === tradeId
-          ? { ...t, status: 'closed', pnl: 0 }
-          : t
-      ));
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
 
       toast({
         title: "Order Cancelled",
@@ -1499,23 +1535,37 @@ const handleCloseTrade = async (tradeId: string) => {
       return;
     }
 
-    // Handle open trades as before
+    // Handle open trades
     const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
     const pnl = calculatePnL(trade, closePrice);
 
     // Start a transaction to update both trades and profile
-    const { data: { withdrawal_wallet }, error: balanceError } = await supabase
+    const { error: closeError } = await supabase
       .rpc('close_trade', {
         p_trade_id: tradeId,
         p_close_price: closePrice,
         p_pnl: pnl
       });
 
-    // ...rest of existing code for handling open trades...
+    if (closeError) throw closeError;
+
+    // Update local state - remove the trade from list
+    setTrades(prev => prev.filter(t => t.id !== tradeId));
+
+    toast({
+      title: "Trade Closed",
+      description: `Trade closed with P&L: $${pnl.toFixed(2)}`,
+    });
   } catch (error) {
-    // ...existing error handling...
+    console.error('Error closing trade:', error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Failed to close trade"
+    });
   }
 };
+// ...existing code...
 
   // Add effect to fetch existing trades on mount
   useEffect(() => {
@@ -1585,6 +1635,18 @@ const handleCloseTrade = async (tradeId: string) => {
 
     fetchTradingPairs();
   }, [selectedPair]);
+
+  // Add handler for executed trades
+  const handleLimitOrderExecuted = useCallback((tradeId: string) => {
+    setTrades(prev => prev.map(t => 
+      t.id === tradeId
+        ? { ...t, status: 'open', openPrice: t.limitPrice || 0 }
+        : t
+    ));
+  }, []);
+
+  // Use the limit orders hook
+  useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
 
   // If mobile, redirect to /trade/select to show pairs selection
   // if (isMobile) {
@@ -1762,3 +1824,9 @@ declare global {
 }
 
 export default Trade;
+function calculateTotalMarginUtilization(trades: Trade[]) {
+  return trades
+    .filter(t => t.status === 'open' || t.status === 'pending')
+    .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+}
+

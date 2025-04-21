@@ -243,12 +243,23 @@ export function TradesSheet({
                           )} />
                           <div className="font-medium">{trade.pair.split(':')[1]}</div>
                         </div>
-                        <div className={cn(
-                          "px-2 py-1 rounded-md text-sm font-medium font-mono",
-                          pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                        )}>
-                          ${pnl.toFixed(2)}
-                        </div>
+                        {trade.status === 'pending' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onCloseTrade?.(trade.id)}
+                            className="h-8 px-3 text-xs font-medium hover:bg-red-50 hover:text-red-600"
+                          >
+                            Cancel Order
+                          </Button>
+                        ) : (
+                          <div className={cn(
+                            "px-2 py-1 rounded-md text-sm font-medium font-mono",
+                            pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                          )}>
+                            ${pnl.toFixed(2)}
+                          </div>
+                        )}
                       </div>
                       
                       <div className="flex items-center justify-between text-sm">
@@ -256,12 +267,20 @@ export function TradesSheet({
                           <div className="text-muted-foreground">
                             {trade.type.toUpperCase()} {trade.lots} Lots
                           </div>
-                          <div className="text-muted-foreground">
-                            Entry @ ${trade.openPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
-                          </div>
-                          <div className="text-muted-foreground">
-                            Current: ${currentPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
-                          </div>
+                          {trade.status === 'pending' ? (
+                            <div className="text-muted-foreground">
+                              Limit @ ${trade.limitPrice?.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-muted-foreground">
+                                Entry @ ${trade.openPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                              </div>
+                              <div className="text-muted-foreground">
+                                Current: ${currentPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                              </div>
+                            </>
+                          )}
                         </div>
                         {trade.status === 'open' && onCloseTrade && (
                           <Button
