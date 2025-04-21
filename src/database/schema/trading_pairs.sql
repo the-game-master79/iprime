@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS trading_pairs (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     display_order INTEGER DEFAULT 0,
-    image_url TEXT
+    image_url TEXT,
+    last_price DECIMAL DEFAULT 0 -- Add new column for last price
 );
 
 -- Create index for faster lookups
@@ -98,3 +99,53 @@ CREATE POLICY "Allow public write access"
 
 -- Grant permissions to public
 GRANT ALL ON trading_pairs TO PUBLIC;
+
+-- Function to update last price for forex pairs
+CREATE OR REPLACE FUNCTION update_forex_last_prices()
+RETURNS void AS $$
+DECLARE
+    pair RECORD;
+    api_response JSONB;
+BEGIN
+    -- Loop through forex pairs
+    FOR pair IN 
+        SELECT symbol, short_name 
+        FROM trading_pairs 
+        WHERE type = 'forex' AND is_active = true
+    LOOP
+        -- Make API call to get current price
+        SELECT content::jsonb INTO api_response
+        FROM http_get('https://marketdata.tradermade.com/api/v1/live?' || 
+                     'currency=' || replace(replace(pair.short_name, '/', ''), 'FX:', '') ||
+                     '&api_key=' || current_setting('app.tradermade_api_key'));
+
+        -- Update last_price if API call successful
+        IF api_response->>'bid' IS NOT NULL THEN
+            UPDATE trading_pairs 
+            SET last_price = (api_response->>'bid')::DECIMAL,
+                updated_at = NOW()
+            WHERE symbol = pair.symbol;
+        END IF;
+
+        -- Add delay to respect API rate limits
+        PERFORM pg_sleep(1);
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a scheduled job to run at 12 PM IST (6:30 AM UTC)
+SELECT cron.schedule(
+    'update-forex-prices', -- job name
+    '30 6 * * *',         -- cron schedule (6:30 AM UTC = 12:00 PM IST)
+    $$SELECT update_forex_last_prices()$$
+);
+
+-- Enable the pg_cron extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA cron TO postgres;
+GRANT ALL ON ALL TABLES IN SCHEMA cron TO postgres;
+
+-- Store TradeMade API key in database settings
+ALTER DATABASE your_database_name SET app.tradermade_api_key = 'your_api_key_here';
