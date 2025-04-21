@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
@@ -25,6 +25,23 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isMobile } = useBreakpoints();
+  const [prevBalance, setPrevBalance] = useState(userBalance);
+  const [balanceChange, setBalanceChange] = useState<'increase' | 'decrease' | null>(null);
+
+  // Add effect to track balance changes
+  useEffect(() => {
+    if (userBalance !== prevBalance) {
+      setBalanceChange(userBalance > prevBalance ? 'increase' : 'decrease');
+      setPrevBalance(userBalance);
+      
+      // Reset animation after 1 second
+      const timer = setTimeout(() => {
+        setBalanceChange(null);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [userBalance, prevBalance]);
 
   return (
     <div className="flex h-screen">
@@ -61,10 +78,17 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
             </Button>
           </div>
 
-          {/* Right side */}
+          {/* Right side with animated balance */}
           <div className="flex items-center gap-2 md:gap-4">
-            <div className="flex items-center gap-1.5 md:gap-2 px-2 py-1 rounded-full bg-muted/50">
-              <span className="text-sm md:text-base font-medium">
+            <div className={cn(
+              "flex items-center gap-1.5 md:gap-2 px-2 py-1 rounded-full bg-muted/50 transition-transform duration-300",
+              balanceChange && "scale-110"
+            )}>
+              <span className={cn(
+                "text-sm md:text-base font-medium transition-colors duration-300",
+                balanceChange === 'increase' && "text-green-500",
+                balanceChange === 'decrease' && "text-red-500"
+              )}>
                 ${userBalance.toLocaleString()}
               </span>
             </div>

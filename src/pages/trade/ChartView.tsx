@@ -319,6 +319,18 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     let connections: { [key: string]: WebSocket } = {};
     let heartbeats: { [key: string]: NodeJS.Timeout } = {};
 
+    // Get all unique pairs from open trades and current chart
+    const getAllPairs = () => {
+      const pairs = new Set<string>();
+      pairs.add(defaultPair);
+      trades.forEach(trade => {
+        if (trade.status === 'open' || trade.status === 'pending') {
+          pairs.add(trade.pair);
+        }
+      });
+      return Array.from(pairs);
+    };
+
     const connectWebSocket = (pair: string) => {
       if (connections[pair]?.readyState === WebSocket.OPEN) {
         connections[pair].close();
@@ -338,17 +350,21 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         };
 
         ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.e === '24hrTicker') {
-            setPairPrices(prev => ({
-              ...prev,
-              [pair]: {
-                price: data.c,
-                bid: data.b,
-                ask: data.a,
-                change: data.P
-              }
-            }));
+          try {
+            const data = JSON.parse(event.data);
+            if (data.e === '24hrTicker') {
+              setPairPrices(prev => ({
+                ...prev,
+                [pair]: {
+                  price: data.c,
+                  bid: data.b,
+                  ask: data.a,
+                  change: data.P
+                }
+              }));
+            }
+          } catch (error) {
+            console.error('Error handling crypto message:', error);
           }
         };
 
@@ -378,16 +394,16 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
             if (data.symbol && data.bid && data.ask) {
               setPairPrices(prev => ({
                 ...prev,
-                [pair]: {
+                [`FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`]: {
                   price: data.mid || data.bid,
                   bid: data.bid,
                   ask: data.ask,
-                  change: '0.00'
+                  change: prev[`FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`]?.change || '0.00'
                 }
               }));
             }
           } catch (error) {
-            console.error('Error handling message:', error);
+            console.error('Error handling forex message:', error);
           }
         };
 
@@ -395,15 +411,21 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       }
     };
 
-    activePairs.forEach(pair => {
+    // Connect to all required pairs
+    getAllPairs().forEach(pair => {
       connectWebSocket(pair);
     });
 
+    // Cleanup function
     return () => {
-      Object.values(connections).forEach(ws => ws.readyState === WebSocket.OPEN && ws.close());
+      Object.values(connections).forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      });
       Object.values(heartbeats).forEach(clearInterval);
     };
-  }, [activePairs, isPageVisible]);
+  }, [trades, defaultPair, isPageVisible]); // Added trades to dependencies
 
   useEffect(() => {
     const total = trades

@@ -501,6 +501,12 @@ const SelectPairs = () => {
   const isForexClosed = !isForexTradingTime();
   const forexMarketStatus = isForexClosed ? "Closed" : "Open";
 
+  // Add this helper function after the imports
+  const getForexFlagUrl = (symbol: string) => {
+    const cleanSymbol = symbol.replace('FX:', '').split('/');
+    return `https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//${cleanSymbol[0].toLowerCase()}-${cleanSymbol[1].toLowerCase()}.svg`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b">
@@ -611,9 +617,14 @@ const SelectPairs = () => {
                               />
                             </div>
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                              <TrendingUp className="h-5 w-5 text-primary" />
-                            </div>
+                            <img 
+                              src={getForexFlagUrl(pair.symbol)}
+                              alt={pair.name}
+                              className="h-10 w-10 object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwb2x5bGluZSBwb2ludHM9IjIzIDYgMTMuNSAxNS41IDguNSAxMC41IDEgMTgiPjwvcG9seWxpbmU+PHBvbHlsaW5lIHBvaW50cz0iMTcgNiAyMyA2IDIzIDEyIj48L3BvbHlsaW5lPjwvc3ZnPg==';
+                              }}
+                            />
                           )}
                           <div className="flex flex-col min-w-0">
                             <span className="font-semibold truncate">{pair.name}</span>

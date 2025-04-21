@@ -4,12 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MagnifyingGlass, TrendUp, ChartLine, Globe, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, ChartLine, Globe, X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { TradingLayout } from "@/components/layout/TradingLayout";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
@@ -96,42 +95,41 @@ const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
 
 // Add helper to check if pair is JPY
 const isJPYPair = (pair: string): boolean => {
-  const symbol = pair.replace('FX:', '').replace('/', '');
-  return FOREX_PAIRS_JPY.includes(symbol);
+  // First clean the pair string (remove 'FX:', '/', etc.)
+  const cleanPair = pair.replace(/[^A-Z]/g, '');
+  // Check if pair ends with JPY
+  return /JPY$/.test(cleanPair);
 };
 
 // Add this helper function to get pip value
 const getPipValue = (pair: string) => {
+  if (!pair) return 0; // Guard against empty pair
+
   if (pair.includes('BINANCE:')) {
     return 0.00001; // Crypto uses 5 decimals standard
   }
-  // Remove FX: prefix and /
-  const symbol = pair.replace('FX:', '').replace('/', '');
+
   // JPY pairs use 0.01 as pip value, others use 0.0001
-  return FOREX_PAIRS_JPY.includes(symbol) ? 0.01 : 0.0001;
+  return isJPYPair(pair) ? 0.01 : 0.0001;
 };
 
 // Update calculateRequiredMargin function
 const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
-  // Double leverage for JPY pairs
-  const effectiveLeverage = isJPYPair(pair) ? leverage * 2 : leverage;
+  if (!price || !lots || !leverage) return 0;
   
-  if (isCrypto) {
-    const positionSize = price * lots;
-    // Cap crypto margin at 100000 per lot
-    const cappedPositionSize = Math.min(positionSize, 100000 * lots);
-    return cappedPositionSize / effectiveLeverage;
-  } else {
-    // For forex, standard lot size of 100000 per lot
-    const positionSize = price * lots * 100000;
-    // Cap forex margin at 100000 per lot
-    const cappedPositionSize = Math.min(positionSize, 100000 * lots * 100000);
-    return cappedPositionSize / effectiveLeverage;
-  }
+  // Double the leverage for JPY pairs to reduce margin requirement
+  const effectiveLeverage = Math.max(1, isJPYPair(pair) ? leverage * 20 : leverage);
+  const positionSize = isCrypto ? price * lots : price * lots * 100000;
+  const cappedPositionSize = Math.min(positionSize, 100000 * lots * (isCrypto ? 1 : 100000));
+  
+  return cappedPositionSize / effectiveLeverage;
 };
 
 // Update calculatePnL function
 const calculatePnL = (trade: Trade, currentPrice: number) => {
+  if (!currentPrice || !trade.openPrice) return 0;
+  if (!trade.pair || !trade.lots) return 0; // Guard against invalid trade data
+  
   const isCrypto = trade.pair.includes('BINANCE:');
   
   if (isCrypto) {
@@ -152,6 +150,13 @@ const calculatePnL = (trade: Trade, currentPrice: number) => {
   
   // Get pip value and calculate pip movement
   const pipValue = getPipValue(trade.pair);
+  
+  // Guard against zero pip value
+  if (pipValue === 0) {
+    console.warn(`Invalid pip value for pair ${trade.pair}`);
+    return 0;
+  }
+  
   const priceDifference = trade.type === 'buy'
     ? currentPrice - trade.openPrice
     : trade.openPrice - currentPrice;
@@ -160,11 +165,25 @@ const calculatePnL = (trade: Trade, currentPrice: number) => {
   // Calculate P&L
   // For USD pairs: P&L = (total units * pip value * pips)
   // For JPY pairs: P&L = (total units * pip value * pips) / current price
-  if (isJPYPair(trade.pair)) {
-    return (totalUnits * pipValue * pips) / currentPrice;
+  try {
+    if (isJPYPair(trade.pair)) {
+      // Avoid division by zero for JPY pairs
+      return currentPrice > 0 
+        ? (totalUnits * pipValue * pips) / currentPrice
+        : 0;
+    }
+    return totalUnits * pipValue * pips;
+  } catch (error) {
+    console.error('Error calculating PnL:', error);
+    return 0;
   }
-  return totalUnits * pipValue * pips;
 };
+
+// Add these types at the top with other interfaces
+interface PriceAnimation {
+  direction: 'up' | 'down';
+  timestamp: number;
+}
 
 const TradeSidebar = ({ 
   selectedPair, 
@@ -185,22 +204,47 @@ const TradeSidebar = ({
   const [activeTab, setActiveTab] = useState("crypto");
 
   // Add price animation state
-  const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down'>>({});
+  const [priceAnimations, setPriceAnimations] = useState<Record<string, PriceAnimation>>({});
+  const isMountedRef = useRef(true); // Add mount status ref
+  const prevPrices = useRef<Record<string, string>>({});
 
-  // Update price animation effect
+  // Update price animation effect with mount check and cleanup
   useEffect(() => {
-    const animations: Record<string, 'up' | 'down'> = {};
+    const animations: Record<string, PriceAnimation> = {};
     Object.entries(pairPrices).forEach(([symbol, data]) => {
-      const prevPrice = parseFloat(pairPrices[symbol]?.bid || '0');
+      const prevPrice = parseFloat(prevPrices.current[symbol] || '0');
       const newPrice = parseFloat(data.bid || '0');
-      if (prevPrice !== newPrice) {
-        animations[symbol] = newPrice > prevPrice ? 'up' : 'down';
+      if (prevPrice !== newPrice && prevPrice !== 0) {
+        animations[symbol] = {
+          direction: newPrice > prevPrice ? 'up' : 'down',
+          timestamp: Date.now()
+        };
       }
+      // Update previous prices
+      prevPrices.current[symbol] = data.bid || '0';
     });
-    setPriceAnimations(animations);
-    const timer = setTimeout(() => setPriceAnimations({}), 1000);
-    return () => clearTimeout(timer);
+    
+    if (isMountedRef.current) {
+      setPriceAnimations(animations);
+    }
+    
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) {
+        setPriceAnimations({});
+      }
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [pairPrices]);
+
+  // Add cleanup for mount status ref
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Handle tab changes
   const handleTabChange = (tab: string) => {
@@ -227,6 +271,21 @@ const TradeSidebar = ({
     }
   };
 
+  // Update the price display in the rendering section for both crypto and forex tabs
+  const renderPriceDisplay = (symbol: string, price: string, animation?: PriceAnimation) => {
+    const isAnimating = animation && Date.now() - animation.timestamp < 1000;
+    
+    return (
+      <span className={cn(
+        "font-mono font-medium transition-colors duration-300",
+        isAnimating && animation.direction === 'up' && "text-green-500",
+        isAnimating && animation.direction === 'down' && "text-red-500"
+      )}>
+        {price}
+      </span>
+    );
+  };
+
   return (
     <div className={cn(
       "bg-white border-r shadow-sm transition-all duration-300",
@@ -237,7 +296,10 @@ const TradeSidebar = ({
       <div className="flex flex-col h-full">
         <div className="p-3 border-b">
           <div className="relative">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+            <MagnifyingGlass 
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60"
+              aria-hidden="true"
+            />
             <Input
               placeholder="Search markets..."
               className="pl-9 h-9 text-sm bg-muted/30 border-0 focus-visible:ring-1"
@@ -250,11 +312,17 @@ const TradeSidebar = ({
         <Tabs defaultValue="crypto" className="flex-1 flex flex-col">
           <TabsList className="h-11 p-1 bg-muted/30 border-b">
             <TabsTrigger value="crypto" onClick={() => handleTabChange("crypto")} className="flex-1 text-xs">
-              <ChartLine className="h-3.5 w-3.5 mr-2" />
+              <ChartLine 
+                className="h-3.5 w-3.5 mr-2" 
+                aria-hidden="true"
+              />
               Crypto
             </TabsTrigger>
             <TabsTrigger value="forex" onClick={() => handleTabChange("forex")} className="flex-1 text-xs">
-              <Globe className="h-3.5 w-3.5 mr-2" />
+              <Globe 
+                className="h-3.5 w-3.5 mr-2" 
+                aria-hidden="true"
+              />
               Forex
             </TabsTrigger>
           </TabsList>
@@ -288,7 +356,10 @@ const TradeSidebar = ({
                             }}
                           />
                         ) : (
-                          <TrendingUp className="h-5 w-5 text-primary" />
+                          <TrendingUp 
+                            className="h-5 w-5 text-primary" 
+                            aria-label="Trading chart icon"
+                          />
                         )}
                         <div className="flex flex-col items-start gap-0.5">
                           <span className="font-semibold">{pair.name}</span>
@@ -296,14 +367,7 @@ const TradeSidebar = ({
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
-                        <span className={cn(
-                          "font-mono font-medium transition-colors duration-300",
-                          priceAnimation === 'up' ? "text-green-500" : 
-                          priceAnimation === 'down' ? "text-red-500" : 
-                          "text-foreground"
-                        )}>
-                          {priceData.bid}
-                        </span>
+                        {renderPriceDisplay(pair.symbol, priceData.bid, priceAnimation)}
                         <span className={cn(
                           "text-xs font-medium px-1.5 py-0.5 rounded-full",
                           parseFloat(priceData.change) < 0 
@@ -343,7 +407,10 @@ const TradeSidebar = ({
                               className="h-6 w-6"
                             />
                           ) : (
-                            <TrendingUp className="h-5 w-5 text-primary" />
+                            <TrendingUp 
+                              className="h-5 w-5 text-primary" 
+                              aria-label="Trading chart icon"
+                            />
                           )}
                         </div>
                         <div className="flex flex-col items-start gap-0.5">
@@ -352,14 +419,7 @@ const TradeSidebar = ({
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-0.5">
-                        <span className={cn(
-                          "font-mono font-medium transition-colors duration-300",
-                          priceAnimation === 'up' ? "text-green-500" : 
-                          priceAnimation === 'down' ? "text-red-500" : 
-                          "text-foreground"
-                        )}>
-                          {priceData.bid}
-                        </span>
+                        {renderPriceDisplay(pair.symbol, priceData.bid, priceAnimation)}
                         <span className={cn(
                           "text-xs font-medium px-1.5 py-0.5 rounded-full",
                           parseFloat(priceData.change) < 0 
@@ -388,25 +448,19 @@ interface TradingPanelProps {
   onTrade: (params: {
     type: 'buy' | 'sell';
     orderType: 'market' | 'limit';
-    lots: string;
-    leverage: string;
+    lots: number;  // Changed from string to number
+    leverage: number; // Changed from string to number
     limitPrice?: string;
   }) => void;
   userBalance: number;
   tradingPairs: TradingPair[];
 }
 
-const TradingPanel = ({ 
-  selectedPair, 
-  pairPrices,
-  onTrade,
-  userBalance,
-  tradingPairs
-}: TradingPanelProps) => {
-  const [lots, setLots] = useState("0.01");
+const TradingPanel = ({ selectedPair, pairPrices, onTrade, userBalance, tradingPairs }: TradingPanelProps) => {
+  const [lots, setLots] = useState<number>(0.01);
   const [lotsError, setLotsError] = useState("");
   const [marginRequired, setMarginRequired] = useState(0);
-  const [leverage, setLeverage] = useState("100");
+  const [leverage, setLeverage] = useState<number>(100);
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState<string>("");
   const [showLeverageDialog, setShowLeverageDialog] = useState(false);
@@ -424,9 +478,9 @@ const TradingPanel = ({
 
   // Update margin calculation to use leverage
   const calculateMargin = useCallback(() => {
-    const lotSize = parseFloat(lots) || 0;
+    const lotSize = lots || 0;
     const price = parseFloat(priceData.price) || 0;
-    const leverageRatio = parseFloat(leverage) || 1;
+    const leverageRatio = leverage || 1;
     const isCrypto = selectedPair.includes('BINANCE:');
     
     // Calculate margin requirement (margin = position size / leverage)
@@ -438,9 +492,9 @@ const TradingPanel = ({
 
   // Update margin calculation to include validation
   const validateMargin = useCallback(() => {
-    const lotSize = parseFloat(lots) || 0;
+    const lotSize = lots || 0;
     const price = parseFloat(priceData.price) || 0;
-    const leverageRatio = parseFloat(leverage) || 1;
+    const leverageRatio = leverage || 1;
     const isCrypto = selectedPair.includes('BINANCE:');
     
     const requiredMargin = calculateRequiredMargin(price, lotSize, leverageRatio, isCrypto, selectedPair);
@@ -465,18 +519,17 @@ const TradingPanel = ({
   }, [lots, priceData.price, leverage, validateMargin]);
 
   // Add lots validation
-  const validateLots = (value: string) => {
-    const numValue = parseFloat(value);
+  const validateLots = (value: number) => {
     const isCrypto = selectedPair.includes('BINANCE:');
     
-    if (isNaN(numValue) || numValue <= 0) {
+    if (isNaN(value) || value <= 0) {
       setLotsError("Lots must be greater than 0");
       return false;
     }
 
     // Different max lots for crypto and forex
     const maxLots = isCrypto ? 100 : 200; // Lower max for crypto due to higher values
-    if (numValue > maxLots) {
+    if (value > maxLots) {
       setLotsError(`Maximum ${maxLots} lots allowed`);
       return false;
     }
@@ -486,7 +539,7 @@ const TradingPanel = ({
   };
 
   const handleLotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = parseFloat(e.target.value) || 0;
     setLots(value);
     validateLots(value);
   };
@@ -551,79 +604,74 @@ const TradingPanel = ({
     [selectedPair, tradingPairs]
   );
 
+  // Add this helper function for price formatting
+  const formatPriceDisplay = (price: string | number | undefined) => {
+    if (!price) return { whole: '0', decimal: '00000' };
+    
+    // Convert price to string if it's a number
+    const priceStr = price.toString();
+    const [whole, decimal = '00000'] = priceStr.split('.');
+    
+    return {
+      whole,
+      decimal: selectedPair.includes('FX:') 
+        ? decimal.padEnd(5, '0').slice(0, 5)
+        : decimal.padEnd(2, '0').slice(0, 2)
+    };
+  };
+
   return (
-    <div className="w-80 border-l bg-white flex flex-col">
-      {isForexClosed && (
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50/50 border border-yellow-200/50">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-            <span className="text-sm text-yellow-700">
-              Forex market is closed. Trading resumes Monday.
-            </span>
-          </div>
-        </div>
-      )}
-      
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-medium">{selectedPair.split(':')[1]}</h2>
-          <div className={cn(
-            "px-2 py-0.5 rounded text-xs font-medium",
-            parseFloat(priceData.change) < 0 ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
-          )}>
-            {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-2 rounded-lg bg-muted/30">
-            <div className="text-xs text-muted-foreground mb-1">Ask</div>
-            <div className="font-mono text-sm">
-              ${selectedPair.includes('FX:')
-                ? parseFloat(priceData.ask || '0').toLocaleString('en-US', { minimumFractionDigits: 5 })
-                : parseFloat(priceData.ask || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+    <div className="w-80 border-l bg-white flex flex-col relative">
+      {/* Close Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="absolute right-2 top-2 hover:bg-muted/50"
+        onClick={() => setIsSidebarOpen(false)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+
+      {/* Price Information */}
+      <div className="p-4 pt-10 border-b space-y-4">
+        <div className="flex flex-col">
+          <div className="flex items-baseline gap-2 mb-1">
+            <h2 className="text-xl font-semibold">{selectedPair.split(':')[1]}</h2>
+            <div className={cn(
+              "px-2 py-0.5 rounded text-xs font-medium",
+              parseFloat(priceData.change) >= 0 
+                ? "bg-blue-50 text-blue-600" 
+                : "bg-red-50 text-red-600"
+            )}>
+              {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
             </div>
           </div>
-          <div className="p-2 rounded-lg bg-muted/30">
-            <div className="text-xs text-muted-foreground mb-1">Bid</div>
-            <div className="font-mono text-sm">
-              ${selectedPair.includes('FX:')
-                ? parseFloat(priceData.bid || '0').toLocaleString('en-US', { minimumFractionDigits: 5 })
-                : parseFloat(priceData.bid || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs text-muted-foreground block mb-1">Ask</span>
+              <span className="font-mono text-lg">${priceData.ask}</span>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground block mb-1">Bid</span>
+              <span className="font-mono text-lg">${priceData.bid}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Trading Controls */}
-      <div className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {/* Order Type Selector */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Order Type</label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant={orderType === "market" ? "default" : "outline"}
-              onClick={() => setOrderType("market")}
-              className="h-9 text-sm"
-            >
-              Market
-            </Button>
-            <Button
-              variant={orderType === "limit" ? "default" : "outline"}
-              onClick={() => setOrderType("limit")}
-              className="h-9 text-sm"
-            >
-              Limit
-            </Button>
-          </div>
-        </div>
+      <div className="flex-1 p-4 space-y-6">
+        {/* Order Type Selector using Tabs */}
+        <Tabs defaultValue="market" onValueChange={value => setOrderType(value as "market" | "limit")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="market">Market</TabsTrigger>
+            <TabsTrigger value="limit">Limit</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Limit Price Input - Only show for limit orders */}
         {orderType === "limit" && (
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-sm font-medium">Limit Price</label>
-            </div>
+            <label className="text-sm font-medium">Limit Price</label>
             <Input
               type="number"
               value={limitPrice}
@@ -635,11 +683,12 @@ const TradingPanel = ({
           </div>
         )}
 
-        {/* Leverage Selector */}
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium">Volume (Lots)</label>
-            <span className="text-xs text-muted-foreground">Max: {currentPair?.max_lots || 0}</span>
+          <div className="flex justify-between">
+            <label className="text-sm font-medium">Position Size</label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Max: {currentPair?.max_lots || 0} lots</span>
+            </div>
           </div>
           <div className="relative">
             <Input
@@ -648,136 +697,133 @@ const TradingPanel = ({
               onChange={handleLotsChange}
               step="0.01"
               min="0.01"
-              max="200"
               className={cn(
-                "text-right font-mono pr-16",
-                lotsError && "border-red-500 focus-visible:ring-red-500"
+                "pr-16 font-mono",
+                lotsError && "border-red-500"
               )}
             />
             <Button
-              variant="ghost" 
+              variant="ghost"
               size="sm"
               onClick={() => setShowLeverageDialog(true)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 h-auto"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-6 px-2"
             >
-              <span className="text-xs font-medium text-primary">{leverage}x</span>
+              <span className="text-xs font-semibold text-primary">{leverage}x</span>
             </Button>
           </div>
-          {lotsError && (
-            <p className="text-xs text-red-500 mt-1">{lotsError}</p>
-          )}
+          {lotsError && <p className="text-xs text-red-500">{lotsError}</p>}
         </div>
 
-        {/* Add leverage dialog */}
-        <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Select Leverage</DialogTitle>
-              <DialogDescription>
-                Choose your preferred leverage level. Higher leverage means higher risk.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {currentPair && (
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <div className="flex-1">
-                      <h4 className="font-medium">Available Leverage</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {currentPair.min_leverage}x - {currentPair.max_leverage}x
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {currentPair.leverage_options.map((value) => (
-                      <Button
-                        key={value}
-                        variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedLeverage(value.toString())}
-                      >
-                        {value}x
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end pt-4 border-t">
-              <Button
-                onClick={() => {
-                  setLeverage(selectedLeverage);
-                  setShowLeverageDialog(false);
-                }}
-                className="w-[200px]"
-              >
-                Confirm Leverage
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         {/* Trade Info */}
-        <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Margin Required</span>
-            <span className="font-medium">
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Required Margin</span>
+            <span className="font-mono">
               ${marginRequired.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Trading Fee</span>
-            <span className="text-sm">0.1%</span>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Trading Fee</span>
+            <span>0.1%</span>
           </div>
+        </div>
+
+        {/* Action Buttons - Updated Layout */}
+        <div className="grid grid-cols-2 gap-2">
+          {marginError && <p className="text-xs text-red-500 col-span-2">{marginError}</p>}
+          
+          <Button
+            className="h-16 bg-blue-600 hover:bg-blue-700"
+            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
+            onClick={() => handleTrade('buy')}
+          >
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-medium mb-1">Buy</span>
+              <div className="font-mono">
+                {(() => {
+                  const price = formatPriceDisplay(orderType === "market" ? priceData.ask : limitPrice);
+                  return (
+                    <div className="flex items-baseline">
+                      <span className="text-sm opacity-80">${price.whole}.</span>
+                      <span className="text-lg">{price.decimal}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </Button>
+          
+          <Button
+            className="h-16 bg-red-600 hover:bg-red-700 text-white border-0"
+            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
+            onClick={() => handleTrade('sell')}
+          >
+            <div className="flex flex-col items-center">
+              <span className="text-xs font-medium mb-1">Sell</span>
+              <div className="font-mono">
+                {(() => {
+                  const price = formatPriceDisplay(orderType === "market" ? priceData.bid : limitPrice);
+                  return (
+                    <div className="flex items-baseline">
+                      <span className="text-sm opacity-80">${price.whole}.</span>
+                      <span className="text-lg">{price.decimal}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </Button>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="p-4 border-t bg-white">
-        {isTradeDisabled && (
-          <p className="text-xs text-red-500 mb-2">{disabledMessage}</p>
-        )}
-        <div className="space-y-2 mb-4">
-          {marginError && (
-            <p className="text-xs text-red-500">{marginError}</p>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Button 
-            className="h-14 font-medium bg-green-600 hover:bg-green-700"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice) || isTradeDisabled}
-            onClick={() => handleTrade('buy')}
-          >
-            <div className="space-y-0.5">
-              <div className="text-sm">{orderType === "market" ? "Buy Market" : "Buy Limit"}</div>
-              <div className="text-xs opacity-90">
-                ${orderType === "market" 
-                  ? (selectedPair.includes('FX:')
-                    ? parseFloat(priceData.ask || '0').toLocaleString('en-US', { minimumFractionDigits: 5 })
-                    : parseFloat(priceData.ask || '0').toLocaleString('en-US', { minimumFractionDigits: 2 }))
-                  : parseFloat(limitPrice || '0').toLocaleString('en-US', { minimumFractionDigits: selectedPair.includes('FX:') ? 5 : 2 })}
+      {/* Keep existing leverage dialog */}
+      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Leverage</DialogTitle>
+            <DialogDescription>
+              Choose your preferred leverage level. Higher leverage means higher risk.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {currentPair && (
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <div className="flex-1">
+                    <h4 className="font-medium">Available Leverage</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {currentPair.min_leverage}x - {currentPair.max_leverage}x
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {currentPair.leverage_options.map((value) => (
+                    <Button
+                      key={value}
+                      variant={selectedLeverage === value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedLeverage(value)}
+                    >
+                      {value}x
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className="h-14 font-medium border-red-600 text-red-600 hover:bg-red-50"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice) || isTradeDisabled}
-            onClick={() => handleTrade('sell')}
-          >
-            <div className="space-y-0.5">
-              <div className="text-sm">{orderType === "market" ? "Sell Market" : "Sell Limit"}</div>
-              <div className="text-xs opacity-90">
-                ${orderType === "market"
-                  ? (selectedPair.includes('FX:')
-                    ? parseFloat(priceData.bid || '0').toLocaleString('en-US', { minimumFractionDigits: 5 })
-                    : parseFloat(priceData.bid || '0').toLocaleString('en-US', { minimumFractionDigits: 2 }))
-                  : parseFloat(limitPrice || '0').toLocaleString('en-US', { minimumFractionDigits: selectedPair.includes('FX:') ? 5 : 2 })}
-              </div>
-            </div>
-          </Button>
-        </div>
-      </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-4 border-t">
+            <Button
+              onClick={() => {
+                setLeverage(selectedLeverage);
+                setShowLeverageDialog(false);
+              }}
+              className="w-[200px]"
+            >
+              Confirm Leverage
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -1050,8 +1096,9 @@ const TradingActivity = ({
                               size="sm"
                               className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-500"
                               onClick={() => onCloseTrade(trade.id)}
+                              aria-label={`Close trade ${trade.id}`}
                             >
-                              <X className="h-4 w-4" />
+                              <X className="h-4 w-4" aria-hidden="true" />
                             </Button>
                           )}
                         </td>
@@ -1100,6 +1147,25 @@ const Trade = () => {
     let forexWs: WebSocket | null = null;
     let heartbeatInterval: NodeJS.Timeout;
 
+    const cleanup = () => {
+      // Close existing WebSocket connections
+      if (cryptoWs?.readyState === WebSocket.OPEN) {
+        cryptoWs.close();
+        cryptoWs = null;
+      }
+      if (forexWs?.readyState === WebSocket.OPEN) {
+        forexWs.close();
+        forexWs = null;
+      }
+      // Clear intervals
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+    };
+
+    // Clean up first to avoid duplicate connections
+    cleanup();
+
     const initializeCryptoWebSocket = () => {
       if (cryptoWs?.readyState === WebSocket.OPEN) return;
 
@@ -1141,89 +1207,88 @@ const Trade = () => {
       };
     };
 
-    // Initialize WebSocket connections
-    initializeCryptoWebSocket();
+    // Initialize WebSocket connections if we have trading pairs
+    if (tradingPairs.length > 0) {
+      initializeCryptoWebSocket();
 
-    // Initialize forex WebSocket with batch processing only
-    if (tradermadeApiKey) {
-      forexWs = new WebSocket(TRADERMADE_WS_URL);
-      const forexPairs = tradingPairs.filter(pair => pair.type === 'forex').map(pair => formatForexSymbol(pair.symbol));
+      // Initialize forex WebSocket with batch processing only
+      if (tradermadeApiKey) {
+        forexWs = new WebSocket(TRADERMADE_WS_URL);
+        const forexPairs = tradingPairs.filter(pair => pair.type === 'forex').map(pair => formatForexSymbol(pair.symbol));
 
-      forexWs.onopen = () => {
-        console.log('Forex WebSocket opened');
-        
-        // Subscribe to all pairs in single batch
-        const subscribeMsg = {
-          userKey: tradermadeApiKey,
-          symbol: forexPairs.join(','),
-          _type: "subscribe"
+        forexWs.onopen = () => {
+          console.log('Forex WebSocket opened');
+          
+          // Subscribe to all pairs in single batch
+          const subscribeMsg = {
+            userKey: tradermadeApiKey,
+            symbol: forexPairs.join(','),
+            _type: "subscribe"
+          };
+          forexWs.send(JSON.stringify(subscribeMsg));
+
+          // Setup heartbeat only
+          heartbeatInterval = setInterval(() => {
+            if (forexWs?.readyState === WebSocket.OPEN) {
+              forexWs.send(JSON.stringify({ heartbeat: "1" }));
+            }
+          }, HEARTBEAT_INTERVAL);
         };
-        forexWs.send(JSON.stringify(subscribeMsg));
 
-        // Setup heartbeat only
-        heartbeatInterval = setInterval(() => {
-          if (forexWs?.readyState === WebSocket.OPEN) {
-            forexWs.send(JSON.stringify({ heartbeat: "1" }));
-          }
-        }, HEARTBEAT_INTERVAL);
-      };
+        forexWs.onmessage = (event) => {
+          try {
+            if (typeof event.data === 'string' && !event.data.startsWith('{')) {
+              return;
+            }
 
-      forexWs.onmessage = (event) => {
-        try {
-          if (typeof event.data === 'string' && !event.data.startsWith('{')) {
-            return;
-          }
-
-          const data = JSON.parse(event.data);
-          
-          if (data.type === "HEARTBEAT") return;
-          
-          // Handle subscription confirmations
-          if (data.type === "SUBSCRIPTION_STATUS") {
-            console.log('Forex subscription status:', data);
-            return;
-          }
-
-          // Handle price updates
-          if (data.symbol && data.bid && data.ask) {
-            const formattedSymbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
+            const data = JSON.parse(event.data);
             
-            setPairPrices(prev => {
-              const oldBid = parseFloat(prev[formattedSymbol]?.bid || data.bid);
-              const newBid = parseFloat(data.bid);
-              // Calculate percentage change
-              const change = oldBid ? ((newBid - oldBid) / oldBid * 100) : 0;
+            if (data.type === "HEARTBEAT") return;
+            
+            // Handle subscription confirmations
+            if (data.type === "SUBSCRIPTION_STATUS") {
+              console.log('Forex subscription status:', data);
+              return;
+            }
+
+            // Handle price updates
+            if (data.symbol && data.bid && data.ask) {
+              const formattedSymbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
               
-              return {
-                ...prev,
-                [formattedSymbol]: {
-                  price: data.bid,
-                  bid: data.bid,
-                  ask: data.ask,
-                  change: change.toFixed(2)
-                }
-              };
-            });
+              setPairPrices(prev => {
+                const oldBid = parseFloat(prev[formattedSymbol]?.bid || data.bid);
+                const newBid = parseFloat(data.bid);
+                // Calculate percentage change
+                const change = oldBid ? ((newBid - oldBid) / oldBid * 100) : 0;
+                
+                return {
+                  ...prev,
+                  [formattedSymbol]: {
+                    price: data.bid,
+                    bid: data.bid,
+                    ask: data.ask,
+                    change: change.toFixed(2)
+                  }
+                };
+              });
+            }
+          } catch (error) {
+            console.error('Error handling forex message:', error);
           }
-        } catch (error) {
-          console.error('Error handling forex message:', error);
-        }
-      };
+        };
 
-      forexWs.onerror = (error) => {
-        console.error('Forex WebSocket error:', error);
-      };
+        forexWs.onerror = (error) => {
+          console.error('Forex WebSocket error:', error);
+        };
 
-      forexWs.onclose = () => {
-        console.log('Forex WebSocket closed');
-      };
+        forexWs.onclose = () => {
+          console.log('Forex WebSocket closed');
+        };
+      }
     }
 
-    return () => {
-      if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
-      if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-    };
+    // Clean up on unmount or when dependencies change
+    return cleanup;
   }, [tradingPairs]);
 
   useEffect(() => {
@@ -1391,8 +1456,8 @@ const Trade = () => {
   const handleTrade = async (params: {
     type: 'buy' | 'sell';
     orderType: 'market' | 'limit';
-    lots: string;
-    leverage: string;
+    lots: number;
+    leverage: number;
     limitPrice?: string;
   }) => {
     try {
@@ -1407,8 +1472,8 @@ const Trade = () => {
 
       const newMarginRequired = calculateRequiredMargin(
         calculatedExecutionPrice,
-        parseFloat(lots),
-        parseInt(leverage),
+        lots,
+        leverage,
         selectedPair.includes('BINANCE:'),
         selectedPair
       );
@@ -1436,8 +1501,8 @@ const Trade = () => {
       // Calculate margin amount
       const marginAmount = calculateRequiredMargin(
         executionPrice,
-        parseFloat(lots),
-        parseInt(leverage),
+        lots,
+        leverage,
         selectedPair.includes('BINANCE:'),
         selectedPair
       );
@@ -1462,8 +1527,8 @@ const Trade = () => {
           type,
           status: orderType === 'market' ? 'open' : 'pending',
           open_price: executionPrice,
-          lots: parseFloat(lots),
-          leverage: parseInt(leverage),
+          lots,
+          leverage,
           order_type: orderType,
           limit_price: orderType === 'limit' ? parseFloat(limitPrice || '0') : null,
           margin_amount: marginAmount // Add margin amount to trade record
@@ -1675,8 +1740,13 @@ const handleCloseTrade = async (tradeId: string) => {
               size="sm"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="absolute left-2 top-2 z-50"
+              aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
             >
-              {isSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {isSidebarOpen ? (
+                <X className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Menu className="h-4 w-4" aria-hidden="true" />
+              )}
             </Button>
 
             {tradingPairs.filter(pair => pair.type === (selectedPair.includes('BINANCE:') ? 'crypto' : 'forex')).map((pair) => {
