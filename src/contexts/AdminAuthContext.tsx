@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
@@ -61,27 +61,22 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginAdmin = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      // Call the admin validation RPC
+      const { data, error } = await supabase
+        .rpc('validate_admin', {
+          admin_email: email,
+          admin_password: password
+        });
 
       if (error) throw error;
 
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
-
-        if (profile?.role === 'admin') {
-          setIsAdminAuthenticated(true);
-          localStorage.setItem('adminAuth', 'true');
-          return true;
-        }
+      if (data.success) {
+        setIsAdminAuthenticated(true);
+        localStorage.setItem('adminAuth', 'true');
+        return true;
       }
-      throw new Error('Not authorized as admin');
+
+      throw new Error('Invalid admin credentials');
     } catch (error) {
       console.error('Admin login error:', error);
       throw error;
@@ -111,27 +106,44 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const RequireAdminAuth = ({ children }: { children: ReactNode }) => {
-  const { isAdminAuthenticated } = useAdminAuth();
+  const { isAdminAuthenticated, isLoading } = useAdminAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    // Periodically check admin status
-    const interval = setInterval(() => {
-      const checkAuth = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setIsAdminAuthenticated(false);
-        }
-      };
-      checkAuth();
-    }, 60000); // Check every minute
+  // Add check for loading state
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
-    return () => clearInterval(interval);
-  }, []);
-
-  if (!isAdminAuthenticated) {
+  // Prevent infinite redirects by checking location
+  if (!isAdminAuthenticated && location.pathname !== '/admin/login') {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;
 };
+
+// Add error boundaries
+export class ErrorBoundary extends React.Component<
+  { children: React.ReactNode, fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode, fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}

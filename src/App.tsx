@@ -8,7 +8,6 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import { AuthGuard } from '@/components/AuthGuard';
 import { lazy, Suspense } from "react";
-import LoadingSpinner from "@/components/ui/loading-spinner";
 import DepositPage from "@/pages/deposit/DepositPage";
 import SelectPairs from "./pages/trade/SelectPairs";
 import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
@@ -20,7 +19,7 @@ import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
 import MarginCalculator from "@/pages/trading/MarginCalculator";
-import AdminLayout from "@/pages/admin/AdminLayout";
+import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -59,7 +58,7 @@ import AdminPairs from "@/pages/admin/pairs/Pairs";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 2, // Increase retry attempts
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
     }
@@ -83,6 +82,44 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Add error boundary for lazy loaded routes
+const AdminRoutes = () => {
+  return (
+    <ErrorBoundary fallback={<div>Error loading admin panel. Please refresh.</div>}>
+      <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }>
+        <Routes>
+          <Route path="login" element={<AdminLogin />} />
+          <Route path="*" element={
+            <RequireAdminAuth>
+              <Routes>
+                <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="payments" element={<PaymentsPage />} />
+                <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                <Route path="deposits" element={<AdminDepositsPage />} />
+                <Route path="plans" element={<AdminPlans />} />
+                <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
+                <Route path="affiliates" element={<AffiliatesPage />} />
+                <Route path="notices" element={<AdminNotices />} />
+                <Route path="support" element={<SupportManagePage />} />
+                <Route path="promotions" element={<PromotionsPage />} />
+                <Route path="pairs" element={<AdminPairs />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="*" element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </RequireAdminAuth>
+          } />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
+  );
+};
+
 const App = () => {
   // Add cache flush hook at the top level
   useCacheFlush();
@@ -90,7 +127,11 @@ const App = () => {
   return (
     <HelmetProvider>
       <Providers>
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        }>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
@@ -153,30 +194,7 @@ const App = () => {
             } />
             
             {/* Admin Routes */}
-            <Route path="/admin">
-              <Route path="login" element={<AdminLogin />} />
-              <Route path="*" element={
-                <RequireAdminAuth>
-                    <Routes>
-                      <Route path="dashboard" element={<AdminDashboard />} />
-                      <Route path="users" element={<UsersPage />} />
-                      <Route path="settings" element={<SettingsPage />} />
-                      <Route path="payments" element={<PaymentsPage />} />
-                      <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                      <Route path="deposits" element={<AdminDepositsPage />} />
-                      <Route path="plans" element={<AdminPlans />} />
-                      <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
-                      <Route path="affiliates" element={<AffiliatesPage />} />
-                      <Route path="notices" element={<AdminNotices />} />
-                      <Route path="support" element={<SupportManagePage />} />
-                      <Route path="promotions" element={<PromotionsPage />} />
-                      <Route path="pairs" element={<AdminPairs />} />
-                      <Route index element={<Navigate to="dashboard" replace />} />
-                      <Route path="*" element={<Navigate to="dashboard" replace />} />
-                    </Routes>
-                </RequireAdminAuth>
-              } />
-            </Route>
+            <Route path="/admin/*" element={<AdminRoutes />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

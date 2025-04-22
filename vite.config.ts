@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
+import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
@@ -17,7 +17,21 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true
+    sourcemap: true,
+    // Improve chunk loading
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'admin': [
+            './src/pages/admin/AdminLayout.tsx',
+            './src/pages/admin/Dashboard.tsx',
+            // Add other admin-related files
+          ],
+        },
+      },
+    },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
   },
   resolve: {
     alias: {
