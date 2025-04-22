@@ -13,8 +13,6 @@ const AdminLogin = () => {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState<"credentials" | "2fa">("credentials");
   const [isLoading, setIsLoading] = useState(false);
   const { loginAdmin } = useAdminAuth();
 
@@ -22,40 +20,23 @@ const AdminLogin = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (step === "credentials") {
-      try {
-        const success = await loginAdmin(email, password);
-        if (success) {
-          setStep("2fa");
-          toast({
-            title: "Verification Required",
-            description: "Please enter the 2FA code to continue.",
-          });
-        }
-      } catch (error) {
-        toast({
-          title: "Authentication Failed", 
-          description: "Invalid admin credentials. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      if (code === "666666") { // Hardcoded 2FA code
-        navigate("/admin/dashboard", { replace: true });
-        toast({
-          title: "Login Successful",
-          description: "Welcome to the admin panel.",
-        });
-      } else {
-        setIsLoading(false);
-        toast({
-          title: "Verification Failed",
-          description: "Invalid verification code.",
-          variant: "destructive",
-        });
-      }
+    try {
+      await loginAdmin(email, password);
+      const from = (location.state as any)?.from?.pathname || "/admin/dashboard";
+      navigate(from, { replace: true });
+      toast({
+        title: "Login Successful",
+        description: "Welcome to the admin panel.",
+      });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        title: "Authentication Failed", 
+        description: error.message || "Invalid admin credentials or not authorized.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -82,52 +63,31 @@ const AdminLogin = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {step === "credentials" ? (
-                    <div className="space-y-4">
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="Admin Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <Input
-                          id="code"
-                          placeholder="Enter 6-digit code"
-                          value={code}
-                          onChange={(e) => setCode(e.target.value)}
-                          maxLength={6}
-                          required
-                        />
-                        <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  )}
+                  <div className="space-y-4">
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Admin Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
 
                   <Button 
                     type="submit" 
                     className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary" 
                     disabled={isLoading}
                   >
-                    {isLoading
-                      ? "Processing..."
-                      : step === "credentials"
-                      ? "Continue"
-                      : "Verify & Login"
-                    }
+                    {isLoading ? "Processing..." : "Continue"}
                   </Button>
                 </form>
               </div>

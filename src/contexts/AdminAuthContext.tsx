@@ -6,6 +6,7 @@ interface AdminAuthContextType {
   isAdminAuthenticated: boolean;
   loginAdmin: (email: string, password: string) => Promise<boolean>;
   logoutAdmin: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
@@ -19,7 +20,8 @@ export const useAdminAuth = () => {
 };
 
 export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     checkAdminStatus();
@@ -27,55 +29,82 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAdminStatus = async () => {
     try {
-      // Check both adminAuth and adminSession
-      const adminAuth = localStorage.getItem('adminAuth');
-      const adminSession = localStorage.getItem('adminSession');
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (adminAuth && adminSession) {
-        const session = JSON.parse(adminSession);
-        // Check if session is still valid (24 hours)
-        if (session.expiresAt && new Date(session.expiresAt) > new Date()) {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.role === 'admin') {
           setIsAdminAuthenticated(true);
-          return;
+          localStorage.setItem('adminAuth', 'true');
+        } else {
+          setIsAdminAuthenticated(false);
+          localStorage.removeItem('adminAuth');
         }
+      } else {
+        setIsAdminAuthenticated(false);
+        localStorage.removeItem('adminAuth');
       }
-      // Clear invalid session
-      localStorage.removeItem('adminAuth');
-      localStorage.removeItem('adminSession');
-      setIsAdminAuthenticated(false);
     } catch (error) {
       console.error('Error checking admin status:', error);
       setIsAdminAuthenticated(false);
+      localStorage.removeItem('adminAuth');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const loginAdmin = async (email: string, password: string) => {
-    // Hardcoded admin credentials - DO NOT USE IN PRODUCTION
-    if (email === 'a1@ok.com' && password === '678123') {
-      setIsAdminAuthenticated(true);
-      
-      // Create admin session with 24 hour expiry
-      const session = {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      };
-      
-      localStorage.setItem('adminAuth', 'true');
-      localStorage.setItem('adminSession', JSON.stringify(session));
-      return true;
+        password
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile?.role === 'admin') {
+          setIsAdminAuthenticated(true);
+          localStorage.setItem('adminAuth', 'true');
+          return true;
+        }
+      }
+      throw new Error('Not authorized as admin');
+    } catch (error) {
+      console.error('Admin login error:', error);
+      throw error;
     }
-    throw new Error('Invalid admin credentials');
   };
 
   const logoutAdmin = async () => {
-    localStorage.removeItem('adminAuth');
-    localStorage.removeItem('adminSession');
-    setIsAdminAuthenticated(false);
+    try {
+      await supabase.auth.signOut();
+      setIsAdminAuthenticated(false);
+      localStorage.removeItem('adminAuth');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
-    <AdminAuthContext.Provider value={{ isAdminAuthenticated, loginAdmin, logoutAdmin }}>
+    <AdminAuthContext.Provider value={{ 
+      isAdminAuthenticated, 
+      loginAdmin, 
+      logoutAdmin,
+      isLoading 
+    }}>
       {children}
     </AdminAuthContext.Provider>
   );
@@ -86,19 +115,18 @@ export const RequireAdminAuth = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check admin session on mount
-    const adminSession = localStorage.getItem('adminSession');
-    if (adminSession) {
-      try {
-        const session = JSON.parse(adminSession);
-        if (new Date(session.expiresAt) <= new Date()) {
-          localStorage.removeItem('adminAuth');
-          localStorage.removeItem('adminSession');
+    // Periodically check admin status
+    const interval = setInterval(() => {
+      const checkAuth = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setIsAdminAuthenticated(false);
         }
-      } catch (error) {
-        console.error('Error checking admin session:', error);
-      }
-    }
+      };
+      checkAuth();
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
   }, []);
 
   if (!isAdminAuthenticated) {

@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { 
   Users, 
   BarChart3, 
@@ -36,7 +36,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAdminAuthenticated, logoutAdmin } = useAdminAuth();
+  const { isAdminAuthenticated, isLoading, logoutAdmin } = useAdminAuth();
 
   useEffect(() => {
     const handleResize = () => {
@@ -68,21 +68,18 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
     navigate('/admin/login');
   };
 
-  if (requireAuth && !isAdminAuthenticated && location.pathname !== '/admin/login') {
+  // Show loading state while checking authentication
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="text-center space-y-4 max-w-md">
-          <Shield className="h-12 w-12 text-primary mx-auto" />
-          <h1 className="text-2xl font-bold">Restricted Access</h1>
-          <p className="text-muted-foreground">
-            Please log in with valid admin credentials to access this area.
-          </p>
-          <Button onClick={() => navigate('/admin/login')} className="w-full sm:w-auto">
-            Go to Admin Login
-          </Button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  // Check authentication for protected routes
+  if (requireAuth && !isAdminAuthenticated && location.pathname !== '/admin/login') {
+    return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
   return (
