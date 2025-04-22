@@ -1,13 +1,12 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AdminAuthProvider, RequireAdminAuth } from "@/contexts/AdminAuthContext";
 import { AuthProvider } from '@/contexts/AuthContext';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
 import { AuthGuard } from '@/components/AuthGuard';
-import PromotionsPage from "./pages/admin/promotions/PromotionsPage";
 import { lazy, Suspense } from "react";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import DepositPage from "@/pages/deposit/DepositPage";
@@ -21,7 +20,7 @@ import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
 import MarginCalculator from "@/pages/trading/MarginCalculator";
-import { adminRoutes } from "@/routes/admin";
+import AdminLayout from "@/pages/admin/AdminLayout";
 
 // Lazy load routes
 const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
@@ -39,6 +38,22 @@ const TradingPage = lazy(() => import("@/pages/trading/TradingPage"));
 const InvestingPage = lazy(() => import("@/pages/investing/InvestingPage")); 
 const PartnersPage = lazy(() => import("@/pages/partners/PartnersPage"));
 const CompanyPage = lazy(() => import("@/pages/company/CompanyPage"));
+
+// Add admin lazy imports 
+const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
+const UsersPage = lazy(() => import("@/pages/admin/users/UsersPage"));
+const AffiliatesPage = lazy(() => import("@/pages/admin/affiliates/AffiliatesPage")); 
+const PaymentsPage = lazy(() => import("@/pages/admin/payments/PaymentsPage"));
+const AdminWithdrawalsPage = lazy(() => import("@/pages/admin/withdrawals/AdminWithdrawalsPage"));
+const AdminDepositsPage = lazy(() => import("@/pages/admin/deposits/AdminDepositsPage"));
+const PlansSubscriptionPage = lazy(() => import("@/pages/admin/plans-subscription/PlansSubscriptionPage"));
+const AdminPlans = lazy(() => import("@/pages/admin/plans/Plans"));
+const SettingsPage = lazy(() => import("@/pages/admin/settings/SettingsPage"));
+const SupportManagePage = lazy(() => import("@/pages/admin/support/SupportManagePage"));
+const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
+const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
+const AdminLogin = lazy(() => import("@/pages/admin/Login"));
+import AdminPairs from "@/pages/admin/pairs/Pairs";
 
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
@@ -80,8 +95,6 @@ const App = () => {
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/home" element={<Index />} />
-            
-            {/* Add new public routes */}
             <Route path="/trading" element={<TradingPage />} />
             <Route path="/investing" element={<InvestingPage />} />
             <Route path="/partners" element={<PartnersPage />} />
@@ -90,19 +103,17 @@ const App = () => {
             <Route path="/legal/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/margin-calculator" element={<MarginCalculator />} />
-
-            {/* Auth Routes */}
             <Route path="/auth/login" element={<Login />} />
 
-            {/* Routes that can be loaded before auth check */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/plans" element={<Plans />} />
-            <Route path="/affiliate" element={<Affiliate />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/withdrawals" element={<Withdrawals />} />
-            <Route path="/rank" element={<MyRank />} />
-            <Route path="/deposit" element={<DepositPage />} />
-            
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={<AuthGuard requireAuth><Dashboard /></AuthGuard>} />
+            <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
+            <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
+            <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
+            <Route path="/withdrawals" element={<AuthGuard requireAuth><Withdrawals /></AuthGuard>} />
+            <Route path="/rank" element={<AuthGuard requireAuth><MyRank /></AuthGuard>} />
+            <Route path="/deposit" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
+
             {/* Trade Routes */}
             <Route path="/trade/chart/:pair" element={
               <AuthGuard requireAuth>
@@ -142,10 +153,31 @@ const App = () => {
             } />
             
             {/* Admin Routes */}
-            {adminRoutes.map((route) => (
-              <Route key={route.path} path={route.path} element={route.element} />
-            ))}
-            
+            <Route path="/admin">
+              <Route path="login" element={<AdminLogin />} />
+              <Route path="*" element={
+                <RequireAdminAuth>
+                    <Routes>
+                      <Route path="dashboard" element={<AdminDashboard />} />
+                      <Route path="users" element={<UsersPage />} />
+                      <Route path="settings" element={<SettingsPage />} />
+                      <Route path="payments" element={<PaymentsPage />} />
+                      <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                      <Route path="deposits" element={<AdminDepositsPage />} />
+                      <Route path="plans" element={<AdminPlans />} />
+                      <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
+                      <Route path="affiliates" element={<AffiliatesPage />} />
+                      <Route path="notices" element={<AdminNotices />} />
+                      <Route path="support" element={<SupportManagePage />} />
+                      <Route path="promotions" element={<PromotionsPage />} />
+                      <Route path="pairs" element={<AdminPairs />} />
+                      <Route index element={<Navigate to="dashboard" replace />} />
+                      <Route path="*" element={<Navigate to="dashboard" replace />} />
+                    </Routes>
+                </RequireAdminAuth>
+              } />
+            </Route>
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

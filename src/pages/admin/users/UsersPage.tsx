@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Download, PlusCircle, Search, Eye, Copy, Check, XCircle } from "lucide-react"; 
+import { ArrowDownUp, Download, PlusCircle, Search, Eye, Copy, Check, XCircle, DollarSign } from "lucide-react"; 
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface KycDocument {
   name: string;
@@ -53,6 +60,7 @@ interface UserProfileData extends User {
   total_commissions: number;
   total_deposits: number;
   total_withdrawals: number;
+  total_plans_amount: number; // Add this new field
   transactions: Array<{
     id: string;
     type: string;
@@ -62,15 +70,71 @@ interface UserProfileData extends User {
     description?: string;
   }>;
   kyc_details?: {
+    id: string;
     full_name: string;
     date_of_birth: string;
-    document_type: string;
-    document_number: string;
     address: string;
     city: string;
+    state: string;
     country: string;
+    postal_code: string;
+    document_type: string;
+    document_number: string;
+    document_front: string;
+    document_back: string;
+    occupation: string;
+    status: string;
+    rejection_reason?: string;
+    created_at: string;
+    updated_at: string;
   };
+  plans: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    plans: {
+      name: string;
+      duration_days: number;
+    };
+    total_earnings: number; // Add this new field
+    created_at: string;
+  }>;
 }
+
+interface TabsState {
+  activeTab: string;
+}
+
+const DocumentPreview = ({ url }: { url: string }) => {
+  if (!url) return null;
+
+  const fileExtension = url.split('.').pop()?.toLowerCase();
+  const isPDF = fileExtension === 'pdf';
+
+  return (
+    <div className="rounded-lg border overflow-hidden bg-white">
+      {isPDF ? (
+        <div className="h-[300px]">
+          <iframe src={url} className="w-full h-full" />
+        </div>
+      ) : (
+        <div className="aspect-[3/2] relative group">
+          <img src={url} alt="Document" className="w-full h-full object-contain" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => window.open(url, '_blank')}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Full
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -82,6 +146,7 @@ const UsersPage = () => {
   const [newBalance, setNewBalance] = useState("");
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [selectedUserProfile, setSelectedUserProfile] = useState<UserProfileData | null>(null);
+  const [activeTab, setActiveTab] = useState<TabsState["activeTab"]>("overview");
 
   useEffect(() => {
     fetchUsers();
@@ -121,11 +186,10 @@ const UsersPage = () => {
             const { data: { publicUrl } } = supabase.storage
               .from('kyc_documents')
               .getPublicUrl(`${user.id}/${file.name}`);
-
             return {
               name: file.name,
               created_at: file.created_at,
-              publicUrl
+              publicUrl,
             };
           })
         );
@@ -174,7 +238,6 @@ const UsersPage = () => {
       const { data } = await supabase.storage
         .from('kyc_documents')
         .createSignedUrl(path, 3600); // 1 hour expiry
-
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank');
       }
@@ -195,7 +258,6 @@ const UsersPage = () => {
         .eq('id', userId);
 
       if (profileError) throw profileError;
-
       toast({
         title: "Success",
         description: `KYC ${status === 'completed' ? 'approved' : 'rejected'} successfully`,
@@ -207,7 +269,7 @@ const UsersPage = () => {
       toast({
         title: "Error",
         description: "Failed to update KYC status",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -217,7 +279,6 @@ const UsersPage = () => {
 
     try {
       const newBalanceNum = parseFloat(newBalance);
-      
       // Update user wallet balance first
       const { error: balanceError } = await supabase
         .from('profiles')
@@ -225,7 +286,6 @@ const UsersPage = () => {
         .eq('id', selectedUser.id);
 
       if (balanceError) throw balanceError;
-
       await fetchUsers();
       setIsBalanceDialogOpen(false);
       toast({
@@ -237,7 +297,7 @@ const UsersPage = () => {
       toast({
         title: "Error",
         description: "Failed to update balance",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -249,7 +309,6 @@ const UsersPage = () => {
       });
 
       if (error) throw error;
-
       await fetchUsers();
       toast({
         title: "Returns Credited",
@@ -260,7 +319,7 @@ const UsersPage = () => {
       toast({
         title: "Error",
         description: "Failed to credit returns",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -350,17 +409,14 @@ const UsersPage = () => {
 
       // Calculate totals
       const total_deposits = deposits
-        ?.filter(d => d.status === 'Completed')
+        ?.filter(d => d.status === 'approved')
         .reduce((sum, d) => sum + (d.amount || 0), 0) || 0;
-
       const total_withdrawals = withdrawals
         ?.filter(w => w.status === 'Completed')
         .reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
-
       const total_commissions = allTransactions
         ?.filter(tx => (tx.type === 'commission' || tx.type === 'rank_bonus') && tx.status === 'Completed')
         .reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-
       // Combine all transactions with the formatted ones
       const combinedTransactions = [
         ...depositsAsTransactions,
@@ -368,12 +424,84 @@ const UsersPage = () => {
         ...formattedTransactions
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      // Get KYC details
+      // Get KYC details from kyc table instead of kyc_details
       const { data: kycData } = await supabase
-        .from('kyc_details')
-        .select('*')
+        .from('kyc')
+        .select(`
+          id,
+          full_name,
+          date_of_birth,
+          address,
+          city,
+          state,
+          country,
+          postal_code,
+          document_type,
+          document_number,
+          document_front,
+          document_back,
+          occupation,
+          status,
+          rejection_reason,
+          created_at,
+          updated_at
+        `)
         .eq('user_id', userId)
+        .order('created_at', { ascending: false })
         .single();
+
+      // If KYC data exists, get signed URLs for documents
+      let documentUrls = { document_front: '', document_back: '' };
+      if (kycData?.document_front && kycData?.document_back) {
+        const frontUrl = await supabase.storage
+          .from('kyc_documents')
+          .createSignedUrl(kycData.document_front, 3600);
+        const backUrl = await supabase.storage
+          .from('kyc_documents')
+          .createSignedUrl(kycData.document_back, 3600);
+        documentUrls = {
+          document_front: frontUrl.data?.signedUrl || '',
+          document_back: backUrl.data?.signedUrl || ''
+        };
+      }
+
+      // Get user's plans and calculate total investment
+      const { data: userPlans } = await supabase
+        .from('plans_subscriptions')
+        .select(`
+          id,
+          amount,
+          status,
+          created_at,
+          plans (
+            name,
+            duration_days
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('status', 'approved');
+
+      // Get earnings for each plan
+      const plansWithEarnings = await Promise.all(
+        (userPlans || []).map(async (plan) => {
+          const { data: earnings } = await supabase
+            .from('transactions')
+            .select('amount')
+            .eq('user_id', userId)
+            .eq('type', 'investment_return')
+            .eq('reference_id', plan.id)
+            .eq('status', 'Completed');
+
+          const total_earnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
+
+          return {
+            ...plan,
+            total_earnings
+          };
+        })
+      );
+
+      const total_plans_amount = userPlans?.reduce((sum, plan) => sum + (plan.amount || 0), 0) || 0;
 
       const userProfile: UserProfileData = {
         ...(users.find(u => u.id === userId) as User),
@@ -381,8 +509,14 @@ const UsersPage = () => {
         total_commissions,
         total_deposits,
         total_withdrawals,
+        total_plans_amount, // Add this new field
         transactions: combinedTransactions,
-        kyc_details: kycData || undefined
+        kyc_details: kycData ? {
+          ...kycData, // This will include all fields from kyc table
+          document_front: documentUrls.document_front,
+          document_back: documentUrls.document_back
+        } : undefined,
+        plans: plansWithEarnings || []
       };
 
       setSelectedUserProfile(userProfile);
@@ -392,13 +526,12 @@ const UsersPage = () => {
       toast({
         title: "Error",
         description: "Failed to load user profile",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const totalUsers = users.length;
-  const activeUsers = users.filter(user => user.status === "active").length;
 
   return (
     <AdminLayout>
@@ -407,16 +540,10 @@ const UsersPage = () => {
         description="Manage and monitor user accounts"
       />
 
-      <div className="grid gap-4 md:grid-cols-2 mb-6">
+      <div className="mb-6">
         <StatCard
-          title="Total Users"
+          title="Registered Users"
           value={totalUsers.toString()}
-          description="All registered users"
-        />
-        <StatCard
-          title="Active Users"
-          value={activeUsers.toString()}
-          description="Currently active users"
         />
       </div>
 
@@ -548,45 +675,78 @@ const UsersPage = () => {
                   <TableCell>
                     <div className="flex gap-2">
                       {(user.kyc_status === 'pending' || user.kyc_status === 'processing') && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-500"
-                            onClick={() => handleKycStatus(user.id, 'completed')}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Approve KYC
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500"
-                            onClick={() => handleKycStatus(user.id, 'rejected')}
-                          >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject KYC
-                          </Button>
-                        </>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-green-500"
+                                onClick={() => handleKycStatus(user.id, 'completed')}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Approve KYC</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-500"
+                                onClick={() => handleKycStatus(user.id, 'rejected')}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Reject KYC</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setNewBalance(user.withdrawal_wallet.toString());
-                          setIsBalanceDialogOpen(true);
-                        }}
-                      >
-                        Edit Balances
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleCreditReturns(user.id)}
-                      >
-                        Credit Returns
-                      </Button>
+
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setNewBalance(user.withdrawal_wallet.toString());
+                                setIsBalanceDialogOpen(true);
+                              }}
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit Balances</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleCreditReturns(user.id)}
+                            >
+                              <PlusCircle className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Credit Returns</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -642,101 +802,315 @@ const UsersPage = () => {
       <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>User Profile</DialogTitle>
+            <DialogTitle>User Profile Details</DialogTitle>
           </DialogHeader>
           {selectedUserProfile && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h3 className="font-medium">Basic Information</h3>
-                  <div className="space-y-1">
-                    <p><span className="text-muted-foreground">User ID:</span> {selectedUserProfile.id}</p>
-                    <p><span className="text-muted-foreground">Name:</span> {selectedUserProfile.first_name} {selectedUserProfile.last_name}</p>
-                    <p><span className="text-muted-foreground">Email:</span> {selectedUserProfile.email}</p>
+            <Tabs defaultValue="overview" className="space-y-4" onValueChange={(value) => setActiveTab(value)}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="kyc">KYC Info</TabsTrigger>
+                <TabsTrigger value="plans">Plans</TabsTrigger>
+                <TabsTrigger value="transactions">Transactions</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview">
+                <div className="space-y-4">
+                  {/* User Identity Card */}
+                  <div className="p-4 rounded-lg border bg-card">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium text-lg">{selectedUserProfile.first_name} {selectedUserProfile.last_name}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">{selectedUserProfile.email}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs text-muted-foreground">ID: {selectedUserProfile.id}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => copyToClipboard(selectedUserProfile.id)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <Badge variant={selectedUserProfile.status === 'active' ? 'success' : 'secondary'}>
+                        {selectedUserProfile.status}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <StatCard
+                      title="Total Deposits"
+                      value={`$${selectedUserProfile.total_deposits.toLocaleString()}`}
+                    />
+                    <StatCard
+                      title="Total Referrals"
+                      value={selectedUserProfile.total_referrals.toString()}
+                    />
+                    <StatCard
+                      title="Current Balance"
+                      value={`$${selectedUserProfile.withdrawal_wallet.toLocaleString()}`}
+                    />
+                    <div className="p-6 rounded-lg border bg-card relative">
+                      <h3 className="font-medium text-sm text-muted-foreground">Total Investment</h3>
+                      <p className="text-2xl font-bold mt-2">
+                        ${selectedUserProfile.total_plans_amount.toLocaleString()}
+                      </p>
+                      <div className="mt-3">
+                        <Badge variant="outline">
+                          {selectedUserProfile.plans?.length || 0} Plans
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </TabsContent>
 
-                <div className="space-y-2">
-                  <h3 className="font-medium">KYC Information</h3>
-                  {selectedUserProfile.kyc_details ? (
+              <TabsContent value="kyc">
+                <div className="p-4 rounded-lg border">
+                  <div className="flex justify-between items-center mb-4">
                     <div className="space-y-1">
-                      <p><span className="text-muted-foreground">Full Name:</span> {selectedUserProfile.kyc_details.full_name}</p>
-                      <p><span className="text-muted-foreground">DOB:</span> {selectedUserProfile.kyc_details.date_of_birth}</p>
-                      <p><span className="text-muted-foreground">Document:</span> {selectedUserProfile.kyc_details.document_type} ({selectedUserProfile.kyc_details.document_number})</p>
-                      <p><span className="text-muted-foreground">Address:</span> {selectedUserProfile.kyc_details.address}</p>
-                      <p><span className="text-muted-foreground">Location:</span> {selectedUserProfile.kyc_details.city}, {selectedUserProfile.kyc_details.country}</p>
+                      <h3 className="font-medium">KYC Information</h3>
+                      {selectedUserProfile.kyc_details?.created_at && (
+                        <p className="text-xs text-muted-foreground">
+                          Submitted on {new Date(selectedUserProfile.kyc_details.created_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <Badge 
+                      variant={
+                        selectedUserProfile.kyc_status === 'completed' ? 'success' :
+                        selectedUserProfile.kyc_status === 'pending' || selectedUserProfile.kyc_status === 'processing' ? 'warning' :
+                        'destructive'
+                      }
+                    >
+                      {selectedUserProfile.kyc_status}
+                    </Badge>
+                  </div>
+
+                  {selectedUserProfile.kyc_status === 'processing' || selectedUserProfile.kyc_status === 'completed' ? (
+                    <div className="space-y-6">
+                      {/* Personal Information */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium">Personal Details</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm text-muted-foreground">Full Name</span>
+                              <p className="font-medium">{selectedUserProfile.kyc_details?.full_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">Date of Birth</span>
+                              <p className="font-medium">{selectedUserProfile.kyc_details?.date_of_birth || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">Occupation</span>
+                              <p className="font-medium">{selectedUserProfile.kyc_details?.occupation || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm text-muted-foreground">Address</span>
+                              <p className="font-medium">{selectedUserProfile.kyc_details?.address || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">Location</span>
+                              <p className="font-medium">
+                                {[
+                                  selectedUserProfile.kyc_details?.city,
+                                  selectedUserProfile.kyc_details?.state,
+                                  selectedUserProfile.kyc_details?.country
+                                ].filter(Boolean).join(', ') || 'N/A'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-sm text-muted-foreground">Postal Code</span>
+                              <p className="font-medium">{selectedUserProfile.kyc_details?.postal_code || 'N/A'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Document Information */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium">Document Details</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm text-muted-foreground">Document Type</span>
+                            <p className="font-medium capitalize">{selectedUserProfile.kyc_details?.document_type.replace(/_/g, ' ') || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <span className="text-sm text-muted-foreground">Document Number</span>
+                            <p className="font-medium">{selectedUserProfile.kyc_details?.document_number || 'N/A'}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Document Preview Section */}
+                        {(selectedUserProfile.kyc_details?.document_front || selectedUserProfile.kyc_details?.document_back) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {selectedUserProfile.kyc_details?.document_front && (
+                              <div className="space-y-2">
+                                <span className="text-sm font-medium text-muted-foreground">Front Side</span>
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => window.open(selectedUserProfile.kyc_details?.document_front, '_blank')}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Front Document
+                                </Button>
+                              </div>
+                            )}
+                            {selectedUserProfile.kyc_details?.document_back && (
+                              <div className="space-y-2">
+                                <span className="text-sm font-medium text-muted-foreground">Back Side</span>
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => window.open(selectedUserProfile.kyc_details?.document_back, '_blank')}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Back Document
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Verification Status */}
+                      {selectedUserProfile.kyc_details?.updated_at && selectedUserProfile.kyc_status === 'completed' && (
+                        <div className="pt-4 border-t">
+                          <p className="text-xs text-muted-foreground">
+                            Verified on {new Date(selectedUserProfile.kyc_details.updated_at).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Rejection Reason */}
+                      {selectedUserProfile.kyc_status === 'rejected' && selectedUserProfile.kyc_details?.rejection_reason && (
+                        <div className="pt-4 border-t">
+                          <h4 className="text-sm font-medium text-red-600">Rejection Reason</h4>
+                          <p className="mt-1 text-sm text-red-600">
+                            {selectedUserProfile.kyc_details.rejection_reason}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No KYC details available</p>
+                    <div className="text-center py-8">
+                      <div className="mx-auto w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                        <XCircle className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <h4 className="text-base font-medium mb-1">No KYC Submitted</h4>
+                      <p className="text-sm text-muted-foreground">
+                        This user has not submitted any KYC information yet.
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
+              </TabsContent>
 
-              <div className="grid grid-cols-4 gap-4">
-                <StatCard
-                  title="Total Deposits"
-                  value={`$${selectedUserProfile.total_deposits.toLocaleString()}`}
-                  description="Completed deposits"
-                />
-                <StatCard
-                  title="Total Withdrawals"
-                  value={`$${selectedUserProfile.total_withdrawals.toLocaleString()}`}
-                  description="Completed withdrawals"
-                />
-                <StatCard
-                  title="Total Referrals"
-                  value={selectedUserProfile.total_referrals.toString()}
-                  description="Direct referrals"
-                />
-                <StatCard
-                  title="Total Commissions"
-                  value={`$${selectedUserProfile.total_commissions.toLocaleString()}`}
-                  description="Earned commissions"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-medium">All Transactions</h3>
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedUserProfile.transactions.map((tx) => (
-                        <TableRow key={tx.id}>
-                          <TableCell>{new Date(tx.created_at).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="capitalize">
-                              {tx.type.replace(/_/g, ' ')}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{tx.description || '-'}</TableCell>
-                          <TableCell>${tx.amount.toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={
-                                tx.status.toLowerCase() === 'completed' ? 'success' : 
-                                tx.status.toLowerCase() === 'pending' ? 'warning' :
-                                'default'
-                              }
-                            >
-                              {tx.status}
-                            </Badge>
-                          </TableCell>
+              <TabsContent value="plans">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">Plans Information</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Total Investment:</span>
+                      <span className="font-medium">${selectedUserProfile.total_plans_amount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Plan Name</TableHead>
+                          <TableHead>Duration</TableHead>
+                          <TableHead>Purchase Date</TableHead>
+                          <TableHead className="text-right">Investment</TableHead>
+                          <TableHead className="text-right">Total Earnings</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedUserProfile.plans?.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">
+                              No active plans found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          selectedUserProfile.plans?.map((plan) => (
+                            <TableRow key={plan.id}>
+                              <TableCell className="font-medium">
+                                {plan.plans.name}
+                              </TableCell>
+                              <TableCell>{plan.plans.duration_days} days</TableCell>
+                              <TableCell>
+                                {new Date(plan.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                ${plan.amount.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                ${plan.total_earnings.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </TabsContent>
+
+              <TabsContent value="transactions">
+                <div className="space-y-2">
+                  <h3 className="font-medium">Transaction History</h3>
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedUserProfile.transactions.map((tx) => (
+                          <TableRow key={tx.id}>
+                            <TableCell>{new Date(tx.created_at).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="capitalize">
+                                {tx.type.replace(/_/g, ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{tx.description || '-'}</TableCell>
+                            <TableCell>${tx.amount.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={
+                                  tx.status.toLowerCase() === 'completed' || tx.status.toLowerCase() === 'approved' ? 'success' : 
+                                  tx.status.toLowerCase() === 'pending' || tx.status.toLowerCase() === 'processing' ? 'warning' :
+                                  tx.status.toLowerCase() === 'rejected' || tx.status.toLowerCase() === 'failed' ? 'destructive' :
+                                  'default'
+                                }
+                              >
+                                {tx.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

@@ -16,7 +16,8 @@ import {
   Image,
   HelpCircle, 
   Bell,
-  ChevronLeft
+  ChevronLeft,
+  LineChart // Add LineChart icon for trading pairs
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -192,20 +193,19 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
-                    to="/admin/support" 
-                    icon={<HelpCircle className="h-5 w-5" />} 
-                    label="Support Tickets" 
-                    active={location.pathname === '/admin/support'} 
-                    collapsed={!sidebarOpen} 
-                  />
-                  <SidebarLink 
                     to="/admin/settings" 
                     icon={<Settings className="h-5 w-5" />} 
                     label="Settings" 
                     active={location.pathname === '/admin/settings'} 
                     collapsed={!sidebarOpen} 
                     />
-
+                  <SidebarLink 
+                    to="/admin/pairs"
+                    icon={<LineChart className="h-5 w-5" />}
+                    label="Trading Pairs"
+                    active={location.pathname === '/admin/pairs'}
+                    collapsed={!sidebarOpen}
+                  />
                 </nav>
               </ScrollArea>
               
@@ -243,33 +243,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
               : "md:ml-0"
           )}
         >
-          <header className="sticky top-0 z-30 flex h-14 items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
-            {showSidebar && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className={cn(
-                  isMobileView ? "flex" : "hidden",
-                  "mr-2"
-                )}
-              >
-                {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
-            )}
-            
-            <div className="ml-auto flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                asChild
-              >
-                <Link to="/">View Site</Link>
-              </Button>
-            </div>
-          </header>
-          
-          <div className="container py-6">{children}</div>
+          <div className="container py-4">{children}</div>
         </main>
       </div>
     </PageTransition>

@@ -1219,13 +1219,31 @@ const Trade = () => {
         forexWs.onopen = () => {
           console.log('Forex WebSocket opened');
           
-          // Subscribe to all pairs in single batch
-          const subscribeMsg = {
-            userKey: tradermadeApiKey,
-            symbol: forexPairs.join(','),
-            _type: "subscribe"
-          };
-          forexWs.send(JSON.stringify(subscribeMsg));
+          // Create batches of 10 pairs
+          const batchSize = 10;
+          const forexPairs = tradingPairs
+            .filter(pair => pair.type === 'forex')
+            .map(pair => formatForexSymbol(pair.symbol));
+
+          // Split pairs into batches
+          for (let i = 0; i < forexPairs.length; i += batchSize) {
+            const batch = forexPairs.slice(i, Math.min(i + batchSize, forexPairs.length));
+            
+            // Subscribe to each batch
+            const subscribeMsg = {
+              userKey: tradermadeApiKey,
+              symbol: batch.join(','),
+              _type: "subscribe"
+            };
+            
+            // Add small delay between batch subscriptions
+            setTimeout(() => {
+              if (forexWs?.readyState === WebSocket.OPEN) {
+                console.log(`Subscribing to forex batch ${i/batchSize + 1}:`, batch);
+                forexWs.send(JSON.stringify(subscribeMsg));
+              }
+            }, i * 100); // 100ms delay between batches
+          }
 
           // Setup heartbeat only
           heartbeatInterval = setInterval(() => {

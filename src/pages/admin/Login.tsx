@@ -1,11 +1,8 @@
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Key, AlertCircle } from "lucide-react";
+import { Shield, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PageTransition } from "@/components/ui-components";
 import AdminLayout from "./AdminLayout";
@@ -65,79 +62,77 @@ const AdminLogin = () => {
   return (
     <AdminLayout requireAuth={false} showSidebar={false}>
       <PageTransition>
-        <div className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center">
-          <Card className="mx-auto w-full max-w-md">
-            <CardHeader className="space-y-1 text-center">
-              <div className="flex justify-center mb-2">
-                <Shield className="h-10 w-10 text-primary" />
-              </div>
-              <CardTitle className="text-2xl">Admin Login</CardTitle>
-              <CardDescription>
-                Secure access to the administrative control panel
-              </CardDescription>
-            </CardHeader>
-            
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-4">
-                {step === "credentials" ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
+        <div className="flex min-h-screen flex-col">
+          <div className="container relative flex-1 flex flex-col items-center justify-center">
+            {/* Gradient Background */}
+            <div className="absolute inset-0 grid grid-cols-2 -space-x-52 opacity-30">
+              <div className="blur-[106px] h-56 bg-gradient-to-br from-primary to-purple-400 dark:from-blue-700 animate-pulse-slow" />
+              <div className="blur-[106px] h-32 bg-gradient-to-r from-cyan-400 to-sky-300 dark:to-indigo-600 animate-pulse-slower" />
+              <div className="blur-[106px] absolute -bottom-48 left-0 h-72 w-72 bg-gradient-to-t from-blue-500 to-cyan-300 dark:from-blue-400 mix-blend-multiply dark:opacity-20 animate-pulse-slowest" />
+            </div>
+
+            <div className="relative w-full max-w-md p-4 min-h-[400px]">
+              <div className="mx-auto flex w-full flex-col justify-center space-y-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg p-8 rounded-xl shadow-[0_2px_8px_2px_rgba(0,0,0,0.08)]">
+                <div className="flex flex-col items-center space-y-4">
+                  <Shield className="h-12 w-12 text-primary" />
+                  <h1 className="text-2xl font-bold">Admin Panel</h1>
+                  <p className="text-sm text-muted-foreground text-center">
+                    Secure access to the administrative control panel
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {step === "credentials" ? (
+                    <div className="space-y-4">
                       <Input
                         id="email"
                         type="email"
-                        placeholder="admin@example.com"
+                        placeholder="Admin Email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
                       <Input
                         id="password"
                         type="password"
-                        placeholder="••••••••"
+                        placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                       />
                     </div>
-                  </>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="code">2FA Verification Code</Label>
-                    <div className="flex items-center gap-2">
-                      <Key className="h-5 w-5 text-muted-foreground" />
-                      <Input
-                        id="code"
-                        placeholder="Enter 6-digit code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        maxLength={6}
-                        required
-                      />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Input
+                          id="code"
+                          placeholder="Enter 6-digit code"
+                          value={code}
+                          onChange={(e) => setCode(e.target.value)}
+                          maxLength={6}
+                          required
+                        />
+                        <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-              
-              <CardFooter>
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading}
-                >
-                  {isLoading
-                    ? "Processing..."
-                    : step === "credentials"
-                    ? "Continue"
-                    : "Verify & Login"
-                  }
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+                  )}
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary" 
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? "Processing..."
+                      : step === "credentials"
+                      ? "Continue"
+                      : "Verify & Login"
+                    }
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </div>
         </div>
       </PageTransition>
     </AdminLayout>

@@ -30,30 +30,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Affiliate {
   id: string;
   name: string;
   referrals: number;
+  directCount: number;
   commissions: number;
-  status: string;
   joinDate: string;
   email: string;
   lastReferralDate?: string;
   isRecentlyActive?: boolean;
 }
 
+// Add these objects outside component for reusability
+const SORT_OPTIONS = [
+  { value: "commissions", label: "Commissions" },
+  { value: "directCount", label: "Direct Referrals" },
+  { value: "referrals", label: "Total Referrals" },
+  { value: "joinDate", label: "Join Date" }
+] as const;
+
+// Add this helper function before the component
+const formatDate = (date: Date) => {
+  return date.toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).toUpperCase();
+};
+
 const AffiliatesPage = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<string>("joinDate"); // Change default value
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [totalCommissions, setTotalCommissions] = useState(0);
-  const [topPerformerSort, setTopPerformerSort] = useState<"commissions" | "referrals">("commissions");
-  const [showTreeDialog, setShowTreeDialog] = useState(false);
-  const [selectedAffiliate, setSelectedAffiliate] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAffiliates();
@@ -78,7 +91,7 @@ const AffiliatesPage = () => {
 
       if (profilesError) throw profilesError;
 
-      // Get referral relationships with timestamps
+      // Get ALL referral relationships for network size calculation
       const { data: relationships, error: relationshipsError } = await supabase
         .from('referral_relationships')
         .select('*')
@@ -101,19 +114,24 @@ const AffiliatesPage = () => {
 
       // Process data
       const processedAffiliates = profiles?.map(profile => {
-        // Only count direct referrals (level 1)
-        const userReferrals = relationships?.filter(rel => 
+        // Calculate direct referrals (level 1 only)
+        const directReferrals = relationships?.filter(rel => 
           rel.referrer_id === profile.id && 
           rel.level === 1
         ) || [];
         
+        // Calculate total referrals (all levels)
+        const totalReferrals = relationships?.filter(rel => 
+          rel.referrer_id === profile.id
+        ).length || 0;
+
         // Calculate total earnings from both commission and rank bonus transactions
         const totalEarnings = (transactions || [])
           .filter(tx => tx.user_id === profile.id)
           .filter(tx => tx.type === 'commission' || tx.type === 'rank_bonus') // Explicitly check both types
           .reduce((sum, tx) => sum + Number(tx.amount), 0); // Use Number() to ensure proper addition
 
-        const lastReferral = userReferrals[0];
+        const lastReferral = directReferrals[0];
         const lastReferralDate = lastReferral ? new Date(lastReferral.created_at) : null;
         const isRecentlyActive = lastReferralDate ? lastReferralDate > fortyEightHoursAgo : false;
 
@@ -121,11 +139,12 @@ const AffiliatesPage = () => {
           id: profile.id,
           name: `${profile.first_name} ${profile.last_name}`,
           email: profile.email || '',
-          referrals: userReferrals.length, // This now only counts direct referrals
+          referrals: totalReferrals, // All downline members
+          directCount: directReferrals.length, // Only direct referrals
           commissions: totalEarnings,
           status: profile.status || 'Active',
-          joinDate: new Date(profile.created_at).toLocaleDateString(),
-          lastReferralDate: lastReferralDate?.toLocaleString(),
+          joinDate: formatDate(new Date(profile.created_at)),
+          lastReferralDate: lastReferralDate ? formatDate(lastReferralDate) : undefined,
           isRecentlyActive
         };
       }) || [];
@@ -172,17 +191,6 @@ const AffiliatesPage = () => {
     }
   };
 
-  const getTopPerformers = () => {
-    return [...affiliates]
-      .sort((a, b) => {
-        if (topPerformerSort === "commissions") {
-          return b.commissions - a.commissions;
-        }
-        return b.referrals - a.referrals;
-      })
-      .slice(0, 5);
-  };
-
   // Calculate statistics
   const totalAffiliates = affiliates.length;
   const activeAffiliates = affiliates.filter(a => a.isRecentlyActive).length;
@@ -225,63 +233,6 @@ const AffiliatesPage = () => {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3 mb-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="space-y-1">
-                <CardTitle>Top Performing Affiliates</CardTitle>
-                <CardDescription>
-                  Affiliates with the highest {topPerformerSort === "commissions" ? "earnings" : "referrals"}
-                </CardDescription>
-              </div>
-              <Select
-                value={topPerformerSort}
-                onValueChange={(value) => setTopPerformerSort(value as "commissions" | "referrals")}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="commissions">Top Earners</SelectItem>
-                  <SelectItem value="referrals">Top Referrers</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {getTopPerformers().map((affiliate, index) => (
-                  <div key={affiliate.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium">{affiliate.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {affiliate.referrals} referrals · {affiliate.email}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">
-                        {topPerformerSort === "commissions" 
-                          ? `$${affiliate.commissions.toLocaleString()}`
-                          : `${affiliate.referrals} referrals`
-                        }
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {topPerformerSort === "commissions" ? "earnings" : "total referrals"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
       <div className="bg-background border rounded-lg shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b">
           <div className="relative w-full sm:w-auto">
@@ -293,6 +244,36 @@ const AffiliatesPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          
+          {/* Add sorting controls */}
+          <div className="flex items-center gap-2">
+            <Select
+              value={sortField}
+              onValueChange={(value) => setSortField(value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+              className="w-9 h-9"
+            >
+              <ArrowDownUp className={`h-4 w-4 transition-transform ${
+                sortDirection === "desc" ? "rotate-180" : ""
+              }`} />
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -300,113 +281,39 @@ const AffiliatesPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[50px]">ID</TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("name")}
-                  >
-                    Name
-                    {sortField === "name" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("referrals")}
-                  >
-                    Referrals
-                    {sortField === "referrals" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("commissions")}
-                  >
-                    Commissions
-                    {sortField === "commissions" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status
-                    {sortField === "status" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("joinDate")}
-                  >
-                    Join Date
-                    {sortField === "joinDate" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Total Referrals</TableHead>
+                <TableHead>Commissions</TableHead>
+                <TableHead>Join Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedAffiliates.map((affiliate) => (
                 <TableRow key={affiliate.id}>
                   <TableCell className="font-medium">{affiliate.id}</TableCell>
-                  <TableCell>{affiliate.name}</TableCell>
-                  <TableCell>{affiliate.referrals}</TableCell>
-                  <TableCell>${affiliate.commissions}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                      ${affiliate.status === 'Active' ? 'bg-green-100 text-green-800' : 
-                        affiliate.status === 'Inactive' ? 'bg-gray-100 text-gray-800' : 
-                        'bg-red-100 text-red-800'}`}>
-                      {affiliate.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>{affiliate.joinDate}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => {
-                          setSelectedAffiliate(affiliate.id);
-                          setShowTreeDialog(true);
-                        }}
-                      >
-                        View Details
-                      </Button>
+                    <div className="flex flex-col">
+                      <span>{affiliate.name}</span>
+                      <span className={`text-xs ${
+                        affiliate.directCount === 0 
+                          ? 'text-red-500' 
+                          : affiliate.directCount === 1 
+                          ? 'text-yellow-500' 
+                          : 'text-green-500'
+                      }`}>
+                        Direct Referrals: {affiliate.directCount}/2
+                      </span>
                     </div>
                   </TableCell>
+                  <TableCell>{affiliate.referrals}</TableCell>
+                  <TableCell>${affiliate.commissions}</TableCell>
+                  <TableCell>{affiliate.joinDate}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       </div>
-
-      <Dialog open={showTreeDialog} onOpenChange={setShowTreeDialog}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Affiliate Details</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <div className="text-center text-muted-foreground">
-              Network visualization has been temporarily disabled.
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Download, Filter, Search, DollarSign, CreditCard, ArrowUpCircle, ArrowDownCircle, ChevronDown } from "lucide-react";
+import { ArrowDownUp, Download, Filter, Search, DollarSign, CreditCard, ArrowUpCircle, ArrowDownCircle, ChevronDown, Clock } from "lucide-react";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,49 +46,74 @@ const PaymentsPage = () => {
     try {
       setIsLoading(true);
 
-      // Fetch deposits with user names
+      // Fetch deposits with user names and crypto details
       const { data: deposits, error: depositsError } = await supabase
         .from('deposits')
-        .select('id, user_id, amount, method, status, created_at, user_name')
-        .order('created_at', { ascending: false });
+        .select(`
+          id, 
+          user_id, 
+          amount, 
+          crypto_name,
+          crypto_symbol,
+          network,
+          status, 
+          created_at,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email
+          )
+        `);
 
       if (depositsError) throw depositsError;
 
-      // Fetch withdrawals with user data
-      const { data: withdrawals, error: withdrawalsError } = await supabase
-        .from('withdrawals')
-        .select('id, user_id, amount, crypto_name, crypto_symbol, status, created_at')
-        .order('created_at', { ascending: false });
+      // Fetch plans subscriptions
+      const { data: subscriptions, error: subscriptionsError } = await supabase
+        .from('plans_subscriptions')
+        .select(`
+          id,
+          user_id,
+          plan_id,
+          amount,
+          status,
+          created_at,
+          profiles:user_id (
+            first_name,
+            last_name,
+            email
+          )
+        `);
 
-      if (withdrawalsError) throw withdrawalsError;
+      if (subscriptionsError) throw subscriptionsError;
 
-      // Fetch other transactions
-      const { data: otherTransactions, error: txError } = await supabase
-        .from('transactions')
-        .select('*')
-        .in('type', ['commission', 'investment', 'adjustment'])
-        .order('created_at', { ascending: false });
-
-      if (txError) throw txError;
-
-      // Format deposits
+      // Format deposits with method derived from crypto info
       const formattedDeposits = (deposits || []).map(d => ({
-        ...d,
+        id: d.id,
+        user_id: d.user_id,
+        amount: d.amount,
         type: 'deposit' as const,
+        status: d.status,
+        created_at: d.created_at,
+        method: d.crypto_name ? `${d.crypto_name} (${d.crypto_symbol})` : 'Unknown',
+        user_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : d.user_id
       }));
 
-      // Format withdrawals
-      const formattedWithdrawals = (withdrawals || []).map(w => ({
-        ...w,
-        type: 'withdrawal' as const,
-        method: `${w.crypto_name} (${w.crypto_symbol})`
+      // Format plan subscriptions
+      const formattedSubscriptions = (subscriptions || []).map(s => ({
+        id: s.id,
+        user_id: s.user_id,
+        amount: s.amount,
+        type: 'investment' as const,
+        status: s.status,
+        created_at: s.created_at,
+        method: 'Plan Subscription',
+        user_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : s.user_id
       }));
 
       // Combine all transactions
       const allTransactions = [
         ...formattedDeposits,
-        ...formattedWithdrawals,
-        ...(otherTransactions || [])
+        ...formattedSubscriptions
       ];
 
       setTransactions(allTransactions);
@@ -144,14 +169,15 @@ const PaymentsPage = () => {
     setFilterStatus(null);
   };
 
-  // Calculate statistics
-  const totalTransactions = transactions.length;
+  // Calculate statistics from raw data
   const totalDeposits = transactions
-    .filter(tx => tx.type === 'deposit' && tx.status === 'Completed')
+    .filter(tx => tx.type === 'deposit')
     .reduce((sum, tx) => sum + tx.amount, 0);
-  const totalWithdrawals = transactions
-    .filter(tx => tx.type === 'withdrawal' && tx.status === 'Completed')
+
+  const totalSubscriptions = transactions
+    .filter(tx => tx.type === 'investment')
     .reduce((sum, tx) => sum + tx.amount, 0);
+
   const pendingTransactions = transactions
     .filter(tx => tx.status === 'Pending' || tx.status === 'Processing').length;
 
@@ -160,18 +186,12 @@ const PaymentsPage = () => {
       <PageHeader 
         title="Payment Management" 
         description="Monitor and manage all payment transactions"
-        action={
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            Export Transactions
-          </Button>
-        }
       />
 
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <StatCard
           title="Total Transactions"
-          value={totalTransactions.toString()}
+          value={transactions.length.toString()}
           icon={<CreditCard className="h-4 w-4" />}
         />
         <StatCard
@@ -180,14 +200,14 @@ const PaymentsPage = () => {
           icon={<ArrowDownCircle className="h-4 w-4" />}
         />
         <StatCard
-          title="Total Withdrawals"
-          value={`$${totalWithdrawals.toLocaleString()}`}
-          icon={<ArrowUpCircle className="h-4 w-4" />}
+          title="Total Investments"
+          value={`$${totalSubscriptions.toLocaleString()}`}
+          icon={<DollarSign className="h-4 w-4" />}
         />
         <StatCard
           title="Pending Transactions"
           value={pendingTransactions.toString()}
-          icon={<DollarSign className="h-4 w-4" />}
+          icon={<Clock className="h-4 w-4" />}
         />
       </div>
 
@@ -349,17 +369,16 @@ const PaymentsPage = () => {
                     )}
                   </button>
                 </TableHead>
-                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center">Loading transactions...</TableCell>
+                  <TableCell colSpan={7} className="text-center">Loading transactions...</TableCell>
                 </TableRow>
               ) : sortedTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center">No transactions found</TableCell>
+                  <TableCell colSpan={7} className="text-center">No transactions found</TableCell>
                 </TableRow>
               ) : (
                 sortedTransactions.map((tx) => (
@@ -370,9 +389,7 @@ const PaymentsPage = () => {
                     <TableCell>
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
                         ${tx.type === 'deposit' ? 'bg-green-100 text-green-800' : 
-                          tx.type === 'withdrawal' ? 'bg-blue-100 text-blue-800' :
-                          tx.type === 'commission' ? 'bg-purple-100 text-purple-800' :
-                          tx.type === 'adjustment' ? 'bg-orange-100 text-orange-800' :
+                          tx.type === 'investment' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-800'}`}>
                         {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
                       </span>
@@ -387,9 +404,6 @@ const PaymentsPage = () => {
                           'bg-red-100 text-red-800'}`}>
                         {tx.status}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm">View</Button>
                     </TableCell>
                   </TableRow>
                 ))
