@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Key } from "lucide-react";
@@ -10,19 +10,44 @@ import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { loginAdmin } = useAdminAuth();
 
+  // Add environment check
+  useEffect(() => {
+    const checkEnvironment = async () => {
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        toast({
+          title: "Configuration Error",
+          description: "Admin panel is not properly configured.",
+          variant: "destructive",
+        });
+      }
+    };
+    checkEnvironment();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
+    if (!email.trim() || !password.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await loginAdmin(email, password);
-      const from = (location.state as any)?.from?.pathname || "/admin/dashboard";
+      const from = location.state?.from?.pathname || "/admin/dashboard";
       navigate(from, { replace: true });
       toast({
         title: "Login Successful",
