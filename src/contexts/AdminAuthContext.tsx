@@ -30,30 +30,33 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const checkAdminStatus = async () => {
     try {
       setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+      const adminAuth = localStorage.getItem('adminAuth');
+      const adminEmail = localStorage.getItem('adminEmail');
+      const adminPassword = localStorage.getItem('adminPassword');
 
-        if (profile?.role === 'admin') {
-          setIsAdminAuthenticated(true);
-          localStorage.setItem('adminAuth', 'true');
-        } else {
-          setIsAdminAuthenticated(false);
-          localStorage.removeItem('adminAuth');
+      if (adminAuth === 'true' && adminEmail && adminPassword) {
+        // Validate stored credentials
+        const { data, error } = await supabase.rpc('validate_admin', {
+          admin_email: adminEmail,
+          admin_password: adminPassword
+        });
+
+        if (error || !data.success) {
+          throw new Error('Invalid admin session');
         }
+        setIsAdminAuthenticated(true);
       } else {
         setIsAdminAuthenticated(false);
         localStorage.removeItem('adminAuth');
+        localStorage.removeItem('adminEmail');
+        localStorage.removeItem('adminPassword');
       }
     } catch (error) {
       console.error('Error checking admin status:', error);
       setIsAdminAuthenticated(false);
       localStorage.removeItem('adminAuth');
+      localStorage.removeItem('adminEmail');
+      localStorage.removeItem('adminPassword');
     } finally {
       setIsLoading(false);
     }
@@ -61,18 +64,18 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const loginAdmin = async (email: string, password: string) => {
     try {
-      // Call the admin validation RPC
-      const { data, error } = await supabase
-        .rpc('validate_admin', {
-          admin_email: email,
-          admin_password: password
-        });
+      const { data, error } = await supabase.rpc('validate_admin', {
+        admin_email: email,
+        admin_password: password
+      });
 
       if (error) throw error;
 
       if (data.success) {
         setIsAdminAuthenticated(true);
         localStorage.setItem('adminAuth', 'true');
+        localStorage.setItem('adminEmail', email);
+        localStorage.setItem('adminPassword', password);
         return true;
       }
 
@@ -85,9 +88,10 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logoutAdmin = async () => {
     try {
-      await supabase.auth.signOut();
       setIsAdminAuthenticated(false);
       localStorage.removeItem('adminAuth');
+      localStorage.removeItem('adminEmail');
+      localStorage.removeItem('adminPassword');
     } catch (error) {
       console.error('Logout error:', error);
     }

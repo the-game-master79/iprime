@@ -82,44 +82,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// Add error boundary for lazy loaded routes
-const AdminRoutes = () => {
-  return (
-    <ErrorBoundary fallback={<div>Error loading admin panel. Please refresh.</div>}>
-      <Suspense fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      }>
-        <Routes>
-          <Route path="login" element={<AdminLogin />} />
-          <Route path="*" element={
-            <RequireAdminAuth>
-              <Routes>
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="payments" element={<PaymentsPage />} />
-                <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
-                <Route path="deposits" element={<AdminDepositsPage />} />
-                <Route path="plans" element={<AdminPlans />} />
-                <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
-                <Route path="affiliates" element={<AffiliatesPage />} />
-                <Route path="notices" element={<AdminNotices />} />
-                <Route path="support" element={<SupportManagePage />} />
-                <Route path="promotions" element={<PromotionsPage />} />
-                <Route path="pairs" element={<AdminPairs />} />
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="*" element={<Navigate to="dashboard" replace />} />
-              </Routes>
-            </RequireAdminAuth>
-          } />
-        </Routes>
-      </Suspense>
-    </ErrorBoundary>
-  );
-};
-
 const App = () => {
   // Add cache flush hook at the top level
   useCacheFlush();
@@ -194,7 +156,27 @@ const App = () => {
             } />
             
             {/* Admin Routes */}
-            <Route path="/admin/*" element={<AdminRoutes />} />
+            <Route
+              path="/admin/*"
+              element={
+                <Routes>
+                  <Route path="login" element={<AdminLogin />} />
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="payments" element={<PaymentsPage />} />
+                  <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+                  <Route path="deposits" element={<AdminDepositsPage />} />
+                  <Route path="plans" element={<AdminPlans />} />
+                  <Route path="plans-subscription" element={<PlansSubscriptionPage />} />
+                  <Route path="affiliates" element={<AffiliatesPage />} />
+                  <Route path="notices" element={<AdminNotices />} />
+                  <Route path="support" element={<SupportManagePage />} />
+                  <Route path="promotions" element={<PromotionsPage />} />
+                  <Route path="pairs" element={<AdminPairs />} />
+                </Routes>
+              }
+            />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

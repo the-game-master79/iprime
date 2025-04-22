@@ -32,7 +32,7 @@ interface AdminLayoutProps {
 }
 
 const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: AdminLayoutProps) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,35 +40,35 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileView(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
-        setSidebarOpen(true);
-      }
+      const isMobile = window.innerWidth < 768;
+      setIsMobileView(isMobile);
+      setSidebarOpen(!isMobile);
     };
 
     window.addEventListener('resize', handleResize);
+    handleResize(); // Call on initial mount
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Close sidebar on mobile when route changes
   useEffect(() => {
     if (isMobileView) {
       setSidebarOpen(false);
     }
   }, [location.pathname, isMobileView]);
 
+  // Check admin authentication
   useEffect(() => {
-    const adminAuth = localStorage.getItem('adminAuth');
-    if (requireAuth && !adminAuth && location.pathname !== '/admin/login') {
-      navigate('/admin/login');
+    if (requireAuth && !isAdminAuthenticated && location.pathname !== '/admin/login') {
+      navigate('/admin/login', { replace: true });
     }
-  }, [requireAuth, navigate, location.pathname]);
+  }, [requireAuth, isAdminAuthenticated, location.pathname, navigate]);
 
   const handleLogout = async () => {
     await logoutAdmin();
-    navigate('/admin/login');
+    navigate('/admin/login', { replace: true });
   };
 
-  // Show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -77,44 +77,44 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
     );
   }
 
-  // Check authentication for protected routes
-  if (requireAuth && !isAdminAuthenticated && location.pathname !== '/admin/login') {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
-  }
-
   return (
     <PageTransition>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-background">
         {showSidebar && isAdminAuthenticated && (
           <>
-            {/* Overlay for mobile */}
+            {/* Mobile overlay */}
             {isMobileView && sidebarOpen && (
               <div
-                className="fixed inset-0 z-10 bg-background/80 backdrop-blur-sm"
+                className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
                 onClick={() => setSidebarOpen(false)}
               />
             )}
             
+            {/* Sidebar */}
             <aside
               className={cn(
-                "fixed inset-y-0 z-20 flex h-full flex-col border-r bg-sidebar transition-all duration-300 ease-in-out",
-                isMobileView
-                  ? `w-64 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-                  : sidebarOpen ? "w-64" : "w-20"
+                "fixed inset-y-0 z-50 flex h-full w-64 flex-col border-r bg-background transition-transform duration-300",
+                isMobileView && !sidebarOpen && "-translate-x-full"
               )}
             >
-              {/* Updated Sidebar Header with Logo */}
-              <div className="flex h-14 items-center justify-center border-b px-4">
+              {/* Sidebar header */}
+              <div className="flex h-14 items-center justify-between border-b px-4">
                 <Link to="/admin/dashboard" className="flex items-center gap-2">
                   <img 
                     src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
                     alt="CloudForex" 
-                    className={cn(
-                      "transition-all duration-300",
-                      sidebarOpen ? "h-8 w-auto" : "h-6 w-auto"
-                    )} 
+                    className="h-8 w-auto"
                   />
                 </Link>
+                {isMobileView && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
 
               <ScrollArea className="flex-1">
@@ -229,18 +229,30 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
             </aside>
           </>
         )}
-        
+
+        {/* Main content */}
         <main 
           className={cn(
-            "flex-1 transition-all duration-300 ease-in-out",
-            showSidebar && isAdminAuthenticated 
-              ? isMobileView 
-                ? "ml-0" 
-                : (sidebarOpen ? "md:ml-64" : "md:ml-20") 
-              : "md:ml-0"
+            "flex-1 transition-all duration-300",
+            showSidebar && isAdminAuthenticated && !isMobileView && "ml-64"
           )}
         >
-          <div className="container py-4">{children}</div>
+          {/* Mobile header */}
+          {showSidebar && isAdminAuthenticated && isMobileView && (
+            <header className="sticky top-0 z-40 flex h-14 items-center border-b bg-background px-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </header>
+          )}
+
+          <div className="container py-4 md:py-8">
+            {children}
+          </div>
         </main>
       </div>
     </PageTransition>
