@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build --base=./",
     "preview": "vite preview",
     "add:magicui": "shadcn-ui add",
-    "host": "vite --host",
-    "prebuild": "node scripts/check-env.js"
+    "host": "vite --host"
   },
   "dependencies": {
     "@hcaptcha/react-hcaptcha": "^1.12.0",
