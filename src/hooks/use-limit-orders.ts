@@ -32,11 +32,16 @@ export function useLimitOrders(
         const currentPrice = prices[trade.pair];
         if (!currentPrice) continue;
 
-        // For buy orders: Execute when ask price <= limit price
-        // For sell orders: Execute when bid price >= limit price
+        // Get bid/ask prices
+        const currentBid = parseFloat(currentPrice.bid);
+        const currentAsk = parseFloat(currentPrice.ask);
+        const limitPrice = trade.limitPrice;
+
+        // For buy orders: Execute when ask price becomes less than or equal to limit price
+        // For sell orders: Execute when bid price becomes greater than or equal to limit price
         const shouldExecute = trade.type === 'buy'
-          ? parseFloat(currentPrice.ask) <= trade.limitPrice
-          : parseFloat(currentPrice.bid) >= trade.limitPrice;
+          ? currentAsk <= limitPrice  // Buy when ask price reaches limit
+          : currentBid >= limitPrice; // Sell when bid price reaches limit
 
         if (shouldExecute) {
           try {
@@ -45,7 +50,7 @@ export function useLimitOrders(
               .from('trades')
               .update({
                 status: 'open',
-                open_price: trade.limitPrice,
+                open_price: limitPrice,
                 executed_at: new Date().toISOString()
               })
               .eq('id', trade.id)
@@ -58,7 +63,7 @@ export function useLimitOrders(
 
             toast({
               title: "Limit Order Executed",
-              description: `${trade.type.toUpperCase()} order executed at $${trade.limitPrice}`,
+              description: `${trade.type.toUpperCase()} order executed at $${limitPrice}`,
             });
           } catch (error) {
             console.error('Error executing limit order:', error);
@@ -72,7 +77,7 @@ export function useLimitOrders(
       }
     };
 
-    // Check prices every 100ms
+    // Check prices every 100ms for better price tracking
     const interval = setInterval(checkLimitOrders, 100);
     return () => clearInterval(interval);
   }, [trades, prices, onExecute]);

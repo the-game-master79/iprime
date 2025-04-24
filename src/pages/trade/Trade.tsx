@@ -1,1314 +1,59 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { MagnifyingGlass, ChartLine, Globe, X } from "@phosphor-icons/react";
-import { supabase } from "@/lib/supabase";
-import { TradingLayout } from "@/components/layout/TradingLayout";
-import TradingViewWidget from "@/components/charts/TradingViewWidget";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { toast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
-import { useBreakpoints } from "@/hooks/use-breakpoints";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Navigate, useLocation } from "react-router-dom";
-import { isForexTradingTime } from "@/lib/utils";
-import { TrendingUp, Menu, AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { wsManager } from '@/services/websocket-manager';
+import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { useLimitOrders } from '@/hooks/use-limit-orders';
-
-// Add these interfaces near the top after existing imports
-interface TradingPair {
-  symbol: string;
-  name: string;
-  short_name: string;
-  type: 'crypto' | 'forex';
-  min_leverage: number;
-  max_leverage: number;
-  leverage_options: number[];
-  is_active: boolean;
-  max_lots: number;
-  image_url?: string;
-}
-
-// Change process.env to import.meta.env
-const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
-
-// Add this helper function at the top level
-const parseMessage = (message: string) => {
-  const messageRegex = /~m~(\d+)~m~(.*)/;
-  const matches = message.match(messageRegex);
-  if (!matches) return null;
-  
-  try {
-    return JSON.parse(matches[2]);
-  } catch {
-    // If it's a ping message, return the number
-    if (matches[2].startsWith('~h~')) {
-      return { type: 'ping', number: matches[2].replace('~h~', '') };
-    }
-    return null;
-  }
-};
-
-const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
-const TRADERMADE_WS_URL = 'wss://marketdata.tradermade.com/feedadv';
-
-const MAX_RECONNECT_ATTEMPTS = 5;
-const INITIAL_RECONNECT_DELAY = 1000;
-const HEARTBEAT_INTERVAL = 30000; // 30 seconds for Tradermade heartbeat
-const PRICE_REFRESH_INTERVAL = 1000; // 1 second for price updates
-
-const formatForexSymbol = (symbol: string) => {
-  // Remove FX: prefix and handle special cases for metals
-  const cleaned = symbol.replace('FX:', '').replace('/', '');
-  // For XAU/USD and XAG/USD, no special formatting needed as they're already in correct format
-  return cleaned;
-};
-
-interface PriceData {
-  price: string;
-  change: string;
-  bid?: string;
-  ask?: string;
-}
-
-// Add these interfaces near the top after existing interfaces
-interface Trade {
-  id: string;
-  pair: string;
-  type: 'buy' | 'sell';
-  status: 'open' | 'pending' | 'closed';
-  openPrice: number;
-  lots: number;
-  currentPrice?: number;
-  pnl?: number;
-  leverage: number;
-  orderType: 'market' | 'limit';
-  limitPrice?: number;
-  openTime: number;
-}
-
-// Add these constants at the top with other constants
-const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
-
-// Add helper to check if pair is JPY
-const isJPYPair = (pair: string): boolean => {
-  // First clean the pair string (remove 'FX:', '/', etc.)
-  const cleanPair = pair.replace(/[^A-Z]/g, '');
-  // Check if pair ends with JPY
-  return /JPY$/.test(cleanPair);
-};
-
-// Add this helper function to get pip value
-const getPipValue = (pair: string) => {
-  if (!pair) return 0; // Guard against empty pair
-
-  if (pair.includes('BINANCE:')) {
-    return 0.00001; // Crypto uses 5 decimals standard
-  }
-
-  // JPY pairs use 0.01 as pip value, others use 0.0001
-  return isJPYPair(pair) ? 0.01 : 0.0001;
-};
-
-// Update calculateRequiredMargin function
-const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
-  if (!price || !lots || !leverage) return 0;
-  
-  // Double the leverage for JPY pairs to reduce margin requirement
-  const effectiveLeverage = Math.max(1, isJPYPair(pair) ? leverage * 20 : leverage);
-  const positionSize = isCrypto ? price * lots : price * lots * 100000;
-  const cappedPositionSize = Math.min(positionSize, 100000 * lots * (isCrypto ? 1 : 100000));
-  
-  return cappedPositionSize / effectiveLeverage;
-};
-
-// Update calculatePnL function
-const calculatePnL = (trade: Trade, currentPrice: number) => {
-  if (!currentPrice || !trade.openPrice) return 0;
-  if (!trade.pair || !trade.lots) return 0; // Guard against invalid trade data
-  
-  const isCrypto = trade.pair.includes('BINANCE:');
-  
-  if (isCrypto) {
-    // For crypto, calculate P&L in USDT terms
-    // 1 lot = 1 unit of base currency
-    const positionSize = trade.lots; // Direct lot size as position size
-    const priceDifference = trade.type === 'buy' 
-      ? currentPrice - trade.openPrice
-      : trade.openPrice - currentPrice;
-    // P&L = position size * price difference (in USDT)
-    return priceDifference * positionSize;
-  }
-  
-  // For forex, calculate based on standard lot size and pip value
-  // 1 standard lot = 100,000 units of base currency
-  const standardLotSize = 100000;
-  const totalUnits = trade.lots * standardLotSize;
-  
-  // Get pip value and calculate pip movement
-  const pipValue = getPipValue(trade.pair);
-  
-  // Guard against zero pip value
-  if (pipValue === 0) {
-    console.warn(`Invalid pip value for pair ${trade.pair}`);
-    return 0;
-  }
-  
-  const priceDifference = trade.type === 'buy'
-    ? currentPrice - trade.openPrice
-    : trade.openPrice - currentPrice;
-  const pips = priceDifference / pipValue;
-  
-  // Calculate P&L
-  // For USD pairs: P&L = (total units * pip value * pips)
-  // For JPY pairs: P&L = (total units * pip value * pips) / current price
-  try {
-    if (isJPYPair(trade.pair)) {
-      // Avoid division by zero for JPY pairs
-      return currentPrice > 0 
-        ? (totalUnits * pipValue * pips) / currentPrice
-        : 0;
-    }
-    return totalUnits * pipValue * pips;
-  } catch (error) {
-    console.error('Error calculating PnL:', error);
-    return 0;
-  }
-};
-
-// Add these types at the top with other interfaces
-interface PriceAnimation {
-  direction: 'up' | 'down';
-  timestamp: number;
-}
-
-const TradeSidebar = ({ 
-  selectedPair, 
-  onPairSelect,
-  isOpen,
-  pairPrices,
-  isMobile = false,
-  tradingPairs
-}: { 
-  selectedPair: string, 
-  onPairSelect: (pair: string) => void,
-  isOpen: boolean,
-  pairPrices: Record<string, PriceData>,
-  isMobile?: boolean,
-  tradingPairs: TradingPair[]
-}) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("crypto");
-
-  // Add price animation state
-  const [priceAnimations, setPriceAnimations] = useState<Record<string, PriceAnimation>>({});
-  const isMountedRef = useRef(true); // Add mount status ref
-  const prevPrices = useRef<Record<string, string>>({});
-
-  // Update price animation effect with mount check and cleanup
-  useEffect(() => {
-    const animations: Record<string, PriceAnimation> = {};
-    Object.entries(pairPrices).forEach(([symbol, data]) => {
-      const prevPrice = parseFloat(prevPrices.current[symbol] || '0');
-      const newPrice = parseFloat(data.bid || '0');
-      if (prevPrice !== newPrice && prevPrice !== 0) {
-        animations[symbol] = {
-          direction: newPrice > prevPrice ? 'up' : 'down',
-          timestamp: Date.now()
-        };
-      }
-      // Update previous prices
-      prevPrices.current[symbol] = data.bid || '0';
-    });
-    
-    if (isMountedRef.current) {
-      setPriceAnimations(animations);
-    }
-    
-    const timer = setTimeout(() => {
-      if (isMountedRef.current) {
-        setPriceAnimations({});
-      }
-    }, 1000);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [pairPrices]);
-
-  // Add cleanup for mount status ref
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  // Handle tab changes
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    // Select first pair when tab changes
-    const firstPair = tradingPairs.find(p => p.type === tab)?.symbol;
-    if (firstPair) {
-      onPairSelect(firstPair);
-    }
-  };
-
-  const filteredPairs = tradingPairs.filter(pair =>
-    pair.type === activeTab &&
-    (pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    pair.name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  const navigate = useNavigate();
-  const handlePairSelect = (pair: string) => {
-    if (isMobile) {
-      navigate(`/trade/${encodeURIComponent(pair)}`);
-    } else {
-      onPairSelect(pair);
-    }
-  };
-
-  // Update the price display in the rendering section for both crypto and forex tabs
-  const renderPriceDisplay = (symbol: string, price: string, animation?: PriceAnimation) => {
-    const isAnimating = animation && Date.now() - animation.timestamp < 1000;
-    
-    return (
-      <span className={cn(
-        "font-mono font-medium transition-colors duration-300",
-        isAnimating && animation.direction === 'up' && "text-green-500",
-        isAnimating && animation.direction === 'down' && "text-red-500"
-      )}>
-        {price}
-      </span>
-    );
-  };
-
-  return (
-    <div className={cn(
-      "bg-white border-r shadow-sm transition-all duration-300",
-      isMobile ? "w-full h-[calc(100vh-3.5rem)]" : (
-        "absolute left-0 top-14 bottom-0 w-72 " + (isOpen ? "translate-x-0" : "-translate-x-full")
-      )
-    )}>
-      <div className="flex flex-col h-full">
-        <div className="p-3 border-b">
-          <div className="relative">
-            <MagnifyingGlass 
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60"
-              aria-hidden="true"
-            />
-            <Input
-              placeholder="Search markets..."
-              className="pl-9 h-9 text-sm bg-muted/30 border-0 focus-visible:ring-1"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <Tabs defaultValue="crypto" className="flex-1 flex flex-col">
-          <TabsList className="h-11 p-1 bg-muted/30 border-b">
-            <TabsTrigger value="crypto" onClick={() => handleTabChange("crypto")} className="flex-1 text-xs">
-              <ChartLine 
-                className="h-3.5 w-3.5 mr-2" 
-                aria-hidden="true"
-              />
-              Crypto
-            </TabsTrigger>
-            <TabsTrigger value="forex" onClick={() => handleTabChange("forex")} className="flex-1 text-xs">
-              <Globe 
-                className="h-3.5 w-3.5 mr-2" 
-                aria-hidden="true"
-              />
-              Forex
-            </TabsTrigger>
-          </TabsList>
-
-          <ScrollArea className="flex-1 px-1.5 py-2">
-            <TabsContent value="crypto" className="m-0">
-              <div className="space-y-1">
-                {filteredPairs.map((pair) => {
-                  const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
-                  const symbol = pair.symbol.replace('BINANCE:', '').replace('USDT', '').toLowerCase();
-                  const priceAnimation = priceAnimations[pair.symbol];
-                  
-                  return (
-                    <Button
-                      key={pair.symbol}
-                      variant={selectedPair === pair.symbol ? "secondary" : "ghost"}
-                      className={cn(
-                        "w-full justify-between h-14 px-3 transition-colors rounded-lg",
-                        selectedPair === pair.symbol ? "bg-muted" : "hover:bg-muted/50"
-                      )}
-                      onClick={() => handlePairSelect(pair.symbol)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {pair.image_url ? (
-                          <img 
-                            src={pair.image_url}
-                            alt={pair.name}
-                            className="h-8 w-8"
-                            onError={(e) => {
-                              e.currentTarget.src = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/generic.png';
-                            }}
-                          />
-                        ) : (
-                          <TrendingUp 
-                            className="h-5 w-5 text-primary" 
-                            aria-label="Trading chart icon"
-                          />
-                        )}
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-semibold">{pair.name}</span>
-                          <span className="text-xs text-muted-foreground">{pair.short_name}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5">
-                        {renderPriceDisplay(pair.symbol, priceData.bid, priceAnimation)}
-                        <span className={cn(
-                          "text-xs font-medium px-1.5 py-0.5 rounded-full",
-                          parseFloat(priceData.change) < 0 
-                            ? "bg-red-500/10 text-red-500" 
-                            : "bg-green-500/10 text-green-500"
-                        )}>
-                          {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-                        </span>
-                      </div>
-                    </Button>
-                  );
-                })}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="forex" className="m-0">
-              <div className="space-y-1">
-                {filteredPairs.map((pair) => {
-                  const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
-                  const priceAnimation = priceAnimations[pair.symbol];
-                  return (
-                    <Button
-                      key={pair.symbol}
-                      variant={selectedPair === pair.symbol ? "secondary" : "ghost"}
-                      className={cn(
-                        "w-full justify-between h-14 px-3 transition-colors rounded-lg",
-                        selectedPair === pair.symbol ? "bg-muted" : "hover:bg-muted/50"
-                      )}
-                      onClick={() => handlePairSelect(pair.symbol)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                          {pair.image_url ? (
-                            <img 
-                              src={pair.image_url}
-                              alt={pair.name}
-                              className="h-6 w-6"
-                            />
-                          ) : (
-                            <TrendingUp 
-                              className="h-5 w-5 text-primary" 
-                              aria-label="Trading chart icon"
-                            />
-                          )}
-                        </div>
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-semibold">{pair.name}</span>
-                          <span className="text-xs text-muted-foreground">{pair.short_name}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-0.5">
-                        {renderPriceDisplay(pair.symbol, priceData.bid, priceAnimation)}
-                        <span className={cn(
-                          "text-xs font-medium px-1.5 py-0.5 rounded-full",
-                          parseFloat(priceData.change) < 0 
-                            ? "bg-red-500/10 text-red-500" 
-                            : "bg-green-500/10 text-green-500"
-                        )}>
-                          {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-                        </span>
-                      </div>
-                    </Button>
-                  );
-                })}
-              </div>
-            </TabsContent>
-          </ScrollArea>
-        </Tabs>
-      </div>
-    </div>
-  );
-};
-
-// Update the TradingPanel component to remove flex-col and h-full since parent will control height
-interface TradingPanelProps {
-  selectedPair: string;
-  pairPrices: Record<string, PriceData>;
-  onTrade: (params: {
-    type: 'buy' | 'sell';
-    orderType: 'market' | 'limit';
-    lots: number;  // Changed from string to number
-    leverage: number; // Changed from string to number
-    limitPrice?: string;
-  }) => void;
-  userBalance: number;
-  tradingPairs: TradingPair[];
-}
-
-const TradingPanel = ({ selectedPair, pairPrices, onTrade, userBalance, tradingPairs }: TradingPanelProps) => {
-  const [lots, setLots] = useState<number>(0.01);
-  const [lotsError, setLotsError] = useState("");
-  const [marginRequired, setMarginRequired] = useState(0);
-  const [leverage, setLeverage] = useState<number>(100);
-  const [orderType, setOrderType] = useState<"market" | "limit">("market");
-  const [limitPrice, setLimitPrice] = useState<string>("");
-  const [showLeverageDialog, setShowLeverageDialog] = useState(false);
-  const [selectedLeverage, setSelectedLeverage] = useState(leverage);
-  const [marginError, setMarginError] = useState<string | null>(null);
-
-  const isForexPair = selectedPair.includes('FX:');
-  const isTradeDisabled = isForexPair && !isForexTradingTime();
-  const disabledMessage = isTradeDisabled ? "Forex trading is closed during weekends" : "";
-
-  const isForexClosed = isForexPair && !isForexTradingTime();
-
-  // Remove the WebSocket connection and use pairPrices directly
-  const priceData = pairPrices[selectedPair] || { price: '0', change: '0', bid: '0', ask: '0' };
-
-  // Update margin calculation to use leverage
-  const calculateMargin = useCallback(() => {
-    const lotSize = lots || 0;
-    const price = parseFloat(priceData.price) || 0;
-    const leverageRatio = leverage || 1;
-    const isCrypto = selectedPair.includes('BINANCE:');
-    
-    // Calculate margin requirement (margin = position size / leverage)
-    const positionSize = isCrypto ? price * lotSize : price * lotSize * 100000; // Standard lot size of 100,000 for forex
-    const margin = positionSize / leverageRatio;
-    
-    setMarginRequired(margin);
-  }, [lots, priceData.price, leverage, selectedPair]);
-
-  // Update margin calculation to include validation
-  const validateMargin = useCallback(() => {
-    const lotSize = lots || 0;
-    const price = parseFloat(priceData.price) || 0;
-    const leverageRatio = leverage || 1;
-    const isCrypto = selectedPair.includes('BINANCE:');
-    
-    const requiredMargin = calculateRequiredMargin(price, lotSize, leverageRatio, isCrypto, selectedPair);
-    setMarginRequired(requiredMargin);
-
-    // Check if user has enough balance
-    if (requiredMargin > userBalance) {
-      setMarginError(`Insufficient balance. Required margin: $${requiredMargin.toFixed(2)}`);
-      return false;
-    }
-    
-    setMarginError(null);
-    return true;
-  }, [lots, priceData.price, leverage, userBalance, selectedPair]);
-
-  useEffect(() => {
-    calculateMargin();
-  }, [lots, priceData.price, calculateMargin]);
-
-  useEffect(() => {
-    validateMargin();
-  }, [lots, priceData.price, leverage, validateMargin]);
-
-  // Add lots validation
-  const validateLots = (value: number) => {
-    const isCrypto = selectedPair.includes('BINANCE:');
-    
-    if (isNaN(value) || value <= 0) {
-      setLotsError("Lots must be greater than 0");
-      return false;
-    }
-
-    // Different max lots for crypto and forex
-    const maxLots = isCrypto ? 100 : 200; // Lower max for crypto due to higher values
-    if (value > maxLots) {
-      setLotsError(`Maximum ${maxLots} lots allowed`);
-      return false;
-    }
-
-    setLotsError("");
-    return true;
-  };
-
-  const handleLotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || 0;
-    setLots(value);
-    validateLots(value);
-  };
-
-  // Add limit price validation
-  const validateLimitPrice = (value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue) || numValue <= 0) {
-      return false;
-    }
-    return true;
-  };
-
-  const handleLimitPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value === "" || validateLimitPrice(value)) {
-      setLimitPrice(value);
-    }
-  };
-
-  // Remove the WebSocket effect and only keep the limit price initialization
-  useEffect(() => {
-    if (orderType === "limit") {
-      const currentPrice = selectedPair.includes('FX:')
-        ? parseFloat(priceData.ask || '0').toFixed(5)
-        : parseFloat(priceData.ask || '0').toFixed(2);
-      setLimitPrice(currentPrice.toString());
-    }
-  }, [orderType]); // Remove selectedPair and priceData.ask dependencies to keep price static
-
-  const handleTrade = (type: 'buy' | 'sell') => {
-    if (!validateMargin()) {
-      toast({
-        variant: "destructive",
-        title: "Trading Error",
-        description: marginError,
-      });
-      return;
-    }
-
-    if (lotsError) {
-      toast({
-        variant: "destructive",
-        title: "Trading Error",
-        description: lotsError,
-      });
-      return;
-    }
-
-    onTrade({
-      type,
-      orderType,
-      lots,
-      leverage,
-      limitPrice: orderType === 'limit' ? limitPrice : undefined
-    });
-  };
-
-  // Get current pair's leverage options and limits
-  const currentPair = useMemo(() => 
-    tradingPairs.find(p => p.symbol === selectedPair), 
-    [selectedPair, tradingPairs]
-  );
-
-  // Add this helper function for price formatting
-  const formatPriceDisplay = (price: string | number | undefined) => {
-    if (!price) return { whole: '0', decimal: '00000' };
-    
-    // Convert price to string if it's a number
-    const priceStr = price.toString();
-    const [whole, decimal = '00000'] = priceStr.split('.');
-    
-    return {
-      whole,
-      decimal: selectedPair.includes('FX:') 
-        ? decimal.padEnd(5, '0').slice(0, 5)
-        : decimal.padEnd(2, '0').slice(0, 2)
-    };
-  };
-
-  return (
-    <div className="w-80 border-l bg-white flex flex-col relative">
-      {/* Close Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="absolute right-2 top-2 hover:bg-muted/50"
-        onClick={() => setIsSidebarOpen(false)}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-
-      {/* Price Information */}
-      <div className="p-4 pt-10 border-b space-y-4">
-        <div className="flex flex-col">
-          <div className="flex items-baseline gap-2 mb-1">
-            <h2 className="text-xl font-semibold">{selectedPair.split(':')[1]}</h2>
-            <div className={cn(
-              "px-2 py-0.5 rounded text-xs font-medium",
-              parseFloat(priceData.change) >= 0 
-                ? "bg-blue-50 text-blue-600" 
-                : "bg-red-50 text-red-600"
-            )}>
-              {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-xs text-muted-foreground block mb-1">Ask</span>
-              <span className="font-mono text-lg">${priceData.ask}</span>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground block mb-1">Bid</span>
-              <span className="font-mono text-lg">${priceData.bid}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trading Controls */}
-      <div className="flex-1 p-4 space-y-6">
-        {/* Order Type Selector using Tabs */}
-        <Tabs defaultValue="market" onValueChange={value => setOrderType(value as "market" | "limit")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="market">Market</TabsTrigger>
-            <TabsTrigger value="limit">Limit</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {orderType === "limit" && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Limit Price</label>
-            <Input
-              type="number"
-              value={limitPrice}
-              onChange={handleLimitPriceChange}
-              step={selectedPair.includes('FX:') ? "0.00001" : "0.01"}
-              min="0"
-              className="text-right font-mono"
-            />
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <label className="text-sm font-medium">Position Size</label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Max: {currentPair?.max_lots || 0} lots</span>
-            </div>
-          </div>
-          <div className="relative">
-            <Input
-              type="number"
-              value={lots}
-              onChange={handleLotsChange}
-              step="0.01"
-              min="0.01"
-              className={cn(
-                "pr-16 font-mono",
-                lotsError && "border-red-500"
-              )}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowLeverageDialog(true)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-6 px-2"
-            >
-              <span className="text-xs font-semibold text-primary">{leverage}x</span>
-            </Button>
-          </div>
-          {lotsError && <p className="text-xs text-red-500">{lotsError}</p>}
-        </div>
-
-        {/* Trade Info */}
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Required Margin</span>
-            <span className="font-mono">
-              ${marginRequired.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Trading Fee</span>
-            <span>0.1%</span>
-          </div>
-        </div>
-
-        {/* Action Buttons - Updated Layout */}
-        <div className="grid grid-cols-2 gap-2">
-          {marginError && <p className="text-xs text-red-500 col-span-2">{marginError}</p>}
-          
-          <Button
-            className="h-16 bg-blue-600 hover:bg-blue-700"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
-            onClick={() => handleTrade('buy')}
-          >
-            <div className="flex flex-col items-center">
-              <span className="text-xs font-medium mb-1">Buy</span>
-              <div className="font-mono">
-                {(() => {
-                  const price = formatPriceDisplay(orderType === "market" ? priceData.ask : limitPrice);
-                  return (
-                    <div className="flex items-baseline">
-                      <span className="text-sm opacity-80">${price.whole}.</span>
-                      <span className="text-lg">{price.decimal}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </Button>
-          
-          <Button
-            className="h-16 bg-red-600 hover:bg-red-700 text-white border-0"
-            disabled={!!marginError || !!lotsError || !lots || (orderType === "limit" && !limitPrice)}
-            onClick={() => handleTrade('sell')}
-          >
-            <div className="flex flex-col items-center">
-              <span className="text-xs font-medium mb-1">Sell</span>
-              <div className="font-mono">
-                {(() => {
-                  const price = formatPriceDisplay(orderType === "market" ? priceData.bid : limitPrice);
-                  return (
-                    <div className="flex items-baseline">
-                      <span className="text-sm opacity-80">${price.whole}.</span>
-                      <span className="text-lg">{price.decimal}</span>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </Button>
-        </div>
-      </div>
-
-      {/* Keep existing leverage dialog */}
-      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Select Leverage</DialogTitle>
-            <DialogDescription>
-              Choose your preferred leverage level. Higher leverage means higher risk.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {currentPair && (
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <h4 className="font-medium">Available Leverage</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {currentPair.min_leverage}x - {currentPair.max_leverage}x
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {currentPair.leverage_options.map((value) => (
-                    <Button
-                      key={value}
-                      variant={selectedLeverage === value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedLeverage(value)}
-                    >
-                      {value}x
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              onClick={() => {
-                setLeverage(selectedLeverage);
-                setShowLeverageDialog(false);
-              }}
-              className="w-[200px]"
-            >
-              Confirm Leverage
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-const CHART_OVERRIDES = {
-  "mainSeriesProperties.candleStyle.upColor": "#22c55e",
-  "mainSeriesProperties.candleStyle.downColor": "#ef4444",
-  "mainSeriesProperties.candleStyle.borderUpColor": "#22c55e",
-  "mainSeriesProperties.candleStyle.borderDownColor": "#ef4444",
-  "mainSeriesProperties.candleStyle.wickUpColor": "#22c55e",
-  "mainSeriesProperties.candleStyle.wickDownColor": "#ef4444",
-  "paneProperties.background": "#ffffff",
-  "paneProperties.vertGridProperties.color": "#f1f5f9",
-  "paneProperties.horzGridProperties.color": "#f1f5f9",
-  "symbolWatermarkProperties.transparency": 90,
-  "scalesProperties.textColor": "#64748b",
-  "mainSeriesProperties.showCountdown": true,
-};
-
-// Add this before the Trade component
-const getChartConfiguration = (pair: string, container: string) => {
-  // Determine if it's a crypto or forex pair
-  const isCrypto = pair.includes('BINANCE:');
-  
-  return {
-    autosize: true,
-    symbol: pair,
-    interval: "1",
-    container: container,
-    library_path: "/charting_library/",
-    locale: "en",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    theme: "light",
-    enabled_features: [
-      "hide_left_toolbar_by_default",
-      "use_localstorage_for_settings",
-      "create_volume_indicator_by_default",
-    ],
-    disabled_features: [
-      "header_symbol_search",
-      "header_settings",
-      "header_compare",
-      "header_undo_redo",
-      "show_logo_on_all_charts",
-      "header_screenshot",
-    ],
-    charts_storage_url: "https://saveload.tradingview.com",
-    charts_storage_api_version: "1.1",
-    client_id: "tradingview.com",
-    user_id: "public_user_id",
-    fullscreen: false,
-    overrides: CHART_OVERRIDES,
-    loading_screen: { backgroundColor: "#ffffff" },
-    studies_overrides: {
-      "volume.volume.color.0": "#ef4444",
-      "volume.volume.color.1": "#22c55e",
-    },
-    time_frames: [
-      { text: "1D", resolution: "1D" },
-      { text: "4H", resolution: "240" },
-      { text: "1H", resolution: "60" },
-      { text: "30m", resolution: "30" },
-      { text: "15m", resolution: "15" },
-      { text: "5m", resolution: "5" },
-      { text: "1m", resolution: "1" },
-    ],
-  };
-};
-
-const TradingActivity = ({ 
-  trades, 
-  currentPrices,
-  onCloseTrade
-}: { 
-  trades: Trade[]; 
-  currentPrices: Record<string, PriceData>;
-  onCloseTrade: (tradeId: string) => void;
-}) => {
-  const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
-  const [height, setHeight] = useState(200);
-  const [isLoading, setIsLoading] = useState(false);
-  const minHeight = 100;
-  const maxHeight = 400;
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // ...existing resize handler code...
-  };
-
-  // This filters trades based on status, so closed trades appear in closed tab
-  const filteredTrades = useMemo(() => {
-    return trades
-      .filter(trade => trade.status === activeTab)
-      .sort((a, b) => b.openTime - a.openTime) // Show newest first
-      .map(trade => {
-        const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
-        // Only calculate P&L for open/closed trades, set to 0 for pending
-        const pnl = trade.status === 'pending' ? 0 : 
-                   trade.status === 'closed' ? trade.pnl || 0 :
-                   calculatePnL(trade, currentPrice);
-        return { ...trade, currentPrice, pnl };
-      });
-  }, [trades, activeTab, currentPrices]);
-
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
-  };
-
-  const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    toast({
-      title: "Copied",
-      description: "Trade ID copied to clipboard",
-    });
-  };
-
-  // Calculate total and today's P&L
-  const { totalPnL, todayPnL } = useMemo(() => {
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    return trades.reduce((acc, trade) => {
-      // Only include closed trades
-      if (trade.status === 'closed') {
-        acc.totalPnL += trade.pnl || 0;
-        
-        // Check if trade was closed today
-        const closeDate = new Date(trade.openTime);
-        if (closeDate >= startOfDay) {
-          acc.todayPnL += trade.pnl || 0;
-        }
-      }
-      return acc;
-    }, { totalPnL: 0, todayPnL: 0 });
-  }, [trades]);
-
-  return (
-    <div style={{ height }} className="relative bg-white border-t">
-      <div 
-        className="absolute -top-1 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/10" 
-        onMouseDown={handleMouseDown}
-      />
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-2 px-3 border-b bg-muted/30">
-          <div className="flex items-center gap-1">
-            <Button 
-              variant={activeTab === 'open' ? "secondary" : "ghost"}
-              onClick={() => setActiveTab('open')}
-              className="h-7 text-xs px-2.5"
-            >
-              Open ({trades.filter(t => t.status === 'open').length})
-            </Button>
-            <Button 
-              variant={activeTab === 'pending' ? "secondary" : "ghost"}
-              onClick={() => setActiveTab('pending')}
-              className="h-7 text-xs px-2.5"
-            >
-              Pending ({trades.filter(t => t.status === 'pending').length})
-            </Button>
-            <Button 
-              variant={activeTab === 'closed' ? "secondary" : "ghost"}
-              onClick={() => setActiveTab('closed')}
-              className="h-7 text-xs px-2.5"
-            >
-              Closed ({trades.filter(t => t.status === 'closed').length})
-            </Button>
-          </div>
-
-          {activeTab === 'closed' && (
-            <div className="flex gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Total P&L:</span>
-                <span className={cn(
-                  "font-mono font-medium",
-                  totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : "text-muted-foreground"
-                )}>
-                  ${totalPnL.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Today's P&L:</span>
-                <span className={cn(
-                  "font-mono font-medium",
-                  todayPnL > 0 ? "text-green-500" : todayPnL < 0 ? "text-red-500" : "text-muted-foreground"
-                )}>
-                  ${todayPnL.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <table className="w-full border-collapse">
-              <thead className="bg-muted/50">
-                <tr className="text-xs font-medium text-muted-foreground"
-                  ><th className="text-left p-2 pl-4">Symbol</th
-                  ><th className="text-right p-2">Type</th
-                  ><th className="text-right p-2">Size</th
-                  ><th className="text-left p-2">Open Price</th
-                  ><th className="text-right p-2">Current</th
-                  ><th className="text-left p-2">Position ID</th
-                  ><th className="text-left p-2">Open Time</th
-                  ><th className="text-right p-2 pr-4">P&L</th
-                  ><th className="w-10"></th
-                ></tr>
-              </thead>
-              <tbody className="text-sm">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={9} className="text-center p-4 text-muted-foreground">
-                      Loading trades...
-                    </td>
-                  </tr>
-                ) : filteredTrades.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center p-4 text-muted-foreground">
-                      No {activeTab} trades found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredTrades.map((trade) => {
-                    const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
-                    const pnl = trade.status === 'open' ? calculatePnL(trade, currentPrice) : trade.pnl || 0;
-                    
-                    return (
-                      <tr key={trade.id} className="border-b border-border/50 hover:bg-muted/50">
-                        <td className="p-2 pl-4 font-medium">{trade.pair.split(':')[1]}</td>
-                        <td className="p-2 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <div className={cn(
-                              "h-2 w-2 rounded-full",
-                              trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
-                            )} />
-                            {trade.type.toUpperCase()}
-                          </div>
-                        </td>
-                        <td className="p-2 text-right font-mono">{trade.lots}</td>
-                        <td className="p-2 text-left font-mono">${trade.openPrice.toFixed(5)}</td>
-                        <td className="p-2 text-right font-mono">${currentPrice.toFixed(5)}</td>
-                        <td className="p-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyId(trade.id)}
-                            className="h-6 font-mono text-xs hover:bg-muted"
-                          >
-                            {trade.id.slice(0, 8)}...
-                          </Button>
-                        </td>
-                        <td className="p-2 text-muted-foreground">
-                          {formatTime(trade.openTime)}
-                        </td>
-                        <td className={cn("p-2 pr-4 text-right font-medium font-mono",
-                          pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : "text-muted-foreground"
-                        )}>
-                          ${pnl.toFixed(2)}
-                        </td>
-                        <td className="w-10 p-2">
-                          {(trade.status === 'open' || trade.status === 'pending') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-500"
-                              onClick={() => onCloseTrade(trade.id)}
-                              aria-label={`Close trade ${trade.id}`}
-                            >
-                              <X className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </ScrollArea>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { TradingLayout } from "@/components/layout/TradingLayout";
+import { TradeSidebar } from "@/components/trading/TradeSidebar";
+import { TradingPanel } from "@/components/trading/TradingPanel";
+import { TradingActivity } from "@/components/trading/TradingActivity";
+import { toast } from "@/components/ui/use-toast";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import TradingViewWidget from "@/components/charts/TradingViewWidget";
+import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading";
+import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin, calculateTradeValue } from "@/utils/trading";
 
 const Trade = () => {
   const { isMobile } = useBreakpoints();
   const { pair } = useParams();
   const location = useLocation();
 
-  // If on mobile root trade route, redirect to select page
-  if (isMobile && location.pathname === '/trade') {
-    return <Navigate to="/trade/select" replace />;
-  }
-
-  // Initialize selected pair state
-  const [selectedPair, setSelectedPair] = useState(
-    pair ? decodeURIComponent(pair) : ''
-  );
+  // Base states
+  const [selectedPair, setSelectedPair] = useState(pair ? decodeURIComponent(pair) : '');
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile); // Update initial state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<any>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
-
-  // Add new state for trading pairs
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [defaultLeverage, setDefaultLeverage] = useState(100);
 
-  // Add WebSocket handling logic
+  // Effect for WebSocket price updates
   useEffect(() => {
-    let cryptoWs: WebSocket | null = null;
-    let forexWs: WebSocket | null = null;
-    let heartbeatInterval: NodeJS.Timeout;
+    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: priceData
+      }));
+    });
 
-    const cleanup = () => {
-      // Close existing WebSocket connections
-      if (cryptoWs?.readyState === WebSocket.OPEN) {
-        cryptoWs.close();
-        cryptoWs = null;
-      }
-      if (forexWs?.readyState === WebSocket.OPEN) {
-        forexWs.close();
-        forexWs = null;
-      }
-      // Clear intervals
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
-    };
-
-    // Clean up first to avoid duplicate connections
-    cleanup();
-
-    const initializeCryptoWebSocket = () => {
-      if (cryptoWs?.readyState === WebSocket.OPEN) return;
-
-      cryptoWs = new WebSocket(BINANCE_WS_URL);
-      const cryptoPairs = tradingPairs.filter(pair => pair.type === 'crypto').map(pair => 
-        pair.symbol.toLowerCase().replace('binance:', '')
-      );
-
-      cryptoWs.onopen = () => {
-        const subscribeMsg = {
-          method: "SUBSCRIBE",
-          params: cryptoPairs.map(symbol => `${symbol}@ticker`),
-          id: 1
-        };
-        cryptoWs.send(JSON.stringify(subscribeMsg));
-      };
-
-      cryptoWs.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.e === '24hrTicker') {
-            setPairPrices(prev => ({
-              ...prev,
-              [`BINANCE:${data.s}`]: {
-                price: parseFloat(data.c).toFixed(5),
-                bid: parseFloat(data.b).toFixed(5),
-                ask: parseFloat(data.a).toFixed(5),
-                change: parseFloat(data.P).toFixed(2)
-              }
-            }));
-          }
-        } catch (error) {
-          console.error('Error parsing crypto data:', error);
-        }
-      };
-
-      cryptoWs.onclose = () => {
-        setTimeout(initializeCryptoWebSocket, 5000); // Attempt to reconnect after 5 seconds
-      };
-    };
-
-    // Initialize WebSocket connections if we have trading pairs
     if (tradingPairs.length > 0) {
-      initializeCryptoWebSocket();
-
-      // Initialize forex WebSocket with batch processing only
-      if (tradermadeApiKey) {
-        forexWs = new WebSocket(TRADERMADE_WS_URL);
-        const forexPairs = tradingPairs.filter(pair => pair.type === 'forex').map(pair => formatForexSymbol(pair.symbol));
-
-        forexWs.onopen = () => {
-          console.log('Forex WebSocket opened');
-          
-          // Create batches of 10 pairs
-          const batchSize = 10;
-          const forexPairs = tradingPairs
-            .filter(pair => pair.type === 'forex')
-            .map(pair => formatForexSymbol(pair.symbol));
-
-          // Split pairs into batches
-          for (let i = 0; i < forexPairs.length; i += batchSize) {
-            const batch = forexPairs.slice(i, Math.min(i + batchSize, forexPairs.length));
-            
-            // Subscribe to each batch
-            const subscribeMsg = {
-              userKey: tradermadeApiKey,
-              symbol: batch.join(','),
-              _type: "subscribe"
-            };
-            
-            // Add small delay between batch subscriptions
-            setTimeout(() => {
-              if (forexWs?.readyState === WebSocket.OPEN) {
-                console.log(`Subscribing to forex batch ${i/batchSize + 1}:`, batch);
-                forexWs.send(JSON.stringify(subscribeMsg));
-              }
-            }, i * 100); // 100ms delay between batches
-          }
-
-          // Setup heartbeat only
-          heartbeatInterval = setInterval(() => {
-            if (forexWs?.readyState === WebSocket.OPEN) {
-              forexWs.send(JSON.stringify({ heartbeat: "1" }));
-            }
-          }, HEARTBEAT_INTERVAL);
-        };
-
-        forexWs.onmessage = (event) => {
-          try {
-            if (typeof event.data === 'string' && !event.data.startsWith('{')) {
-              return;
-            }
-
-            const data = JSON.parse(event.data);
-            
-            if (data.type === "HEARTBEAT") return;
-            
-            // Handle subscription confirmations
-            if (data.type === "SUBSCRIPTION_STATUS") {
-              console.log('Forex subscription status:', data);
-              return;
-            }
-
-            // Handle price updates
-            if (data.symbol && data.bid && data.ask) {
-              const formattedSymbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
-              
-              setPairPrices(prev => {
-                const oldBid = parseFloat(prev[formattedSymbol]?.bid || data.bid);
-                const newBid = parseFloat(data.bid);
-                // Calculate percentage change
-                const change = oldBid ? ((newBid - oldBid) / oldBid * 100) : 0;
-                
-                return {
-                  ...prev,
-                  [formattedSymbol]: {
-                    price: data.bid,
-                    bid: data.bid,
-                    ask: data.ask,
-                    change: change.toFixed(2)
-                  }
-                };
-              });
-            }
-          } catch (error) {
-            console.error('Error handling forex message:', error);
-          }
-        };
-
-        forexWs.onerror = (error) => {
-          console.error('Forex WebSocket error:', error);
-        };
-
-        forexWs.onclose = () => {
-          console.log('Forex WebSocket closed');
-        };
-      }
+      wsManager.watchPairs(tradingPairs.map(p => p.symbol));
     }
 
-    // Clean up on unmount or when dependencies change
-    return cleanup;
+    return () => {
+      unsubscribe();
+      wsManager.disconnect();
+    };
   }, [tradingPairs]);
 
+  // Effect to fetch user balance
   useEffect(() => {
     const fetchUserBalance = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1328,367 +73,7 @@ const Trade = () => {
     fetchUserBalance();
   }, []);
 
-  // Initialize TradingView widget
-  useEffect(() => {
-    const initializeWidget = () => {
-      const container = document.getElementById('chart_container');
-      if (!container || !window.TradingView) {
-        return;
-      }
-
-      // Clear any existing chart
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.remove();
-        chartInstanceRef.current = null;
-      }
-
-      try {
-        // Get configuration based on the selected pair
-        const config = getChartConfiguration(selectedPair, "chart_container");
-        chartInstanceRef.current = new window.TradingView.widget(config);
-      } catch (err) {
-        console.error('Failed to initialize TradingView widget:', err);
-      }
-    };
-
-    // Load TradingView script
-    const loadTradingViewScript = () => {
-      return new Promise((resolve) => {
-        if (window.TradingView) {
-          resolve(window.TradingView);
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.id = 'tradingview-widget';
-        script.type = 'text/javascript';
-        script.src = 'https://s3.tradingview.com/tv.js';
-        script.async = true;
-        script.onload = () => resolve(window.TradingView);
-        document.head.appendChild(script);
-      });
-    };
-
-    // Initialize chart with delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      loadTradingViewScript().then(() => {
-        initializeWidget();
-      });
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (chartInstanceRef.current) {
-        try {
-          chartInstanceRef.current.remove();
-          chartInstanceRef.current = null;
-        } catch (err) {
-          console.error('Error cleaning up chart:', err);
-        }
-      }
-    };
-  }, [selectedPair]);
-
-  // Add this effect after other effects
-  useEffect(() => {
-    // Check pending trades every second for limit price hits
-    const timer = setInterval(async () => {
-      const pendingTrades = trades.filter(t => t.status === 'pending');
-      if (!pendingTrades.length) return;
-
-      for (const trade of pendingTrades) {
-        if (!trade.limitPrice) continue;
-
-        const currentPrice = pairPrices[trade.pair];
-        if (!currentPrice) continue;
-
-        // Check if limit price conditions are met
-        const shouldExecute = trade.type === 'buy' 
-          ? parseFloat(currentPrice.ask) <= trade.limitPrice
-          : parseFloat(currentPrice.bid) >= trade.limitPrice;
-
-        if (shouldExecute) {
-          try {
-            // Use limit price directly as execution price
-            const { error } = await supabase
-              .from('trades')
-              .update({
-                status: 'open',
-                open_price: trade.limitPrice,
-                executed_at: new Date().toISOString()
-              })
-              .eq('id', trade.id)
-              .eq('status', 'pending');
-
-            if (error) throw error;
-
-            // Update local state
-            setTrades(prev => prev.map(t => 
-              t.id === trade.id
-                ? { ...t, status: 'open', openPrice: trade.limitPrice }
-                : t
-            ));
-
-            toast({
-              title: "Limit Order Executed",
-              description: `${trade.type.toUpperCase()} order executed at $${trade.limitPrice}`,
-            });
-          } catch (error) {
-            console.error('Error executing limit order:', error);
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Failed to execute limit order"
-            });
-          }
-        }
-      }
-    }, PRICE_REFRESH_INTERVAL);
-
-    return () => clearInterval(timer);
-  }, [trades, pairPrices]);
-
-  // Add this effect after other effects
-  useEffect(() => {
-    // Set first pairs in tabs
-    const firstCryptoPair = tradingPairs.find(p => p.type === 'crypto')?.symbol;
-    const firstForexPair = tradingPairs.find(p => p.type === 'forex')?.symbol;
-    
-    // Update selectedPair based on active tab
-    if (!selectedPair && firstCryptoPair) {
-      setSelectedPair(firstCryptoPair);
-    }
-  }, [tradingPairs, selectedPair]);
-
-  const formatTradingViewSymbol = (symbol: string) => {
-    if (symbol.includes('BINANCE:')) {
-      return symbol;
-    } else if (symbol.includes('FX:')) {
-      // Convert FX:EUR/USD to EURUSD
-      return symbol.replace('FX:', '').replace('/', '');
-    }
-    return symbol;
-  };
-
-  // Add trade creation function
-  const handleTrade = async (params: {
-    type: 'buy' | 'sell';
-    orderType: 'market' | 'limit';
-    lots: number;
-    leverage: number;
-    limitPrice?: string;
-  }) => {
-    try {
-      const { type, orderType, lots, leverage, limitPrice } = params;
-      
-      // Calculate new trade's margin requirement
-      const calculatedExecutionPrice = orderType === 'market'
-        ? (type === 'buy' 
-            ? parseFloat(pairPrices[selectedPair]?.ask || '0')
-            : parseFloat(pairPrices[selectedPair]?.bid || '0'))
-        : parseFloat(limitPrice || '0');
-
-      const newMarginRequired = calculateRequiredMargin(
-        calculatedExecutionPrice,
-        lots,
-        leverage,
-        selectedPair.includes('BINANCE:'),
-        selectedPair
-      );
-
-      // Calculate current total margin utilization
-      const currentMarginUtilization = calculateTotalMarginUtilization(trades);
-      
-      // Check if total margin would exceed balance
-      if (currentMarginUtilization + newMarginRequired > userBalance) {
-        toast({
-          variant: "destructive",
-          title: "Insufficient Margin",
-          description: `Total margin (${(currentMarginUtilization + newMarginRequired).toFixed(2)}) would exceed available balance (${userBalance.toFixed(2)}). Please close some positions first.`
-        });
-        return;
-      }
-
-      // For limit orders, use the limit price as the initial open price
-      const executionPrice = orderType === 'market'
-        ? (type === 'buy' 
-            ? parseFloat(pairPrices[selectedPair]?.ask || '0')
-            : parseFloat(pairPrices[selectedPair]?.bid || '0'))
-        : parseFloat(limitPrice || '0'); // Use limit price for limit orders
-
-      // Calculate margin amount
-      const marginAmount = calculateRequiredMargin(
-        executionPrice,
-        lots,
-        leverage,
-        selectedPair.includes('BINANCE:'),
-        selectedPair
-      );
-
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "You must be logged in to trade",
-        });
-        return;
-      }
-
-      // Insert trade into database
-      const { data: trade, error } = await supabase
-        .from('trades')
-        .insert({
-          user_id: user.id,
-          pair: selectedPair,
-          type,
-          status: orderType === 'market' ? 'open' : 'pending',
-          open_price: executionPrice,
-          lots,
-          leverage,
-          order_type: orderType,
-          limit_price: orderType === 'limit' ? parseFloat(limitPrice || '0') : null,
-          margin_amount: marginAmount // Add margin amount to trade record
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Add trade to local state
-      setTrades(prev => [{
-        id: trade.id,
-        pair: trade.pair,
-        type: trade.type,
-        status: trade.status,
-        openPrice: trade.open_price || 0,
-        lots: trade.lots,
-        leverage: trade.leverage,
-        orderType: trade.order_type,
-        limitPrice: trade.limit_price,
-        openTime: new Date(trade.created_at).getTime(),
-        pnl: 0
-      }, ...prev]);
-
-      const message = orderType === 'market'
-        ? `Successfully opened ${type.toUpperCase()} position for ${selectedPair} @ $${executionPrice}`
-        : `Successfully placed ${type.toUpperCase()} limit order for ${selectedPair} @ $${limitPrice}`;
-
-      toast({
-        title: orderType === 'market' ? "Trade Opened" : "Limit Order Placed",
-        description: message,
-      });
-    } catch (error) {
-      console.error('Error creating trade:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Total margin will exceed available balance. Please exit positions first to free up margin!"
-      });
-    }
-  };
-
-// ...existing code...
-const handleCloseTrade = async (tradeId: string) => {
-  try {
-    const trade = trades.find(t => t.id === tradeId);
-    if (!trade) return;
-
-    // If trade is pending, just update status to closed with 0 PnL
-    if (trade.status === 'pending') {
-      const { error } = await supabase
-        .from('trades')
-        .update({
-          status: 'closed',
-          pnl: 0,
-          closed_at: new Date().toISOString()
-        })
-        .eq('id', tradeId);
-
-      if (error) throw error;
-
-      // Update local state
-      setTrades(prev => prev.filter(t => t.id !== tradeId));
-
-      toast({
-        title: "Order Cancelled",
-        description: "Pending order has been cancelled",
-      });
-      return;
-    }
-
-    // Handle open trades
-    const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
-    const pnl = calculatePnL(trade, closePrice);
-
-    // Start a transaction to update both trades and profile
-    const { error: closeError } = await supabase
-      .rpc('close_trade', {
-        p_trade_id: tradeId,
-        p_close_price: closePrice,
-        p_pnl: pnl
-      });
-
-    if (closeError) throw closeError;
-
-    // Update local state - remove the trade from list
-    setTrades(prev => prev.filter(t => t.id !== tradeId));
-
-    toast({
-      title: "Trade Closed",
-      description: `Trade closed with P&L: $${pnl.toFixed(2)}`,
-    });
-  } catch (error) {
-    console.error('Error closing trade:', error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "Failed to close trade"
-    });
-  }
-};
-// ...existing code...
-
-  // Add effect to fetch existing trades on mount
-  useEffect(() => {
-    const fetchTrades = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: userTrades, error } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching trades:', error);
-        return;
-      }
-
-      // Transform trades data
-      const formattedTrades: Trade[] = userTrades.map(trade => ({
-        id: trade.id,
-        pair: trade.pair,
-        type: trade.type,
-        status: trade.status,
-        openPrice: trade.open_price,
-        lots: trade.lots,
-        leverage: trade.leverage,
-        orderType: trade.order_type,
-        limitPrice: trade.limit_price,
-        openTime: new Date(trade.created_at).getTime(),
-        pnl: trade.pnl || 0
-      }));
-
-      setTrades(formattedTrades);
-    };
-
-    fetchTrades();
-  }, []);
-
-  // Add effect to fetch trading pairs
+  // Effect to fetch trading pairs
   useEffect(() => {
     const fetchTradingPairs = async () => {
       try {
@@ -1700,7 +85,6 @@ const handleCloseTrade = async (tradeId: string) => {
 
         if (error) throw error;
         
-        // Set first pair as default if no pair selected
         if (!selectedPair && data.length > 0) {
           const firstCryptoPair = data.find(p => p.type === 'crypto');
           if (firstCryptoPair) {
@@ -1719,7 +103,45 @@ const handleCloseTrade = async (tradeId: string) => {
     fetchTradingPairs();
   }, [selectedPair]);
 
-  // Add handler for executed trades
+  // Effect to fetch trades
+  useEffect(() => {
+    const fetchTrades = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userTrades, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching trades:', error);
+        return;
+      }
+
+      const formattedTrades: Trade[] = userTrades.map(trade => ({
+        id: trade.id,
+        pair: trade.pair,
+        type: trade.type,
+        status: trade.status,
+        openPrice: trade.open_price,
+        lots: trade.lots,
+        leverage: trade.leverage,
+        orderType: trade.order_type,
+        limitPrice: trade.limit_price,
+        openTime: new Date(trade.created_at).getTime(),
+        pnl: trade.pnl || 0,
+        margin_amount: trade.margin_amount
+      }));
+
+      setTrades(formattedTrades);
+    };
+
+    fetchTrades();
+  }, []);
+
+  // Limit orders execution handler
   const handleLimitOrderExecuted = useCallback((tradeId: string) => {
     setTrades(prev => prev.map(t => 
       t.id === tradeId
@@ -1728,15 +150,212 @@ const handleCloseTrade = async (tradeId: string) => {
     ));
   }, []);
 
-  // Use the limit orders hook
   useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
 
-  // If mobile, redirect to /trade/select to show pairs selection
-  // if (isMobile) {
-  //   return <Navigate to="/trade/select" />;
-  // }
+  // Add helper function to check margin utilization
+  const calculateTotalMarginUtilization = (excludeTradeId?: string) => {
+    return trades
+      .filter(t => (t.status === 'open' || t.status === 'pending') && t.id !== excludeTradeId)
+      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+  };
 
-  // Desktop view remains unchanged
+  // Trade handlers
+  const handleTrade = async (params: TradeParams) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const currentPrice = params.type === 'buy'
+        ? parseFloat(pairPrices[selectedPair]?.ask || '0')
+        : parseFloat(pairPrices[selectedPair]?.bid || '0');
+
+      const marginAmount = calculateRequiredMargin(
+        currentPrice,
+        params.lots,
+        params.leverage,
+        selectedPair.includes('BINANCE:'),
+        selectedPair
+      );
+
+      const currentMarginUtilization = calculateTotalMarginUtilization();
+      if (currentMarginUtilization + marginAmount > userBalance) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Balance",
+          description: `Total margin (${(currentMarginUtilization + marginAmount).toFixed(2)}) would exceed available balance (${userBalance.toFixed(2)})`
+        });
+        return;
+      }
+
+      // Insert market trade
+      const { data: trade, error } = await supabase
+        .from('trades')
+        .insert([{
+          user_id: user.id,
+          pair: selectedPair,
+          type: params.type,
+          status: 'open',
+          open_price: currentPrice,
+          lots: params.lots,
+          leverage: params.leverage,
+          order_type: 'market',
+          margin_amount: marginAmount
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update trades state
+      setTrades(prev => [{
+        id: trade.id,
+        pair: selectedPair,
+        type: params.type,  
+        status: 'open',
+        openPrice: currentPrice,
+        lots: params.lots,
+        leverage: params.leverage,
+        orderType: 'market',
+        openTime: Date.now(),
+        pnl: 0,
+        margin_amount: marginAmount
+      }, ...prev]);
+
+      // Fetch updated balance
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('withdrawal_wallet')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setUserBalance(profile.withdrawal_wallet);
+      }
+
+      toast({
+        title: "Trade Opened",
+        description: `Market order ${params.type.toUpperCase()} executed at $${currentPrice}`
+      });
+
+    } catch (error) {
+      console.error('Error creating trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create trade"
+      });
+    }
+  };
+
+  const handleCloseTrade = async (tradeId: string) => {
+    try {
+      const trade = trades.find(t => t.id === tradeId);
+      if (!trade) return;
+
+      const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      const pnl = calculatePnL(trade, closePrice);
+      
+      const { data, error } = await supabase
+        .rpc('close_trade', {
+          p_trade_id: tradeId,
+          p_close_price: closePrice,
+          p_pnl: pnl
+        });
+
+      if (error) throw error;
+
+      // Update local trades state
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
+      
+      // Update balance if data contains new wallet amount
+      if (data?.withdrawal_wallet) {
+        setUserBalance(data.withdrawal_wallet);
+      }
+
+      toast({
+        title: "Trade Closed",
+        description: `Successfully closed trade for ${trade.pair}`
+      });
+    } catch (error) {
+      console.error('Error closing trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to close trade"
+      });
+    }
+  };
+
+  // Add effect to fetch default leverage
+  useEffect(() => {
+    const fetchDefaultLeverage = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_leverage')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching default leverage:', error);
+        return;
+      }
+
+      if (data?.default_leverage) {
+        setDefaultLeverage(data.default_leverage);
+      }
+    };
+
+    fetchDefaultLeverage();
+  }, []);
+
+  const handleSaveLeverage = async (leverage: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "User not authenticated",
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          default_leverage: leverage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      // Update local state after successful save
+      setDefaultLeverage(leverage);
+
+      toast({
+        title: "Success",
+        description: "Leverage preference saved"
+      });
+
+    } catch (error) {
+      console.error('Error saving leverage:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save leverage preference"
+      });
+      throw error;
+    }
+  };
+
+  if (isMobile && location.pathname === '/trade') {
+    return <Navigate to="/trade/select" replace />;
+  }
+
   return (
     <TradingLayout
       isSidebarOpen={isSidebarOpen}
@@ -1744,15 +363,17 @@ const handleCloseTrade = async (tradeId: string) => {
       userBalance={userBalance}
       depositDialogOpen={depositDialogOpen}
       setDepositDialogOpen={setDepositDialogOpen}
+      trades={trades}
+      currentPrices={pairPrices}
+      onCloseTrade={handleCloseTrade}
     >
       {isMobile ? (
         <div className="flex flex-col h-full bg-background">
-          {/* Market Selection Bar - Updated styling */}
+          {/* Mobile view layout */}
           <div className={cn(
             "flex items-center gap-2 p-2 border-b bg-card overflow-x-auto transition-all duration-300",
-            !isSidebarOpen ? "pl-14" : "pl-2" // Add padding when collapsed
+            !isSidebarOpen ? "pl-14" : "pl-2"
           )}>
-            {/* Add toggle button */}
             <Button
               variant="ghost"
               size="sm"
@@ -1767,104 +388,26 @@ const handleCloseTrade = async (tradeId: string) => {
               )}
             </Button>
 
-            {tradingPairs.filter(pair => pair.type === (selectedPair.includes('BINANCE:') ? 'crypto' : 'forex')).map((pair) => {
-              const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
-              return (
-                <Button
-                  key={pair.symbol}
-                  variant={selectedPair === pair.symbol ? "secondary" : "ghost"}
-                  className={cn(
-                    "flex-none py-1.5 h-auto",
-                    selectedPair === pair.symbol ? "bg-muted" : ""
-                  )}
-                  onClick={() => setSelectedPair(pair.symbol)}
-                >
-                  <div className="flex items-center gap-2">
-                    {pair.image_url ? (
-                      <img 
-                        src={pair.image_url}
-                        alt={pair.name}
-                        className="h-5 w-5"
-                      />
-                    ) : (
-                      <TrendingUp className="h-4 w-4" />
-                    )}
-                    <div className="flex flex-col items-start text-left">
-                      <span className="text-sm font-medium">{pair.short_name}</span>
-                      <span className={cn(
-                        "text-xs",
-                        parseFloat(priceData.change) < 0 ? "text-red-500" : "text-green-500"
-                      )}>
-                        {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-                      </span>
-                    </div>
-                  </div>
-                </Button>
-              );
-            })}
+            {/* Market Selection List */}
+            {/* ...existing mobile market selection code... */}
           </div>
 
-          {/* Chart - Update margin when sidebar is open */}
+          {/* Mobile Chart */}
           <div className={cn(
             "flex-1 relative min-h-0 transition-all duration-300",
             isSidebarOpen ? "mt-[300px]" : "mt-0"
           )}>
-            <div className="absolute inset-0 p-3"> {/* Add padding */}
-              <div className="w-full h-full rounded-xl border overflow-hidden bg-card"> {/* Add rounded corners */}
+            <div className="absolute inset-0 p-3">
+              <div className="w-full h-full rounded-xl border overflow-hidden bg-card">
                 <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
               </div>
             </div>
           </div>
 
-          {/* Trading Panel Sheet */}
+          {/* Mobile Trading Panel */}
           <Sheet defaultOpen>
             <SheetContent side="bottom" className="h-[60vh] p-0 flex flex-col">
-              <div className="relative -mt-2 pb-1">
-                <div className="absolute left-1/2 -translate-x-1/2 top-0 h-1 w-12 rounded-full bg-muted" />
-              </div>
-              <div className="px-4 py-2 border-b">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-medium">{selectedPair.split(':')[1]}</h2>
-                    <div className={cn(
-                      "px-2 py-0.5 rounded text-xs font-medium",
-                      parseFloat(pairPrices[selectedPair]?.change || '0') < 0 
-                        ? "bg-red-50 text-red-600" 
-                        : "bg-green-50 text-green-600"
-                    )}>
-                      {parseFloat(pairPrices[selectedPair]?.change || '0') > 0 ? '+' : ''}
-                      {pairPrices[selectedPair]?.change || '0.00'}%
-                    </div>
-                  </div>
-                  
-                  <Tabs defaultValue="trade" className="w-auto">
-                    <TabsList className="grid w-[160px] grid-cols-2 h-8">
-                      <TabsTrigger value="trade" className="text-xs">Trade</TabsTrigger>
-                      <TabsTrigger value="orders" className="text-xs">Orders</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto">
-                <TabsContent value="trade" className="m-0 h-full">
-                  <TradingPanel 
-                    selectedPair={selectedPair}
-                    pairPrices={pairPrices}
-                    onTrade={handleTrade}
-                    userBalance={userBalance}
-                    tradingPairs={tradingPairs}
-                  />
-                </TabsContent>
-                <TabsContent value="orders" className="m-0 p-4 h-full">
-                  <TradingActivity 
-                    trades={trades} 
-                    currentPrices={pairPrices} 
-                    onCloseTrade={handleCloseTrade} 
-                  />
-                </TabsContent>
-              </div>
+              {/* ...existing mobile trading panel code... */}
             </SheetContent>
           </Sheet>
         </div>
@@ -1876,45 +419,46 @@ const handleCloseTrade = async (tradeId: string) => {
             isOpen={isSidebarOpen}
             pairPrices={pairPrices}
             tradingPairs={tradingPairs}
+            collapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
           
           <div className="flex flex-1">
-            {/* Main content with chart and activity */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex-1 relative min-h-0 p-3"> {/* Add padding */}
-                <div className="w-full h-full rounded-xl border overflow-hidden bg-card"> {/* Add rounded corners */}
+            {/* Main content area with chart and activity */}
+            <div className="flex-1 flex flex-col h-full">
+              {/* Chart container */}
+              <div className="flex-1 min-h-0 p-3">
+                <div className="w-full h-full rounded-xl border overflow-hidden bg-card">
                   <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
                 </div>
               </div>
-              <TradingActivity trades={trades} currentPrices={pairPrices} onCloseTrade={handleCloseTrade} />
+              
+              {/* Activity panel */}
+              <div className="flex-none">
+                <TradingActivity 
+                  trades={trades} 
+                  currentPrices={pairPrices} 
+                  onCloseTrade={handleCloseTrade} 
+                  userBalance={userBalance}
+                />
+              </div>
             </div>
-          </div>
             
-          {/* Right trading panel */}
-          <TradingPanel 
-            selectedPair={selectedPair} 
-            pairPrices={pairPrices}
-            onTrade={handleTrade}
-            userBalance={userBalance}
-            tradingPairs={tradingPairs}
-          />
+            <TradingPanel 
+              selectedPair={selectedPair} 
+              pairPrices={pairPrices}
+              onTrade={handleTrade}
+              userBalance={userBalance}
+              tradingPairs={tradingPairs}
+              onSaveLeverage={handleSaveLeverage}
+              defaultLeverage={defaultLeverage}  // Add this prop
+            />
+          </div>
         </div>
       )}
     </TradingLayout>
   );
 };
 
-// Add this type declaration at the top of your file
-declare global {
-  interface Window {
-    TradingView: any;
-  }
-}
-
 export default Trade;
-function calculateTotalMarginUtilization(trades: Trade[]) {
-  return trades
-    .filter(t => t.status === 'open' || t.status === 'pending')
-    .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
-}
 

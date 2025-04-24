@@ -45,14 +45,13 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
 
   return (
     <div className="flex h-screen">
-      <header className="fixed top-0 left-0 right-0 h-14 border-b bg-background/95 backdrop-blur z-50">
-        <div className="flex items-center justify-between h-full px-2 md:px-4">
-          {/* Left side */}
-          <div className="flex items-center gap-1.5 md:gap-4">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-full items-center justify-between gap-2 px-2 md:px-4">
+          <div className="flex items-center gap-2">
             <Button 
               variant="ghost" 
-              size={isMobile ? "sm" : "icon"} 
-              onClick={() => navigate('/dashboard')}
+              size="icon"
+              onClick={() => navigate(-1)}
               className="h-8 w-8 md:h-10 md:w-10"
             >
               <ArrowLeftCircle className="h-4 w-4 md:h-5 md:w-5" />
@@ -67,15 +66,6 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
                 />
               </Link>
             )}
-            
-            <Button 
-              variant="ghost" 
-              size={isMobile ? "sm" : "icon"}
-              onClick={toggleSidebar}
-              className="h-8 w-8 md:h-10 md:w-10"
-            >
-              <Menu className="h-4 w-4 md:h-5 md:w-5" />
-            </Button>
           </div>
 
           {/* Right side with animated balance */}

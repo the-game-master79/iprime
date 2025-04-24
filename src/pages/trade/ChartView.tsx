@@ -20,6 +20,7 @@ import { TradesSheet } from "@/components/shared/TradesSheet";
 import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { wsManager } from '@/services/websocket-manager';
 
 const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
   const effectiveLeverage = isJPYPair(pair) ? leverage * 2 : leverage;
@@ -796,6 +797,26 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     const interval = setInterval(checkMarginLevels, 5000);
     return () => clearInterval(interval);
   }, [trades, pairPrices, userBalance]);
+
+  useEffect(() => {
+    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: priceData
+      }));
+    });
+
+    // Watch required pairs
+    const pairsToWatch = Array.from(activePairs);
+    if (pairsToWatch.length > 0) {
+      wsManager.watchPairs(pairsToWatch);
+    }
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(pairsToWatch);
+    };
+  }, [activePairs]);
 
   return (
     <div className="h-screen bg-background flex flex-col">
