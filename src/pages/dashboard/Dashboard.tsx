@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
-import { getReferralLink } from "@/lib/utils";
-import { format } from "date-fns";
+import { DashboardTopbar } from "@/components/shared/DashboardTopbar"; // Add this import
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -11,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { TransactionTable } from "@/components/tables/TransactionTable"; // Add this import
+import { RankTable } from "@/components/dashboard/RankTable"; // Add this import
 
 // Icons
 import {
@@ -481,6 +480,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         .from('transactions')
         .select('*', { count: 'exact' })
         .eq('user_id', user.id)
+        .in('type', ['deposit', 'withdrawal', 'commission', 'investment', 'investment_return', 'rank_bonus'])
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -590,451 +590,218 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-muted/30"> {/* Changed to use dynamic viewport height */}
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm py-4">
-        <div className="container mx-auto px-4 sm:px-4 pr-0 sm:pr-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <img 
-                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg"
-                alt="CloudForex" 
-                className="h-12 w-auto" 
-              />
-            </div>
-            <div className="flex items-center gap-2 sm:gap-6">
-              <button
-                onClick={handleTradeClick}
-                className="order-2 sm:order-1 flex items-center gap-3 px-4 py-2 sm:rounded-lg rounded-l-lg bg-[#FFA500] text-white hover:bg-[#FFA500]/90 transition-colors scale-on-hover"
-              >
-                <div className="sm:flex items-center gap-2 hidden">
-                  <img 
-                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
-                    alt="CloudTrade"
-                    className="h-6 w-auto" 
-                  />
-                  <ArrowCircleUpRight weight="bold" className="h-5 w-5 slide-from-left" />
-                </div>
-                <div className="sm:hidden">
-                  <img 
-                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
-                    alt="CloudTrade"
-                    className="h-6 w-auto" 
-                  />
-                </div>
-              </button>
-              
-              <Avatar 
-                className="order-1 sm:order-2 cursor-pointer bg-primary"
-                onClick={() => navigate('/profile')}
-              >
-                <AvatarImage src={userProfile?.avatar_url} />
-                <AvatarFallback>{userProfile?.first_name?.[0] || 'U'}</AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-[100dvh] bg-gray-50">
+      <DashboardTopbar />
 
-      <main className="flex-1 py-6">
-        <div className="container mx-auto px-4 pb-20"> {/* Added horizontal padding */}
+      <main className="py-8">
+        <div className="container mx-auto px-4 max-w-[1200px]">
           {loading || isLoading ? (
-            <div className="flex items-center justify-center min-h-[50dvh]">
+            <div className="flex items-center justify-center min-h-[60vh]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="space-y-4 sm:space-y-6">
-              {/* Quick Actions Container */}
-              <div className="p-4 sm:p-8 rounded-[1rem] bg-primary shadow-lg">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {/* Deposit */}
-                  <div onClick={() => navigate('/deposit')} className="cursor-pointer group">
-                    <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
-                      <PlusCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+            <div className="space-y-8">
+              {/* Balance Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-primary border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-white mb-1">Available Balance</span>
+                        <span className="text-2xl font-semibold text-white">
+                          ${withdrawalBalance.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => navigate('/deposit')}
+                          className="whitespace-nowrap bg-white border-white text-primary hover:bg-white/90"
+                        >
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Deposit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate('/withdrawals')}
+                          className="whitespace-nowrap bg-transparent border-white text-white hover:bg-white/20"
+                        >
+                          <ArrowCircleUpRight className="h-4 w-4 mr-2" />
+                          Withdraw
+                        </Button>
+                      </div>
                     </div>
-                    <div className="w-full flex items-center justify-center">
-                      <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Deposit</span>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Withdraw */} 
-                  <div onClick={() => navigate('/withdrawals')} className="cursor-pointer group">
-                    <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
-                      <ArrowCircleUpRight className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                <Card className="bg-white border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-muted-foreground mb-1">Active Plans</span>
+                        <span className="text-2xl font-semibold">
+                          ${totalInvested.toLocaleString()}
+                        </span>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          {activePlans.count} Plan{activePlans.count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/plans')}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Buy Plans
+                      </Button>
                     </div>
-                    <div className="w-full flex items-center justify-center">
-                      <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Withdraw</span>
-                    </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Buy Plans */}
-                  <div onClick={() => navigate('/plans')} className="cursor-pointer group">
-                    <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
-                      <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
+                <Card className="bg-white border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col">
+                        <span className="text-sm text-muted-foreground mb-1">Current Rank</span>
+                        <span className="text-2xl font-semibold">
+                          {businessStats.currentRank || 'New Member'}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/affiliate')}
+                      >
+                        <ShareNetwork className="h-4 w-4 mr-2" />
+                        Refer & Earn
+                      </Button>
                     </div>
-                    <div className="w-full flex items-center justify-center">
-                      <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Buy Plans</span>
-                    </div>
-                  </div>
+                    {businessStats.nextRank && (
+                      <div className="mt-2">
+                        <div className="h-1 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-500" 
+                            style={{ width: `${businessStats.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          {Math.round(businessStats.progress)}% to {businessStats.nextRank.title}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-                  {/* Refer */}
-                  <div onClick={() => navigate('/affiliate')} className="cursor-pointer group">
-                    <div className="flex items-center justify-center rounded-full bg-white transition-all group-hover:scale-[1.02] p-3">
-                      <ShareNetwork className="h-6 w-6 sm:h-8 sm:w-8 text-primary" weight="bold" />
-                    </div>
-                    <div className="w-full flex items-center justify-center">
-                      <span className="text-white text-[10px] sm:text-xs font-medium uppercase tracking-wide mt-2">Refer</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Referral Section */}
-                <div className="mt-8 border-t border-white/10 pt-6">
+              {/* Referral Section */}
+              <Card>
+                <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <div className="flex-1 w-full">
-                      <div className="text-white/80 text-sm mb-2">Your Referral Link</div>
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="text-sm font-medium">Your Referral Link</div>
                       <div className="relative">
                         <Input
                           readOnly
                           value={referralLink}
-                          className="pr-20 font-mono text-sm bg-white/10 border-white/20 text-white"
+                          className="pr-20 font-mono text-sm"
                         />
                         <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="hover:bg-white/10 text-white"
-                            onClick={handleShowQrCode}
-                          >
+                          <Button size="sm" variant="ghost" onClick={handleShowQrCode}>
                             <QrCode className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost" 
-                            className="hover:bg-white/10 text-white"
-                            onClick={handleCopyLink}
-                          >
+                          <Button size="sm" variant="ghost" onClick={handleCopyLink}>
                             <Copy className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                     </div>
                     {qrCodeUrl && (
-                      <div className="h-24 w-24 bg-white p-2 rounded-lg">
+                      <div className="h-24 w-24 p-2 bg-white rounded-lg shadow-sm">
                         <img src={qrCodeUrl} alt="QR Code" className="w-full h-full" />
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
+              {/* Tabs Section */}
+              <Card>
+                <CardContent className="p-6">
+                  <Tabs defaultValue="transactions" className="w-full">
+                    <TabsList className="inline-flex mb-6">
+                      <TabsTrigger value="transactions">
+                        <Receipt className="h-4 w-4 mr-2" />
+                        Transactions
+                      </TabsTrigger>
+                      <TabsTrigger value="ranks">
+                        <Trophy className="h-4 w-4 mr-2" />
+                        Ranks
+                      </TabsTrigger>
+                    </TabsList>
 
-              {/* Balance Containers */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
-                  <div className={cn(
-                    "font-bold tracking-tight transition-all",
-                    getBalanceTextSize(withdrawalBalance)
-                  )}>
-                    ${withdrawalBalance.toLocaleString()}
-                  </div>
-                  <div className="text-muted-foreground text-sm mt-2">Available Balance</div>
-                </div>
-
-                <div className="p-6 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center">
-                  <div className={cn(
-                    "font-bold tracking-tight transition-all",
-                    getBalanceTextSize(totalInvested)
-                  )}>
-                    ${totalInvested.toLocaleString()}
-                  </div>
-                  <div 
-                    onClick={() => navigate('/plans')} 
-                    className="text-sm text-muted-foreground mt-2 cursor-pointer hover:text-primary transition-colors"
-                  >
-                    {activePlans.count} Plan{activePlans.count !== 1 ? 's' : ''} Active
-                  </div>
-                </div>
-
-                {/* Redesigned Rank Status Container */}
-                <div className="p-6 rounded-xl bg-white border shadow-sm">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Current Rank</div>
-                      <div className="text-xl font-semibold mt-1">
-                        {businessStats.currentRank || 'New Member'}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="text-sm text-muted-foreground">Next Rank</div>
-                      <div className="text-xl font-semibold mt-1">
-                        {businessStats.nextRank?.title || 'Maximum'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {businessStats.nextRank && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>${businessStats.totalVolume.toLocaleString()}</span>
-                        <span>${businessStats.nextRank.business_amount.toLocaleString()}</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-1.5">
-                        <div 
-                          className="bg-primary h-1.5 rounded-full transition-all duration-300" 
-                          style={{ width: `${businessStats.progress}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-muted-foreground text-center">
-                        {Math.round(businessStats.progress)}% Progress to Next Rank
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <Tabs defaultValue="transactions" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 rounded-xl mb-4">
-                  <TabsTrigger value="transactions" className="rounded-l-xl">
-                    <Receipt className="h-4 w-4 mr-2" />
-                    Transactions
-                  </TabsTrigger>
-                  <TabsTrigger value="ranks" className="rounded-r-xl">
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Your Rank
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent 
-                  value="transactions" 
-                  className="space-y-3 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
-                >
-                  <div className="overflow-y-auto">
-                    {transactions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No transactions found
-                      </div>
-                    ) : (
-                      <div className="space-y-4"> {/* Added vertical spacing */}
-                        <Accordion type="multiple" className="space-y-3">
-                          {Object.entries(
-                            transactions.reduce((groups, tx) => {
-                              const date = new Date(tx.created_at).toISOString().split('T')[0];
-                              if (!groups[date]) groups[date] = [];
-                              groups[date].push(tx);
-                              return groups;
-                            }, {} as Record<string, any[]>)
-                          ).map(([date, txs]) => (
-                            <AccordionItem key={date} value={date} className="border rounded-lg overflow-hidden">
-                              <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
-                                <div className="flex justify-between items-center w-full">
-                                  <span className="font-medium">
-                                    {format(new Date(date), 'dd MMM yyyy').toUpperCase()}
-                                  </span>
-                                  <Badge variant="secondary" className="ml-auto mr-4 text-xs">
-                                    {txs.length} Transactions
-                                  </Badge>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent className="px-4 pb-4">
-                                <div className="space-y-3">
-                                  {txs.map((tx) => (
-                                    <div key={tx.id} className="relative bg-white border rounded-lg p-4">
-                                      <div className="space-y-3">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium text-muted-foreground">{tx.id}</span>
-                                          <div className={`h-2.5 w-2.5 rounded-full ${
-                                            tx.status === 'Completed' ? 'bg-green-500' : 
-                                            tx.status === 'Pending' ? 'bg-yellow-500' : 
-                                            tx.status === 'Processing' ? 'bg-blue-500' : 
-                                            'bg-red-500'
-                                          }`} />
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 hover:bg-background"
-                                            onClick={() => handleCopyId(tx.id)}
-                                          >
-                                            <Copy className="h-3 w-3" />
-                                            <span className="sr-only">Copy ID</span>
-                                          </Button>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                          <span className={`text-2xl font-semibold ${
-                                            tx.type === 'deposit' || tx.type === 'commission' || tx.type === 'investment_return' 
-                                              ? 'text-green-600' 
-                                              : tx.type === 'withdrawal' || tx.type === 'investment' 
-                                              ? 'text-red-600' 
-                                              : 'text-blue-600'
-                                          }`}>
-                                            ${tx.amount.toLocaleString()}
-                                          </span>
-                                          <Badge variant="outline" className="font-normal">
-                                            {tx.type.replace(/_/g, ' ')}
-                                          </Badge>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          ))}
-                        </Accordion>
-                        
-                        {hasMore && (
-                          <div className="py-4 text-center sticky bottom-0 bg-background/95 backdrop-blur-sm">
-                            <Button
-                              variant="outline"
-                              onClick={handleLoadMore}
-                              disabled={isLoadingMore}
-                              className="w-full sm:w-auto"
-                            >
-                              {isLoadingMore ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
-                                  Loading...
-                                </>
-                              ) : (
-                                'Load More'
-                              )}
-                            </Button>
+                    <TabsContent 
+                      value="transactions" 
+                      className="space-y-3 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
+                    >
+                      <div className="overflow-x-auto">
+                        {transactions.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            No transactions found
                           </div>
-                        )}
-
-                        {!hasMore && transactions.length > 0 && (
-                          <div className="py-4 text-center text-sm text-muted-foreground">
-                            End of your Transactions
-                          </div>
-                        )}
-
-                        {/* Replace the download app button */}
-                        {canInstall && (
-                          <div className="mt-6 flex justify-center">
-                            <button
-                              onClick={install}
-                              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full hover:bg-primary/90 transition-colors shadow-lg"
-                            >
-                              <img
-                                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg"
-                                alt="CloudForex"
-                                className="h-5 w-auto"
-                              />
-                              <span className="font-medium">Download our app</span>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-5 w-5"
-                              >
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent 
-                  value="ranks" 
-                  className="space-y-4 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
-                >
-                  <div className="space-y-3">
-                    {ranks.map((rank) => (
-                      <Card 
-                        key={rank.title} 
-                        className={cn(
-                          "transition-all duration-200 hover:shadow-md",
-                          businessStats.totalVolume >= rank.business_amount 
-                            ? "bg-primary/5 border-primary" 
-                            : "hover:border-primary/50 bg-muted/30"
-                        )}
-                      >
-                        <CardContent className={cn(
-                          "p-4 sm:p-6",
-                          businessStats.totalVolume < rank.business_amount && "opacity-60"
-                        )}>
-                            {/* Rank Icon & Title */}
-                            <div className="flex items-center gap-6">
-                            <div className="flex-shrink-0">
-                              <div className={cn(
-                                "h-16 w-16 rounded-full flex items-center justify-center",
-                                businessStats.totalVolume >= rank.business_amount
-                                  ? "bg-primary/20"
-                                  : "bg-muted/50"
-                              )}>
-                                <Trophy className={cn(
-                                  "h-8 w-8",
-                                  businessStats.totalVolume >= rank.business_amount
-                                    ? "text-primary"
-                                    : "text-muted-foreground/40"
-                                )} />
-                              </div>
-                            </div>
-
-                            {/* Rank Details */}
-                            <div className="flex-grow space-y-1">
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-semibold">{rank.title}</h3>
-                                <Badge variant={businessStats.totalVolume >= rank.business_amount ? "success" : "secondary"} className="ml-2">
-                                  {businessStats.totalVolume >= rank.business_amount ? 'Achieved' : 'Locked'}
-                                </Badge>
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {businessStats.totalVolume >= rank.business_amount 
-                                  ? `$${businessStats.totalVolume.toLocaleString()} Business Achieved`
-                                  : `Required Volume: $${rank.business_amount.toLocaleString()}`
-                                }
-                              </div>
-                              <div className="h-2 w-full bg-muted rounded-full mt-2">
-                                <div 
-                                  className="h-2 bg-primary rounded-full transition-all duration-500"
-                                  style={{ 
-                                    width: `${Math.min(100, (businessStats.totalVolume / rank.business_amount) * 100)}%` 
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Bonus & Action */}
-                            <div className="flex-shrink-0 text-right space-y-2 min-w-[150px]">
-                              <div className="text-2xl font-bold text-green-600">
-                                +${rank.bonus.toLocaleString()}
-                              </div>
-                              <div className="text-xs text-muted-foreground">Rank Bonus</div>
-                              {businessStats.totalVolume >= rank.business_amount && 
-                               !claimedRanks.includes(rank.title) && 
-                               rank.title !== 'New Member' && 
-                               isRankEligible(businessStats.currentRank, rank.title, ranks) && (
+                        ) : (
+                          <div className="space-y-4">
+                            <TransactionTable 
+                              transactions={transactions} 
+                              onCopyId={handleCopyId}
+                            />
+                            
+                            {hasMore && (
+                              <div className="py-4 text-center">
                                 <Button
-                                  size="sm"
-                                  variant="default"
-                                  onClick={() => handleClaimRankBonus(rank)}
-                                  disabled={claimingRank === rank.title}
-                                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                                  variant="outline"
+                                  onClick={handleLoadMore}
+                                  disabled={isLoadingMore}
+                                  className="w-full sm:w-auto"
                                 >
-                                  {claimingRank === rank.title ? 'Claiming...' : 'Claim Bonus'}
+                                  {isLoadingMore ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                                      Loading...
+                                    </>
+                                  ) : (
+                                    'Load More'
+                                  )}
                                 </Button>
-                              )}
-                            </div>
+                              </div>
+                            )}
+
+                            {!hasMore && transactions.length > 0 && (
+                              <div className="py-4 text-center text-sm text-muted-foreground">
+                                End of your Transactions
+                              </div>
+                            )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="ranks" className="space-y-4">
+                      <RankTable
+                        ranks={ranks}
+                        businessVolume={businessStats.totalVolume}
+                        currentRank={businessStats.currentRank}
+                        claimedRanks={claimedRanks}
+                        claimingRank={claimingRank}
+                        onClaimBonus={handleClaimRankBonus}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
         </div>
       </main>
     </div>

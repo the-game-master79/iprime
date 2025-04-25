@@ -1,4 +1,4 @@
-import { ArrowLeft, Bell, Info, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Bell, Info, AlertCircle, CheckCircle, Menu, UserCircle } from "lucide-react";
 import { Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Separator } from "@/components/ui/separator";
 
 interface TopbarProps {
   title: string;
@@ -29,6 +34,7 @@ interface Notice {
 
 export const Topbar = ({ title }: TopbarProps) => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [balance, setBalance] = useState(0);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -111,33 +117,48 @@ export const Topbar = ({ title }: TopbarProps) => {
   };
 
   const handleBalanceClick = () => {
-    navigate('/deposit');
+    if (window.location.pathname === '/deposit') {
+      // If already on deposit page, reload the page
+      window.location.reload();
+    } else {
+      // Otherwise navigate to deposit page
+      navigate('/deposit');
+    }
   };
 
   return (
-    <header className="flex items-center justify-between py-4 mt-4">
-      <div className="container max-w-[1000px] mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <Button 
-            variant="ghost" 
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-            onClick={() => window.history.back()}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 max-w-[1200px] items-center px-4">
+        <div className="flex flex-1 items-center justify-between gap-4">
+          {/* Left section */}
           <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={() => window.history.back()}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="hidden md:block">
+              <h1 className="text-xl font-semibold">{title}</h1>
+            </div>
+          </div>
+
+          {/* Right section */}
+          <div className="flex items-center gap-4">
+            {/* Balance */}
             <div 
               onClick={handleBalanceClick}
-              className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full cursor-pointer hover:bg-primary/20 transition-colors"
+              className="flex items-center gap-2 rounded-full border bg-card px-4 py-1.5 shadow-sm transition-colors hover:bg-accent"
             >
               <span className="text-sm font-medium">
                 ${balance.toLocaleString()}
               </span>
-              <Plus className="h-4 w-4 p-0.5 bg-primary text-white rounded-full hover:bg-primary/90 transition-colors" />
+              <Plus className="h-4 w-4 rounded-full bg-primary p-0.5 text-white hover:bg-primary/90" />
             </div>
 
+            {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
@@ -145,7 +166,7 @@ export const Topbar = ({ title }: TopbarProps) => {
                   {unreadCount > 0 && (
                     <Badge 
                       variant="default" 
-                      className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                      className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center p-0 text-[10px]"
                     >
                       {unreadCount}
                     </Badge>
@@ -153,24 +174,24 @@ export const Topbar = ({ title }: TopbarProps) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[380px]">
-                <div className="flex items-center justify-between px-4 py-2 border-b">
-                  <span className="font-semibold">Notifications</span>
+                <div className="flex items-center justify-between border-b px-4 py-2">
+                  <DropdownMenuLabel className="font-semibold">Notifications</DropdownMenuLabel>
                   {unreadCount > 0 && (
                     <Button variant="ghost" size="sm" className="text-xs" onClick={handleMarkAllAsRead}>
                       Mark all as read
                     </Button>
                   )}
                 </div>
-                <div className="py-2 max-h-[400px] overflow-auto">
+                <div className="max-h-[400px] overflow-auto py-2">
                   {notices.length === 0 ? (
-                    <div className="px-4 py-2 text-sm text-muted-foreground text-center">
+                    <div className="px-4 py-2 text-center text-sm text-muted-foreground">
                       No notifications
                     </div>
                   ) : (
                     notices.map((notice) => (
                       <div 
                         key={notice.id} 
-                        className={`px-4 py-3 hover:bg-muted flex items-start gap-3 ${
+                        className={`flex items-start gap-3 px-4 py-3 hover:bg-muted ${
                           ((notice.category === 'admin' && notice.is_active) || 
                            ((notice.category === 'referral' || notice.category === 'system') && !notice.read_at)) 
                             ? 'bg-muted/50' : ''
@@ -179,8 +200,8 @@ export const Topbar = ({ title }: TopbarProps) => {
                         {getNoticeIcon(notice.type)}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">{notice.title}</p>
-                          <p className="text-sm text-muted-foreground truncate">{notice.content}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="truncate text-sm text-muted-foreground">{notice.content}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {new Date(notice.created_at).toLocaleDateString()}
                           </p>
                         </div>
@@ -190,9 +211,35 @@ export const Topbar = ({ title }: TopbarProps) => {
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            {/* User Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <UserCircle className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-red-600">
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
+      </div>
+      
+      {/* Mobile title */}
+      <div className="border-b md:hidden">
+        <div className="container px-4 py-2">
+          <h1 className="text-lg font-semibold">{title}</h1>
+        </div>
       </div>
     </header>
   );

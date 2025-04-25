@@ -61,9 +61,8 @@ export interface UserProfile {
 
 export interface Transaction {
   id: string;
-  user_id: string;
   amount: number;
-  type: string;
+  type: 'deposit' | 'withdrawal' | 'commission' | 'investment' | 'investment_return' | 'rank_bonus';
   status: string;
   created_at: string;
 }

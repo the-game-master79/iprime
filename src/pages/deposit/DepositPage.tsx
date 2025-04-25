@@ -1,20 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Topbar } from "@/components/shared/Topbar";
 import { supabase } from "@/lib/supabase";
 import { Copy, ArrowLeft, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DepositMethod {
   id: string;
@@ -276,63 +270,34 @@ export default function DepositPage() {
         <div className="flex flex-col-reverse md:grid md:grid-cols-[1fr_300px] gap-6">
           <Card>
             <CardContent className="p-6 space-y-6">
-              {/* Amount Input */}
-              <div className="space-y-4">
-                <h3 className="font-semibold">Enter Amount</h3>
-                <div className="relative">
-                  <div className="absolute left-3 top-2.5 text-muted-foreground">$</div>
-                  <input
-                    type="number"
-                    className="w-full pl-7 rounded-md border border-input bg-background px-3 py-2"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => {
-                      setAmount(e.target.value);
-                      validateAmount(e.target.value);
-                    }}
-                  />
-                  {amountError && (
-                    <p className="text-sm text-destructive mt-1">{amountError}</p>
-                  )}
-                </div>
-              </div>
-
               {/* Cryptocurrency Selection */}
-              <div className="space-y-4">
-                <h3 className="font-semibold">Select Cryptocurrency</h3>
-                <Select 
-                  value={cryptoType} 
+              <div className="space-y-2">
+                <Select
+                  value={cryptoType}
                   onValueChange={(value) => {
                     setCryptoType(value);
-                    setNetwork(""); // Reset network when crypto changes
+                    setNetwork("");
                   }}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select cryptocurrency" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableCryptos.map((symbol) => {
                       const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
-                      if (!crypto) return null;
                       const price = cryptoPrices[symbol.toLowerCase()]?.usd || 0;
                       
                       return (
-                        <SelectItem 
-                          key={symbol} 
-                          value={symbol}
-                          className="p-4 rounded-lg hover:bg-primary/5 focus:bg-primary/5"
-                        >
-                          <div className="flex items-center justify-between w-full gap-6">
-                            <div className="flex items-center gap-4">
-                              {crypto.logo_url && (
+                        <SelectItem key={symbol} value={symbol}>
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <div className="flex items-center gap-2">
+                              {crypto?.logo_url && (
                                 <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-6 h-6" />
                               )}
-                              <div>
-                                <p className="font-medium">{crypto.crypto_name}</p>
-                                <p className="text-xs text-muted-foreground">{symbol.toUpperCase()}</p>
-                              </div>
+                              <span>{crypto?.crypto_name}</span>
+                              <span className="text-muted-foreground">({symbol.toUpperCase()})</span>
                             </div>
-                            <p className="text-sm font-semibold text-primary">${price.toLocaleString()}</p>
+                            <span className="text-sm font-medium">${price.toLocaleString()}</span>
                           </div>
                         </SelectItem>
                       );
@@ -342,33 +307,45 @@ export default function DepositPage() {
               </div>
 
               {/* Network Selection */}
-              <div className="space-y-4">
-                <h3 className="font-semibold">Select Network</h3>
-                <Select 
-                  value={network} 
+              <div className="space-y-2">
+                <Select
+                  value={network}
                   onValueChange={setNetwork}
-                  disabled={!cryptoType} // Disable until crypto is selected
+                  disabled={!cryptoType}
                 >
-                  <SelectTrigger className={cn(
-                    "w-full",
-                    !cryptoType && "opacity-50 cursor-not-allowed"
-                  )}>
+                  <SelectTrigger>
                     <SelectValue placeholder="Select network" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableNetworks.map((net) => (
-                      <SelectItem key={net} value={net}>
-                        {net}
-                      </SelectItem>
+                      <SelectItem key={net} value={net}>{net}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {!cryptoType && (
-                  <p className="text-xs text-muted-foreground">Please select a cryptocurrency first</p>
+                  <p className="text-sm text-muted-foreground">Please select a cryptocurrency first</p>
                 )}
               </div>
 
-              {/* Display Deposit Details only when both crypto and network are selected */}
+              {/* Amount Input */}
+              <div className="space-y-2">
+                <div className="relative">
+                  <Input
+                    type="number"
+                    placeholder="$ Enter Amount"
+                    value={amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      validateAmount(e.target.value);
+                    }}
+                    className="pl-3" // Removed extra padding since we removed the icon
+                  />
+                </div>
+                {amountError && (
+                  <p className="text-sm text-destructive">{amountError}</p>
+                )}
+              </div>
+
               {cryptoType && network && (
                 <div className="space-y-4">
                   <h3 className="font-semibold">Deposit Details</h3>
@@ -402,7 +379,6 @@ export default function DepositPage() {
 
                     {/* Deposit Address */}
                     <div className="space-y-2">
-                      <Label>Deposit Address</Label>
                       <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
                         <code className="flex-1 break-all font-mono text-sm">
                           {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
@@ -440,17 +416,17 @@ export default function DepositPage() {
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 mb-4">
                 <Info className="h-4 w-4" />
-                <span className="font-medium">How to deposit?</span>
+                <span className="font-medium">This deposit is for trades only.</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                If you're looking to trade, use this deposit form. For investment plans, visit our plans page.
+                If you're looking to trade, use this deposit form. For investing in packages, then visit our plans page.
               </p>
               <Button
                 variant="outline"
                 onClick={() => navigate('/plans')}
                 className="w-full"
               >
-                View Investment Plans
+                View Plans
               </Button>
             </div>
           </div>

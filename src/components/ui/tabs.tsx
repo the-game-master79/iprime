@@ -11,7 +11,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex w-full items-center justify-center rounded border bg-[#F1F1F1] p-0 shadow-sm",
+      "inline-flex w-full items-center justify-start gap-x-2 relative border-b",
       className
     )}
     {...props}
@@ -28,9 +28,17 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-bold",
-      "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50",
+      "inline-flex items-center justify-center gap-2 text-sm font-medium transition-all duration-300 relative",
+      "text-muted-foreground hover:text-foreground",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "disabled:pointer-events-none disabled:opacity-50",
+      "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px]",
+      "after:scale-x-0 after:bg-primary after:transition-transform after:duration-300 after:ease-in-out",
+      "after:rounded-t-sm",
+      "data-[state=active]:text-primary data-[state=active]:font-semibold",
+      "data-[state=active]:after:scale-x-100",
+      "data-[state=active]:bg-muted/50 data-[state=active]:rounded-t-lg",
+      "px-3 py-3",
       className
     )}
     {...props}
@@ -48,7 +56,10 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "w-full p-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "w-full p-4 ring-offset-background",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:slide-out-left-2",
+      "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-left-2",
       className
     )}
     {...props}
