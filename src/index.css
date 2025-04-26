@@ -167,4 +167,18 @@
       background-position: 0% 50%;
     }
   }
+
+  .animate-on-scroll {
+    @apply transition-all duration-700 ease-out;
+  }
+
+  .animate-on-scroll.animate-in {
+    @apply opacity-100 translate-y-0;
+  }
+
+  /* Starting state for animations */
+  .animate-on-scroll {
+    opacity: 0;
+    transform: translateY(20px);
+  }
 }

@@ -113,17 +113,19 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
+  // Add this state near other state declarations
+  const [directCount, setDirectCount] = useState(0);
+
   // Data fetching functions
   const fetchUserProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user profile and subscribed plans data
       const [profileData, plansData] = await Promise.all([
         supabase
           .from('profiles')
-          .select('*')
+          .select('*, withdrawal_wallet, multiplier_bonus, direct_count')
           .eq('id', user.id)
           .single(),
         supabase
@@ -140,9 +142,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (profileData.error) throw profileData.error;
       
       setUserProfile(profileData.data);
-      setWithdrawalBalance(profileData.data?.withdrawal_wallet || 0);
+      setDirectCount(profileData.data?.direct_count || 0);
+      // Calculate total available balance including multiplier bonus
+      const totalBalance = (profileData.data?.withdrawal_wallet || 0) + (profileData.data?.multiplier_bonus || 0);
+      setWithdrawalBalance(totalBalance);
+
       if (profileData.data?.referral_code) {
-        // Update referral link to include tab ID
         setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}&tab=register`);
       }
 
@@ -611,6 +616,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <span className="text-2xl font-semibold text-white">
                           ${withdrawalBalance.toLocaleString()}
                         </span>
+                        <div className="flex flex-col text-xs text-white/80 mt-1">
+                          <span>Wallet: ${(userProfile?.withdrawal_wallet || 0).toLocaleString()}</span>
+                          <span>Bonus: ${(userProfile?.multiplier_bonus || 0).toLocaleString()}</span>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-2">
                         <Button
@@ -628,7 +637,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                           onClick={() => navigate('/withdrawals')}
                           className="whitespace-nowrap bg-transparent border-white text-white hover:bg-white/20"
                         >
-                          <ArrowCircleUpRight className="h-4 w-4 mr-2" />
+                          <ArrowCircleUpRight className="h-4 w-4 mr-2 " />
                           Withdraw
                         </Button>
                       </div>
@@ -700,7 +709,15 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-1 w-full space-y-2">
-                      <div className="text-sm font-medium">Your Referral Link</div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">Your Referral Link</div>
+                        <Badge 
+                          variant={directCount >= 2 ? "success" : "secondary"}
+                          className="text-xs"
+                        >
+                          {directCount}/2 Directs
+                        </Badge>
+                      </div>
                       <div className="relative">
                         <Input
                           readOnly

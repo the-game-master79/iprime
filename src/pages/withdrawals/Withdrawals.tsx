@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LockKeyhole, Search, DollarSign } from "lucide-react";
+import { LockSimple, MagnifyingGlass, CurrencyDollar, Receipt, ClockCounterClockwise, Copy, ArrowsDownUp } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { checkWithdrawalLimit } from "@/lib/rateLimit";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { format } from "date-fns";
 import { Topbar } from "@/components/shared/Topbar";
 
 interface DepositMethod {
@@ -43,6 +44,7 @@ interface Withdrawal {
   wallet_address: string;
   status: 'Pending' | 'Processing' | 'Completed' | 'Failed';
   created_at: string;
+  updated_at?: string;
 }
 
 interface Profile {
@@ -51,6 +53,16 @@ interface Profile {
   investment_wallet: number;
   kyc_status: 'pending' | 'completed' | 'rejected' | null;
 }
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    console.error('Failed to copy text:', err);
+    return false;
+  }
+};
 
 const Withdrawals = () => {
   const { toast } = useToast();
@@ -70,6 +82,9 @@ const Withdrawals = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("request");
+  const [copied, setCopied] = useState(false);
+  const [sortField, setSortField] = useState<'created_at' | 'amount' | 'status'>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchDepositMethods();
@@ -384,7 +399,7 @@ const Withdrawals = () => {
     <Card className="border-yellow-200 bg-yellow-50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-yellow-800">
-          <LockKeyhole className="h-5 w-5" />
+          <LockSimple className="h-5 w-5" />
           KYC Verification Required
         </CardTitle>
         <CardDescription className="text-yellow-700">
@@ -410,16 +425,6 @@ const Withdrawals = () => {
     const matchesStatus = statusFilter === "all" || withdrawal.status.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
-
-  // Group withdrawals by date
-  const groupedWithdrawals = Object.entries(
-    filteredWithdrawals.reduce((groups, withdrawal) => {
-      const date = new Date(withdrawal.created_at).toLocaleDateString();
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(withdrawal);
-      return groups;
-    }, {} as Record<string, Withdrawal[]>)
-  );
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -449,234 +454,370 @@ const Withdrawals = () => {
     setActiveTab(value);
   };
 
+  const handleCopyId = async (id: string) => {
+    const success = await copyToClipboard(id);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Add sorted withdrawals computation
+  const sortedAndFilteredWithdrawals = filteredWithdrawals.sort((a, b) => {
+    if (sortField === 'amount') {
+      return sortDirection === 'asc' ? a.amount - b.amount : b.amount - a.amount;
+    }
+    if (sortField === 'status') {
+      return sortDirection === 'asc' 
+        ? a.status.localeCompare(b.status)
+        : b.status.localeCompare(a.status);
+    }
+    // Default sort by date
+    return sortDirection === 'asc'
+      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   return (
     <div className="w-full min-h-screen bg-background">
       <Topbar title="Withdrawals" />
       
-      <div className="max-w-[1000px] mx-auto py-6 px-4 sm:px-6">
+      <div className="container max-w-[1000px] mx-auto py-6 px-4 md:px-6">
+        {/* Balance Cards Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          <div className="border border-black p-4 rounded-lg flex flex-col">
-            <div className="text-4xl font-bold mb-2">
-              ${userBalance.toLocaleString()}
-            </div>
-            <div className="text-sm font-medium">Available Balance</div>
-          </div>
+          <Card className="bg-primary border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col">
+                  <span className="text-sm text-white mb-1">Available Balance</span>
+                  <span className="text-2xl font-semibold text-white">
+                    ${userBalance.toLocaleString()}
+                  </span>
+                  <div className="flex flex-col text-xs text-white/80 mt-1">
+                    <span>Ready to withdraw</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="border border-black p-4 rounded-lg flex flex-col">
-            <div className="text-4xl font-bold text-yellow-600 mb-2">
-              ${pendingWithdrawals.toLocaleString()}
-            </div>
-            <div className="text-sm font-medium">Pending Withdrawals</div>
-          </div>
+          <Card className="bg-white border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <span className="text-sm text-muted-foreground mb-1">Pending Withdrawals</span>
+                <span className="text-2xl font-semibold text-yellow-600">
+                  ${pendingWithdrawals.toLocaleString()}
+                </span>
+                <span className="text-xs text-muted-foreground mt-1">
+                  Processing
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="border border-black p-4 rounded-lg flex flex-col">
-            <div className="text-4xl font-bold text-green-600 mb-2">
-              ${withdrawals.filter(w => w.status === 'Completed').reduce((sum, w) => sum + w.amount, 0).toLocaleString()}
-            </div>
-            <div className="text-sm font-medium">Completed Withdrawals</div>
-          </div>
+          <Card className="bg-white border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex flex-col">
+                <span className="text-sm text-muted-foreground mb-1">Total Withdrawals</span>
+                <span className="text-2xl font-semibold text-green-600">
+                  ${withdrawals.filter(w => w.status === 'Completed').reduce((sum, w) => sum + w.amount, 0).toLocaleString()}
+                </span>
+                <span className="text-xs text-muted-foreground mt-1">
+                  Completed
+                </span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2" data-kyc-disabled={kycStatus !== 'completed'}>
-            <TabsTrigger value="request">Request Withdrawal</TabsTrigger>
-            <TabsTrigger 
-              value="history"
-              disabled={kycStatus !== 'completed'}
-              className="data-[kyc-disabled=true]:opacity-50 data-[kyc-disabled=true]:cursor-not-allowed"
-            >
-              History
-            </TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
+          <div className="container max-w-[1000px] mx-auto">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <div className="border-b">
+                <TabsList className="h-10 w-full justify-start gap-6 bg-transparent">
+                  <TabsTrigger value="request" className="flex items-center gap-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                    <Receipt className="h-4 w-4" />
+                    Request Withdrawal
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="history" 
+                    className="flex items-center gap-2 data-[state=active]:bg-transparent data-[state=active]:shadow-none relative"
+                    disabled={kycStatus !== 'completed'}
+                  >
+                    <ClockCounterClockwise className="h-4 w-4" />
+                    History
+                    {withdrawals.some(w => w.status === 'Pending') && (
+                      <Badge className="absolute -right-6 -top-2 h-5 w-5 p-0 flex items-center justify-center">
+                        {withdrawals.filter(w => w.status === 'Pending').length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
-          <TabsContent value="request" className="space-y-4">
-            {kycStatus !== 'completed' ? (
-              <KycWarning />
-            ) : (
-              <Card>
-                <form onSubmit={handleSubmit}>
-                  <CardContent className="space-y-6 pt-6">
-                    {/* Replace grid with stacked layout */}
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Select Cryptocurrency</Label>
-                        <Select 
-                          value={formData.cryptoId} 
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, cryptoId: value, network: '' }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select cryptocurrency" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cryptoOptions.map(crypto => (
-                              <SelectItem key={crypto.id} value={crypto.id || ''}>
-                                <div className="flex items-center gap-2">
-                                  {crypto.logo && (
-                                    <img src={crypto.logo} alt={crypto.name || ''} className="w-4 h-4" />
-                                  )}
-                                  {crypto.name} ({crypto.symbol})
+              <TabsContent value="request" className="m-0 space-y-4">
+                {kycStatus !== 'completed' ? (
+                  <KycWarning />
+                ) : (
+                  <div className="max-w-[1000px] mx-auto">
+                    <Card className="border rounded-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-xl">Request Withdrawal</CardTitle>
+                        <CardDescription>Request withdrawal to your crypto wallet</CardDescription>
+                      </CardHeader>
+                      <form onSubmit={handleSubmit}>
+                        <Tabs defaultValue="crypto" className="w-full">
+                          <CardContent className="border-b p-6">
+                            <TabsList className="w-[400px]">
+                              <TabsTrigger value="crypto" className="flex items-center gap-2">
+                                <Receipt className="h-4 w-4" />
+                                Cryptocurrency
+                              </TabsTrigger>
+                              <TabsTrigger value="fiat" disabled className="flex items-center gap-2">
+                                <CurrencyDollar className="h-4 w-4" />
+                                Fiat
+                              </TabsTrigger>
+                            </TabsList>
+                          </CardContent>
+
+                          <TabsContent value="crypto">
+                            <CardContent className="space-y-6 pt-6">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-normal">Select Cryptocurrency</Label>
+                                  <Select 
+                                    value={formData.cryptoId} 
+                                    onValueChange={(value) => setFormData(prev => ({ ...prev, cryptoId: value, network: '' }))}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select cryptocurrency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {cryptoOptions.map(crypto => (
+                                        <SelectItem key={crypto.id} value={crypto.id || ''}>
+                                          <div className="flex items-center gap-2">
+                                            {crypto.logo && (
+                                              <img src={crypto.logo} alt={crypto.name || ''} className="w-4 h-4" />
+                                            )}
+                                            {crypto.name} ({crypto.symbol})
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
 
-                      {formData.cryptoId && networks.length > 0 && networks.some(network => 
-                        shouldShowNetworkSelect(
-                          depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol,
-                          network
-                        )
-                      ) && (
-                        <div className="space-y-2">
-                          <Label>Select Network</Label>
-                          <Select 
-                            value={formData.network} 
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, network: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select network" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {networks.map(network => (
-                                <SelectItem key={network} value={network}>{network}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
+                                {formData.cryptoId && networks.length > 0 && networks.some(network => 
+                                  shouldShowNetworkSelect(
+                                    depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol,
+                                    network
+                                  )
+                                ) && (
+                                  <div className="space-y-2">
+                                    <Label className="text-xs font-normal">Select Network</Label>
+                                    <Select 
+                                      value={formData.network} 
+                                      onValueChange={(value) => setFormData(prev => ({ ...prev, network: value }))}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select network" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {networks.map(network => (
+                                          <SelectItem key={network} value={network}>{network}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </div>
 
-                    {/* Rest of the form remains unchanged */}
-                    <div className="space-y-2">
-                      <Label htmlFor="walletAddress">Wallet Address</Label>
+                              <div className="space-y-2">
+                                <Label htmlFor="walletAddress" className="text-xs font-normal">Wallet Address</Label>
+                                <Input
+                                  id="walletAddress"
+                                  placeholder="Enter your wallet address"
+                                  value={formData.walletAddress}
+                                  onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="amount" className="text-xs font-normal">Amount</Label>
+                                <div className="relative">
+                                  <CurrencyDollar className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                                  <Input
+                                    id="amount"
+                                    type="number"
+                                    min="0"
+                                    placeholder="0.00"
+                                    className={`pl-10 ${amountError ? 'border-red-500' : ''}`}
+                                    value={formData.amount}
+                                    onChange={handleAmountChange}
+                                  />
+                                </div>
+                                {amountError && (
+                                  <p className="text-sm text-red-500">{amountError}</p>
+                                )}
+                                <p className="text-sm text-muted-foreground">
+                                  Available balance: ${userBalance.toLocaleString()}
+                                </p>
+                              </div>
+                            </CardContent>
+                            <CardFooter>
+                              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                                {isSubmitting ? "Processing..." : "Request Withdrawal"}
+                              </Button>
+                            </CardFooter>
+                          </TabsContent>
+
+                          <TabsContent value="fiat">
+                            <CardContent className="pt-6">
+                              <div className="flex flex-col items-center justify-center py-8 text-center">
+                                <CurrencyDollar className="h-8 w-8 text-muted-foreground mb-3" />
+                                <p className="text-sm text-muted-foreground">Fiat withdrawals coming soon</p>
+                              </div>
+                            </CardContent>
+                          </TabsContent>
+                        </Tabs>
+                      </form>
+                    </Card>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" className="m-0 space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-full sm:w-[300px]">
+                      <MagnifyingGlass className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="walletAddress"
-                        placeholder="Enter your wallet address"
-                        value={formData.walletAddress}
-                        onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
+                        type="search"
+                        placeholder="Search withdrawals..."
+                        className="pl-8 w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="failed">Failed</SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Amount</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          id="amount"
-                          type="number"
-                          min="0"
-                          placeholder="0.00"
-                          className={`pl-10 ${amountError ? 'border-red-500' : ''}`}
-                          value={formData.amount}
-                          onChange={handleAmountChange}
-                        />
-                      </div>
-                      {amountError && (
-                        <p className="text-sm text-red-500">{amountError}</p>
-                      )}
-                      <p className="text-sm text-muted-foreground">
-                        Available balance: ${userBalance.toLocaleString()}
-                      </p>
+                      <Select value={sortField} onValueChange={(value: typeof sortField) => setSortField(value)}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Sort By" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="created_at">Date</SelectItem>
+                          <SelectItem value="amount">Amount</SelectItem>
+                          <SelectItem value="status">Status</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+                        className="w-10"
+                      >
+                        <ArrowsDownUp className={`h-4 w-4 transition-transform ${
+                          sortDirection === "desc" ? "rotate-180" : ""
+                        }`} />
+                      </Button>
                     </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                      {isSubmitting ? "Processing..." : "Request Withdrawal"}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-4 sm:space-y-0 sm:flex sm:justify-between sm:items-center">
-                <div className="relative w-full sm:w-[300px]">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search withdrawals..."
-                    className="pl-8 w-full"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={() => setStatusFilter("all")} variant="outline" size="sm">
-                    Clear Filter
-                  </Button>
-                </div>
-              </div>
-
-              <div className="rounded-lg border bg-card">
-                {filteredWithdrawals.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No withdrawals found
                   </div>
-                ) : (
-                  <Accordion type="multiple" className="divide-y">
-                    {groupedWithdrawals.map(([date, transactions]) => (
-                      <AccordionItem key={date} value={date}>
-                        <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>svg]:rotate-180">
-                          <div className="flex justify-between items-center w-full">
-                            <span className="font-medium">{formatDate(date)}</span>
-                            <Badge variant="secondary" className="ml-auto mr-4 text-xs">
-                              {transactions.length} Withdrawals
-                            </Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-4">
-                          <div className="space-y-3">
-                            {transactions.map((withdrawal) => (
-                              <div key={withdrawal.id} className="relative bg-white border rounded-lg p-4">
-                                <div className="space-y-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium text-muted-foreground">{withdrawal.id}</span>
-                                    <div className={`h-2.5 w-2.5 rounded-full ${
-                                      withdrawal.status === 'Completed' ? 'bg-green-500' : 
-                                      withdrawal.status === 'Pending' ? 'bg-yellow-500' : 
-                                      withdrawal.status === 'Processing' ? 'bg-blue-500' : 
-                                      'bg-red-500'
-                                    }`} />
+
+                  <div className="rounded-lg border bg-card">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent border-b border-border/40">
+                          <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Date</TableHead>
+                          <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Transaction</TableHead>
+                          <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Amount</TableHead>
+                          <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedAndFilteredWithdrawals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                              No withdrawals found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          sortedAndFilteredWithdrawals.map((withdrawal) => (
+                            <TableRow 
+                              key={withdrawal.id}
+                              className="group hover:bg-muted/50 transition-colors"
+                            >
+                              <TableCell className="py-4 align-top">
+                                <div className="text-sm font-medium">
+                                  {format(new Date(withdrawal.created_at), 'MMM dd, yyyy')}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {format(new Date(withdrawal.created_at), 'hh:mm a')}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 align-top">
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="outline" className="w-fit capitalize text-xs">
+                                    Withdrawal
+                                  </Badge>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="font-mono">{withdrawal.id.slice(0, 12)}...</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => handleCopyId(withdrawal.id)}
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-2xl font-semibold">
-                                      ${withdrawal.amount.toLocaleString()}
-                                    </span>
-                                    <Badge variant="outline" className="font-normal">
-                                      {withdrawal.crypto_name} ({withdrawal.crypto_symbol})
-                                    </Badge>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Network: {withdrawal.network}
+                                  <div className="text-xs text-muted-foreground">
+                                    {withdrawal.crypto_name} ({withdrawal.crypto_symbol}) - {withdrawal.network}
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+                              </TableCell>
+                              <TableCell className="py-4 align-top">
+                                <Badge variant="outline" className="font-mono">
+                                  -${withdrawal.amount.toLocaleString()}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-4 align-top">
+                                <Badge 
+                                  variant={
+                                    withdrawal.status === 'Completed' ? 'success' :
+                                    withdrawal.status === 'Pending' ? 'warning' :
+                                    withdrawal.status === 'Processing' ? 'secondary' :
+                                    'destructive'
+                                  } 
+                                  className="capitalize"
+                                >
+                                  {withdrawal.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,13 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { PageTransition, FeatureCard } from "@/components/ui-components";
+import { PageTransition } from "@/components/ui-components";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowRight, ChevronDown, Clock } from "lucide-react";
+import { ArrowRight, ChevronDown, Clock, DollarSign } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,10 +21,15 @@ import { Navbar } from "@/components/shared/Navbar";
 import { Hero } from "@/components/shared/Hero";
 import { Companies } from "@/components/shared/Companies";
 import { SEO } from "@/components/shared/SEO";
+import { useScrollAnimation } from "@/hooks/use-scroll-animation";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
   const [showContact, setShowContact] = useState(false);
   const navigate = useNavigate();
+  
+  // Add scroll animation hook
+  useScrollAnimation();
 
   const handleNavigation = (section: string) => {
     // If it's a section scroll, handle it
@@ -71,6 +76,64 @@ const Index = () => {
           />
 
           <Companies />
+
+          {/* Quick Features Section */}
+          <section className="py-16 bg-background/5">
+            <div className="container max-w-[1200px] mx-auto px-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Add animate-on-scroll to each feature card */}
+                {[
+                  {
+                    icon: <Clock className="h-8 w-8 text-primary" />,
+                    title: "Instant Withdrawals",
+                    description: "Fastest Payouts in Seconds"
+                  },
+                  {
+                    icon: <ChevronDown className="h-8 w-8 text-primary" />,
+                    title: "Lowest Spreads",
+                    description: "Starting from 0.1 pips"
+                  },
+                  {
+                    icon: <Users className="h-8 w-8 text-primary" />,
+                    title: "24/7 Support",
+                    description: "Always here to help you"
+                  },
+                  {
+                    icon: <DollarSign className="h-8 w-8 text-primary" />,
+                    title: "Zero Commission",
+                    description: "Trade with no extra fees"
+                  }
+                ].map((feature, index) => (
+                  <div 
+                    key={index}
+                    className={cn(
+                      "animate-on-scroll opacity-0 translate-y-4 transition-all duration-700",
+                      {
+                        'delay-0': index === 0,
+                        'delay-100': index === 1,
+                        'delay-200': index === 2,
+                        'delay-300': index === 3
+                      }
+                    )}
+                  >
+                    <div className="relative bg-white p-2 rounded-2xl border">
+                      <div className="h-full w-full border rounded-xl p-6">
+                        <div className="flex flex-col gap-4">
+                          <div className="w-full h-24 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-transparent flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.02)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-white/20 before:bg-gradient-to-br before:from-white/10 before:to-transparent">
+                            <div className="relative w-16 h-16 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary/10">
+                              {feature.icon}
+                            </div>
+                          </div>
+                          <h3 className="font-semibold text-xl text-center">{feature.title}</h3>
+                          <p className="text-sm text-muted-foreground text-center">{feature.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
           {/* How it Works Section - Replace Stats Section */}
           <section className="my-24">

@@ -2,23 +2,22 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { 
   Users, 
-  BarChart3, 
-  ArrowDownToLine, 
-  ArrowUpToLine,
-  Settings, 
-  LogOut, 
-  Menu, 
-  X, 
-  ChevronRight, 
-  Shield,
+  ChartBar, 
+  ArrowLineUp, 
+  ArrowLineDown,
+  Gear, 
+  SignOut, 
+  List, 
+  X as XIcon, 
+  CaretRight, 
   CreditCard,
   Briefcase, 
-  Image,
-  HelpCircle, 
-  Bell,
-  ChevronLeft,
-  LineChart // Add LineChart icon for trading pairs
-} from "lucide-react";
+  Image as ImageIcon,
+  Bell as BellIcon,
+  CaretLeft,
+  ChartLine,
+  Tag
+} from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -112,7 +111,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     size="sm"
                     onClick={() => setSidebarOpen(false)}
                   >
-                    <X className="h-4 w-4" />
+                    <XIcon className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -121,7 +120,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                 <nav className="flex flex-col gap-1 p-2">
                   <SidebarLink 
                     to="/admin/dashboard" 
-                    icon={<BarChart3 className="h-5 w-5" />} 
+                    icon={<ChartBar className="h-5 w-5" />} 
                     label="Dashboard" 
                     active={location.pathname === '/admin/dashboard'} 
                     collapsed={!sidebarOpen} 
@@ -149,56 +148,63 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                   />
                   <SidebarLink 
                     to="/admin/withdrawals" 
-                    icon={<ArrowUpToLine className="h-5 w-5" />} 
+                    icon={<ArrowLineUp className="h-5 w-5" />} 
                     label="Withdrawals" 
                     active={location.pathname === '/admin/withdrawals'} 
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
                     to="/admin/plans-subscription" 
-                    icon={<ArrowDownToLine className="h-5 w-5" />} 
+                    icon={<ArrowLineDown className="h-5 w-5" />} 
                     label="Plans Subscription" 
                     active={location.pathname === '/admin/plans-subscription'} 
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
                     to="/admin/deposits" 
-                    icon={<ArrowDownToLine className="h-5 w-5" />} 
+                    icon={<ArrowLineDown className="h-5 w-5" />} 
                     label="Deposits" 
                     active={location.pathname === '/admin/deposits'} 
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
                     to="/admin/promotions"
-                    icon={<Image className="h-5 w-5" />}
+                    icon={<ImageIcon className="h-5 w-5" />}
                     label="Promotions"
                     active={location.pathname === '/admin/promotions'}
                     collapsed={!sidebarOpen}
                   />
-                    <SidebarLink 
-                      to="/admin/plans" 
-                      icon={<Briefcase className="h-5 w-5" />} 
-                      label="Plans" 
-                      active={location.pathname === '/admin/plans'} 
-                      collapsed={!sidebarOpen} 
-                    />
+                  <SidebarLink 
+                    to="/admin/promocodes"
+                    icon={<Tag className="h-5 w-5" />}
+                    label="Promocodes"
+                    active={location.pathname === '/admin/promocodes'}
+                    collapsed={!sidebarOpen}
+                  />
+                  <SidebarLink 
+                    to="/admin/plans" 
+                    icon={<Briefcase className="h-5 w-5" />} 
+                    label="Plans" 
+                    active={location.pathname === '/admin/plans'} 
+                    collapsed={!sidebarOpen} 
+                  />
                   <SidebarLink 
                     to="/admin/notices" 
-                    icon={<Bell className="h-5 w-5" />} 
+                    icon={<BellIcon className="h-5 w-5" />} 
                     label="Notices" 
                     active={location.pathname === '/admin/notices'} 
                     collapsed={!sidebarOpen} 
                   />
                   <SidebarLink 
                     to="/admin/settings" 
-                    icon={<Settings className="h-5 w-5" />} 
+                    icon={<Gear className="h-5 w-5" />} 
                     label="Settings" 
                     active={location.pathname === '/admin/settings'} 
                     collapsed={!sidebarOpen} 
                     />
                   <SidebarLink 
                     to="/admin/pairs"
-                    icon={<LineChart className="h-5 w-5" />}
+                    icon={<ChartLine className="h-5 w-5" />}
                     label="Trading Pairs"
                     active={location.pathname === '/admin/pairs'}
                     collapsed={!sidebarOpen}
@@ -213,7 +219,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                   className="w-full justify-start gap-2 mb-2"
                   onClick={handleLogout}
                 >
-                  <LogOut className="h-4 w-4" />
+                  <SignOut className="h-4 w-4" />
                   {sidebarOpen && <span>Logout</span>}
                 </Button>
                 
@@ -223,7 +229,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                   className="hidden md:flex w-full justify-center"
                 >
-                  {sidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                  {sidebarOpen ? <CaretLeft className="h-4 w-4" /> : <List className="h-4 w-4" />}
                 </Button>
               </div>
             </aside>
@@ -245,7 +251,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                 size="sm"
                 onClick={() => setSidebarOpen(true)}
               >
-                <Menu className="h-5 w-5" />
+                <List className="h-5 w-5" />
               </Button>
             </header>
           )}
@@ -285,7 +291,7 @@ const SidebarLink = ({
       >
         {icon}
         {!collapsed && <span>{label}</span>}
-        {!collapsed && active && <ChevronRight className="ml-auto h-4 w-4" />}
+        {!collapsed && active && <CaretRight className="ml-auto h-4 w-4" />}
       </Button>
     </Link>
   );

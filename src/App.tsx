@@ -51,6 +51,7 @@ const SettingsPage = lazy(() => import("@/pages/admin/settings/SettingsPage"));
 const SupportManagePage = lazy(() => import("@/pages/admin/support/SupportManagePage"));
 const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
 const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
+const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage")); // Add this line
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
@@ -173,6 +174,7 @@ const App = () => {
                   <Route path="notices" element={<AdminNotices />} />
                   <Route path="support" element={<SupportManagePage />} />
                   <Route path="promotions" element={<PromotionsPage />} />
+                  <Route path="promocodes" element={<PromocodesPage />} /> {/* Add this line */}
                   <Route path="pairs" element={<AdminPairs />} />
                 </Routes>
               }

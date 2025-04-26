@@ -273,7 +273,14 @@ export default {
     				'Albert Sans',
     				'sans-serif'
     			]
-    		}
+    		},
+    		transitionDelay: {
+    			'0': '0ms',
+    			'100': '100ms',
+    			'200': '200ms',
+    			'300': '300ms',
+    			'400': '400ms',
+    		},
     	}
     },
 	plugins: [require("tailwindcss-animate")],

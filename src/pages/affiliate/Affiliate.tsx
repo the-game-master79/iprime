@@ -50,6 +50,7 @@ const Affiliate = () => {
     hasDirectReferrals: false,
   });
   const [legendType, setLegendType] = useState<"investments" | "directCount">("investments");
+  const [userDirectCount, setUserDirectCount] = useState(0);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -58,7 +59,7 @@ const Affiliate = () => {
         if (user) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('referral_code, referred_by')
+            .select('referral_code, referred_by, direct_count')
             .eq('id', user.id)
             .single();
 
@@ -71,6 +72,8 @@ const Affiliate = () => {
             setReferralCode(profile.referral_code);
             setReferralLink(`${window.location.origin}/auth/register?ref=${profile.referral_code}`);
           }
+          
+          setUserDirectCount(profile?.direct_count || 0);
 
           if (profile?.referred_by) {
             const { data: referrer, error: referrerError } = await supabase
@@ -309,23 +312,23 @@ const Affiliate = () => {
           </Card>
 
           <Card className={`border-black ${
-            teamData.filter(m => m.level === 1).length === 0 
+            userDirectCount === 0 
               ? 'from-orange-50 to-orange-100/50' 
               : 'from-green-50 to-green-100/50'
           }`}>
             <CardContent className="p-4 sm:p-6">
               <div>
                 <div className="text-xl sm:text-2xl font-bold">
-                  {teamData.filter(m => m.level === 1).length}/2
+                  {userDirectCount}/2
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground mt-2">Direct Referrals</div>
-                {!eligibility.hasDirectReferrals && (
+                {userDirectCount < 2 && (
                   <p className={`text-xs mt-3 rounded-full px-3 py-1 ${
-                    teamData.filter(m => m.level === 1).length === 0
+                    userDirectCount === 0
                       ? 'text-orange-800 bg-orange-100'
                       : 'text-green-800 bg-green-100'
                   }`}>
-                    {2 - teamData.filter(m => m.level === 1).length} more to activate commissions
+                    {2 - userDirectCount} more to activate commissions
                   </p>
                 )}
               </div>

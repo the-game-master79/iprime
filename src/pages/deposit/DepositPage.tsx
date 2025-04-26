@@ -3,12 +3,26 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/shared/Topbar";
 import { supabase } from "@/lib/supabase";
-import { Copy, ArrowLeft, Info } from "lucide-react";
+import { Copy, ArrowLeft, Info, CurrencyDollar, Receipt } from "@phosphor-icons/react"; // Changed from lucide-react
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label"; // Add this import
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Add this import
+
+interface Promocode {
+  id: string;
+  code: string;
+  description: string;
+  type: 'multiplier' | 'cashback';  // Updated to only have these two types
+  discount_percentage: number;
+  min_amount: number;
+  max_amount: number | null;
+}
 
 interface DepositMethod {
   id: string;
@@ -49,6 +63,10 @@ export default function DepositPage() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [amountError, setAmountError] = useState<string>("");
+  const [promocodes, setPromocodes] = useState<Promocode[]>([]);
+  const [selectedPromocode, setSelectedPromocode] = useState<Promocode | null>(null);
+  const [promoInput, setPromoInput] = useState<string>("");
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -153,6 +171,30 @@ export default function DepositPage() {
     });
   };
 
+  // Replace calculateFinalAmount with new logic
+  const calculateFinalAmount = (baseAmount: number) => {
+    if (!selectedPromocode) return baseAmount;
+    
+    switch (selectedPromocode.type) {
+      case 'multiplier':
+        return baseAmount * 2;
+      case 'cashback':
+        return baseAmount;
+      default:
+        return baseAmount;
+    }
+  };
+
+  // Add function to get promo description
+  const getPromoDescription = (promo: Promocode) => {
+    switch (promo.type) {
+      case 'multiplier':
+        return '2X Your Deposit';
+      case 'cashback':
+        return `${promo.discount_percentage}% Cashback to Withdrawal Wallet`;
+    }
+  };
+
   const handleSubmit = async (investment: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -164,22 +206,29 @@ export default function DepositPage() {
 
       if (!selectedCrypto) throw new Error('Invalid cryptocurrency selected');
 
-      const { error } = await supabase.from('deposits').insert({
+      const finalAmount = calculateFinalAmount(investment);
+
+      const { data, error } = await supabase.from('deposits').insert({
         user_id: user.id,
         amount: investment,
         crypto_name: selectedCrypto.crypto_name,
         crypto_symbol: selectedCrypto.crypto_symbol,
         network: selectedCrypto.network,
-        status: 'pending'
-      });
+        status: 'pending',
+        promocode_id: selectedPromocode?.id
+      }).select().single();
 
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to submit deposit request.",
-          variant: "destructive"
-        });
-        return;
+      if (error) throw error;
+
+      // Apply promocode effects
+      if (selectedPromocode) {
+        const { error: promoError } = await supabase
+          .rpc('apply_promocode', { 
+            p_deposit_id: data.id,
+            p_promocode_id: selectedPromocode.id 
+          });
+
+        if (promoError) throw promoError;
       }
 
       toast({
@@ -255,13 +304,72 @@ export default function DepositPage() {
     return classes.filter(Boolean).join(" ");
   }
 
+  // Add function to handle promo code application
+  const handleApplyPromoCode = async () => {
+    try {
+      setIsApplyingPromo(true);
+      const { data, error } = await supabase
+        .from('promocodes')
+        .select('*')
+        .eq('code', promoInput)
+        .eq('is_active', true)
+        .gt('expiry_date', new Date().toISOString())
+        .single();
+
+      if (error || !data) {
+        toast({
+          title: "Invalid Code",
+          description: "This promo code is invalid or has expired",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate amount restrictions
+      const amountValue = parseFloat(amount || '0');
+      if (amountValue < data.min_amount) {
+        toast({
+          title: "Invalid Amount",
+          description: `Minimum amount for this code is $${data.min_amount}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.max_amount && amountValue > data.max_amount) {
+        toast({
+          title: "Invalid Amount",
+          description: `Maximum amount for this code is $${data.max_amount}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setSelectedPromocode(data);
+      setPromoInput("");
+      toast({
+        title: "Success",
+        description: "Promo code applied successfully"
+      });
+    } catch (error) {
+      console.error('Error applying promo code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply promo code",
+        variant: "destructive"
+      });
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Topbar 
         title="Deposit Funds"
         leftContent={
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft size={20} weight="regular" /> {/* Updated Phosphor icon */}
           </Button>
         }
       />
@@ -270,156 +378,259 @@ export default function DepositPage() {
         <div className="flex flex-col-reverse md:grid md:grid-cols-[1fr_300px] gap-6">
           <Card>
             <CardContent className="p-6 space-y-6">
-              {/* Cryptocurrency Selection */}
-              <div className="space-y-2">
-                <Select
-                  value={cryptoType}
-                  onValueChange={(value) => {
-                    setCryptoType(value);
-                    setNetwork("");
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select cryptocurrency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCryptos.map((symbol) => {
-                      const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
-                      const price = cryptoPrices[symbol.toLowerCase()]?.usd || 0;
-                      
-                      return (
-                        <SelectItem key={symbol} value={symbol}>
-                          <div className="flex items-center justify-between w-full gap-2">
-                            <div className="flex items-center gap-2">
-                              {crypto?.logo_url && (
-                                <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-6 h-6" />
-                              )}
-                              <span>{crypto?.crypto_name}</span>
-                              <span className="text-muted-foreground">({symbol.toUpperCase()})</span>
-                            </div>
-                            <span className="text-sm font-medium">${price.toLocaleString()}</span>
+              <form>
+                <Tabs defaultValue="crypto" className="w-full">
+                  <CardContent className="border-b p-6">
+                    <TabsList className="w-[400px]">
+                      <TabsTrigger value="crypto" className="flex items-center gap-2">
+                        <Receipt size={16} weight="regular" /> {/* Updated Phosphor icon */}
+                        Cryptocurrency
+                      </TabsTrigger>
+                      <TabsTrigger value="fiat" disabled className="flex items-center gap-2">
+                        <CurrencyDollar size={16} weight="regular" /> {/* Updated Phosphor icon */}
+                        Fiat
+                      </TabsTrigger>
+                    </TabsList>
+                  </CardContent>
+
+                  <TabsContent value="crypto">
+                    <CardContent className="space-y-6 pt-6">
+                      {/* Move existing crypto form fields here */}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="crypto">Select Crypto</Label>
+                          <Select
+                            value={cryptoType}
+                            onValueChange={(value) => {
+                              setCryptoType(value);
+                              setNetwork("");
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select cryptocurrency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableCryptos.map((symbol) => {
+                                const crypto = depositMethods.find(m => m.crypto_symbol === symbol);
+                                const price = cryptoPrices[symbol.toLowerCase()]?.usd || 0;
+                                
+                                return (
+                                  <SelectItem key={symbol} value={symbol}>
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <div className="flex items-center gap-2">
+                                        {crypto?.logo_url && (
+                                          <img src={crypto.logo_url} alt={crypto.crypto_name || ''} className="w-6 h-6" />
+                                        )}
+                                        <span>{crypto?.crypto_name}</span>
+                                        <span className="text-muted-foreground">({symbol.toUpperCase()})</span>
+                                      </div>
+                                      <span className="text-sm font-medium">${price.toLocaleString()}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Network Selection */}
+                        <div className="space-y-2">
+                          <Label htmlFor="network">Network</Label>
+                          <Select
+                            value={network}
+                            onValueChange={setNetwork}
+                            disabled={!cryptoType}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select network" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableNetworks.map((net) => (
+                                <SelectItem key={net} value={net}>{net}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {!cryptoType && (
+                            <p className="text-xs text-muted-foreground mt-1">Please select a cryptocurrency first</p>
+                          )}
+                        </div>
+
+                        {/* Amount Input */}
+                        <div className="space-y-2">
+                          <Label htmlFor="amount">Enter Amount</Label>
+                          <div className="relative">
+                            <Input
+                              id="amount"
+                              type="number"
+                              placeholder="$ Enter Amount"
+                              value={amount}
+                              onChange={(e) => {
+                                setAmount(e.target.value);
+                                validateAmount(e.target.value);
+                              }}
+                              className="pl-3"
+                            />
                           </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Network Selection */}
-              <div className="space-y-2">
-                <Select
-                  value={network}
-                  onValueChange={setNetwork}
-                  disabled={!cryptoType}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select network" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableNetworks.map((net) => (
-                      <SelectItem key={net} value={net}>{net}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!cryptoType && (
-                  <p className="text-sm text-muted-foreground">Please select a cryptocurrency first</p>
-                )}
-              </div>
-
-              {/* Amount Input */}
-              <div className="space-y-2">
-                <div className="relative">
-                  <Input
-                    type="number"
-                    placeholder="$ Enter Amount"
-                    value={amount}
-                    onChange={(e) => {
-                      setAmount(e.target.value);
-                      validateAmount(e.target.value);
-                    }}
-                    className="pl-3" // Removed extra padding since we removed the icon
-                  />
-                </div>
-                {amountError && (
-                  <p className="text-sm text-destructive">{amountError}</p>
-                )}
-              </div>
-
-              {cryptoType && network && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold">Deposit Details</h3>
-                  <div className="rounded-xl border bg-card p-6 space-y-6">
-                    {/* Amount in Crypto */}
-                    <div className="bg-muted/50 rounded-lg p-4">
-                      <div className="text-sm text-muted-foreground mb-1">
-                        Please send exactly
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <div className="text-2xl font-bold text-primary">
-                          {calculateCryptoAmount(parseFloat(amount || '0'), cryptoType)}
+                          {amountError && (
+                            <p className="text-sm text-destructive">{amountError}</p>
+                          )}
                         </div>
-                        <div className="text-lg font-medium">
-                          {cryptoType.toUpperCase()}
-                        </div>
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        ≈ ${parseFloat(amount || '0').toLocaleString()}
-                      </div>
-                    </div>
 
-                    {/* QR Code */}
-                    {qrCodeUrl && (
-                      <div className="flex justify-center">
-                        <div className="p-4 bg-white rounded-lg shadow-sm">
-                          <img src={qrCodeUrl} alt="Deposit QR Code" className="w-48 h-48" />
-                        </div>
-                      </div>
-                    )}
+                        {/* Deposit Details */}
+                        {cryptoType && network && (
+                          <div className="space-y-4">
+                            <h3 className="font-semibold">Deposit Details</h3>
+                            <div className="rounded-xl border bg-card p-6 space-y-6">
+                              {/* Amount in Crypto */}
+                              <div className="bg-muted/50 rounded-lg p-4">
+                                <div className="text-sm text-muted-foreground mb-1">
+                                  Please send exactly
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <div className="text-2xl font-bold text-primary">
+                                    {calculateCryptoAmount(parseFloat(amount || '0'), cryptoType)}
+                                  </div>
+                                  <div className="text-lg font-medium">
+                                    {cryptoType.toUpperCase()}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  ≈ ${parseFloat(amount || '0').toLocaleString()}
+                                </div>
+                              </div>
 
-                    {/* Deposit Address */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
-                        <code className="flex-1 break-all font-mono text-sm">
-                          {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
-                        </code>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                              {/* QR Code */}
+                              {qrCodeUrl && (
+                                <div className="flex justify-center">
+                                  <div className="p-4 bg-white rounded-lg shadow-sm">
+                                    <img src={qrCodeUrl} alt="Deposit QR Code" className="w-48 h-48" />
+                                  </div>
+                                </div>
+                              )}
 
-              {/* Submit Button */}
-              <Button 
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                size="lg"
-                disabled={!amount || !cryptoType || !network || !!amountError}
-                onClick={async () => {
-                  await handleSubmit(parseFloat(amount));
-                  navigate('/dashboard');
-                }}
-              >
-                Confirm Deposit
-              </Button>
+                              {/* Deposit Address */}
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-3">
+                                  <code className="flex-1 break-all font-mono text-sm">
+                                    {depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address}
+                                  </code>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => handleCopyAddress(depositMethods.find(m => m.crypto_symbol === cryptoType && m.network === network)?.deposit_address || '')}
+                                  >
+                                    <Copy size={16} weight="regular" /> {/* Updated Phosphor icon */}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                    <CardFooter>
+                      <Button 
+                        type="submit"
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                        size="lg"
+                        disabled={!amount || !cryptoType || !network || !!amountError}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          await handleSubmit(parseFloat(amount));
+                          navigate('/dashboard');
+                        }}
+                      >
+                        Confirm Deposit
+                      </Button>
+                    </CardFooter>
+                  </TabsContent>
+
+                  <TabsContent value="fiat">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <CurrencyDollar size={32} weight="regular" className="text-muted-foreground mb-3" /> {/* Updated Phosphor icon */}
+                        <p className="text-sm text-muted-foreground">Fiat deposits coming soon</p>
+                      </div>
+                    </CardContent>
+                  </TabsContent>
+                </Tabs>
+              </form>
             </CardContent>
           </Card>
 
           {/* Right Section - Info Box */}
           <div className="space-y-4 md:mt-0">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Have a Promo Code?</h3>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter code"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      className="uppercase"
+                    />
+                    <Button 
+                      variant="outline"
+                      disabled={!promoInput || isApplyingPromo}
+                      onClick={handleApplyPromoCode}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+
+                {selectedPromocode && (
+                  <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Applied Code:</span>
+                      <Badge>{selectedPromocode.code}</Badge>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={selectedPromocode.type === 'multiplier' ? 'default' : 'outline'}>
+                          {selectedPromocode.type === 'multiplier' ? '2X Deposit' : `${selectedPromocode.discount_percentage}% Cashback`}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedPromocode.description}
+                      </p>
+                    </div>
+
+                    {amount && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Original Amount</span>
+                          <span>${parseFloat(amount).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span>Final Amount</span>
+                          <span className="text-primary">${calculateFinalAmount(parseFloat(amount)).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button 
+                      variant="ghost" 
+                      className="w-full text-destructive hover:text-destructive"
+                      onClick={() => setSelectedPromocode(null)}
+                    >
+                      Remove Code
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 mb-4">
-                <Info className="h-4 w-4" />
+                <Info size={16} weight="regular" /> {/* Updated Phosphor icon */}
                 <span className="font-medium">This deposit is for trades only.</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                If you're looking to trade, use this deposit form. For investing in packages, then visit our plans page.
+              If you want to trade, use the deposit form. To invest in packages, visit our plans page.
               </p>
               <Button
                 variant="outline"

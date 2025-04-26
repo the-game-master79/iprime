@@ -18,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import { Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "qrcode"; // Add this import
+import { Input } from "@/components/ui/input"; // Add if not already imported
 
 interface DepositMethod {
   id: string;
@@ -62,6 +63,9 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
   const [depositMethods, setDepositMethods] = useState<DepositMethod[]>([]);
   const [cryptoPrices, setCryptoPrices] = useState<Record<string, { usd: number }>>({});
   const [qrCodeUrl, setQrCodeUrl] = useState<string>(""); // Add this state
+  const [promoInput, setPromoInput] = useState<string>("");
+  const [selectedPromocode, setSelectedPromocode] = useState<any>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -255,6 +259,47 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
     return price > 0 ? (investment / price).toFixed(3) : '0';
   };
 
+  // Add this function to handle promocode application
+  const handleApplyPromoCode = async () => {
+    if (!promoInput) return;
+    
+    setIsApplyingPromo(true);
+    try {
+      const { data, error } = await supabase
+        .rpc('apply_promocode', { 
+          code: promoInput.toUpperCase(),
+          plan_id: selectedPlan?.id 
+        });
+
+      if (error) throw error;
+
+      if (!data) {
+        toast({
+          title: "Invalid Code",
+          description: "This promo code is invalid or expired",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setSelectedPromocode(data);
+      setPromoInput("");
+      toast({
+        title: "Success",
+        description: "Promo code applied successfully"
+      });
+    } catch (error) {
+      console.error('Error applying promo code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply promo code",
+        variant: "destructive"
+      });
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] p-0 flex flex-col h-[85vh] sm:h-auto max-h-[700px] overflow-hidden bg-white rounded-xl sm:mx-0">
@@ -430,7 +475,26 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
           )}
         </div>
 
-        <div className="p-4 bg-gradient-to-t from-muted/10 to-transparent border-t shrink-0">
+        <div className="p-4 bg-gradient-to-t from-muted/10 to-transparent border-t shrink-0 space-y-4">
+          {/* Add Promo Code Section */}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Have a promo code?"
+              value={promoInput}
+              onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+              className="flex-1 uppercase"
+            />
+            <Button 
+              variant="outline"
+              size="default"
+              disabled={!promoInput || isApplyingPromo}
+              onClick={handleApplyPromoCode}
+            >
+              Apply
+            </Button>
+          </div>
+
+          {/* Existing submit button */}
           <Button 
             className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary rounded-lg"
             size="default"
