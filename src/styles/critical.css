@@ -7,7 +7,7 @@
     --foreground: 210 25% 9%;
     --primary: 220 100% 55%;
     --primary-foreground: 0 0% 100%;
-    font-family: 'Questrial', sans-serif;
+    font-family: 'Aeonik', system-ui, sans-serif;
   }
 
   body {

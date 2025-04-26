@@ -25,7 +25,7 @@ export const Navbar = () => {
 
   return (
     <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[1200px]">
-      <div className="mx-auto backdrop-blur-sm bg-background/95 border rounded-full px-4 py-2 shadow-lg">
+      <div className="mx-auto backdrop-blur-sm bg-background/95 border rounded-2xl px-2 py-2">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
@@ -39,7 +39,7 @@ export const Navbar = () => {
               <DropdownMenuTrigger asChild>
                 <button 
                   className={cn(
-                    "text-sm font-medium px-4 py-2 rounded-full transition-colors flex items-center gap-1",
+                    "text-sm font-medium px-4 py-2 rounded-2xl transition-colors flex items-center gap-1",
                     "text-muted-foreground",
                     "hover:text-primary hover:bg-primary/10",
                     (isActive('/trading') || isActive('/margin-calculator')) && "text-primary bg-primary/10"
@@ -63,7 +63,7 @@ export const Navbar = () => {
                 key={item}
                 onClick={() => handleNavigation(`/${item}`)} 
                 className={cn(
-                  "text-sm font-medium px-4 py-2 rounded-full transition-colors",
+                  "text-sm font-medium px-4 py-2 rounded-2xl transition-colors",
                   "text-muted-foreground",
                   "hover:text-primary hover:bg-primary/10",
                   isActive(`/${item}`) && "text-primary bg-primary/10"
@@ -75,7 +75,7 @@ export const Navbar = () => {
           </nav>
           <div className="flex items-center gap-4">
             <Link to={user ? "/dashboard" : "/auth/login"}>
-              <Button variant="default" className="rounded-full px-6 gap-2">
+              <Button variant="default" className="rounded-2xl px-6 gap-2">
                 {user ? "Go to App" : "Get Started"}
                 <ArrowCircleRight weight="bold" className="h-5 w-5" />
               </Button>

@@ -270,7 +270,7 @@ export default {
     		},
     		fontFamily: {
     			sans: [
-    				'Albert Sans',
+    				'Aeonik',
     				'sans-serif'
     			]
     		},

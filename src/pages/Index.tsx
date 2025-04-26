@@ -80,61 +80,80 @@ const Index = () => {
           {/* Quick Features Section */}
           <section className="py-16 bg-background/5">
             <div className="container max-w-[1200px] mx-auto px-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Add animate-on-scroll to each feature card */}
-                {[
-                  {
-                    icon: <Clock className="h-8 w-8 text-primary" />,
-                    title: "Instant Withdrawals",
-                    description: "Fastest Payouts in Seconds"
-                  },
-                  {
-                    icon: <ChevronDown className="h-8 w-8 text-primary" />,
-                    title: "Lowest Spreads",
-                    description: "Starting from 0.1 pips"
-                  },
-                  {
-                    icon: <Users className="h-8 w-8 text-primary" />,
-                    title: "24/7 Support",
-                    description: "Always here to help you"
-                  },
-                  {
-                    icon: <DollarSign className="h-8 w-8 text-primary" />,
-                    title: "Zero Commission",
-                    description: "Trade with no extra fees"
-                  }
-                ].map((feature, index) => (
-                  <div 
-                    key={index}
-                    className={cn(
-                      "animate-on-scroll opacity-0 translate-y-4 transition-all duration-700",
-                      {
-                        'delay-0': index === 0,
-                        'delay-100': index === 1,
-                        'delay-200': index === 2,
-                        'delay-300': index === 3
-                      }
-                    )}
-                  >
-                    <div className="relative bg-white p-2 rounded-2xl border">
-                      <div className="h-full w-full border rounded-xl p-6">
-                        <div className="flex flex-col gap-4">
-                          <div className="w-full h-24 rounded-xl bg-gradient-to-br from-primary/5 via-primary/10 to-transparent flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.02)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-white/20 before:bg-gradient-to-br before:from-white/10 before:to-transparent">
-                            <div className="relative w-16 h-16 rounded-xl bg-white flex items-center justify-center shadow-lg shadow-primary/10">
-                              {feature.icon}
-                            </div>
-                          </div>
-                          <h3 className="font-semibold text-xl text-center">{feature.title}</h3>
-                          <p className="text-sm text-muted-foreground text-center">{feature.description}</p>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-6 auto-rows-[120px]">
+                {/* Featured Card - Spans 2 rows and 2 columns */}
+                <div className="relative md:col-span-2 md:row-span-2 animate-on-scroll opacity-0 translate-y-4 transition-all duration-700">
+                  <div className="h-full w-full bg-white p-2 rounded-2xl border group hover:border-primary/50 transition-colors">
+                    <div className="relative h-full w-full border rounded-xl p-6 overflow-hidden bg-primary group-hover:bg-primary/90 transition-colors">
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative flex flex-col h-full">
+                        <div className="bg-white/10 rounded-xl w-16 h-16 flex items-center justify-center mb-6">
+                          <Clock className="h-8 w-8 text-white" />
+                        </div>
+                        <h3 className="font-semibold text-xl mb-2 text-white">Instant Withdrawals</h3>
+                        <p className="text-sm text-white/80">Fastest Payouts in Seconds</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Regular Cards */}
+                <div className="relative md:col-span-2 animate-on-scroll opacity-0 translate-y-4 transition-all duration-700 delay-100">
+                  <div className="h-full w-full bg-white p-2 rounded-2xl border group hover:border-primary/50 transition-colors">
+                    <div className="relative h-full w-full border rounded-xl p-6 overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative flex items-center gap-4">
+                        <div className="bg-primary/10 rounded-xl w-12 h-12 flex items-center justify-center">
+                          <ChevronDown className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold mb-1">Lowest Spreads</h3>
+                          <p className="text-sm text-muted-foreground">Starting from 0.1 pips</p>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                {/* Support Card - Spans 2 columns */}
+                <div className="relative md:col-span-2 animate-on-scroll opacity-0 translate-y-4 transition-all duration-700 delay-200">
+                  <div className="h-full w-full bg-white p-2 rounded-2xl border group hover:border-primary/50 transition-colors">
+                    <div className="relative h-full w-full border rounded-xl p-6 overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative flex items-center gap-4">
+                        <div className="bg-primary/10 rounded-xl w-12 h-12 flex items-center justify-center">
+                          <Users className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold mb-1">24/7 Support</h3>
+                          <p className="text-sm text-muted-foreground">Always here to help you</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Commission Card - Spans 4 columns */}
+                <div className="relative md:col-span-4 animate-on-scroll opacity-0 translate-y-4 transition-all duration-700 delay-300">
+                  <div className="h-full w-full bg-white p-2 rounded-2xl border group hover:border-primary/50 transition-colors">
+                    <div className="relative h-full w-full border rounded-xl p-6 overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative flex items-center gap-4">
+                        <div className="bg-primary/10 rounded-xl w-12 h-12 flex items-center justify-center">
+                          <DollarSign className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold mb-1">Zero Commission</h3>
+                          <p className="text-sm text-muted-foreground">Trade with no extra fees</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
-
+          
           {/* How it Works Section - Replace Stats Section */}
           <section className="my-24">
             <div className="container max-w-[1200px] mx-auto px-4">
