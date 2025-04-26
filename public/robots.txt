@@ -1,9 +1,17 @@
 User-agent: *
 Allow: /
+Allow: /trading
+Allow: /investing
+Allow: /company
+Allow: /partners
 
 # Disallow admin and auth routes
 Disallow: /admin/
 Disallow: /auth/
+Disallow: /api/
+
+# Crawl delays and rate limiting
+Crawl-delay: 10
 
 # Sitemap location
 Sitemap: https://www.cloudforex.club/sitemap.xml
