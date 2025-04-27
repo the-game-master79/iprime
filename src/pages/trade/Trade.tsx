@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Navigate, useLocation } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { cn, getForexMarketStatus } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { wsManager } from '@/services/websocket-manager';
 import { useBreakpoints } from "@/hooks/use-breakpoints";
@@ -164,6 +164,19 @@ const Trade = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Check if forex market is closed for forex pairs
+      if (selectedPair.startsWith('FX:')) {
+        const { isOpen, message } = getForexMarketStatus();
+        if (!isOpen) {
+          toast({
+            variant: "destructive",
+            title: "Market Closed",
+            description: message
+          });
+          return;
+        }
+      }
 
       const currentPrice = params.type === 'buy'
         ? parseFloat(pairPrices[selectedPair]?.ask || '0')
@@ -423,9 +436,13 @@ const Trade = () => {
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
           
-          <div className="flex flex-1">
-            {/* Main content area with chart and activity */}
-            <div className="flex-1 flex flex-col h-full">
+          <div className={cn(
+            "flex flex-1 transition-all duration-300",
+            isSidebarOpen ? (isSidebarCollapsed ? "ml-20" : "ml-72") : "p-0" // Only apply margin when sidebar is open
+          )}>
+            <div className={cn(
+              "flex flex-col h-full w-full transition-all duration-300"
+            )}>
               {/* Chart container */}
               <div className="flex-1 min-h-0 p-3">
                 <div className="w-full h-full rounded-xl border overflow-hidden bg-card">
@@ -451,7 +468,7 @@ const Trade = () => {
               userBalance={userBalance}
               tradingPairs={tradingPairs}
               onSaveLeverage={handleSaveLeverage}
-              defaultLeverage={defaultLeverage}  // Add this prop
+              defaultLeverage={defaultLeverage}
             />
           </div>
         </div>

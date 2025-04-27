@@ -21,75 +21,7 @@ import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
-
-const calculateRequiredMargin = (price: number, lots: number, leverage: number, isCrypto: boolean, pair: string) => {
-  const effectiveLeverage = isJPYPair(pair) ? leverage * 2 : leverage;
-  
-  if (isCrypto) {
-    const positionSize = price * lots;
-    // Cap crypto margin at 100000 per lot
-    const cappedPositionSize = Math.min(positionSize, 100000 * lots);
-    return cappedPositionSize / effectiveLeverage;
-  } else {
-    // For forex, standard lot size of 100000 per lot
-    const positionSize = price * lots * 100000;
-    // Cap forex margin at 100000 per lot
-    const cappedPositionSize = Math.min(positionSize, 100000 * lots * 100000);
-    return cappedPositionSize / effectiveLeverage;
-  }
-};
-
-const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
-
-const isJPYPair = (pair: string): boolean => {
-  const symbol = pair.replace('FX:', '').replace('/', '');
-  return FOREX_PAIRS_JPY.includes(symbol);
-};
-
-const getPipValue = (pair: string) => {
-  if (pair.includes('BINANCE:')) {
-    return 0.00001; // Crypto uses 5 decimals standard
-  }
-  // Remove FX: prefix and /
-  const symbol = pair.replace('FX:', '').replace('/', '');
-  // JPY pairs use 0.01 as pip value, others use 0.0001
-  return FOREX_PAIRS_JPY.includes(symbol) ? 0.01 : 0.0001;
-};
-
-const calculatePnL = (trade: Trade, currentPrice: number) => {
-  const isCrypto = trade.pair.includes('BINANCE:');
-  
-  if (isCrypto) {
-    // For crypto, calculate P&L in USDT terms
-    // 1 lot = 1 unit of base currency
-    const positionSize = trade.lots; // Direct lot size as position size
-    const priceDifference = trade.type === 'buy' 
-      ? currentPrice - trade.openPrice
-      : trade.openPrice - currentPrice;
-    // P&L = position size * price difference (in USDT)
-    return priceDifference * positionSize;
-  }
-  
-  // For forex, calculate based on standard lot size and pip value
-  // 1 standard lot = 100,000 units of base currency
-  const standardLotSize = 100000;
-  const totalUnits = trade.lots * standardLotSize;
-  
-  // Get pip value and calculate pip movement
-  const pipValue = getPipValue(trade.pair);
-  const priceDifference = trade.type === 'buy'
-    ? currentPrice - trade.openPrice
-    : trade.openPrice - currentPrice;
-  const pips = priceDifference / pipValue;
-  
-  // Calculate P&L
-  // For USD pairs: P&L = (total units * pip value * pips)
-  // For JPY pairs: P&L = (total units * pip value * pips) / current price
-  if (isJPYPair(trade.pair)) {
-    return (totalUnits * pipValue * pips) / currentPrice;
-  }
-  return totalUnits * pipValue * pips;
-};
+import { calculatePnL, calculateRequiredMargin } from "@/utils/trading"; // Update imports
 
 interface PriceData {
   price: string;
@@ -445,6 +377,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     setMarginUtilized(total);
   }, [trades, pairPrices]);
 
+  // Update all PnL calculations to use imported function
   const { totalPnL, openTradesCount } = useMemo(() => {
     return trades.reduce((acc, trade) => {
       if (trade.status === 'open') {
@@ -490,11 +423,9 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return value > 1 ? value.toFixed(2) : value.toFixed(5);
   };
 
+  // Update close trade handler to use imported calculatePnL
   const handleCloseTrade = async (tradeId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
@@ -837,7 +768,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       )}
 
       <div className="bg-muted/30">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 mt-6">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center justify-between w-full gap-4">
               <div 

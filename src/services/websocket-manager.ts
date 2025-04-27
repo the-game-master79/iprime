@@ -1,4 +1,5 @@
 import { toast } from "@/components/ui/use-toast";
+import { isForexTradingTime, getForexMarketStatus } from "@/lib/utils";
 
 const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
 const TRADERMADE_WS_URL = 'wss://marketdata.tradermade.com/feedadv';
@@ -66,7 +67,23 @@ class WebSocketManager {
     const forexPairs = Array.from(this.activePairs).filter(p => p.includes('FX:'));
 
     if (cryptoPairs.length > 0) this.connectCrypto(cryptoPairs);
-    if (forexPairs.length > 0) this.connectForex(forexPairs);
+    
+    // Only connect to forex if market is open
+    if (forexPairs.length > 0 && isForexTradingTime()) {
+      this.connectForex(forexPairs);
+    } else if (forexPairs.length > 0) {
+      const { message } = getForexMarketStatus();
+      console.log('Forex market closed:', message);
+      // Notify subscribers about closed market status
+      forexPairs.forEach(pair => {
+        if (this.lastPrices[pair]) {
+          this.notifySubscribers(pair, {
+            ...this.lastPrices[pair],
+            marketClosed: true
+          });
+        }
+      });
+    }
   }
 
   private sendMessage(ws: WebSocket | null, message: any, retry = 3): void {
@@ -140,6 +157,13 @@ class WebSocketManager {
 
   private connectForex(pairs: string[]) {
     if (!this.tradermadeApiKey || this.forexWs?.readyState === WebSocket.OPEN) return;
+    
+    // Double check market is open before connecting
+    if (!isForexTradingTime()) {
+      const { message } = getForexMarketStatus();
+      console.log('Forex market closed:', message);
+      return;
+    }
 
     try {
       this.forexWs = new WebSocket(TRADERMADE_WS_URL);

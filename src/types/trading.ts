@@ -7,7 +7,9 @@ export interface TradingPair {
   max_leverage: number;
   leverage_options: number[];
   is_active: boolean;
+  min_lots: number;
   max_lots: number;
+  lot_step: number;
   image_url?: string;
 }
 

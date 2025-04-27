@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MagnifyingGlass, ChartLine, Globe, X, ArrowsHorizontal } from "@phosphor-icons/react";
+import { MagnifyingGlass, ChartLine, Globe, ArrowsHorizontal } from "@phosphor-icons/react";
 import { TradingPair, PriceData } from "@/types/trading";
+import { Badge } from "@/components/ui/badge";
+import { isForexTradingTime } from "@/lib/utils";
 
 interface TradeSidebarProps {
   selectedPair: string;
@@ -32,6 +34,17 @@ export const TradeSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("crypto");
   const [priceAnimations, setPriceAnimations] = useState<{[key: string]: 'up' | 'down'}>({});
+
+  // Add market status check
+  const isForexClosed = !isForexTradingTime();
+
+  // Prevent switching to forex tab when market is closed
+  const handleTabChange = (value: string) => {
+    if (value === 'forex' && isForexClosed) {
+      return;
+    }
+    setActiveTab(value);
+  };
 
   // Price animation effect
   useEffect(() => {
@@ -97,15 +110,15 @@ export const TradeSidebar = ({
 
   return (
     <aside className={cn(
-      "fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-card transition-all duration-300",
+      "fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-card transition-all duration-300 mt-14",
       collapsed ? "w-20" : "w-72",
       !isOpen && "-translate-x-full"
     )}>
-      <div className="flex h-14 items-center justify-between border-b px-4">
-        <div className={cn("font-semibold", collapsed && "hidden")}>
-          Markets
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col items-center border-b">
+        <div className="flex h-14 w-full items-center justify-between px-4">
+          <div className={cn("font-semibold", collapsed && "hidden")}>
+            Markets
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -115,17 +128,29 @@ export const TradeSidebar = ({
           >
             <ArrowsHorizontal className="h-4 w-4" />
           </Button>
-          {!collapsed && (
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => onPairSelect(selectedPair)} 
-              className="h-8 w-8 hover:bg-accent"
-            >
-              <X className="h-4 w-4" weight="bold" />
-            </Button>
-          )}
         </div>
+
+        {/* Add price display when collapsed */}
+        {collapsed && selectedPair && (
+          <div className="pb-2 text-center">
+            <div className={cn(
+              "font-medium tabular-nums transition-colors text-sm",
+              priceAnimations[selectedPair] === 'up' && "text-green-500",
+              priceAnimations[selectedPair] === 'down' && "text-red-500"
+            )}>
+              ${parseFloat(pairPrices[selectedPair]?.bid || '0').toFixed(getDecimalPlaces(selectedPair))}
+            </div>
+            <div className={cn(
+              "text-xs font-medium",
+              parseFloat(pairPrices[selectedPair]?.change || '0') >= 0 
+                ? "text-green-500" 
+                : "text-red-500"
+            )}>
+              {parseFloat(pairPrices[selectedPair]?.change || '0') >= 0 ? '+' : ''}
+              {pairPrices[selectedPair]?.change || '0'}%
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
@@ -142,15 +167,26 @@ export const TradeSidebar = ({
                 />
               </div>
 
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tabs value={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="crypto" className="flex items-center gap-2">
                     <ChartLine className="h-4 w-4" />
                     {!collapsed && "Crypto"}
                   </TabsTrigger>
-                  <TabsTrigger value="forex" className="flex items-center gap-2">
+                  <TabsTrigger 
+                    value="forex" 
+                    className="flex items-center gap-2"
+                    disabled={isForexClosed}
+                  >
                     <Globe className="h-4 w-4" />
-                    {!collapsed && "Forex"}
+                    {!collapsed && (
+                      <div className="flex items-center gap-2">
+                        Forex
+                        <Badge variant="destructive" className="ml-1">
+                          Closed
+                        </Badge>
+                      </div>
+                    )}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>

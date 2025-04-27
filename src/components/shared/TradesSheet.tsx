@@ -4,11 +4,12 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Trade } from "@/types/trade";
-import { XCircle } from "@phosphor-icons/react";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import { calculatePnL } from "@/utils/trading";
+import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 
 // Add groupTradesByDate helper function
 const groupTradesByDate = (trades: Trade[]) => {
@@ -44,16 +45,14 @@ interface TradesSheetProps {
   trades: Trade[];
   pairPrices: Record<string, { bid?: string; ask?: string }>;
   onCloseTrade?: (tradeId: string) => Promise<void>;
-  calculatePnL: (trade: Trade, currentPrice: number) => number;
 }
 
 export function TradesSheet({
   open,
   onOpenChange,
-  trades: openTrades, // Rename to clarify these are open trades
+  trades: openTrades,
   pairPrices,
   onCloseTrade,
-  calculatePnL
 }: TradesSheetProps) {
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
   const [closedTrades, setClosedTrades] = useState<Trade[]>([]);
@@ -114,6 +113,11 @@ export function TradesSheet({
   const displayedTrades = activeTab === 'closed' 
     ? closedTrades 
     : openTrades.filter(trade => trade.status === activeTab);
+
+  // Add price formatting helper
+  const formatPrice = (price: number, symbol: string) => {
+    return price.toFixed(getDecimalPlaces(symbol));
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -207,7 +211,7 @@ export function TradesSheet({
                                   {trade.type.toUpperCase()} {trade.lots} Lots
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  Entry @ ${trade.openPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                                  Entry @ ${formatPrice(trade.openPrice, trade.pair)}
                                 </div>
                               </div>
                             </div>
@@ -269,15 +273,15 @@ export function TradesSheet({
                           </div>
                           {trade.status === 'pending' ? (
                             <div className="text-muted-foreground">
-                              Limit @ ${trade.limitPrice?.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                              Limit @ ${formatPrice(trade.limitPrice || 0, trade.pair)}
                             </div>
                           ) : (
                             <>
                               <div className="text-muted-foreground">
-                                Entry @ ${trade.openPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                                Entry @ ${formatPrice(trade.openPrice, trade.pair)}
                               </div>
                               <div className="text-muted-foreground">
-                                Current: ${currentPrice.toFixed(trade.pair.includes('JPY') ? 3 : 5)}
+                                Current: ${formatPrice(currentPrice, trade.pair)}
                               </div>
                             </>
                           )}

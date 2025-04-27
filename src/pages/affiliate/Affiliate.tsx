@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Copy, Users, LineChart, BarChart, Users2 } from "lucide-react";
+import { LineChart, Users, ArrowUpRight, DollarSign, ArrowRight, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface TeamMember {
   id: string;
@@ -46,6 +47,7 @@ const Affiliate = () => {
   const [commissionStructure, setCommissionStructure] = useState<CommissionStructure[]>([]);
   const [totalCommissions, setTotalCommissions] = useState(0);
   const [totalBusiness, setTotalBusiness] = useState(0);
+  const [userBusiness, setUserBusiness] = useState(0);
   const [eligibility, setEligibility] = useState({
     hasDirectReferrals: false,
   });
@@ -252,15 +254,44 @@ const Affiliate = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
 
-        const { data, error } = await supabase
-          .from('total_business_volumes')
-          .select('total_amount')
+        // Get total network volume from referred users' subscriptions
+        const { data: networkData, error: networkError } = await supabase
+          .from('referral_relationships')
+          .select('referred_id')
+          .eq('referrer_id', session.user.id);
+
+        if (networkError) throw networkError;
+
+        const referredIds = networkData?.map(rel => rel.referred_id) || [];
+
+        // Get all approved subscriptions from network
+        const { data: networkSubs, error: subsError } = await supabase
+          .from('plans_subscriptions')
+          .select('amount')
+          .in('user_id', referredIds)
+          .eq('status', 'approved');
+
+        if (subsError) throw subsError;
+
+        // Get user's personal subscriptions
+        const { data: userSubs, error: userSubsError } = await supabase
+          .from('plans_subscriptions')
+          .select('amount')
           .eq('user_id', session.user.id)
-          .single();
+          .eq('status', 'approved');
 
-        if (error) throw error;
+        if (userSubsError) throw userSubsError;
 
-        setTotalBusiness(data?.total_amount || 0);
+        // Calculate total network volume
+        const networkVolume = (networkSubs || []).reduce((sum, sub) => sum + (sub.amount || 0), 0);
+        
+        // Calculate personal volume
+        const personalVolume = (userSubs || []).reduce((sum, sub) => sum + (sub.amount || 0), 0);
+
+        // Set both volumes
+        setUserBusiness(personalVolume);
+        setTotalBusiness(networkVolume + personalVolume);
+
       } catch (error) {
         console.error('Error fetching total business:', error);
       }
@@ -278,57 +309,60 @@ const Affiliate = () => {
   };
 
   return (
-    <div>
-      <Topbar title="Affiliate Program" />
+    <div className="min-h-[100dvh] bg-gray-50">
+      <Topbar title="Affiliate Dashboard" />
 
       {/* Stats Overview */}
       <div className="px-4 md:px-8 lg:container mb-6 mt-6">
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
-          <Card className="border-black">
-            <CardContent className="p-4 sm:p-6">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">{teamData.length}</div>
-                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Total Referrals</div>
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Total Referrals</p>
+                <div className="text-2xl font-bold">{teamData.length}</div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-black">
-            <CardContent className="p-4 sm:p-6">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">${totalCommissions.toLocaleString()}</div>
-                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Commission Earned</div>
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Commission Earned</p>
+                <div className="text-2xl font-bold">${totalCommissions.toLocaleString()}</div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-black">
-            <CardContent className="p-4 sm:p-6">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">${totalBusiness.toLocaleString()}</div>
-                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Business Volume</div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`border-black ${
-            userDirectCount === 0 
-              ? 'from-orange-50 to-orange-100/50' 
-              : 'from-green-50 to-green-100/50'
-          }`}>
-            <CardContent className="p-4 sm:p-6">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold">
-                  {userDirectCount}/2
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Business Volume</p>
+                <div className="text-2xl font-bold">${totalBusiness.toLocaleString()}</div>
+                <div className="text-xs text-muted-foreground">
+                  Personal: ${userBusiness.toLocaleString()}
                 </div>
-                <div className="text-xs sm:text-sm text-muted-foreground mt-2">Direct Referrals</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="relative overflow-hidden">
+            <CardContent className="p-6">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Direct Referrals</p>
+                <div className={cn(
+                  "text-2xl font-bold",
+                  userDirectCount === 0 ? "text-red-500" :
+                  userDirectCount === 1 ? "text-yellow-500" :
+                  "text-green-500"
+                )}>{userDirectCount}/2</div>
                 {userDirectCount < 2 && (
-                  <p className={`text-xs mt-3 rounded-full px-3 py-1 ${
-                    userDirectCount === 0
-                      ? 'text-orange-800 bg-orange-100'
-                      : 'text-green-800 bg-green-100'
-                  }`}>
-                    {2 - userDirectCount} more to activate commissions
+                  <p className={cn(
+                    "text-xs rounded-full px-2 py-0.5 w-fit",
+                    userDirectCount === 0 
+                      ? "text-red-800 bg-red-100"
+                      : "text-amber-800 bg-amber-100"
+                  )}>
+                    {2 - userDirectCount} more needed
                   </p>
                 )}
               </div>
@@ -344,7 +378,7 @@ const Affiliate = () => {
           <div className="hidden lg:block space-y-4 sm:space-y-6">
             <Card>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle>Share</CardTitle>
+                <CardTitle>Share with your Network</CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="space-y-2">
@@ -379,10 +413,7 @@ const Affiliate = () => {
 
                 {currentReferrer && (
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <Users className="h-4 w-4" />
-                      <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
-                    </div>
+                    <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
                   </div>
                 )}
               </CardContent>
@@ -428,10 +459,7 @@ const Affiliate = () => {
 
                 {currentReferrer && (
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <Users className="h-4 w-4" />
-                      <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
-                    </div>
+                    <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
                   </div>
                 )}
               </CardContent>
@@ -496,7 +524,6 @@ const Affiliate = () => {
               <CardContent className="p-0 sm:px-6">
                 {teamData.length === 0 ? (
                   <div className="text-center p-6 border-2 border-dashed rounded-lg mx-4 sm:mx-6 mb-4">
-                    <Users2 className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
                     <h3 className="font-medium text-muted-foreground">No Team Members Yet</h3>
                     <p className="text-sm text-muted-foreground mt-1 mb-3">
                       Start building your network by sharing your referral code
@@ -507,96 +534,83 @@ const Affiliate = () => {
                     {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
                       <AccordionItem value={`level-${level}`} key={level} className="border-none">
                         <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-7 w-7 items-center justify-center rounded 
-                              ${level === 1 ? 'bg-primary/20' : 
-                                level === 2 ? 'bg-blue-100' : 
-                                level === 3 ? 'bg-purple-100' : 
-                                'bg-gray-100'}`}>
-                              <Users className={`h-4 w-4 
-                                ${level === 1 ? 'text-primary' : 
-                                  level === 2 ? 'text-blue-600' : 
-                                  level === 3 ? 'text-purple-600' : 
-                                  'text-gray-600'}`} />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm text-left">Level {level}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {teamData.filter(m => m.level === level).length} members
-                              </p>
-                            </div>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="px-4 sm:px-6 pb-4">
-                            <div className="space-y-3">
-                              {teamData
-                                .filter(member => member.level === level)
-                                .map(member => (
-                                  <div
-                                    key={member.id}
-                                    className={`rounded-lg border p-4 transition-colors ${
-                                      legendType === "investments" ? (
-                                        member.totalSubscriptions > 0
-                                          ? 'bg-green-50/50 border-green-100'  
-                                          : member.status === 'Active'
-                                          ? 'bg-amber-50/50 border-amber-100'
-                                          : 'bg-red-50/50 border-red-100'
-                                      ) : (
-                                        member.directCount >= 2
-                                          ? 'bg-green-50/50 border-green-100'
-                                          : 'bg-amber-50/50 border-amber-100'
-                                      )
-                                    }`}
-                                  >
-                                    <div className="flex justify-between items-start gap-4">
-                                      <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-medium">{member.name}</p>
-                                          <div className={`w-2 h-2 rounded-full ${
-                                            legendType === "investments" ? (
-                                              member.totalSubscriptions > 0
-                                                ? 'bg-green-500'
-                                                : member.status === 'Active'
-                                                ? 'bg-amber-500'
-                                                : 'bg-red-500'
-                                            ) : (
-                                              member.directCount >= 2
-                                                ? 'bg-green-500'
-                                                : 'bg-amber-500'
-                                            )
-                                          }`} />
-                                        </div>
-                                        <Badge 
-                                          variant="outline" 
-                                          className="w-fit text-[10px] h-5 text-muted-foreground"
-                                        >
-                                          {member.referralCode}
-                                        </Badge>
-                                        <p className={`text-xs ${
-                                          member.directCount >= 2 
-                                            ? 'text-green-600' 
-                                            : 'text-amber-600'
-                                        }`}>
-                                          Direct Referrals: {member.directCount}/2
-                                        </p>
+                          <div>
+                            <p className="font-medium text-sm text-left">Level {level}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {teamData.filter(m => m.level === level).length} members
+                            </p>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 sm:px-6 pb-4">
+                          <div className="space-y-3">
+                            {teamData
+                              .filter(member => member.level === level)
+                              .map(member => (
+                                <div
+                                  key={member.id}
+                                  className={`rounded-lg border p-4 transition-colors ${
+                                    legendType === "investments" ? (
+                                      member.totalSubscriptions > 0
+                                        ? 'bg-green-50/50 border-green-100'  
+                                        : member.status === 'Active'
+                                        ? 'bg-amber-50/50 border-amber-100'
+                                        : 'bg-red-50/50 border-red-100'
+                                    ) : (
+                                      member.directCount >= 2
+                                        ? 'bg-green-50/50 border-green-100'
+                                        : 'bg-amber-50/50 border-amber-100'
+                                    )
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-start gap-4">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <p className="font-medium">{member.name}</p>
+                                        <div className={cn(
+                                          "w-2 h-2 rounded-full",
+                                          legendType === "investments" 
+                                            ? member.totalSubscriptions > 0
+                                              ? "bg-green-500"
+                                              : member.status === 'Active'
+                                                ? "bg-amber-500"
+                                                : "bg-red-500"
+                                            : member.directCount >= 2
+                                              ? "bg-green-500" 
+                                              : "bg-amber-500"
+                                        )} />
                                       </div>
-                                      <div className="text-right space-y-1">
-                                        <div className="text-sm font-medium">
-                                          Business Volume: ${member.totalInvested.toLocaleString()}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          Plans: {member.totalSubscriptions}
-                                        </div>
+                                      <Badge 
+                                        variant="outline" 
+                                        className="w-fit text-[10px] h-5 text-muted-foreground"
+                                      >
+                                        {member.referralCode}
+                                      </Badge>
+                                      <p className={cn(
+                                        "text-xs",
+                                        member.directCount === 0 ? "text-red-600" :
+                                        member.directCount === 1 ? "text-amber-600" :
+                                        "text-green-600"
+                                      )}>
+                                        Direct Referrals: {member.directCount}/2
+                                      </p>
+                                    </div>
+                                    <div className="text-right space-y-1">
+                                      <div className="text-sm font-medium">
+                                        Business Volume: ${(member.totalInvested || 0).toLocaleString()}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Plans: {member.totalSubscriptions || 0}
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  )}
+                                </div>
+                              ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
               </CardContent>
             </Card>
 

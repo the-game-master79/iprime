@@ -1,70 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, CandlestickChart, Globe, AlertTriangle } from "lucide-react";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { AlertTriangle } from "lucide-react"; // Keep this one since it's used for alerts
+import { MagnifyingGlass, ChartLine, Globe } from "@phosphor-icons/react"; // Update imports
 import { Topbar } from "@/components/shared/Topbar";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { TradesSheet } from "@/components/shared/TradesSheet";
-import { useToast } from "@/hooks/use-toast"; // Add this import
+import { useToast } from "@/hooks/use-toast";
+import { calculatePnL } from "@/utils/trading"; // Add this import
+import { getDecimalPlaces } from "@/config/decimals";
 
-// Add TradingMade API Key from env
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
-
-// Add helper functions for P&L calculation
-const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
-
-const isJPYPair = (pair: string): boolean => {
-  const symbol = pair.replace('FX:', '').replace('/', '');
-  return FOREX_PAIRS_JPY.includes(symbol);
-};
-
-const getPipValue = (pair: string) => {
-  if (pair.includes('BINANCE:')) {
-    return 0.00001; // Crypto uses 5 decimals standard
-  }
-  // Remove FX: prefix and /
-  const symbol = pair.replace('FX:', '').replace('/', '');
-  // JPY pairs use 0.01 as pip value, others use 0.0001
-  return FOREX_PAIRS_JPY.includes(symbol) ? 0.01 : 0.0001;
-};
-
-const calculatePnL = (trade: Trade, currentPrice: number) => {
-  const isCrypto = trade.pair.includes('BINANCE:');
-  
-  if (isCrypto) {
-    // For crypto, calculate P&L in USDT terms
-    // 1 lot = 1 unit of base currency
-    const positionSize = trade.lots;
-    const priceDifference = trade.type === 'buy' 
-      ? currentPrice - trade.openPrice
-      : trade.openPrice - currentPrice;
-    return priceDifference * positionSize;
-  }
-  
-  // For forex, calculate based on standard lot size and pip value
-  // 1 standard lot = 100,000 units of base currency
-  const standardLotSize = 100000;
-  const totalUnits = trade.lots * standardLotSize;
-  
-  // Get pip value and calculate pip movement
-  const pipValue = getPipValue(trade.pair);
-  const priceDifference = trade.type === 'buy'
-    ? currentPrice - trade.openPrice
-    : trade.openPrice - currentPrice;
-  const pips = priceDifference / pipValue;
-  
-  // Calculate P&L
-  if (isJPYPair(trade.pair)) {
-    return (totalUnits * pipValue * pips) / currentPrice;
-  }
-  return totalUnits * pipValue * pips;
-};
 
 // Add interface for trading pair
 interface TradingPair {
@@ -76,6 +27,7 @@ interface TradingPair {
   max_leverage: number;
   leverage_options: number[];
   is_active: boolean;
+  image_url: string; // Add this field
 }
 
 interface PriceData {
@@ -247,16 +199,14 @@ const SelectPairs = () => {
     fetchTrades();
   }, []);
 
-  // Calculate P&L effect
+  // Update P&L calculation effect to use imported function
   useEffect(() => {
     if (!trades.length) return;
 
     const total = trades.reduce((sum, trade) => {
       const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
       if (!currentPrice) return sum;
-
-      const pnl = calculatePnL(trade, currentPrice);
-      return sum + (pnl || 0); 
+      return sum + calculatePnL(trade, currentPrice);
     }, 0);
 
     setTotalPnL(total);
@@ -339,12 +289,14 @@ const SelectPairs = () => {
       try {
         const data = JSON.parse(event.data);
         if (data.e === '24hrTicker') {
+          const symbol = `BINANCE:${data.s}`;
+          const decimals = getDecimalPlaces(symbol);
           setPairPrices(prev => ({
             ...prev,
-            [`BINANCE:${data.s}`]: {
-              price: parseFloat(data.c).toFixed(5),
-              bid: parseFloat(data.b).toFixed(5),
-              ask: parseFloat(data.a).toFixed(5),
+            [symbol]: {
+              price: parseFloat(data.c).toFixed(decimals),
+              bid: parseFloat(data.b).toFixed(decimals),
+              ask: parseFloat(data.a).toFixed(decimals),
               change: parseFloat(data.P).toFixed(2)
             }
           }));
@@ -436,14 +388,15 @@ const SelectPairs = () => {
         const data = JSON.parse(event.data);
         if (data.symbol && data.bid && data.ask) {
           const formattedSymbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
+          const decimals = getDecimalPlaces(formattedSymbol);
           setPairPrices(prev => {
             const change = ((data.bid - (prev[formattedSymbol]?.bid || data.bid)) / data.bid * 100);
             return {
               ...prev,
               [formattedSymbol]: {
-                price: data.bid,
-                bid: data.bid,
-                ask: data.ask,
+                price: parseFloat(data.bid).toFixed(decimals),
+                bid: parseFloat(data.bid).toFixed(decimals),
+                ask: parseFloat(data.ask).toFixed(decimals),
                 change: change.toFixed(2)
               }
             };
@@ -497,14 +450,20 @@ const SelectPairs = () => {
     }
   };
 
-  // Add market status check
+  // Add/update market status check
   const isForexClosed = !isForexTradingTime();
   const forexMarketStatus = isForexClosed ? "Closed" : "Open";
 
-  // Add this helper function after the imports
-  const getForexFlagUrl = (symbol: string) => {
-    const cleanSymbol = symbol.replace('FX:', '').split('/');
-    return `https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//${cleanSymbol[0].toLowerCase()}-${cleanSymbol[1].toLowerCase()}.svg`;
+  // Update tab change handler to prevent forex selection when closed
+  const handleTabChange = (value: string) => {
+    if (value === 'forex' && isForexClosed) {
+      toast({
+        title: "Market Closed",
+        description: "Forex market is currently closed. Trading resumes during market hours.",
+      });
+      return;
+    }
+    setActiveTab(value);
   };
 
   return (
@@ -561,24 +520,25 @@ const SelectPairs = () => {
             />
           </div>
 
-          <Tabs defaultValue="crypto" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 h-11 rounded-xl p-1">
+          <Tabs defaultValue="crypto" onValueChange={handleTabChange}>
+            <TabsList className="grid w-full grid-cols-2 h-12 rounded-xl p-1">
               <TabsTrigger value="crypto" className="rounded-lg">
                 <div className="flex items-center gap-2">
-                  <CandlestickChart className="h-4 w-4" />
+                  <ChartLine className="h-4 w-4" weight="bold" />
                   <span className="font-medium">Crypto</span>
                 </div>
               </TabsTrigger>
-              <TabsTrigger value="forex" className="rounded-lg">
+              <TabsTrigger 
+                value="forex" 
+                className="rounded-lg"
+                disabled={isForexClosed}
+              >
                 <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
+                  <Globe className="h-4 w-4" weight="bold" />
                   <span className="font-medium">Forex</span>
-                  {activeTab === 'forex' && (
-                    <Badge variant={isForexClosed ? "destructive" : "success"} 
-                           className="ml-1.5 h-5">
-                      {forexMarketStatus}
-                    </Badge>
-                  )}
+                  <Badge variant={isForexClosed ? "destructive" : "success"} className="ml-1.5 h-5">
+                    {forexMarketStatus}
+                  </Badge>
                 </div>
               </TabsTrigger>
             </TabsList>
@@ -605,27 +565,14 @@ const SelectPairs = () => {
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
-                          {pair.symbol.includes('BINANCE:') ? (
-                            <div className="relative h-10 w-10 rounded-full bg-primary/10 p-1.5">
-                              <img 
-                                src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/${pair.short_name.toLowerCase()}.png`}
-                                alt={pair.name}
-                                className="h-full w-full"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/generic.png';
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <img 
-                              src={getForexFlagUrl(pair.symbol)}
-                              alt={pair.name}
-                              className="h-10 w-10 object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwb2x5bGluZSBwb2ludHM9IjIzIDYgMTMuNSAxNS41IDguNSAxMC41IDEgMTgiPjwvcG9seWxpbmU+PHBvbHlsaW5lIHBvaW50cz0iMTcgNiAyMyA2IDIzIDEyIj48L3BvbHlsaW5lPjwvc3ZnPg==';
-                              }}
-                            />
-                          )}
+                          <img 
+                            src={pair.image_url}
+                            alt={pair.name}
+                            className="h-12 w-12 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/generic.svg';
+                            }}
+                          />
                           <div className="flex flex-col min-w-0">
                             <span className="font-semibold truncate">{pair.name}</span>
                             <span className="text-sm text-muted-foreground">{pair.short_name}</span>

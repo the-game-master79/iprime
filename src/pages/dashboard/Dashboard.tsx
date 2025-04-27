@@ -649,13 +649,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start">
                       <div className="flex flex-col">
-                        <span className="text-sm text-muted-foreground mb-1">Active Plans</span>
+                        <span className="text-sm text-muted-foreground mb-1">Active AI Computes</span>
                         <span className="text-2xl font-semibold">
                           ${totalInvested.toLocaleString()}
                         </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          {activePlans.count} Plan{activePlans.count !== 1 ? 's' : ''}
-                        </span>
+                        <div className="flex flex-col text-xs text-muted-foreground mt-1">
+                          <span>{activePlans.count} Compute{activePlans.count !== 1 ? 's' : ''}</span>
+                          <span>Commission: ${totalCommissions.toLocaleString()}</span>
+                        </div>
                       </div>
                       <Button
                         variant="outline"
@@ -663,7 +664,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         onClick={() => navigate('/plans')}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
-                        Buy Plans
+                        Buy Computes
                       </Button>
                     </div>
                   </CardContent>

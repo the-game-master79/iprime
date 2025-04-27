@@ -561,125 +561,95 @@ const Withdrawals = () => {
                 ) : (
                   <div className="max-w-[1000px] mx-auto">
                     <Card className="border rounded-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-xl">Request Withdrawal</CardTitle>
-                        <CardDescription>Request withdrawal to your crypto wallet</CardDescription>
-                      </CardHeader>
                       <form onSubmit={handleSubmit}>
-                        <Tabs defaultValue="crypto" className="w-full">
-                          <CardContent className="border-b p-6">
-                            <TabsList className="w-[400px]">
-                              <TabsTrigger value="crypto" className="flex items-center gap-2">
-                                <Receipt className="h-4 w-4" />
-                                Cryptocurrency
-                              </TabsTrigger>
-                              <TabsTrigger value="fiat" disabled className="flex items-center gap-2">
-                                <CurrencyDollar className="h-4 w-4" />
-                                Fiat
-                              </TabsTrigger>
-                            </TabsList>
-                          </CardContent>
+                        <CardContent className="space-y-6 pt-6">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-normal">Select Cryptocurrency</Label>
+                              <Select 
+                                value={formData.cryptoId} 
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, cryptoId: value, network: '' }))}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select cryptocurrency" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {cryptoOptions.map(crypto => (
+                                    <SelectItem key={crypto.id} value={crypto.id || ''}>
+                                      <div className="flex items-center gap-2">
+                                        {crypto.logo && (
+                                          <img src={crypto.logo} alt={crypto.name || ''} className="w-4 h-4" />
+                                        )}
+                                        {crypto.name} ({crypto.symbol})
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
 
-                          <TabsContent value="crypto">
-                            <CardContent className="space-y-6 pt-6">
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-normal">Select Cryptocurrency</Label>
-                                  <Select 
-                                    value={formData.cryptoId} 
-                                    onValueChange={(value) => setFormData(prev => ({ ...prev, cryptoId: value, network: '' }))}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select cryptocurrency" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {cryptoOptions.map(crypto => (
-                                        <SelectItem key={crypto.id} value={crypto.id || ''}>
-                                          <div className="flex items-center gap-2">
-                                            {crypto.logo && (
-                                              <img src={crypto.logo} alt={crypto.name || ''} className="w-4 h-4" />
-                                            )}
-                                            {crypto.name} ({crypto.symbol})
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                {formData.cryptoId && networks.length > 0 && networks.some(network => 
-                                  shouldShowNetworkSelect(
-                                    depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol,
-                                    network
-                                  )
-                                ) && (
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-normal">Select Network</Label>
-                                    <Select 
-                                      value={formData.network} 
-                                      onValueChange={(value) => setFormData(prev => ({ ...prev, network: value }))}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select network" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {networks.map(network => (
-                                          <SelectItem key={network} value={network}>{network}</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                )}
-                              </div>
-
+                            {formData.cryptoId && networks.length > 0 && networks.some(network => 
+                              shouldShowNetworkSelect(
+                                depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol,
+                                network
+                              )
+                            ) && (
                               <div className="space-y-2">
-                                <Label htmlFor="walletAddress" className="text-xs font-normal">Wallet Address</Label>
-                                <Input
-                                  id="walletAddress"
-                                  placeholder="Enter your wallet address"
-                                  value={formData.walletAddress}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
-                                />
+                                <Label className="text-xs font-normal">Select Network</Label>
+                                <Select 
+                                  value={formData.network} 
+                                  onValueChange={(value) => setFormData(prev => ({ ...prev, network: value }))}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select network" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {networks.map(network => (
+                                      <SelectItem key={network} value={network}>{network}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
+                            )}
+                          </div>
 
-                              <div className="space-y-2">
-                                <Label htmlFor="amount" className="text-xs font-normal">Amount</Label>
-                                <div className="relative">
-                                  <CurrencyDollar className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                                  <Input
-                                    id="amount"
-                                    type="number"
-                                    min="0"
-                                    placeholder="0.00"
-                                    className={`pl-10 ${amountError ? 'border-red-500' : ''}`}
-                                    value={formData.amount}
-                                    onChange={handleAmountChange}
-                                  />
-                                </div>
-                                {amountError && (
-                                  <p className="text-sm text-red-500">{amountError}</p>
-                                )}
-                                <p className="text-sm text-muted-foreground">
-                                  Available balance: ${userBalance.toLocaleString()}
-                                </p>
-                              </div>
-                            </CardContent>
-                            <CardFooter>
-                              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                                {isSubmitting ? "Processing..." : "Request Withdrawal"}
-                              </Button>
-                            </CardFooter>
-                          </TabsContent>
+                          <div className="space-y-2">
+                            <Label htmlFor="walletAddress" className="text-xs font-normal">Wallet Address</Label>
+                            <Input
+                              id="walletAddress"
+                              placeholder="Enter your wallet address"
+                              value={formData.walletAddress}
+                              onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
+                            />
+                          </div>
 
-                          <TabsContent value="fiat">
-                            <CardContent className="pt-6">
-                              <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <CurrencyDollar className="h-8 w-8 text-muted-foreground mb-3" />
-                                <p className="text-sm text-muted-foreground">Fiat withdrawals coming soon</p>
-                              </div>
-                            </CardContent>
-                          </TabsContent>
-                        </Tabs>
+                          <div className="space-y-2">
+                            <Label htmlFor="amount" className="text-xs font-normal">Amount</Label>
+                            <div className="relative">
+                              <CurrencyDollar className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                              <Input
+                                id="amount"
+                                type="number"
+                                min="0"
+                                placeholder="0.00"
+                                className={`pl-10 ${amountError ? 'border-red-500' : ''}`}
+                                value={formData.amount}
+                                onChange={handleAmountChange}
+                              />
+                            </div>
+                            {amountError && (
+                              <p className="text-sm text-red-500">{amountError}</p>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              Available balance: ${userBalance.toLocaleString()}
+                            </p>
+                          </div>
+                        </CardContent>
+                        <CardFooter>
+                          <Button type="submit" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting ? "Processing..." : "Request Withdrawal"}
+                          </Button>
+                        </CardFooter>
                       </form>
                     </Card>
                   </div>

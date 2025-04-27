@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "@phosphor-icons/react";
 import { toast } from "@/components/ui/use-toast";
 import { Trade, PriceData } from "@/types/trading";
-import { calculatePnL } from "@/utils/trading";
+import { calculatePnL } from "@/utils/trading"; // Updated import
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
@@ -184,7 +184,9 @@ export const TradingActivity = ({
                 <tbody className="text-sm">
                   {displayedTrades.map(trade => {
                     const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
-                    const pnl = trade.status === 'closed' ? (trade.pnl || 0) : calculatePnL(trade, currentPrice);
+                    const pnl = trade.status === 'closed' 
+                      ? (trade.pnl || 0) 
+                      : calculatePnL(trade, currentPrice);
                     const pairSymbol = trade.pair.split(':')[1];
                     const openTime = new Date(trade.openTime).toLocaleString('en-US', {
                       month: 'short',

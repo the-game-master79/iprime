@@ -68,3 +68,19 @@ export function isForexTradingTime(): boolean {
 
   return true;
 }
+
+export function getForexMarketStatus() {
+  const now = new Date();
+  const utcDay = now.getUTCDay();
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const totalMinutes = utcHours * 60 + utcMinutes;
+
+  // Weekend check
+  if (utcDay === 6) return { isOpen: false, message: "Closed for Weekend (Saturday)" }; // Saturday
+  if (utcDay === 0) return { isOpen: false, message: "Closed for Weekend (Sunday)" }; // Sunday
+  if (utcDay === 5 && totalMinutes >= 1320) return { isOpen: false, message: "Closed for Weekend" }; // Friday after 22:00 UTC
+  if (utcDay === 1 && totalMinutes < 120) return { isOpen: false, message: "Opens at 02:00 UTC" }; // Monday before 02:00 UTC
+
+  return { isOpen: true, message: "Market Open" };
+}

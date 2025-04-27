@@ -1,6 +1,3 @@
--- Drop existing table and dependencies
-DROP TABLE IF EXISTS plans_subscriptions CASCADE;
-
 -- Recreate plans_subscriptions table
 CREATE TABLE plans_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -27,13 +24,35 @@ CREATE TRIGGER update_plans_subscriptions_timestamp
     FOR EACH ROW
     EXECUTE FUNCTION update_plans_subscriptions_timestamp();
 
--- Create trigger function for handling plan status changes
+-- Add wallet_type column to plans_subscriptions
+ALTER TABLE plans_subscriptions
+ADD COLUMN IF NOT EXISTS wallet_type TEXT NOT NULL DEFAULT 'withdrawal'
+CHECK (wallet_type IN ('withdrawal', 'investment'));
+
+-- Recreate or modify the trigger function
 CREATE OR REPLACE FUNCTION handle_plan_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Handle plan approval
     IF NEW.status = 'approved' AND OLD.status = 'pending' THEN
-        -- Create transaction record for approved investment
+        -- Deduct from specified wallet
+        UPDATE profiles 
+        SET 
+            withdrawal_wallet = CASE 
+                WHEN NEW.wallet_type = 'withdrawal' 
+                THEN COALESCE(withdrawal_wallet, 0) - NEW.amount
+                ELSE withdrawal_wallet
+            END,
+            investment_wallet = CASE 
+                WHEN NEW.wallet_type = 'investment' 
+                THEN COALESCE(investment_wallet, 0) - NEW.amount
+                ELSE investment_wallet
+            END,
+            total_invested = COALESCE(total_invested, 0) + NEW.amount,
+            updated_at = NOW()
+        WHERE id = NEW.user_id;
+
+        -- Create investment transaction record
         INSERT INTO transactions (
             id,
             user_id,
@@ -55,11 +74,6 @@ BEGIN
             NEW.id,
             NOW()
         );
-
-        -- Update total_invested in profiles
-        UPDATE profiles 
-        SET total_invested = COALESCE(total_invested, 0) + NEW.amount
-        WHERE id = NEW.user_id;
 
         -- Call function to distribute business volume
         PERFORM distribute_business_volume(NEW.id, NEW.user_id, NEW.amount);

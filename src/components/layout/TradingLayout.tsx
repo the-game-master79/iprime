@@ -97,7 +97,7 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
 
       <main className={cn(
         "flex-1 mt-14 transition-all duration-300",
-        isMobile ? "ml-0" : (isSidebarOpen ? "ml-72" : "ml-0")
+        isMobile ? "ml-0" : (isSidebarOpen ? "ml-0" : "ml-0") // Start with no margin, only add when sidebar is open
       )}>
         {children}
       </main>

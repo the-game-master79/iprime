@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, DollarSign, Clock, Percent, ArrowRight, BadgeCheck, ArrowRightIcon, Circle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Removed ShellLayout
-import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -74,9 +73,33 @@ const Plans = () => {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [investmentError, setInvestmentError] = useState<string | null>(null);
-  const [showDepositDialog, setShowDepositDialog] = useState(false);
-  const [selectedPlanForDeposit, setSelectedPlanForDeposit] = useState<Plan | null>(null);
   const [subscribedPlans, setSubscribedPlans] = useState<PlanWithSubscription[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [planToSubscribe, setPlanToSubscribe] = useState<Plan | null>(null);
+  const [totalInvested, setTotalInvested] = useState(0);
+
+  // Add this new function
+  const calculateTotalInvested = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return 0;
+
+      const { data, error } = await supabase
+        .from('plans_subscriptions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('status', 'approved');
+
+      if (error) throw error;
+      
+      const total = data?.reduce((sum, sub) => sum + (sub.amount || 0), 0) || 0;
+      setTotalInvested(total);
+      return total;
+    } catch (error) {
+      console.error('Error calculating total invested:', error);
+      return 0;
+    }
+  };
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -102,25 +125,25 @@ const Plans = () => {
     fetchPlans();
   }, []);
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('id, withdrawal_wallet, investment_wallet, total_invested')
-            .eq('id', user.id)
-            .single();
+  const fetchUserProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id, withdrawal_wallet, investment_wallet, total_invested')
+          .eq('id', user.id)
+          .single();
 
-          if (error) throw error;
-          setUserProfile(profile);
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
+        if (error) throw error;
+        setUserProfile(profile);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
+  useEffect(() => {
     fetchUserProfile();
   }, []);
 
@@ -181,13 +204,125 @@ const Plans = () => {
     fetchSubscribedPlans();
   }, []);
 
+  useEffect(() => {
+    calculateTotalInvested();
+  }, []);
+
+  const handleSubscribe = async (plan: Plan) => {
+    try {
+      if (!userProfile) {
+        toast({
+          title: "Error",
+          description: "Please login to subscribe to plans",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (userProfile.withdrawal_wallet < plan.investment) {
+        toast({
+          title: "Insufficient Balance", 
+          description: `Need $${plan.investment} in your wallet to subscribe to this plan. Available balance: $${userProfile.withdrawal_wallet}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Create subscription without wallet_type
+      const { data: subscription, error: subscriptionError } = await supabase
+        .from('plans_subscriptions')
+        .insert({
+          user_id: user.id,
+          plan_id: plan.id,
+          amount: plan.investment,
+          status: 'approved'
+        })
+        .select()
+        .single();
+
+      if (subscriptionError) throw subscriptionError;
+
+      // Update withdrawal wallet balance directly
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          withdrawal_wallet: userProfile.withdrawal_wallet - plan.investment,
+          total_invested: (userProfile.total_invested || 0) + plan.investment 
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Recalculate total invested
+      await calculateTotalInvested();
+
+      toast({
+        title: "Success",
+        description: `Successfully subscribed to ${plan.name}`,
+        variant: "default"
+      });
+
+      // Refresh data
+      fetchSubscribedPlans();
+      fetchUserProfile();
+
+    } catch (error) {
+      console.error('Error subscribing to plan:', error);
+      toast({
+        title: "Error",
+        description: "Failed to subscribe to plan. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleInvestClick = (planId: string) => {
     const selectedPlanData = plans.find(p => p.id === planId);
     if (!selectedPlanData) return;
+    
+    if (!userProfile) {
+      toast({
+        title: "Error",
+        description: "Please login to subscribe to plans",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setSelectedPlan(planId);
-    setSelectedPlanForDeposit(selectedPlanData);
-    setShowDepositDialog(true);
+    const currentBalance = userProfile.withdrawal_wallet;
+    const requiredAmount = selectedPlanData.investment;
+    
+    if (currentBalance < requiredAmount) {
+      const amountNeeded = requiredAmount - currentBalance;
+      toast({
+        title: "Insufficient Balance",
+        description: `You need $${amountNeeded.toLocaleString()} more to subscribe to this plan`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPlanToSubscribe(selectedPlanData);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSubscription = () => {
+    if (planToSubscribe) {
+      handleSubscribe(planToSubscribe);
+      setShowConfirmDialog(false);
+      setPlanToSubscribe(null);
+    }
+  };
+
+  // Add this function to handle dialog close
+  const handleDialogClose = (open: boolean) => {
+    setShowConfirmDialog(open);
+    if (!open) {
+      setPlanToSubscribe(null);
+    }
   };
 
   const calculateRefundAmount = (investment: number) => {
@@ -233,6 +368,9 @@ const Plans = () => {
         if (deleteError) throw deleteError;
       }
 
+      // Recalculate total invested
+      await calculateTotalInvested();
+
       toast({
         title: "Plan Cancelled",
         description: "Your investment has been refunded to your withdrawal wallet with applicable fees deducted.",
@@ -253,25 +391,39 @@ const Plans = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Topbar title="Buy Plans" />
-
+      <Topbar title="Buy Computes" />
+      
       <div className="container py-6 px-4">
+        {/* Add balance display */}
+        <div className="mb-6 p-4 bg-card rounded-lg border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Available Balance</p>
+              <p className="text-2xl font-bold">${userProfile?.withdrawal_wallet.toLocaleString() || '0'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Invested</p>
+              <p className="text-2xl font-bold">${totalInvested.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
         <Alert className="mb-8 bg-muted border-primary/20">
           <Info className="h-5 w-5 text-primary" />
-          <AlertTitle className="text-primary">Start earning with Plans</AlertTitle>
+          <AlertTitle className="text-primary">Start earning with Computes</AlertTitle>
           <AlertDescription className="mt-2 text-muted-foreground space-y-2">
-            <p>• Once you subscribe to a Plan, our bot gets activated and starts generating profits to your account.</p>
-            <p>• You can buy a plan by depositing the available Crypto Methods.</p>
-            <p>• You can close a plan anytime, and get your refunds. (Deductions Apply)</p>
+            <p>• A compute will start trading in your account automatically.</p>
+            <p>• You can use your existing balance to subscribe to any compute available.</p>
+            <p>• You can close a Compute anytime, and get your refunds. (Deductions Apply)</p>
           </AlertDescription>
         </Alert>
         
         <Tabs defaultValue="available" className="space-y-8">
           <div className="flex items-center justify-between">
             <TabsList className="w-[400px]">
-              <TabsTrigger value="available" className="flex-1">Available Plans</TabsTrigger>
+              <TabsTrigger value="available" className="flex-1">Available Computes</TabsTrigger>
               <TabsTrigger value="subscribed" className="flex-1 relative">
-                My Investments
+                Active Computes
                 {subscribedPlans.length > 0 && (
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
                     {subscribedPlans.length}
@@ -305,7 +457,13 @@ const Plans = () => {
                     "relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40",
                     selectedPlan === plan.id && "ring-1 ring-primary"
                   )}>
-                    <CardHeader className="p-4 pb-2 space-y-2">
+                    {/* Move gradient div here and add negative z-index */}
+                    <div className={cn(
+                      "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse -z-10",
+                      getRandomGradient()
+                    )} />
+                    
+                    <CardHeader className="p-4 pb-2 space-y-2 relative z-10">
                       <div>
                         <CardTitle className="text-base sm:text-lg font-medium">
                           {plan.name}
@@ -321,7 +479,7 @@ const Plans = () => {
                         </span>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2 space-y-4">
+                    <CardContent className="p-4 pt-2 space-y-4 relative z-10">
                       <div className="space-y-2">
                         <div className="rounded border bg-card/50 p-3">
                           <div className="flex items-center justify-between space-x-2 sm:space-x-4">
@@ -346,11 +504,6 @@ const Plans = () => {
                             </div>
                           </div>
                         </div>
-
-                        <div className={cn(
-                          "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
-                          getRandomGradient()
-                        )} />
                       </div>
 
                       <Button 
@@ -358,8 +511,10 @@ const Plans = () => {
                         variant="default"
                         onClick={() => handleInvestClick(plan.id)}
                       >
-                        Invest Now
-                        <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="flex items-center justify-center w-full">
+                          Invest Now
+                          <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
+                        </span>
                       </Button>
 
                       <Dialog>
@@ -368,7 +523,7 @@ const Plans = () => {
                             className="w-full text-xs sm:text-sm h-8 sm:h-9"
                             variant="secondary"
                           >
-                            View Plan Benefits
+                            View Benefits
                             <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </DialogTrigger>
@@ -418,7 +573,7 @@ const Plans = () => {
                     availableTab?.click();
                   }}
                 >
-                  View Available Plans
+                  View Available Computes
                 </Button>
               </div>
             ) : (
@@ -563,14 +718,43 @@ const Plans = () => {
             )}
           </TabsContent>
         </Tabs>
-
-        <DepositDialog 
-          open={showDepositDialog} 
-          onOpenChange={setShowDepositDialog}
-          selectedPlan={selectedPlanForDeposit}
-          onSuccess={() => setShowDepositDialog(false)}
-        />
       </div>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Subscription</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>Please confirm your subscription to {planToSubscribe?.name}</p>
+                
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Current Balance:</span>
+                    <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-destructive">
+                    <span>Investment Amount:</span>
+                    <span>-${planToSubscribe?.investment.toLocaleString()}</span>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex justify-between font-medium">
+                    <span>Remaining Balance:</span>
+                    <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubscription}>
+              Confirm Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 };
