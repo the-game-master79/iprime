@@ -1,4 +1,5 @@
 import { Trade, PriceData } from "@/types/trading";
+import { getPipValueForPair } from '@/config/pipValues';
 
 const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
 
@@ -24,25 +25,25 @@ export const calculatePipValue = (
   pair: string
 ): number => {
   const isCrypto = pair.includes('BINANCE:');
-  const isGold = pair === 'FX:XAU/USD';
+  const pipValue = getPipValueForPair(pair);
   
   if (isCrypto) {
-    const positionValue = price * lots;
-    return positionValue * 0.01; // Use 0.01 consistently for crypto
+    // For crypto, pip value scales with price and lot size directly
+    return lots * price * pipValue;
   }
   
-  if (isGold) {
-    return lots * 100 * 0.01;
+  if (pair === 'FX:XAU/USD') {
+    return lots * 100 * pipValue;
   }
 
   const standardLot = getStandardLotSize(pair);
   const positionSize = lots * standardLot;
   
   if (isJPYPair(pair)) {
-    return (positionSize * 0.01) / price;
+    return (positionSize * pipValue) / price;
   }
   
-  return positionSize * 0.0001;
+  return positionSize * pipValue;
 };
 
 export const calculatePriceDifference = (

@@ -9,6 +9,7 @@ export interface TradingPair {
   is_active: boolean;
   min_lots: number;
   max_lots: number;
+  pip_value: number; // Add pip value configuration
   lot_step: number;
   image_url?: string;
 }

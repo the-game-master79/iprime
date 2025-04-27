@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Brain } from "lucide-react";
-import { TradingPair, PriceData, TradeParams } from "@/types/trading";
+import { TradingPair, PriceData, TradeParams, Trade } from "@/types/trading"; // Add this import
 import { 
   calculateRequiredMargin, 
   isJPYPair, 
@@ -13,9 +13,8 @@ import {
   calculateTradeInfo,
   calculatePipValue 
 } from "@/utils/trading";
-import { Card } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
+import { getMaxLeverageForPair } from '@/config/leverageValues';
 
 interface DatabasePlan {
   id: string;
@@ -46,6 +45,7 @@ interface TradingPanelProps {
   onSaveLeverage?: (leverage: number) => Promise<void>;
   defaultLeverage?: number;
   onSubscribe?: (plan: SubscriptionPlan) => Promise<void>;
+  trades?: Trade[]; // Make trades prop optional
 }
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -84,12 +84,6 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
 const CRYPTO_LEVERAGE = 400;
 const FOREX_LEVERAGE_OPTIONS = [2, 5, 10, 20, 30, 50, 88, 100, 500, 1000, 2000];
 
-// Add constants for pair-specific leverages
-const CRYPTO_LEVERAGES = {
-  'DOGEUSDT': 1,
-  'DEFAULT': 400
-};
-
 export const TradingPanel = ({
   selectedPair,
   pairPrices,
@@ -98,7 +92,8 @@ export const TradingPanel = ({
   tradingPairs,
   onSaveLeverage,
   defaultLeverage = 100,
-  onSubscribe
+  onSubscribe,
+  trades = [] // Provide default empty array
 }: TradingPanelProps) => {
   const navigate = useNavigate(); // Add this hook
   const [lots, setLots] = useState('0.01');
@@ -136,22 +131,33 @@ export const TradingPanel = ({
   };
 
   // Add getMaxAffordableLots helper after getStandardLotSize
+  // Calculate total margin utilization from existing trades
+  // Update margin utilization calculation to consider only open/pending trades
+  const calculateExistingMarginUtilization = useMemo(() => {
+    return (trades || [])
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+  }, [trades]);
+
+  // Update getMaxAffordableLots to properly consider existing margin utilization
   const getMaxAffordableLots = (): number => {
     const price = parseFloat(pairPrices[selectedPair]?.price || '0');
     const leverageValue = parseFloat(selectedLeverage);
     const isCrypto = selectedPair.includes('BINANCE:');
     
-    if (!price || !leverageValue) return 0;
+    if (!price || !leverageValue || !userBalance) return 0;
 
+    // Calculate available balance after existing margin utilization
+    const existingMargin = calculateExistingMarginUtilization;
+    const availableBalance = Math.max(0, userBalance - existingMargin);
+
+    // Calculate max lots based on remaining available balance and pair type
     if (isCrypto) {
-      // For crypto: maxLots = (balance * leverage) / price
-      return (userBalance * leverageValue) / price;
+      return (availableBalance * leverageValue) / price;
     } else if (selectedPair === 'FX:XAU/USD') {
-      // For gold: maxLots = (balance * leverage) / (price * 100)
-      return (userBalance * leverageValue) / (price * 100);
+      return (availableBalance * leverageValue) / (price * 100);
     } else {
-      // For forex: maxLots = (balance * leverage) / (price * standardLotSize)
-      return (userBalance * leverageValue) / (price * getStandardLotSize(selectedPair));
+      return (availableBalance * leverageValue) / (price * getStandardLotSize(selectedPair));
     }
   };
 
@@ -161,11 +167,9 @@ export const TradingPanel = ({
     if (pair) {
       setPairInfo(pair);
       if (pair.type === 'crypto') {
-        const symbol = selectedPair.replace('BINANCE:', '');
-        const leverage = CRYPTO_LEVERAGES[symbol] || CRYPTO_LEVERAGES.DEFAULT;
-        setSelectedLeverage(leverage.toString());
+        const maxLeverage = getMaxLeverageForPair(selectedPair);
+        setSelectedLeverage(maxLeverage.toString());
       } else if (pair.type === 'forex') {
-        // Set to nearest valid forex leverage
         const validLeverage = FOREX_LEVERAGE_OPTIONS.find(l => l >= defaultLeverage) || FOREX_LEVERAGE_OPTIONS[0];
         setSelectedLeverage(validLeverage.toString());
       }
@@ -398,17 +402,14 @@ export const TradingPanel = ({
 
     // Get current lots as number
     const currentLots = parseFloat(lots) || 0;
-    const maxAffordableLots = getMaxAffordableLots();
-    const effectiveMaxLots = Math.min(pair.max_lots, maxAffordableLots);
-
-    // If current lots exceed the new max, adjust it
-    if (currentLots > effectiveMaxLots) {
-      setLots(effectiveMaxLots.toFixed(getDecimalPlaces(selectedPair)));
-    } else if (currentLots < pair.min_lots) {
-      // Also ensure we're not below minimum
+    
+    // Only adjust if current lots are outside allowed range
+    if (currentLots < pair.min_lots) {
       setLots(pair.min_lots.toFixed(getDecimalPlaces(selectedPair)));
+    } else if (currentLots > pair.max_lots) {
+      setLots(pair.max_lots.toFixed(getDecimalPlaces(selectedPair)));
     }
-  }, [selectedPair, pairPrices, userBalance, selectedLeverage]); // Dependencies that affect max lots
+  }, [selectedPair, userBalance, selectedLeverage]); // Remove pairPrices from dependencies
 
   return (
     <div className="w-[350px] border-l bg-card p-4">
@@ -446,6 +447,11 @@ export const TradingPanel = ({
                 Size (Lots)
                 <span className="ml-2 text-xs text-muted-foreground">
                   Max: {Math.min(pairInfo?.max_lots || 0, getMaxAffordableLots()).toFixed(2)}
+                  {calculateExistingMarginUtilization > 0 && (
+                    <span className="text-yellow-500 ml-1">
+                      (Used: ${calculateExistingMarginUtilization.toFixed(2)})
+                    </span>
+                  )}
                 </span>
               </label>
             </div>
@@ -525,7 +531,9 @@ export const TradingPanel = ({
                     onClick={() => setShowLeverageDialog(true)}
                   >
                     <span>Leverage:</span>
-                    <span className="font-mono">{pairInfo?.type === 'crypto' ? CRYPTO_LEVERAGE : selectedLeverage}x</span>
+                    <span className="font-mono">
+                      {pairInfo?.type === 'crypto' ? `${getMaxLeverageForPair(selectedPair)}x` : `${selectedLeverage}x`}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Pip Value:</span>
@@ -556,27 +564,29 @@ export const TradingPanel = ({
               <DialogHeader className="px-6 py-4 border-b">
                 <DialogTitle className="text-xl">Leverage Information</DialogTitle>
                 <DialogDescription className="text-sm">
-                  {selectedPair.includes('DOGEUSDT')
-                    ? 'Dogecoin trading has a fixed leverage of 1x for reduced risk'
-                    : pairInfo?.type === 'crypto' 
-                      ? 'This cryptocurrency pair has a fixed leverage setting'
-                      : 'Choose your preferred leverage level. Higher leverage means higher risk.'}
+                  {pairInfo?.type === 'crypto' 
+                    ? 'This cryptocurrency pair has a fixed maximum leverage for risk management'
+                    : 'Choose your preferred leverage level. Higher leverage means higher risk.'}
                 </DialogDescription>
               </DialogHeader>
               
               {pairInfo?.type === 'crypto' ? (
                 <div className="p-6">
-                  <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-6 text-center">
-                    <span className="text-3xl font-bold text-red-500">
-                      {selectedPair.includes('DOGEUSDT') ? '1x' : `${CRYPTO_LEVERAGE}x`}
+                  <div className={cn(
+                    "bg-red-500/5 border border-red-500/10 rounded-lg p-6 text-center",
+                    getMaxLeverageForPair(selectedPair) <= 20 ? "bg-green-500/5 border-green-500/10" : ""
+                  )}>
+                    <span className={cn(
+                      "text-3xl font-bold",
+                      getMaxLeverageForPair(selectedPair) <= 20 ? "text-green-500" : "text-red-500"
+                    )}>
+                      {getMaxLeverageForPair(selectedPair)}x
                     </span>
                     <p className="text-sm text-red-500/70 mt-2">
-                      {selectedPair.includes('DOGEUSDT') ? 'Fixed Low Risk' : 'Fixed High Risk'}
+                      Fixed Maximum Leverage
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {selectedPair.includes('DOGEUSDT') 
-                        ? 'Trading DOGE is restricted to 1x leverage for risk management'
-                        : 'This leverage setting is fixed and cannot be changed'}
+                      This leverage setting is fixed for risk management purposes
                     </p>
                   </div>
                 </div>

@@ -1,0 +1,7 @@
+[functions.price-updater]
+verify_jwt = false
+import_map = "./import_map.json"
+[functions.price-updater.environment]
+SUPABASE_URL = "{{SUPABASE_URL}}"
+SUPABASE_SERVICE_ROLE_KEY = "{{SUPABASE_SERVICE_ROLE_KEY}}"
+TRADERMADE_API_KEY = "{{TRADERMADE_API_KEY}}"

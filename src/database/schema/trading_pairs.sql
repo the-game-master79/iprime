@@ -148,4 +148,23 @@ GRANT USAGE ON SCHEMA cron TO postgres;
 GRANT ALL ON ALL TABLES IN SCHEMA cron TO postgres;
 
 -- Store TradeMade API key in database settings
-ALTER DATABASE your_database_name SET app.tradermade_api_key = 'your_api_key_here';
+ALTER DATABASE acvzuxvssuovhiwtdmtj SET app.tradermade_api_key = 'wsBKO0DDr7uN79MRA-Ow';
+
+-- Add function to update prices
+CREATE OR REPLACE FUNCTION update_binance_trading_pairs()
+RETURNS void AS $$
+BEGIN
+    -- Update last_updated timestamp for touched records
+    UPDATE trading_pairs
+    SET updated_at = NOW()
+    WHERE type = 'crypto' 
+    AND updated_at < NOW() - INTERVAL '5 minutes';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a scheduled job to run every 5 minutes
+SELECT cron.schedule(
+    'update-binance-pairs',
+    '*/5 * * * *',
+    $$SELECT update_binance_trading_pairs()$$
+);

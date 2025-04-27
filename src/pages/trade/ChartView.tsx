@@ -395,6 +395,77 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return calculateRequiredMargin(price, lotSize, leverageValue, isCrypto, defaultPair).toFixed(2);
   }, [lots, pairPrices, selectedLeverage, defaultPair]);
 
+  // Add handleLotsChange function before the return statement
+  const handleLotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty input or decimal point
+    if (value === '' || value === '.') {
+      setLots(value);
+      return;
+    }
+
+    // Validate numeric input
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+
+    // Get margin utilization from open trades
+    const existingMargin = trades
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+
+    // Calculate margin for new position
+    const price = parseFloat(pairPrices[defaultPair]?.price || '0');
+    const leverageValue = parseFloat(selectedLeverage);
+    const newPositionMargin = calculateRequiredMargin(
+      price,
+      numValue,
+      leverageValue,
+      defaultPair.includes('BINANCE:'),
+      defaultPair
+    );
+
+    // Check if total margin would exceed balance
+    if (existingMargin + newPositionMargin > userBalance) {
+      // Set to maximum affordable lots
+      setLots(getMaxAffordableLots.toFixed(2));
+      return;
+    }
+
+    setLots(value);
+  };
+
+  // Add getMaxAffordableLots function before the return statement
+  const getMaxAffordableLots = useMemo(() => {
+    const price = parseFloat(pairPrices[defaultPair]?.price || '0');
+    const leverageValue = parseFloat(selectedLeverage);
+    const isCrypto = defaultPair.includes('BINANCE:');
+    
+    if (!price || !leverageValue || !userBalance) return 0;
+
+    // Calculate total margin already used by open trades
+    const marginUtilized = trades
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+
+    // Available balance for new positions
+    const availableBalance = userBalance - marginUtilized;
+    if (availableBalance <= 0) return 0;
+
+    // Calculate max lots based on remaining available balance
+    const maxByBalance = availableBalance * leverageValue / (
+      isCrypto 
+        ? price
+        : defaultPair === 'FX:XAU/USD'
+          ? price * 100
+          : price * 100000
+    );
+
+    // Respect pair's max lots limit if available
+    const pairMaxLots = pairInfo?.max_lots || (isCrypto ? 100 : 200);
+    return Math.min(maxByBalance, pairMaxLots);
+  }, [pairPrices, selectedLeverage, defaultPair, userBalance, pairInfo, trades]);
+
   const handleTradeClick = (type: 'buy' | 'sell') => {
     if (showPanel && type === tradeType) {
       setShowPanel(false);
@@ -804,169 +875,78 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
       <div className="container mx-auto px-4 flex-1 mb-20">
         <div className="flex flex-col h-full relative bg-white rounded-xl mt-4 overflow-hidden">
-          <div className="flex-1 relative">
+          {/* Add pb-[160px] to create space for trading controls */}
+          <div className="flex-1 pb-[140px]">
             <TradingViewWidget symbol={formattedSymbol} />
-            
-            <div className={cn(
-              "absolute bottom-[380px] right-4 w-60 bg-white rounded-lg shadow-lg border p-3 transition-all duration-300",
-              showSLInput ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
-            )}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Stop Loss Price</label>
-                <Input
-                  type="number"
-                  value={stopLoss}
-                  onChange={(e) => setStopLoss(e.target.value)}
-                  className="text-right font-mono"
-                />
-              </div>
-            </div>
+          </div>
 
-            <div className={cn(
-              "absolute bottom-[380px] right-4 w-60 bg-white rounded-lg shadow-lg border p-3 transition-all duration-300",
-              showTPInput ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
-            )}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Take Profit Price</label>
-                <Input
-                  type="number"
-                  value={takeProfit}
-                  onChange={(e) => setTakeProfit(e.target.value)}
-                  className="text-right font-mono"
-                />
-              </div>
-            </div>
-
-            <div className={cn(
-              "absolute bottom-24 right-4 w-80 bg-white rounded-lg shadow-lg border p-4 space-y-3 transition-all duration-300",
-              showPanel ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0 pointer-events-none"
-            )}>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-medium">Size (Lots)</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">(Margin: ${marginRequired})</span>
+          {/* Trading Controls Container */}
+          <div className="fixed inset-x-0 bottom-5 z-50">
+            <div className="bg-background/80 backdrop-blur-sm border-t shadow-lg pb-safe">
+              <div className="p-4 space-y-4">
+                {/* Trade Info Panel */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+                    <div className="flex justify-between items-center">
+                      <span>Margin</span>
+                      <span className="font-mono text-foreground">${marginRequired}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Pip Value</span>
+                      <span className="font-mono text-foreground">${calculatePipValue(parseFloat(lots), parseFloat(pairPrices[defaultPair]?.price || '0'), defaultPair).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Max Lots</span>
+                      <span className="font-mono text-foreground">{getMaxAffordableLots.toFixed(2)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={lots}
-                    onChange={(e) => setLots(e.target.value)}
-                    step="0.01"
-                    min="0.01"
-                    max="200"
-                    className="text-right font-mono pr-16"
-                  />
-                  <Button
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowLeverageDialog(true)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 h-auto"
-                  >
-                    <span className="text-xs font-medium text-primary">{selectedLeverage}x</span>
-                  </Button>
-                </div>
-                {/* Add pip value and fees info */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="text-xs text-muted-foreground">
-                    <span>Pip Value:</span>
-                    <span className="float-right font-mono">${calculatePipValue(parseFloat(lots) || 0, parseFloat(pairPrices[defaultPair]?.price || '0'), defaultPair).toFixed(2)}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    <span>Fees:</span>
-                    <span className="float-right font-mono">$0.00</span>
-                  </div>
-                </div>
-              </div>
 
-              <Button 
-                className={cn(
-                  "w-full",
-                  tradeType === 'buy' ? "bg-primary hover:bg-primary/90" : "bg-red-600 hover:bg-red-700 text-white"
-                )}
-                onClick={() => handleTrade(tradeType || 'buy')}
-              >
-                Confirm {tradeType?.toUpperCase()}
-              </Button>
-
-              <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Select Leverage</DialogTitle>
-                    <DialogDescription>
-                      Choose your preferred leverage level. Higher leverage means higher risk.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <div className="flex-1">
-                          <h4 className="font-medium">Available Leverage</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {pairInfo?.min_leverage}x - {pairInfo?.max_leverage}x
-                          </p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-5 gap-2">
-                        {Array.from(
-                          { length: pairInfo ? pairInfo.max_leverage - pairInfo.min_leverage + 1 : 0 },
-                          (_, i) => pairInfo!.min_leverage + i
-                        ).map((value) => (
-                          <Button
-                            key={value}
-                            variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setSelectedLeverage(value.toString())}
-                          >
-                            {value}x
-                          </Button>
-                        ))}
+                  {/* Lots Input */}
+                  <div className="w-full">
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        value={lots}
+                        onChange={handleLotsChange}
+                        placeholder="Enter size"
+                        className="w-full text-right pr-16 font-mono"
+                        min={0}
+                        max={getMaxAffordableLots}
+                        step={0.01}
+                      />
+                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
+                        lots
                       </div>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button
-                      onClick={() => {
-                        setShowLeverageDialog(false);
-                      }}
-                      className="w-[200px]"
-                    >
-                      Confirm Leverage
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+                </div>
 
-            <div className="absolute bottom-4 right-4 flex gap-2">
-              <Button 
-                variant="outline"
-                className={cn(
-                  "border-2 h-12 shadow-lg text-white flex flex-col items-center px-4",
-                  tradeType === 'sell' && showPanel
-                    ? "border-red-600 bg-red-700 hover:bg-red-800 hover:border-red-700"
-                    : "border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
-                )}
-                onClick={() => handleTradeClick('sell')}
-              >
-                <span>{tradeType === 'sell' && showPanel ? 'Close' : 'Sell'}</span>
-                <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.bid)}</span>
-              </Button>
-              <Button 
-                className={cn(
-                  "h-12 shadow-lg flex flex-col items-center px-4",
-                  tradeType === 'buy' && showPanel
-                    ? "bg-primary hover:bg-primary/90"
-                    : "bg-primary hover:bg-primary/90"
-                )}
-                onClick={() => handleTradeClick('buy')}
-              >
-                <span>{tradeType === 'buy' && showPanel ? 'Close' : 'Buy'}</span>
-                <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.ask)}</span>
-              </Button>
+                {/* Trade Buttons */}
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    className="flex-1 h-12 shadow-sm text-white border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
+                    onClick={() => handleTrade('sell')}
+                  >
+                    <div className="flex flex-col">
+                      <span>Sell</span>
+                      <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.bid)}</span>
+                    </div>
+                  </Button>
+                  <Button 
+                    className="flex-1 h-12 shadow-sm bg-primary hover:bg-primary/90"
+                    onClick={() => handleTrade('buy')}
+                  >
+                    <div className="flex flex-col">
+                      <span>Buy</span>
+                      <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.ask)}</span>
+                    </div>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
