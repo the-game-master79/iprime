@@ -653,10 +653,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <span className="text-2xl font-semibold">
                           ${totalInvested.toLocaleString()}
                         </span>
-                        <div className="flex flex-col text-xs text-muted-foreground mt-1">
-                          <span>{activePlans.count} Compute{activePlans.count !== 1 ? 's' : ''}</span>
-                          <span>Commission: ${totalCommissions.toLocaleString()}</span>
-                        </div>
+                        <span className="text-xs text-muted-foreground mt-1">
+                          {activePlans.count} Compute{activePlans.count !== 1 ? 's' : ''}
+                        </span>
                       </div>
                       <Button
                         variant="outline"
@@ -685,7 +684,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         onClick={() => navigate('/affiliate')}
                       >
                         <ShareNetwork className="h-4 w-4 mr-2" />
-                        Refer & Earn
+                        Affiliate Dashboard
                       </Button>
                     </div>
                     {businessStats.nextRank && (

@@ -21,7 +21,7 @@ import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
-import { calculatePnL, calculateRequiredMargin } from "@/utils/trading"; // Update imports
+import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Add calculatePipValue
 
 interface PriceData {
   price: string;
@@ -91,13 +91,12 @@ const groupTradesByDate = (trades: Trade[]) => {
   );
 };
 
-// Add this interface near the top after existing imports
+// Update the interface to match actual database columns
 interface TradingPairInfo {
   symbol: string;
   name: string;
-  leverage_options: number[];
-  max_leverage: number;
   min_leverage: number;
+  max_leverage: number;
 }
 
 // Add margin call threshold constant (80%)
@@ -155,9 +154,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [activePairs, setActivePairs] = useState<Set<string>>(new Set());
   const [showPanel, setShowPanel] = useState(false);
   const [tradeType, setTradeType] = useState<'buy' | 'sell' | null>(null);
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [lots, setLots] = useState('0.01');
-  const [limitPrice, setLimitPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
   const [takeProfit, setTakeProfit] = useState('');
   const [showSLInput, setShowSLInput] = useState(false);
@@ -541,33 +538,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         return;
       }
 
-      // Add limit price validation
-      if (orderType === 'limit') {
-        const limitPriceValue = parseFloat(limitPrice);
-        const currentPrice = type === 'buy' 
-          ? parseFloat(pairPrices[defaultPair]?.ask || '0')
-          : parseFloat(pairPrices[defaultPair]?.bid || '0');
-
-        // Validate that limit price is reasonable
-        if (type === 'buy' && limitPriceValue >= currentPrice) {
-          toast({
-            variant: "destructive",
-            title: "Invalid Limit Price",
-            description: "Buy limit price must be below current market price"
-          });
-          return;
-        }
-
-        if (type === 'sell' && limitPriceValue <= currentPrice) {
-          toast({
-            variant: "destructive", 
-            title: "Invalid Limit Price",
-            description: "Sell limit price must be above current market price"
-          });
-          return;
-        }
-      }
-
       const lotSize = parseFloat(lots);
       const price = type === 'buy' 
         ? parseFloat(pairPrices[defaultPair]?.ask || '0')
@@ -621,12 +591,12 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       const tradeData: Partial<Trade> = {
         pair: defaultPair,
         type,
-        status: orderType === 'market' ? 'open' : 'pending',
+        status: 'open',
         openPrice: price,
         lots: lotSize,
         leverage: leverageValue,
-        orderType,
-        limitPrice: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : null,
+        orderType: 'market',
+        limitPrice: null,
         openTime: Date.now(),
         margin_amount: marginAmount // Add margin amount
       };
@@ -637,12 +607,12 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
           user_id: user.id,
           pair: defaultPair,
           type,
-          status: orderType === 'market' ? 'open' : 'pending',
+          status: 'open',
           open_price: price,
           lots: lotSize,
           leverage: leverageValue,
-          order_type: orderType,
-          limit_price: orderType === 'limit' && limitPrice ? parseFloat(limitPrice) : null,
+          order_type: 'market',
+          limit_price: null,
           margin_amount: marginAmount // Add margin amount
         }])
         .select()
@@ -659,16 +629,12 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       } as Trade, ...prev]);
 
       // Only deduct margin for market orders
-      if (orderType === 'market') {
-        const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
-        setUserBalance(prev => prev - margin);
-      }
+      const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
+      setUserBalance(prev => prev - margin);
 
       toast({
-        title: orderType === 'market' ? "Trade Opened" : "Limit Order Placed",
-        description: orderType === 'market'
-          ? `Successfully opened ${type.toUpperCase()} position for ${defaultPair} @ $${price}`
-          : `Successfully placed ${type.toUpperCase()} limit order for ${defaultPair} @ $${limitPrice}`,
+        title: "Trade Opened",
+        description: `Successfully opened ${type.toUpperCase()} position for ${defaultPair} @ $${price}`,
       });
 
       // Reset trade panel
@@ -692,7 +658,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       
       const { data, error } = await supabase
         .from('trading_pairs')
-        .select('symbol, name, leverage_options, max_leverage, min_leverage')
+        .select('symbol, name, min_leverage, max_leverage')
         .eq('symbol', defaultPair)
         .single();
 
@@ -875,36 +841,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
               "absolute bottom-24 right-4 w-80 bg-white rounded-lg shadow-lg border p-4 space-y-3 transition-all duration-300",
               showPanel ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0 pointer-events-none"
             )}>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant={orderType === 'market' ? 'default' : 'outline'}
-                  onClick={() => setOrderType('market')}
-                  className="h-8 text-xs px-2"
-                >
-                  Market
-                </Button>
-                <Button
-                  variant={orderType === 'limit' ? 'default' : 'outline'}
-                  onClick={() => setOrderType('limit')}
-                  className="h-8 text-xs px-2"
-                >
-                  Limit
-                </Button>
-              </div>
-
-              {orderType === 'limit' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Limit Price</label>
-                  <Input
-                    type="number"
-                    value={limitPrice}
-                    onChange={(e) => setLimitPrice(e.target.value)}
-                    className="text-right font-mono"
-                    placeholder="Enter limit price"
-                  />
-                </div>
-              )}
-
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-medium">Size (Lots)</label>
@@ -931,7 +867,28 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                     <span className="text-xs font-medium text-primary">{selectedLeverage}x</span>
                   </Button>
                 </div>
+                {/* Add pip value and fees info */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="text-xs text-muted-foreground">
+                    <span>Pip Value:</span>
+                    <span className="float-right font-mono">${calculatePipValue(parseFloat(lots) || 0, parseFloat(pairPrices[defaultPair]?.price || '0'), defaultPair).toFixed(2)}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <span>Fees:</span>
+                    <span className="float-right font-mono">$0.00</span>
+                  </div>
+                </div>
               </div>
+
+              <Button 
+                className={cn(
+                  "w-full",
+                  tradeType === 'buy' ? "bg-primary hover:bg-primary/90" : "bg-red-600 hover:bg-red-700 text-white"
+                )}
+                onClick={() => handleTrade(tradeType || 'buy')}
+              >
+                Confirm {tradeType?.toUpperCase()}
+              </Button>
 
               <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
                 <DialogContent>
@@ -952,7 +909,10 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                         </div>
                       </div>
                       <div className="grid grid-cols-5 gap-2">
-                        {pairInfo?.leverage_options.map((value) => (
+                        {Array.from(
+                          { length: pairInfo ? pairInfo.max_leverage - pairInfo.min_leverage + 1 : 0 },
+                          (_, i) => pairInfo!.min_leverage + i
+                        ).map((value) => (
                           <Button
                             key={value}
                             variant={selectedLeverage === value.toString() ? "default" : "outline"}
@@ -977,16 +937,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-
-              <Button 
-                className={cn(
-                  "w-full",
-                  tradeType === 'buy' ? "bg-primary hover:bg-primary/90" : "bg-red-600 hover:bg-red-700 text-white"
-                )}
-                onClick={() => handleTrade(tradeType || 'buy')}
-              >
-                Confirm {tradeType?.toUpperCase()}
-              </Button>
             </div>
 
             <div className="absolute bottom-4 right-4 flex gap-2">

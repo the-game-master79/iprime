@@ -127,10 +127,10 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border/40">
-              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Date</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50 hidden md:table-cell">Date</TableHead>
               <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Transaction</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Amount</TableHead>
-              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Status</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50 hidden md:table-cell">Amount</TableHead>
+              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50 hidden md:table-cell">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,7 +139,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
                 key={tx.id} 
                 className="group hover:bg-muted/50 transition-colors"
               >
-                <TableCell className="py-4 align-top">
+                <TableCell className="py-4 align-top hidden md:table-cell">
                   <div className="text-sm font-medium">
                     {format(new Date(tx.created_at), 'MMM dd, yyyy')}
                   </div>
@@ -149,6 +149,13 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
                 </TableCell>
                 <TableCell className="py-4 align-top">
                   <div className="flex flex-col gap-1">
+                    {/* Mobile Date Display */}
+                    <div className="flex items-center justify-between md:hidden mb-1">
+                      <div className="text-xs text-muted-foreground">
+                        {format(new Date(tx.created_at), 'MMM dd, yyyy • hh:mm a')}
+                      </div>
+                    </div>
+                    {/* Rest of transaction content */}
                     <Badge variant="outline" className={cn("w-fit capitalize text-xs", getTypeVariant(tx.type))}>
                       {getTypeLabel(tx.type)}
                     </Badge>
