@@ -10,6 +10,7 @@ import {
   calculateRequiredMargin, 
   isJPYPair, 
   getStandardLotSize, 
+  calculateAdjustedPipValue // Import the new utility function
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -186,10 +187,9 @@ export const TradingPanel = ({
 
     const lotSize = parseFloat(lots) || 0;
     const price = parseFloat(pairPrices[selectedPair]?.price || '0');
-    const pipValue = pairInfo.pip_value || 0;
     
-    // Calculate pip value based on lot size and current price
-    const calculatedPipValue = lotSize * price * pipValue;
+    // Use the new utility function
+    const calculatedPipValue = calculateAdjustedPipValue(lotSize, price, selectedPair);
     
     // Calculate volume
     const isCrypto = selectedPair.includes('BINANCE:');

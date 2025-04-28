@@ -30,7 +30,7 @@ export interface Trade {
   id: string;
   pair: string;
   type: 'buy' | 'sell';
-  status: 'open' | 'pending' | 'closed';
+  status: 'open' | 'pending' | 'closed' | 'cancelled';  // Add cancelled status
   openPrice: number;
   lots: number;
   currentPrice?: number;

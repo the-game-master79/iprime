@@ -61,14 +61,52 @@ export const calculatePriceDifference = (
     : openPrice - currentPrice;
 };
 
+/**
+ * Example PnL Calculations:
+ * 
+ * 1. Bitcoin (BINANCE:BTCUSDT)
+ * - Trade: Buy 1 lot at $40,000
+ * - Current price: $41,000
+ * - Pip value (0.00001): $0.40 per pip at open price
+ * - Price difference: +$1,000
+ * - Pips moved: 1000 / (40000 * 0.00001) = 2500 pips
+ * - PnL: 2500 * $0.40 * 1 lot = +$1,000
+ * 
+ * 2. EUR/USD (FX:EUR/USD)
+ * - Trade: Sell 1 lot at 1.1000
+ * - Current price: 1.0950
+ * - Standard lot: 100,000 units
+ * - Pip value (0.0001): $10 per pip
+ * - Price difference: +0.0050 (because sell trade)
+ * - Pips moved: 0.0050 / 0.0001 = 50 pips
+ * - PnL: 50 * $10 = +$500
+ * 
+ * 3. USD/JPY (FX:USD/JPY)
+ * - Trade: Buy 1 lot at 150.00
+ * - Current price: 150.50
+ * - Pip value (0.01): $6.67 per pip (100000 * 0.01 / 150.00)
+ * - Price difference: +0.50
+ * - Pips moved: 0.50 / 0.01 = 50 pips
+ * - PnL: 50 * $6.67 = +$333.50
+ */
 export const calculatePnL = (trade: Trade, currentPrice: number): number => {
   if (!currentPrice || !trade.openPrice) return 0;
   
+  // Special handling for BTC and ETH
+  if (trade.pair === 'BINANCE:BTCUSDT' || trade.pair === 'BINANCE:ETHUSDT') {
+    const pipValue = getPipValueForPair(trade.pair);
+    // Calculate price-adjusted pip value
+    const adjustedPipValue = trade.openPrice * pipValue;
+    const priceDiff = calculatePriceDifference(trade.type, currentPrice, trade.openPrice);
+    const pips = priceDiff / adjustedPipValue;
+    return pips * adjustedPipValue * trade.lots;
+  }
+  
   const priceDiff = calculatePriceDifference(trade.type, currentPrice, trade.openPrice);
+  const pipValue = getPipValueForPair(trade.pair);
   
   if (trade.pair.includes('BINANCE:')) {
-    // Get number of pips moved for crypto
-    const pips = priceDiff / getPipValueForPair(trade.pair);
+    const pips = priceDiff / pipValue;
     return pips * calculatePipValue(trade.lots, currentPrice, trade.pair);
   }
   
@@ -180,4 +218,14 @@ export const calculateTradeInfo = (
     volumeUnits,
     volumeUsd
   };
+};
+
+export const calculateAdjustedPipValue = (
+  lots: number,
+  price: number,
+  pair: string
+): number => {
+  if (!lots || !price) return 0;
+  const pipValue = getPipValueForPair(pair);
+  return lots * price * pipValue;
 };

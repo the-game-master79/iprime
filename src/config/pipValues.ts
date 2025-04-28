@@ -1,14 +1,14 @@
 // Pip value configuration for crypto and forex pairs
 export const PIP_VALUES = {
   // Major cryptocurrencies with custom pip values
-  'BINANCE:BTCUSDT': 0.0001,    // 1 pip = $0.0001 for BTC
-  'BINANCE:ETHUSDT': 0.00001,   // 1 pip = $0.00001 for others
-  'BINANCE:BNBUSDT': 0.00001,
+  'BINANCE:BTCUSDT': 0.0001,    // 1 pip = $9.4748 at BTC price of 94,748
+  'BINANCE:ETHUSDT': 0.001,     // 1 pip = $2.4738 at ETH price of 2,473.8
+  'BINANCE:BNBUSDT': 0.01,
   'BINANCE:SOLUSDT': 0.01,
   'BINANCE:ADAUSDT': 0.00001,
   'BINANCE:DOGEUSDT': 0.1,
-  'BINANCE:DOTUSDT': 0.00001,
-  'BINANCE:TRXUSDT': 0.00001,
+  'BINANCE:DOTUSDT': 0.1,
+  'BINANCE:TRXUSDT': 0.1,
   
   // Default values
   'CRYPTO_DEFAULT': 0.00001,  // Standard crypto pip
