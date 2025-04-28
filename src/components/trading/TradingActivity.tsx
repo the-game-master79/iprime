@@ -1,16 +1,14 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/lib/supabase"; // Add this import
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { X } from "@phosphor-icons/react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { Trade, PriceData } from "@/types/trading";
-import { calculatePnL } from "@/utils/trading"; // Updated import
+import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-
-const CRYPTO_LEVERAGE = 400;
-const FOREX_LEVERAGE_OPTIONS = [2, 5, 10, 20, 30, 50, 88, 100, 500, 1000, 2000];
 
 interface TradingActivityProps {
   trades: Trade[];
@@ -27,6 +25,8 @@ export const TradingActivity = ({
 }: TradingActivityProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
+  
+  // Move all hooks before any conditional returns
   const filteredTrades = useMemo(() => ({
     open: trades.filter(t => t.status === 'open'),
     pending: trades.filter(t => t.status === 'pending'),
@@ -42,7 +42,6 @@ export const TradingActivity = ({
   }, [filteredTrades.open, currentPrices]);
 
   const { totalMarginUsed, marginLevel, adjustedBalance } = useMemo(() => {
-    // Calculate total P&L first
     const totalPnL = trades
       .filter(t => t.status === 'open')
       .reduce((acc, trade) => {
@@ -50,17 +49,13 @@ export const TradingActivity = ({
         return acc + calculatePnL(trade, currentPrice);
       }, 0);
 
-    // Calculate total margin used
     const marginUsed = trades
       .filter(t => t.status === 'open' || t.status === 'pending')
       .reduce((total, trade) => {
         return total + (trade.margin_amount || 0);
       }, 0);
 
-    // Calculate adjusted balance including unrealized P&L
     const adjustedBal = userBalance + totalPnL;
-    
-    // Calculate margin level using adjusted balance
     const level = marginUsed > 0 ? ((adjustedBal / marginUsed) * 100) : 100;
 
     return {
@@ -70,8 +65,32 @@ export const TradingActivity = ({
     };
   }, [trades, userBalance, currentPrices]);
 
-  // Update free margin calculation to use adjusted balance
+  // Move useEffect before conditional return
+  useEffect(() => {
+    const channel = supabase.channel('trade-executions')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'trades',
+        filter: `status=eq.open`,
+      }, (payload) => {
+        const executedTrade = payload.new as Trade;
+        if (executedTrade.orderType === 'limit' && executedTrade.status === 'open') {
+          toast({
+            title: "Trade Executed",
+            description: `${executedTrade.type === 'buy' ? 'Buy' : 'Sell'} order executed at ${executedTrade.openPrice}`,
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const freeMargin = adjustedBalance - totalMarginUsed;
+  const displayedTrades = filteredTrades[activeTab];
 
   const handleCloseTrade = async (tradeId: string) => {
     try {
@@ -85,9 +104,10 @@ export const TradingActivity = ({
     }
   };
 
-  if (trades.length === 0) return null;
-
-  const displayedTrades = filteredTrades[activeTab];
+  // Only return null after all hooks
+  if (trades.length === 0) {
+    return null;
+  }
 
   const cryptoDecimals: Record<string, number> = {
     'BNBUSDT': 2,
@@ -126,6 +146,15 @@ export const TradingActivity = ({
     }
     
     return 5; // Default for unknown symbols
+  };
+
+  // Update helper to format order info with proper decimals
+  const getOrderInfo = (trade: Trade) => {
+    if (trade.status === 'pending' && trade.orderType === 'limit' && trade.limitPrice) {
+      const decimals = getDecimalPlaces(trade.pair);
+      return `Limit ${trade.type.toUpperCase()} @ $${trade.limitPrice.toFixed(decimals)}`;
+    }
+    return `${trade.type.toUpperCase()} ${trade.lots} Lots`;
   };
 
   return (
@@ -173,20 +202,25 @@ export const TradingActivity = ({
                     <th className="text-left p-2">Type</th>
                     <th className="text-right p-2">Volume</th>
                     <th className="text-right p-2">Open Price</th>
-                    <th className="text-right p-2">Current Price</th>
+                    <th className="text-right p-2">{activeTab === 'closed' ? 'Close Price' : 'Current Price'}</th>
                     <th className="text-right p-2">T/P</th>
                     <th className="text-right p-2">S/L</th>
                     <th className="text-left p-2">Position ID</th>
                     <th className="text-left p-2">Open Time</th>
-                    <th className="text-right p-2">P&L</th>
+                    {activeTab !== 'pending' && <th className="text-right p-2">P&L</th>}
+                    <th className="text-right p-2">Action</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm">
                   {displayedTrades.map(trade => {
                     const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+                    // Calculate PnL based on trade status
                     const pnl = trade.status === 'closed' 
-                      ? (trade.pnl || 0) 
-                      : calculatePnL(trade, currentPrice);
+                      ? trade.pnl || 0
+                      : trade.status === 'open'
+                        ? calculatePnL(trade, currentPrice)
+                        : 0;
+
                     const pairSymbol = trade.pair.split(':')[1];
                     const openTime = new Date(trade.openTime).toLocaleString('en-US', {
                       month: 'short',
@@ -219,11 +253,15 @@ export const TradingActivity = ({
                         </td>
                         <td className="p-2">
                           <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "h-2 w-2 rounded-full",
-                              trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
-                            )} />
-                            {trade.type.toUpperCase()}
+                            {trade.status === 'pending' ? (
+                              <span className="text-yellow-500">Pending</span>
+                            ) : (
+                              <div className={cn(
+                                "h-2 w-2 rounded-full",
+                                trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
+                              )} />
+                            )}
+                            {getOrderInfo(trade)}
                           </div>
                         </td>
                         <td className="p-2 text-right">
@@ -232,26 +270,37 @@ export const TradingActivity = ({
                           </Badge>
                         </td>
                         <td className="p-2 text-right font-mono">${trade.openPrice.toFixed(decimals)}</td>
-                        <td className="p-2 text-right font-mono">${currentPrice.toFixed(decimals)}</td>
-                        <td className="p-2 text-right font-mono">-</td>
-                        <td className="p-2 text-right font-mono">-</td>
+                        <td className="p-2 text-right font-mono">
+                          {trade.status === 'pending' ? '-' : `$${currentPrice.toFixed(decimals)}`}
+                        </td>
+                        <td className="p-2 text-right font-mono">{trade.takeProfit || '-'}</td>
+                        <td className="p-2 text-right font-mono">{trade.stopLoss || '-'}</td>
                         <td className="p-2 font-mono">{trade.id.slice(0, 8)}</td>
                         <td className="p-2">{openTime}</td>
+                        {activeTab !== 'pending' && (
+                          <td className="p-2 text-right">
+                            <div className={cn(
+                              "font-mono",
+                              pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
+                            )}>
+                              ${pnl.toFixed(2)}
+                            </div>
+                          </td>
+                        )}
                         <td className="p-2 text-right">
-                          <span className={cn(
-                            "font-mono",
-                            pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
-                          )}>
-                            ${pnl.toFixed(2)}
-                          </span>
-                          {trade.status !== 'closed' && (
+                          {(trade.status === 'pending' || trade.status === 'open') && (
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 ml-2 text-red-600"
+                              size="sm" 
                               onClick={() => handleCloseTrade(trade.id)}
+                              className={cn(
+                                "h-7 px-2",
+                                trade.status === 'pending' 
+                                  ? "text-red-500 hover:text-red-600 hover:bg-red-50"
+                                  : "text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                              )}
                             >
-                              <X className="h-4 w-4" weight="bold" />
+                              <X className="h-4 w-4" />
                             </Button>
                           )}
                         </td>

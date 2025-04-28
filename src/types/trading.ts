@@ -37,9 +37,8 @@ export interface Trade {
   pnl?: number;
   leverage: number;
   orderType: 'market' | 'limit';
-  limitPrice?: number;
+  limitPrice: number | null;
   openTime: number;
-  liquidationPrice: number;
   margin_amount: number;
 }
 
@@ -48,5 +47,6 @@ export interface TradeParams {
   orderType: 'market' | 'limit';
   lots: number;
   leverage: number;
-  limitPrice?: string;
+  limitPrice?: number;
+  openPrice?: number;  // Add this field
 }

@@ -50,74 +50,153 @@ interface Trade {
   openTime: number;
 }
 
+interface CryptoPrice {
+  symbol: string;
+  bid: number;
+  ask: number;
+}
+
+interface ForexPrice {
+  symbol: string;
+  bid: number;
+  ask: number;
+}
+
 const SelectPairs = () => {
-  const { toast } = useToast(); // Add this hook
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("crypto");
   const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down'>>({});
-  const [isPageVisible, setIsPageVisible] = useState(document.visibilityState === 'visible');
   const [trades, setTrades] = useState<Trade[]>([]);
   const [totalPnL, setTotalPnL] = useState(0);
   const [showTradesSheet, setShowTradesSheet] = useState(false);
-  const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Move WebSocket references to component level
-  let cryptoWs: WebSocket | null = null;
-  let forexWs: WebSocket | null = null;
-  let heartbeatInterval: NodeJS.Timeout | undefined;
-  let priceRefreshInterval: NodeJS.Timeout | undefined;
-
-  // Add effect to fetch trading pairs from database
+  // Add effect to fetch trading pairs and set up price subscriptions
   useEffect(() => {
-    const fetchTradingPairs = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('trading_pairs')
-          .select('*')
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
+    // Initial fetch of prices
+    const fetchInitialPrices = async () => {
+      // Fetch crypto prices
+      const { data: cryptoPrices } = await supabase
+        .from('crypto_prices')
+        .select('*');
 
-        if (error) throw error;
-        setTradingPairs(data);
-        
-        // Initialize WebSocket connections after getting pairs
-        if (isPageVisible) {
-          if (activeTab === "crypto") {
-            initializeCryptoWebSocket();
-          } else if (activeTab === "forex" && tradermadeApiKey) {
-            initializeForexWebSocket();
-          }
+      // Fetch forex prices  
+      const { data: forexPrices } = await supabase
+        .from('forex_prices')
+        .select('*');
+
+      const prices: Record<string, PriceData> = {};
+
+      // Format crypto prices
+      cryptoPrices?.forEach(price => {
+        prices[`BINANCE:${price.symbol}`] = {
+          price: price.bid.toString(),
+          bid: price.bid.toString(),
+          ask: price.ask.toString(),
+          change: '0.00'
+        };
+      });
+
+      // Format forex prices
+      forexPrices?.forEach(price => {
+        const symbol = `FX:${price.symbol.slice(0,3)}/${price.symbol.slice(3)}`;
+        prices[symbol] = {
+          price: price.bid.toString(),
+          bid: price.bid.toString(),
+          ask: price.ask.toString(),
+          change: '0.00'
+        };
+      });
+
+      setPairPrices(prices);
+    };
+
+    // Set up real-time subscriptions
+    const cryptoSubscription = supabase
+      .channel('crypto-prices-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'crypto_prices' },
+        (payload) => {
+          const priceData = payload.new as CryptoPrice;
+          if (!priceData) return;
+
+          setPairPrices(prev => ({
+            ...prev,
+            [`BINANCE:${priceData.symbol}`]: {
+              price: priceData.bid.toString(),
+              bid: priceData.bid.toString(),
+              ask: priceData.ask.toString(),
+              change: '0.00'
+            }
+          }));
         }
-      } catch (error) {
-        console.error('Error fetching trading pairs:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      )
+      .subscribe();
 
-    fetchTradingPairs();
+    const forexSubscription = supabase
+      .channel('forex-prices-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'forex_prices' },
+        (payload) => {
+          const priceData = payload.new as ForexPrice;
+          if (!priceData) return;
 
-    // Cleanup function
+          const symbol = `FX:${priceData.symbol.slice(0,3)}/${priceData.symbol.slice(3)}`;
+          setPairPrices(prev => ({
+            ...prev,
+            [symbol]: {
+              price: priceData.bid.toString(),
+              bid: priceData.bid.toString(),
+              ask: priceData.ask.toString(),
+              change: '0.00'
+            }
+          }));
+        }
+      )
+      .subscribe();
+
+    // Initialize data
+    fetchInitialPrices();
+
+    // Cleanup subscriptions
     return () => {
-      if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
-      if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
-      clearInterval(heartbeatInterval);
-      clearInterval(priceRefreshInterval);
+      supabase.removeChannel(cryptoSubscription);
+      supabase.removeChannel(forexSubscription);
     };
-  }, []); // Empty dependency array since we only want to fetch once on mount
+  }, []);
 
   const filteredPairs = useMemo(() => {
-    return tradingPairs
-      .filter(pair => pair.type === activeTab)
-      .filter(pair => 
-        pair.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pair.short_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-  }, [tradingPairs, activeTab, searchQuery]);
+    return Object.entries(pairPrices)
+      .filter(([symbol]) => {
+        const isCrypto = symbol.startsWith('BINANCE:');
+        return activeTab === 'crypto' ? isCrypto : !isCrypto;
+      })
+      .filter(([symbol]) => 
+        symbol.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .map(([symbol, price]) => {
+        const isCrypto = symbol.startsWith('BINANCE:');
+        let shortName;
+        
+        if (isCrypto) {
+          // For crypto, remove USDT and convert to uppercase (e.g., BTCUSDT -> BTC)
+          shortName = symbol.split(':')[1].toUpperCase().replace('USDT', '');
+        } else {
+          // For forex, format as EUR-USD from FX:EUR/USD
+          shortName = symbol.split(':')[1].toUpperCase().replace('/', '-');
+        }
+
+        return {
+          symbol,
+          name: symbol.split(':')[1], // Keep the display name as is
+          price: price.bid || '0',
+          short_name: shortName,
+          image_url: `https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//${shortName.toLowerCase()}.svg` // Keep image URLs lowercase
+        };
+      });
+  }, [pairPrices, activeTab, searchQuery]);
 
   const handlePairSelect = (pair: string) => {
     // Format the pair correctly for the URL
@@ -129,21 +208,9 @@ const SelectPairs = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       const visible = document.visibilityState === 'visible';
-      setIsPageVisible(visible);
-      
       if (visible) {
-        // Reinitialize WebSockets when page becomes visible
-        if (activeTab === "crypto") {
-          initializeCryptoWebSocket();
-        } else if (activeTab === "forex" && tradermadeApiKey) {
-          initializeForexWebSocket();
-        }
-      } else {
-        // Cleanup WebSockets when page is hidden
-        if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
-        if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
-        clearInterval(heartbeatInterval);
-        clearInterval(priceRefreshInterval);
+        // Fetch latest prices when page becomes visible
+        fetchInitialPrices();
       }
     };
 
@@ -151,7 +218,7 @@ const SelectPairs = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [activeTab]);
+  }, []);
 
   // Add price animation effect
   useEffect(() => {
@@ -211,206 +278,6 @@ const SelectPairs = () => {
 
     setTotalPnL(total);
   }, [trades, pairPrices]);
-
-  // WebSocket connection for price updates
-  useEffect(() => {
-    // Only initialize WebSocket if page is visible
-    if (isPageVisible && tradingPairs.length > 0) {
-      if (activeTab === "crypto") {
-        initializeCryptoWebSocket();
-      } else if (activeTab === "forex" && tradermadeApiKey) {
-        initializeForexWebSocket();
-      }
-    }
-
-    return () => {
-      if (cryptoWs?.readyState === WebSocket.OPEN) cryptoWs.close();
-      if (forexWs?.readyState === WebSocket.OPEN) forexWs.close();
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      if (priceRefreshInterval) clearInterval(priceRefreshInterval);
-    };
-  }, [activeTab, isPageVisible, tradingPairs]); // Add tradingPairs to dependencies
-
-  const initializeCryptoWebSocket = () => {
-    if (cryptoWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
-    
-    const cryptoPairs = tradingPairs
-      .filter(pair => pair.type === 'crypto')
-      .map(pair => pair.symbol.toLowerCase().replace('binance:', ''));
-
-    // Only initialize if we have pairs to subscribe to
-    if (cryptoPairs.length === 0) return;
-      
-    cryptoWs = new WebSocket('wss://stream.binance.com:9443/ws');
-
-    let reconnectAttempt = 0;
-    const maxReconnectAttempts = 5;
-    
-    const reconnect = () => {
-      if (reconnectAttempt < maxReconnectAttempts && isPageVisible) {
-        reconnectAttempt++;
-        setTimeout(initializeCryptoWebSocket, Math.min(1000 * reconnectAttempt, 5000));
-      }
-    };
-
-    cryptoWs.onopen = () => {
-      // Wait for connection to be established
-      setTimeout(() => {
-        if (cryptoWs?.readyState === WebSocket.OPEN) {
-          const subscribeMsg = {
-            method: "SUBSCRIBE",
-            params: cryptoPairs.map(symbol => `${symbol}@ticker`),
-            id: 1
-          };
-          try {
-            cryptoWs.send(JSON.stringify(subscribeMsg));
-          } catch (err) {
-            console.error('Failed to send subscription message:', err);
-            // Attempt to reconnect on failure
-            cryptoWs?.close();
-            reconnect();
-          }
-        }
-      }, 1000); // Add 1s delay to ensure connection is ready
-    };
-
-    // Add error handler
-    cryptoWs.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      reconnect();
-    };
-
-    // Add close handler with reconnect logic
-    cryptoWs.onclose = () => {
-      reconnect();
-    };
-
-    cryptoWs.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.e === '24hrTicker') {
-          const symbol = `BINANCE:${data.s}`;
-          const decimals = getDecimalPlaces(symbol);
-          setPairPrices(prev => ({
-            ...prev,
-            [symbol]: {
-              price: parseFloat(data.c).toFixed(decimals),
-              bid: parseFloat(data.b).toFixed(decimals),
-              ask: parseFloat(data.a).toFixed(decimals),
-              change: parseFloat(data.P).toFixed(2)
-            }
-          }));
-        }
-      } catch (error) {
-        console.error('Error handling crypto message:', error);
-      }
-    };
-  };
-
-  const initializeForexWebSocket = () => {
-    if (forexWs?.readyState === WebSocket.OPEN || !isPageVisible) return;
-
-    const forexPairs = tradingPairs
-      .filter(pair => pair.type === 'forex')
-      .map(pair => pair.symbol.replace('FX:', '').replace('/', ''));
-
-    // Only initialize if we have pairs to subscribe to  
-    if (forexPairs.length === 0) return;
-
-    forexWs = new WebSocket('wss://marketdata.tradermade.com/feedadv');
-
-    forexWs.onopen = async () => {
-      // Initialize with API key
-      forexWs.send(JSON.stringify({
-        userKey: tradermadeApiKey,
-        _type: "init"
-      }));
-
-      // Subscribe to pairs in batches of 10
-      const forexPairs = tradingPairs
-        .filter(pair => pair.type === 'forex')
-        .map(pair => pair.symbol.replace('FX:', '').replace('/', ''));
-      
-      // Subscribe in batches of 10
-      for (let i = 0; i < forexPairs.length; i += 10) {
-        const batch = forexPairs.slice(i, i + 10);
-        if (forexWs?.readyState === WebSocket.OPEN) {
-          const subscribeMsg = {
-            userKey: tradermadeApiKey,
-            symbol: batch.join(','),
-            _type: "subscribe"
-          };
-          forexWs.send(JSON.stringify(subscribeMsg));
-        }
-      }
-
-      // Setup heartbeat and price refresh intervals
-      heartbeatInterval = setInterval(() => {
-        if (forexWs?.readyState === WebSocket.OPEN) {
-          forexWs.send(JSON.stringify({ heartbeat: "1" }));
-        }
-      }, 30000);
-
-      priceRefreshInterval = setInterval(() => {
-        if (forexWs?.readyState === WebSocket.OPEN) {
-          forexPairs.forEach((symbol, index) => {
-            setTimeout(() => {
-              forexWs?.send(JSON.stringify({
-                userKey: tradermadeApiKey,
-                symbol: symbol,
-                _type: "quote"
-              }));
-            }, index * 50);
-          });
-        }
-      }, 10000);
-    };
-
-    forexWs.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    forexWs.onclose = () => {
-      setTimeout(initializeForexWebSocket, 2000); // Retry after 2s
-    };
-
-    forexWs.onmessage = (event) => {
-      try {
-        // Skip non-JSON messages like "Connected" and "User Key..."
-        if (typeof event.data === 'string') {
-          if (event.data.startsWith('Connected') || 
-              event.data.startsWith('User Key') || 
-              !event.data.startsWith('{')) {
-            return;
-          }
-        }
-
-        const data = JSON.parse(event.data);
-        if (data.symbol && data.bid && data.ask) {
-          const formattedSymbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
-          const decimals = getDecimalPlaces(formattedSymbol);
-          setPairPrices(prev => {
-            const change = ((data.bid - (prev[formattedSymbol]?.bid || data.bid)) / data.bid * 100);
-            return {
-              ...prev,
-              [formattedSymbol]: {
-                price: parseFloat(data.bid).toFixed(decimals),
-                bid: parseFloat(data.bid).toFixed(decimals),
-                ask: parseFloat(data.ask).toFixed(decimals),
-                change: change.toFixed(2)
-              }
-            };
-          });
-        }
-      } catch (error) {
-        // Silently handle expected non-JSON messages
-        if (!(error instanceof SyntaxError)) {
-          // Only log unexpected errors
-          console.error('Error handling forex message:', error);
-        }
-      }
-    };
-  };
 
   // Add close trade handler
   const handleCloseTrade = async (tradeId: string) => {

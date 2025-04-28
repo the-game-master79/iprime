@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Navigate, useLocation } from "react-router-dom";
 import { cn, getForexMarketStatus } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { wsManager } from '@/services/websocket-manager';
 import { useBreakpoints } from "@/hooks/use-breakpoints";
-import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { TradingLayout } from "@/components/layout/TradingLayout";
 import { TradeSidebar } from "@/components/trading/TradeSidebar";
 import { TradingPanel } from "@/components/trading/TradingPanel";
@@ -15,7 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading";
-import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin, calculateTradeValue } from "@/utils/trading";
+import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin } from "@/utils/trading";
+import { usePriceSubscriptions } from '@/hooks/use-price-subscriptions';
+
+// Add interfaces for price tables
+interface CryptoPrice {
+  symbol: string;
+  bid: number;
+  ask: number;
+}
+
+interface ForexPrice {
+  symbol: string;
+  bid: number;
+  ask: number;
+}
 
 const Trade = () => {
   const { isMobile } = useBreakpoints();
@@ -28,30 +40,13 @@ const Trade = () => {
   const [userBalance, setUserBalance] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [defaultLeverage, setDefaultLeverage] = useState(100);
 
-  // Effect for WebSocket price updates
-  useEffect(() => {
-    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
-      setPairPrices(prev => ({
-        ...prev,
-        [symbol]: priceData
-      }));
-    });
-
-    if (tradingPairs.length > 0) {
-      wsManager.watchPairs(tradingPairs.map(p => p.symbol));
-    }
-
-    return () => {
-      unsubscribe();
-      wsManager.disconnect();
-    };
-  }, [tradingPairs]);
+  // Replace the price subscription logic with hook
+  const pairPrices = usePriceSubscriptions();
 
   // Effect to fetch user balance
   useEffect(() => {
@@ -120,7 +115,7 @@ const Trade = () => {
         return;
       }
 
-      const formattedTrades: Trade[] = userTrades.map(trade => ({
+      const formattedTrades = userTrades.map(trade => ({
         id: trade.id,
         pair: trade.pair,
         type: trade.type,
@@ -129,7 +124,7 @@ const Trade = () => {
         lots: trade.lots,
         leverage: trade.leverage,
         orderType: trade.order_type,
-        limitPrice: trade.limit_price,
+        limitPrice: trade.limit_price || null,
         openTime: new Date(trade.created_at).getTime(),
         pnl: trade.pnl || 0,
         margin_amount: trade.margin_amount
@@ -140,17 +135,6 @@ const Trade = () => {
 
     fetchTrades();
   }, []);
-
-  // Limit orders execution handler
-  const handleLimitOrderExecuted = useCallback((tradeId: string) => {
-    setTrades(prev => prev.map(t => 
-      t.id === tradeId
-        ? { ...t, status: 'open', openPrice: t.limitPrice || 0 }
-        : t
-    ));
-  }, []);
-
-  useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
 
   // Add helper function to check margin utilization
   const calculateTotalMarginUtilization = (excludeTradeId?: string) => {
@@ -171,7 +155,7 @@ const Trade = () => {
         if (!isOpen) {
           toast({
             variant: "destructive",
-            title: "Market Closed",
+            title: "Market Closed", 
             description: message
           });
           return;
@@ -182,8 +166,13 @@ const Trade = () => {
         ? parseFloat(pairPrices[selectedPair]?.ask || '0')
         : parseFloat(pairPrices[selectedPair]?.bid || '0');
 
+      // For limit orders, use limit price as open price
+      const effectivePrice = params.orderType === 'limit' 
+        ? parseFloat(params.limitPrice!) 
+        : currentPrice;
+
       const marginAmount = calculateRequiredMargin(
-        currentPrice,
+        effectivePrice,
         params.lots,
         params.leverage,
         selectedPair.includes('BINANCE:'),
@@ -200,48 +189,36 @@ const Trade = () => {
         return;
       }
 
-      const liquidationPrice = calculateLiquidationPrice({
-        type: params.type,
-        openPrice: currentPrice,
-        lots: params.lots,
-        leverage: params.leverage,
-        pair: selectedPair,
-        margin_amount: marginAmount
-      } as Trade);
-
       const { data: trade, error } = await supabase
         .from('trades')
         .insert([{
           user_id: user.id,
           pair: selectedPair,
           type: params.type,
-          status: 'open',
-          open_price: currentPrice,
+          status: params.orderType === 'limit' ? 'pending' : 'open',
+          open_price: effectivePrice, // Set open_price to limit price for limit orders
           lots: params.lots,
           leverage: params.leverage,
-          order_type: 'market',
-          liquidation_price: liquidationPrice,
+          order_type: params.orderType,
+          limit_price: params.limitPrice,
           margin_amount: marginAmount
         }])
         .select()
         .single();
 
-      // Setup liquidation monitoring
-      wsManager.setActiveTrades([
-        ...trades,
-        { ...trade, liquidationPrice }
-      ]);
+      if (error) throw error;
 
-      // Update trades state
+      // Update trades state with new trade
       setTrades(prev => [{
         id: trade.id,
         pair: selectedPair,
-        type: params.type,  
-        status: 'open',
-        openPrice: currentPrice,
+        type: params.type,
+        status: params.orderType === 'limit' ? 'pending' : 'open',
+        openPrice: params.orderType === 'limit' ? params.limitPrice! : currentPrice,
         lots: params.lots,
         leverage: params.leverage,
-        orderType: 'market',
+        orderType: params.orderType,
+        limitPrice: params.limitPrice,
         openTime: Date.now(),
         pnl: 0,
         margin_amount: marginAmount
@@ -258,10 +235,12 @@ const Trade = () => {
         setUserBalance(profile.withdrawal_wallet);
       }
 
-      toast({
-        title: "Trade Opened",
-        description: `Market order ${params.type.toUpperCase()} executed at $${currentPrice}`
-      });
+      if (params.orderType === 'market') {
+        toast({
+          title: "Trade Opened",
+          description: `Market order ${params.type.toUpperCase()} executed at $${currentPrice}`
+        });
+      }
 
     } catch (error) {
       console.error('Error creating trade:', error);

@@ -15,8 +15,8 @@ export const getStandardLotSize = (pair: string): number => {
 
 export const getPipValue = (pair: string): number => {
   if (!pair) return 0;
-  if (pair.includes('BINANCE:')) return 0.01; // Use 0.01 for crypto consistently
-  return isJPYPair(pair) ? 0.01 : 0.0001;
+  // Use consistent pip values from config
+  return getPipValueForPair(pair);
 };
 
 export const calculatePipValue = (
@@ -24,25 +24,30 @@ export const calculatePipValue = (
   price: number,
   pair: string
 ): number => {
-  const isCrypto = pair.includes('BINANCE:');
+  if (!pair || !price || !lots) return 0;
+  
+  const standardLotSize = getStandardLotSize(pair);
   const pipValue = getPipValueForPair(pair);
   
-  if (isCrypto) {
-    // For crypto, pip value scales with price and lot size directly
+  if (pair.includes('BINANCE:')) {
+    // For crypto: value per pip = position size * configured pip value
     return lots * price * pipValue;
   }
   
   if (pair === 'FX:XAU/USD') {
-    return lots * 100 * pipValue;
+    // For gold: value per pip = lots * configured pip value
+    return lots * pipValue;
   }
 
-  const standardLot = getStandardLotSize(pair);
-  const positionSize = lots * standardLot;
+  // For forex: Calculate based on standard lot size and pip value from config
+  const positionSize = lots * standardLotSize;
   
   if (isJPYPair(pair)) {
+    // For JPY pairs: adjust for price scale
     return (positionSize * pipValue) / price;
   }
   
+  // For standard forex: use configured pip value
   return positionSize * pipValue;
 };
 
@@ -57,23 +62,28 @@ export const calculatePriceDifference = (
 };
 
 export const calculatePnL = (trade: Trade, currentPrice: number): number => {
-  const isCrypto = trade.pair.includes('BINANCE:');
+  if (!currentPrice || !trade.openPrice) return 0;
   
-  if (isCrypto) {
-    // For crypto, we calculate pip-based P&L just like forex
-    const priceDifference = calculatePriceDifference(trade.type, currentPrice, trade.openPrice);
-    const lotPipValue = calculatePipValue(trade.lots, currentPrice, trade.pair);
-    const pipValue = getPipValue(trade.pair);
-    const pips = priceDifference / pipValue;
-    return pips * lotPipValue;
+  const priceDiff = calculatePriceDifference(trade.type, currentPrice, trade.openPrice);
+  
+  if (trade.pair.includes('BINANCE:')) {
+    // Get number of pips moved for crypto
+    const pips = priceDiff / getPipValueForPair(trade.pair);
+    return pips * calculatePipValue(trade.lots, currentPrice, trade.pair);
   }
-
-  // For forex pairs, calculate pips difference and multiply by pip value
-  const priceDifference = calculatePriceDifference(trade.type, currentPrice, trade.openPrice);
-  const lotPipValue = calculatePipValue(trade.lots, currentPrice, trade.pair);
-  const pipValue = getPipValue(trade.pair);
-  const pips = priceDifference / pipValue;
-  return pips * lotPipValue;
+  
+  if (trade.pair === 'FX:XAU/USD') {
+    // Gold is quoted in cents, so divide by 0.01 to get pips
+    const pips = priceDiff / 0.01;
+    return pips * calculatePipValue(trade.lots, currentPrice, trade.pair);
+  }
+  
+  // For forex pairs
+  const pips = isJPYPair(trade.pair) 
+    ? priceDiff / 0.01  // JPY pairs use 0.01 pip size
+    : priceDiff / 0.0001; // Other pairs use 0.0001 pip size
+    
+  return pips * calculatePipValue(trade.lots, currentPrice, trade.pair);
 };
 
 export const calculateRequiredMargin = (
@@ -170,46 +180,4 @@ export const calculateTradeInfo = (
     volumeUnits,
     volumeUsd
   };
-};
-
-// Liquidation threshold percentage (e.g. 80% of margin)
-export const LIQUIDATION_THRESHOLD = 0.8;
-
-export const calculateLiquidationPrice = (
-  trade: Trade,
-  marginAmount: number
-): number => {
-  const { type, openPrice, lots, leverage, pair } = trade;
-  const isCrypto = pair.includes('BINANCE:');
-  
-  // Calculate price movement that would consume threshold % of margin
-  const maxLoss = marginAmount * LIQUIDATION_THRESHOLD;
-  
-  if (isCrypto) {
-    // For crypto: liquidation occurs when loss equals margin * threshold
-    const priceMove = maxLoss / (lots * leverage);
-    return type === 'buy' 
-      ? openPrice - priceMove 
-      : openPrice + priceMove;
-  }
-
-  // For forex
-  const standardLot = getStandardLotSize(pair);
-  const pipValue = getPipValue(pair);
-  const maxPips = maxLoss / (lots * standardLot * pipValue);
-  
-  return type === 'buy'
-    ? openPrice - (maxPips * pipValue)
-    : openPrice + (maxPips * pipValue);
-};
-
-export const checkLiquidation = (
-  trade: Trade, 
-  currentPrice: number
-): boolean => {
-  if (!trade.liquidationPrice) return false;
-  
-  return trade.type === 'buy'
-    ? currentPrice <= trade.liquidationPrice
-    : currentPrice >= trade.liquidationPrice;
 };

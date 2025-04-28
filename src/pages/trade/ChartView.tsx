@@ -6,14 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import { cn } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { TradesSheet } from "@/components/shared/TradesSheet";
@@ -22,6 +14,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
 import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Add calculatePipValue
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PriceData {
   price: string;
@@ -91,12 +84,13 @@ const groupTradesByDate = (trades: Trade[]) => {
   );
 };
 
-// Update the interface to match actual database columns
+// Update interface
 interface TradingPairInfo {
   symbol: string;
   name: string;
   min_leverage: number;
   max_leverage: number;
+  max_lots: number;
 }
 
 // Add margin call threshold constant (80%)
@@ -168,6 +162,8 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [marginUtilized, setMarginUtilized] = useState(0);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [marginCallAlerts, setMarginCallAlerts] = useState<{[key: string]: boolean}>({});
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  const [limitPrice, setLimitPrice] = useState('');
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -435,7 +431,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     setLots(value);
   };
 
-  // Add getMaxAffordableLots function before the return statement
+  // Update the getMaxAffordableLots calculation
   const getMaxAffordableLots = useMemo(() => {
     const price = parseFloat(pairPrices[defaultPair]?.price || '0');
     const leverageValue = parseFloat(selectedLeverage);
@@ -443,7 +439,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     
     if (!price || !leverageValue || !userBalance) return 0;
 
-    // Calculate total margin already used by open trades
+    // Calculate total margin already used
     const marginUtilized = trades
       .filter(t => t.status === 'open' || t.status === 'pending')
       .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
@@ -452,19 +448,24 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     const availableBalance = userBalance - marginUtilized;
     if (availableBalance <= 0) return 0;
 
-    // Calculate max lots based on remaining available balance
-    const maxByBalance = availableBalance * leverageValue / (
+    // Calculate max affordable lots
+    const maxAffordableLots = availableBalance * leverageValue / (
       isCrypto 
-        ? price
+        ? price 
         : defaultPair === 'FX:XAU/USD'
           ? price * 100
           : price * 100000
     );
 
-    // Respect pair's max lots limit if available
-    const pairMaxLots = pairInfo?.max_lots || (isCrypto ? 100 : 200);
-    return Math.min(maxByBalance, pairMaxLots);
-  }, [pairPrices, selectedLeverage, defaultPair, userBalance, pairInfo, trades]);
+    return maxAffordableLots;
+  }, [pairPrices, selectedLeverage, defaultPair, userBalance, trades]);
+
+  // Add effective max lots calculation
+  const effectiveMaxLots = useMemo(() => {
+    const maxByBalance = getMaxAffordableLots;
+    const maxByPair = pairInfo?.max_lots || 0;
+    return Math.min(maxByBalance, maxByPair);
+  }, [getMaxAffordableLots, pairInfo]);
 
   const handleTradeClick = (type: 'buy' | 'sell') => {
     if (showPanel && type === tradeType) {
@@ -559,15 +560,16 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   // Add proper validation checks
   const validateLots = (value: string) => {
     const numValue = parseFloat(value);
-    const isCrypto = defaultPair.includes('BINANCE:');
     
     if (isNaN(numValue) || numValue <= 0) {
       return "Lots must be greater than 0";
     }
 
-    const maxLots = isCrypto ? 100 : 200;
-    if (numValue > maxLots) {
-      return `Maximum ${maxLots} lots allowed`;
+    if (numValue > effectiveMaxLots) {
+      if (effectiveMaxLots < (pairInfo?.max_lots || 0)) {
+        return `Maximum ${effectiveMaxLots.toFixed(2)} lots allowed with current balance`;
+      }
+      return `Maximum ${pairInfo?.max_lots} lots allowed for this pair`;
     }
 
     return null;
@@ -584,19 +586,56 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return null;
   };
 
-  // Add handler for executed trades
-  const handleLimitOrderExecuted = useCallback((tradeId: string) => {
-    setTrades(prev => prev.map(t => 
-      t.id === tradeId
-        ? { ...t, status: 'open', openPrice: t.limitPrice || 0 }
-        : t
-    ));
-  }, []);
+  // Update the handler for executed trades
+  const handleLimitOrderExecuted = useCallback(async (tradeId: string) => {
+    try {
+      const trade = trades.find(t => t.id === tradeId);
+      if (!trade) return;
+
+      const currentPrice = trade.type === 'buy' 
+        ? parseFloat(pairPrices[trade.pair]?.ask || '0')
+        : parseFloat(pairPrices[trade.pair]?.bid || '0');
+
+      // Call the execute_limit_order stored procedure
+      const { data, error } = await supabase.rpc('execute_limit_order', {
+        p_trade_id: tradeId,
+        p_execution_price: currentPrice
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setTrades(prev => prev.map(t => 
+        t.id === tradeId ? {
+          ...t,
+          status: 'open',
+          openPrice: currentPrice,
+          margin_amount: data.margin_required
+        } : t
+      ));
+
+      // Update user balance
+      setUserBalance(data.withdrawal_wallet);
+
+      toast({
+        title: "Success",
+        description: `Limit order executed at $${currentPrice}`,
+      });
+
+    } catch (error) {
+      console.error('Error executing limit order:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to execute limit order",
+      });
+    }
+  }, [trades, pairPrices]);
 
   // Use the limit orders hook
   useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
 
-  // Update handleTrade function to handle limit orders
+  // Update handleTrade function to include limit order handling
   async function handleTrade(type: 'buy' | 'sell') {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -662,14 +701,14 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       const tradeData: Partial<Trade> = {
         pair: defaultPair,
         type,
-        status: 'open',
-        openPrice: price,
+        status: orderType === 'limit' ? 'pending' : 'open',
+        openPrice: orderType === 'limit' ? parseFloat(limitPrice) : price,
         lots: lotSize,
         leverage: leverageValue,
-        orderType: 'market',
-        limitPrice: null,
+        orderType,
+        limitPrice: orderType === 'limit' ? parseFloat(limitPrice) : null,
         openTime: Date.now(),
-        margin_amount: marginAmount // Add margin amount
+        margin_amount: marginAmount
       };
 
       const { data: trade, error } = await supabase
@@ -678,13 +717,13 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
           user_id: user.id,
           pair: defaultPair,
           type,
-          status: 'open',
-          open_price: price,
+          status: orderType === 'limit' ? 'pending' : 'open',
+          open_price: orderType === 'limit' ? parseFloat(limitPrice) : price,
           lots: lotSize,
           leverage: leverageValue,
-          order_type: 'market',
-          limit_price: null,
-          margin_amount: marginAmount // Add margin amount
+          order_type: orderType,
+          limit_price: orderType === 'limit' ? parseFloat(limitPrice) : null,
+          margin_amount: marginAmount
         }])
         .select()
         .single();
@@ -703,12 +742,18 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
       setUserBalance(prev => prev - margin);
 
+      // Add order type specific message
       toast({
-        title: "Trade Opened",
-        description: `Successfully opened ${type.toUpperCase()} position for ${defaultPair} @ $${price}`,
+        title: "Success",
+        description: orderType === 'limit' 
+          ? `Limit order placed at $${limitPrice}`
+          : `Market order executed at $${price}`,
       });
 
-      // Reset trade panel
+      // Reset form
+      if (orderType === 'limit') {
+        setLimitPrice('');
+      }
       setShowPanel(false);
       setTradeType(null);
       
@@ -722,14 +767,14 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     }
   }
 
-  // Add this effect to fetch trading pair info
+  // Update fetchPairInfo effect
   useEffect(() => {
     const fetchPairInfo = async () => {
       if (!defaultPair) return;
       
       const { data, error } = await supabase
         .from('trading_pairs')
-        .select('symbol, name, min_leverage, max_leverage')
+        .select('symbol, name, min_leverage, max_leverage, max_lots')
         .eq('symbol', defaultPair)
         .single();
 
@@ -744,7 +789,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     fetchPairInfo();
   }, [defaultPair]);
 
-  // Add effect to check margin levels
+  // Update the effect to check margin levels
   useEffect(() => {
     const checkMarginLevels = () => {
       const alerts: {[key: string]: boolean} = {};
@@ -873,75 +918,119 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         </div>
       </div>
 
-      <div className="container mx-auto px-4 flex-1 mb-20">
-        <div className="flex flex-col h-full relative bg-white rounded-xl mt-4 overflow-hidden">
-          {/* Add pb-[160px] to create space for trading controls */}
-          <div className="flex-1 pb-[140px]">
+      <div className="container mx-auto px-4 flex-1">
+        <div className="flex flex-col h-full relative bg-white rounded-xl mt-4">
+          {/* Chart container */}
+          <div className="flex-1 min-h-0 pb-[calc(1rem+240px)]"> {/* Add padding bottom to account for controls */}
             <TradingViewWidget symbol={formattedSymbol} />
           </div>
 
-          {/* Trading Controls Container */}
-          <div className="fixed inset-x-0 bottom-5 z-50">
-            <div className="bg-background/80 backdrop-blur-sm border-t shadow-lg pb-safe">
-              <div className="p-4 space-y-4">
-                {/* Trade Info Panel */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground">
-                    <div className="flex justify-between items-center">
-                      <span>Margin</span>
-                      <span className="font-mono text-foreground">${marginRequired}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Pip Value</span>
-                      <span className="font-mono text-foreground">${calculatePipValue(parseFloat(lots), parseFloat(pairPrices[defaultPair]?.price || '0'), defaultPair).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>Max Lots</span>
-                      <span className="font-mono text-foreground">{getMaxAffordableLots.toFixed(2)}</span>
-                    </div>
-                  </div>
+          {/* Trading Controls */}
+          <div className="absolute bottom-0 inset-x-0">
+            <div className="container mx-auto px-4 pb-5">
+              <div className="bg-background/80 backdrop-blur-sm border rounded-xl shadow-lg">
+                <div className="p-4 space-y-4">
+                  {/* Order Type Selector */}
+                  <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="market">Market Order</TabsTrigger>
+                      <TabsTrigger value="limit">Limit Order</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
 
-                  {/* Lots Input */}
-                  <div className="w-full">
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={lots}
-                        onChange={handleLotsChange}
-                        placeholder="Enter size"
-                        className="w-full text-right pr-16 font-mono"
-                        min={0}
-                        max={getMaxAffordableLots}
-                        step={0.01}
-                      />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
-                        lots
+                  {/* Trade Info Panel */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+                      <div className="flex justify-between items-center">
+                        <span>Margin</span>
+                        <span className="font-mono text-foreground">${marginRequired}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Pip Value</span>
+                        <span className="font-mono text-foreground">
+                          ${(async () => {
+                            const pipValue = await calculatePipValue(
+                              parseFloat(lots), 
+                              parseFloat(pairPrices[defaultPair]?.price || '0'),
+                              defaultPair
+                            );
+                            return pipValue.toFixed(2);
+                          })()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Max Lots</span>
+                        <span className="font-mono text-foreground">
+                          {effectiveMaxLots.toFixed(2)}
+                          {effectiveMaxLots < (pairInfo?.max_lots || 0) && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              (Balance limited)
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Trade Buttons */}
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline"
-                    className="flex-1 h-12 shadow-sm text-white border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
-                    onClick={() => handleTrade('sell')}
-                  >
-                    <div className="flex flex-col">
-                      <span>Sell</span>
-                      <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.bid)}</span>
+                    {/* Lots Input */}
+                    <div className="w-full space-y-2">
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          value={lots}
+                          onChange={handleLotsChange}
+                          placeholder="Enter size"
+                          className="w-full text-right pr-16 font-mono"
+                          min={0}
+                          max={effectiveMaxLots}
+                          step={0.01}
+                        />
+                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
+                          lots
+                        </div>
+                      </div>
+
+                      {/* Limit Price Input - only show for limit orders */}
+                      {orderType === 'limit' && (
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            value={limitPrice}
+                            onChange={(e) => setLimitPrice(e.target.value)}
+                            placeholder="Enter limit price"
+                            className="w-full text-right pr-16 font-mono"
+                            min={0}
+                            step={0.00001}
+                          />
+                          <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
+                            price
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </Button>
-                  <Button 
-                    className="flex-1 h-12 shadow-sm bg-primary hover:bg-primary/90"
-                    onClick={() => handleTrade('buy')}
-                  >
-                    <div className="flex flex-col">
-                      <span>Buy</span>
-                      <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.ask)}</span>
-                    </div>
-                  </Button>
+                  </div>
+
+                  {/* Trade Buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline"
+                      className="flex-1 h-12 shadow-sm text-white border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
+                      onClick={() => handleTrade('sell')}
+                    >
+                      <div className="flex flex-col">
+                        <span>Sell</span>
+                        <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.bid)}</span>
+                      </div>
+                    </Button>
+                    <Button 
+                      className="flex-1 h-12 shadow-sm bg-primary hover:bg-primary/90"
+                      onClick={() => handleTrade('buy')}
+                    >
+                      <div className="flex flex-col">
+                        <span>Buy</span>
+                        <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.ask)}</span>
+                      </div>
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

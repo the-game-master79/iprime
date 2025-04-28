@@ -1,20 +1,19 @@
 // Pip value configuration for crypto and forex pairs
 export const PIP_VALUES = {
   // Major cryptocurrencies with custom pip values
-  'BINANCE:BTCUSDT': 0.0001,     // $1.00 per pip
-  'BINANCE:ETHUSDT': 0.01,     // $0.10 per pip
-  'BINANCE:BNBUSDT': 0.01,    // $0.01 per pip
-  'BINANCE:SOLUSDT': 0.01,    // $0.01 per pip
-  'BINANCE:ADAUSDT': 0.0001,   // $0.01 per pip
-  'BINANCE:DOGEUSDT': 0.0001,  // $0.01 per pip
-  'BINANCE:DOTUSDT': 0.01,     // $0.01 per pip
-  'BINANCE:TRXUSDT': 0.0001,   // $0.01 per pip
-
+  'BINANCE:BTCUSDT': 0.0001,    // 1 pip = $0.0001 for BTC
+  'BINANCE:ETHUSDT': 0.00001,   // 1 pip = $0.00001 for others
+  'BINANCE:BNBUSDT': 0.00001,
+  'BINANCE:SOLUSDT': 0.01,
+  'BINANCE:ADAUSDT': 0.00001,
+  'BINANCE:DOGEUSDT': 0.1,
+  'BINANCE:DOTUSDT': 0.00001,
+  'BINANCE:TRXUSDT': 0.00001,
   
   // Default values
-  'CRYPTO_DEFAULT': 0.00001,  // Default for other crypto pairs
-  'FOREX_DEFAULT': 0.0001,    // Default for forex pairs
-  'FOREX_JPY': 0.01          // Default for JPY pairs
+  'CRYPTO_DEFAULT': 0.00001,  // Standard crypto pip
+  'FOREX_DEFAULT': 0.0001,    // Standard forex pip
+  'FOREX_JPY': 0.01          // Standard JPY pip
 } as const;
 
 export const getPipValueForPair = (pair: string): number => {

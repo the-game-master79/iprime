@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,6 +29,13 @@ const getPipValue = (symbol: string) => {
   }
   // JPY pairs use 0.01 as pip value, others use 0.0001
   return isJPYPair(symbol) ? 0.01 : 0.0001;
+};
+
+const getStandardLotSize = (symbol: string) => {
+  if (symbol.includes('BINANCE:')) {
+    return 1; // Crypto standard lot size
+  }
+  return 100000; // Forex standard lot size
 };
 
 interface TradingPair {
@@ -273,10 +280,7 @@ export const MarginCalculator = () => {
     }
   };
 
-  const calculateMargin = React.useCallback((currentPrice = price, currentLots = lots) => {
-    const lotsValue = parseFloat(currentLots) || 0;
-    const leverageValue = parseFloat(leverage);
-    const priceValue = parseFloat(currentPrice);
+  const calculateMargin = useCallback((priceValue: number, lotsValue: number) => {
     const isCrypto = category === 'crypto';
     
     let margin;
@@ -284,22 +288,11 @@ export const MarginCalculator = () => {
     
     if (isCrypto) {
       margin = (priceValue * lotsValue) / leverageValue;
-      // For crypto, 1 pip = 0.00001 of price movement
-      pipValue = lotsValue * priceValue * 0.00001;
+      pipValue = calculatePipValue(lotsValue, priceValue, selectedPair);
     } else {
-      const standardLot = 100000;
+      const standardLot = getStandardLotSize(selectedPair);
       margin = (priceValue * lotsValue * standardLot) / leverageValue;
-      // For forex, calculate pip value based on pair type
-      const pip = getPipValue(selectedPair);
-      const isJpy = isJPYPair(selectedPair);
-      
-      if (isJpy) {
-        // For JPY pairs: (lot size * 100000 * 0.01) / current price
-        pipValue = (lotsValue * standardLot * pip) / priceValue;
-      } else {
-        // For other pairs: lot size * 100000 * 0.0001
-        pipValue = lotsValue * standardLot * pip;
-      }
+      pipValue = calculatePipValue(lotsValue, priceValue, selectedPair);
     }
 
     const commission = margin * 0.001;

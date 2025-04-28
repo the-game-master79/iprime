@@ -230,7 +230,9 @@ export function TradesSheet({
               ) : (
                 displayedTrades.map(trade => {
                   const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
-                  const pnl = trade.status === 'closed' ? trade.pnl : calculatePnL(trade, currentPrice);
+                  const pnl = trade.status === 'closed' 
+                    ? trade.pnl 
+                    : calculatePnL(trade, currentPrice);
                   
                   return (
                     <div 

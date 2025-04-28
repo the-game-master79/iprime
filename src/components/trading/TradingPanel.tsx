@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,22 +10,10 @@ import {
   calculateRequiredMargin, 
   isJPYPair, 
   getStandardLotSize, 
-  calculateTradeInfo,
-  calculatePipValue 
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
-import { getMaxLeverageForPair } from '@/config/leverageValues';
-
-interface DatabasePlan {
-  id: string;
-  name: string;
-  description: string;
-  investment: number;
-  returns_percentage: number;
-  duration_days: number;
-  benefits: string;
-  status: 'active' | 'inactive';
-}
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createClient } from '@supabase/supabase-js'; // Import Supabase client
 
 interface SubscriptionPlan {
   id: string;
@@ -48,42 +36,6 @@ interface TradingPanelProps {
   trades?: Trade[]; // Make trades prop optional
 }
 
-const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
-  {
-    id: 'basic',
-    name: 'Basic Plan',
-    price: 100,
-    investment: 100,
-    duration: '30 days',
-    description: [
-      'AI-powered trading signals',
-      'Basic risk management',
-      'Market analysis',
-      'Real-time alerts',
-      '24/7 support',
-      'Educational resources'
-    ]
-  },
-  {
-    id: 'premium',
-    name: 'Premium Plan',
-    price: 500,
-    investment: 500,
-    duration: '30 days',
-    description: [
-      'Advanced AI trading strategies',
-      'Priority signals',
-      'Risk management suite',
-      'Premium market analysis',
-      'VIP support',
-      'Trading masterclass'
-    ]
-  }
-];
-
-const CRYPTO_LEVERAGE = 400;
-const FOREX_LEVERAGE_OPTIONS = [2, 5, 10, 20, 30, 50, 88, 100, 500, 1000, 2000];
-
 export const TradingPanel = ({
   selectedPair,
   pairPrices,
@@ -93,13 +45,18 @@ export const TradingPanel = ({
   onSaveLeverage,
   defaultLeverage = 100,
   onSubscribe,
-  trades = [] // Provide default empty array
+  trades = []
 }: TradingPanelProps) => {
+  // Add new state variables for static prices
+  const [staticBidPrice, setStaticBidPrice] = useState('0');
+  const [staticAskPrice, setStaticAskPrice] = useState('0');
   const navigate = useNavigate(); // Add this hook
   const [lots, setLots] = useState('0.01');
   const [showLeverageDialog, setShowLeverageDialog] = useState(false);
   const [selectedLeverage, setSelectedLeverage] = useState(defaultLeverage.toString());
   const [pairInfo, setPairInfo] = useState<TradingPair | null>(null);
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  const [limitPrice, setLimitPrice] = useState('');
 
   // Add crypto decimal limits mapping
   const cryptoLotDecimals: Record<string, number> = {
@@ -161,18 +118,40 @@ export const TradingPanel = ({
     }
   };
 
-  // Effect to update pair info
+  // Add helper to get max leverage for pair
+  const getMaxLeverageForPair = (pair: TradingPair) => {
+    if (!pair.leverage_options?.length) return 1;
+    return Math.max(...pair.leverage_options);
+  };
+
+  // Add helper to categorize leverage options
+  const getLeverageCategories = (options: number[]) => {
+    if (!options?.length) return { low: [], medium: [], high: [] };
+    return {
+      low: options.filter(v => v <= 20),
+      medium: options.filter(v => v > 20 && v <= 100),
+      high: options.filter(v => v > 100)
+    };
+  };
+
+  // Add new helper to get visible risk categories
+  const getVisibleRiskCategories = (options: number[]) => {
+    if (!options?.length) return [];
+    const categories = getLeverageCategories(options);
+    return ['low', 'medium', 'high'].filter(risk => 
+      categories[risk as keyof typeof categories].length > 0
+    );
+  };
+
+  // Update effect to parse leverage options correctly
   useEffect(() => {
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
     if (pair) {
       setPairInfo(pair);
-      if (pair.type === 'crypto') {
-        const maxLeverage = getMaxLeverageForPair(selectedPair);
-        setSelectedLeverage(maxLeverage.toString());
-      } else if (pair.type === 'forex') {
-        const validLeverage = FOREX_LEVERAGE_OPTIONS.find(l => l >= defaultLeverage) || FOREX_LEVERAGE_OPTIONS[0];
-        setSelectedLeverage(validLeverage.toString());
-      }
+      // Parse leverage options from the array
+      const leverageOptions = pair.leverage_options?.map(Number) || [];
+      const defaultLeverageValue = leverageOptions.find(l => l >= defaultLeverage) || leverageOptions[0];
+      setSelectedLeverage(defaultLeverageValue?.toString() || "1");
     }
   }, [selectedPair, tradingPairs, defaultLeverage]);
 
@@ -196,23 +175,35 @@ export const TradingPanel = ({
     return calculateRequiredMargin(price, lotSize, leverageValue, isCrypto, selectedPair).toFixed(2);
   }, [lots, pairPrices, selectedLeverage, selectedPair]);
 
-  // Update tradingInfo calculation
+  // Update tradingInfo calculation to use pair's pip value
   const tradingInfo = useMemo(() => {
+    if (!pairInfo) return {
+      pipValue: '0.00',
+      fees: '0.00',
+      volumeUnits: '0.00',
+      volumeUsd: '0.00'
+    };
+
     const lotSize = parseFloat(lots) || 0;
-    const info = calculateTradeInfo(
-      lotSize,
-      selectedPair,
-      pairPrices,
-      parseInt(selectedLeverage)
-    );
+    const price = parseFloat(pairPrices[selectedPair]?.price || '0');
+    const pipValue = pairInfo.pip_value || 0;
+    
+    // Calculate pip value based on lot size and current price
+    const calculatedPipValue = lotSize * price * pipValue;
+    
+    // Calculate volume
+    const isCrypto = selectedPair.includes('BINANCE:');
+    const standardLotSize = isCrypto ? 1 : selectedPair === 'FX:XAU/USD' ? 100 : 100000;
+    const volumeUnits = lotSize * standardLotSize;
+    const volumeUsd = volumeUnits * price;
     
     return {
-      pipValue: info.pipValue.toFixed(2),
+      pipValue: calculatedPipValue.toFixed(2),
       fees: '0.00', // No fees
-      volumeUnits: info.volumeUnits.toFixed(2),
-      volumeUsd: info.volumeUsd.toFixed(2)
+      volumeUnits: volumeUnits.toFixed(2),
+      volumeUsd: volumeUsd.toFixed(2)
     };
-  }, [lots, pairPrices, selectedPair, selectedLeverage]);
+  }, [lots, pairPrices, selectedPair, pairInfo]);
 
   // Format price helper
   const formatPrice = (price: string | undefined) => {
@@ -245,6 +236,45 @@ export const TradingPanel = ({
     return null;
   };
 
+  // Add this helper to validate limit price
+  const validateLimitPrice = () => {
+    const price = parseFloat(limitPrice);
+    if (!price || price <= 0) {
+      return "Please enter a valid limit price";
+    }
+    return null;
+  };
+
+  // Update validateTrade to include limit price validation
+  const validateTrade = () => {
+    const basicValidation = validateLots(lots);
+    if (basicValidation) return basicValidation;
+
+    if (orderType === 'limit') {
+      const limitValidation = validateLimitPrice();
+      if (limitValidation) return limitValidation;
+    }
+
+    const pair = tradingPairs.find(p => p.symbol === selectedPair);
+    if (!pair) return "Invalid trading pair";
+
+    let lotsNum = parseFloat(lots);
+    const maxAffordableLots = getMaxAffordableLots();
+    
+    if (lotsNum < pair.min_lots) {
+      return `Minimum lot size is ${pair.min_lots}`;
+    }
+    if (lotsNum > maxAffordableLots) {
+      return `Maximum affordable lots with current balance is ${maxAffordableLots.toFixed(2)}`;
+    }
+    if (lotsNum > pair.max_lots) {
+      return `Maximum lot size is ${pair.max_lots}`;
+    }
+
+    return null;
+  };
+
+  // Update handleTrade to handle limit orders differently
   const handleTrade = (type: 'buy' | 'sell') => {
     const error = validateTrade();
     if (error) {
@@ -256,38 +286,27 @@ export const TradingPanel = ({
       return;
     }
 
-    onTrade({
+    const parsedLimitPrice = orderType === 'limit' ? parseFloat(limitPrice) : undefined;
+    
+    const params: TradeParams = {
       type,
-      orderType: 'market',
+      orderType,
       lots: parseFloat(lots),
       leverage: parseInt(selectedLeverage),
-    });
-  };
-
-  // Add spread calculation helper
-  const getSpread = () => {
-    const ask = parseFloat(pairPrices[selectedPair]?.ask || '0');
-    const bid = parseFloat(pairPrices[selectedPair]?.bid || '0');
-    const spread = ask - bid;
-    
-    if (selectedPair.includes('FX:')) {
-      const symbol = selectedPair.replace('FX:', '').replace('/', '');
-      return isJPYPair(symbol) ? spread.toFixed(3) : spread.toFixed(5);
-    }
-    
-    const mapping: Record<string, number> = {
-      'BNBUSDT': 2,
-      'DOTUSDT': 3,
-      'ETHUSDT': 2,
-      'DOGEUSDT': 5,
-      'BTCUSDT': 2,
-      'TRXUSDT': 4,
-      'LINKUSDT': 2,
-      'ADAUSDT': 4
+      limitPrice: parsedLimitPrice,
+      // Set the open price to limit price for limit orders
+      openPrice: orderType === 'limit' ? parsedLimitPrice : undefined,
     };
-    
-    const base = selectedPair.replace('BINANCE:', '');
-    return spread.toFixed(mapping[base] ?? 5);
+
+    // For limit orders, show pending status message
+    if (orderType === 'limit') {
+      toast({
+        title: "Limit Order Placed",
+        description: `${type.toUpperCase()} order placed at ${limitPrice}`,
+      });
+    }
+
+    onTrade(params);
   };
 
   // Update handleLotsChange to consider affordable lots
@@ -322,27 +341,6 @@ export const TradingPanel = ({
       
       setLots(numValue.toString());
     }
-  };
-
-  // Update validateTrade to use affordable lots check
-  const validateTrade = () => {
-    const pair = tradingPairs.find(p => p.symbol === selectedPair);
-    if (!pair) return "Invalid trading pair";
-
-    let lotsNum = parseFloat(lots);
-    const maxAffordableLots = getMaxAffordableLots();
-    
-    if (lotsNum < pair.min_lots) {
-      return `Minimum lot size is ${pair.min_lots}`;
-    }
-    if (lotsNum > maxAffordableLots) {
-      return `Maximum affordable lots with current balance is ${maxAffordableLots.toFixed(2)}`;
-    }
-    if (lotsNum > pair.max_lots) {
-      return `Maximum lot size is ${pair.max_lots}`;
-    }
-
-    return null;
   };
 
   const handleConfirmLeverage = async () => {
@@ -390,9 +388,12 @@ export const TradingPanel = ({
     }
   };
 
-  // Add helper to get display price
-  const getDisplayPrice = (type: 'buy' | 'sell') => {
-    return formatPrice(type === 'buy' ? pairPrices[selectedPair]?.ask : pairPrices[selectedPair]?.bid);
+  // Add handleSetMaxLots function before return statement
+  const handleSetMaxLots = () => {
+    const maxAffordableLots = getMaxAffordableLots();
+    const maxPairLots = pairInfo?.max_lots || 0;
+    const effectiveMaxLots = Math.min(maxAffordableLots, maxPairLots);
+    setLots(effectiveMaxLots.toFixed(getDecimalPlaces(selectedPair)));
   };
 
   // Add effect to adjust lots when pair changes
@@ -410,6 +411,58 @@ export const TradingPanel = ({
       setLots(pair.max_lots.toFixed(getDecimalPlaces(selectedPair)));
     }
   }, [selectedPair, userBalance, selectedLeverage]); // Remove pairPrices from dependencies
+
+  // Add this effect to update limit price when order type changes
+  useEffect(() => {
+    if (orderType === 'limit') {
+      setLimitPrice(formatPrice(pairPrices[selectedPair]?.bid) || '0');
+    }
+  }, [orderType]);
+
+  // Add effect to update static prices
+  useEffect(() => {
+    if (pairPrices[selectedPair]) {
+      setStaticBidPrice(formatPrice(pairPrices[selectedPair].bid));
+      setStaticAskPrice(formatPrice(pairPrices[selectedPair].ask));
+    }
+  }, [selectedPair, pairPrices[selectedPair]?.bid, pairPrices[selectedPair]?.ask]);
+
+  // Update getDisplayPrice to use static prices
+  function getDisplayPrice(type: 'buy' | 'sell'): string {
+    return type === 'buy' ? staticAskPrice : staticBidPrice;
+  }
+
+  // Initialize Supabase client
+  const supabase = useMemo(() => {
+    return createClient(
+      import.meta.env.VITE_SUPABASE_URL || '',
+      import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+    );
+  }, []);
+
+  // Add subscription to trade execution notifications
+  useEffect(() => {
+    const channel = supabase.channel('trade-executions')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'trades',
+        filter: `status=eq.open`,
+      }, (payload) => {
+        const trade = payload.new as Trade;
+        if (trade.orderType === 'limit') {
+          toast({
+            title: "Limit Order Executed",
+            description: `${trade.type === 'buy' ? 'Buy' : 'Sell'} order executed at ${trade.openPrice}`,
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div className="w-[350px] border-l bg-card p-4">
@@ -440,12 +493,24 @@ export const TradingPanel = ({
             </div>
           </div>
 
+          {/* Add Order Type Tabs */}
+          <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="market">Market Order</TabsTrigger>
+              <TabsTrigger value="limit">Limit Order</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           {/* Quick trade form */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-sm font-medium">
                 Size (Lots)
-                <span className="ml-2 text-xs text-muted-foreground">
+                <span 
+                  className="ml-2 text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors"
+                  onClick={handleSetMaxLots}
+                  title="Click to set maximum lots"
+                >
                   Max: {Math.min(pairInfo?.max_lots || 0, getMaxAffordableLots()).toFixed(2)}
                   {calculateExistingMarginUtilization > 0 && (
                     <span className="text-yellow-500 ml-1">
@@ -483,8 +548,22 @@ export const TradingPanel = ({
                 </Button>
               </div>
             </div>
+
+            {/* Update Limit Price Input */}
+            {orderType === 'limit' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Limit Price</label>
+                <Input
+                  type="number"
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  className="text-right font-mono"
+                />
+              </div>
+            )}
           </div>
 
+          {/* Trade buttons section */}
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <Button
@@ -497,9 +576,11 @@ export const TradingPanel = ({
                 )}
                 onClick={() => handleTrade('sell')}
               >
-                <div className="text-xs font-normal text-left pl-2">Sell at</div>
+                <div className="text-xs font-normal text-left pl-2">
+                  {orderType === 'limit' ? 'Sell Limit at' : 'Sell at'}
+                </div>
                 <div className="text-lg font-mono font-semibold text-left pl-2">
-                  {getDisplayPrice('sell')}
+                  {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('sell')}
                 </div>
               </Button>
 
@@ -513,12 +594,15 @@ export const TradingPanel = ({
                 )}
                 onClick={() => handleTrade('buy')}
               >
-                <div className="text-xs font-normal text-right pr-2">Buy at</div>
+                <div className="text-xs font-normal text-right pr-2">
+                  {orderType === 'limit' ? 'Buy Limit at' : 'Buy at'}
+                </div>
                 <div className="text-lg font-mono font-semibold text-right pr-2">
-                  {getDisplayPrice('buy')}
+                  {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('buy')}
                 </div>
               </Button>
             </div>
+
             <div className="space-y-1 mt-2">
               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 <div className="space-y-1">
@@ -532,7 +616,7 @@ export const TradingPanel = ({
                   >
                     <span>Leverage:</span>
                     <span className="font-mono">
-                      {pairInfo?.type === 'crypto' ? `${getMaxLeverageForPair(selectedPair)}x` : `${selectedLeverage}x`}
+                      {pairInfo?.leverage_options ? `${selectedLeverage}x` : '1x'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -558,147 +642,94 @@ export const TradingPanel = ({
             </div>
           </div>
 
-          {/* Update leverage dialog */}
+          {/* Update leverage dialog section */}
           <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
             <DialogContent className="p-0 overflow-hidden">
               <DialogHeader className="px-6 py-4 border-b">
                 <DialogTitle className="text-xl">Leverage Information</DialogTitle>
                 <DialogDescription className="text-sm">
-                  {pairInfo?.type === 'crypto' 
-                    ? 'This cryptocurrency pair has a fixed maximum leverage for risk management'
-                    : 'Choose your preferred leverage level. Higher leverage means higher risk.'}
+                  Choose your preferred leverage level. Higher leverage means higher risk.
                 </DialogDescription>
               </DialogHeader>
               
-              {pairInfo?.type === 'crypto' ? (
-                <div className="p-6">
+              <div className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Current Selection</label>
                   <div className={cn(
-                    "bg-red-500/5 border border-red-500/10 rounded-lg p-6 text-center",
-                    getMaxLeverageForPair(selectedPair) <= 20 ? "bg-green-500/5 border-green-500/10" : ""
+                    "border rounded-lg p-4 text-center",
+                    parseInt(selectedLeverage) <= 20 
+                      ? "bg-green-500/5 border-green-500/10" 
+                      : parseInt(selectedLeverage) <= 100
+                        ? "bg-yellow-500/5 border-yellow-500/10"
+                        : "bg-red-500/5 border-red-500/10"
                   )}>
                     <span className={cn(
                       "text-3xl font-bold",
-                      getMaxLeverageForPair(selectedPair) <= 20 ? "text-green-500" : "text-red-500"
-                    )}>
-                      {getMaxLeverageForPair(selectedPair)}x
-                    </span>
-                    <p className="text-sm text-red-500/70 mt-2">
-                      Fixed Maximum Leverage
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This leverage setting is fixed for risk management purposes
-                    </p>
+                      parseInt(selectedLeverage) <= 20 
+                        ? "text-green-500" 
+                        : parseInt(selectedLeverage) <= 100
+                          ? "text-yellow-500"
+                          : "text-red-500"
+                    )}>{selectedLeverage}x</span>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {/* Existing forex leverage options */}
-                  <div className="p-6 space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Current Selection</label>
-                      <div className={cn(
-                        "border rounded-lg p-4 text-center",
-                        parseInt(selectedLeverage) <= 20 
-                          ? "bg-green-500/5 border-green-500/10" 
-                          : parseInt(selectedLeverage) <= 100
-                            ? "bg-yellow-500/5 border-yellow-500/10"
-                            : "bg-red-500/5 border-red-500/10"
-                      )}>
-                        <span className={cn(
-                          "text-3xl font-bold",
-                          parseInt(selectedLeverage) <= 20 
-                            ? "text-green-500" 
-                            : parseInt(selectedLeverage) <= 100
-                              ? "text-yellow-500"
-                              : "text-red-500"
-                        )}>{selectedLeverage}x</span>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div className="space-y-2">
-                        <div className="font-medium text-green-500">Low Risk</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {FOREX_LEVERAGE_OPTIONS.filter(v => v <= 20).map((value) => (
-                            <Button
-                              key={value}
-                              variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                              onClick={() => setSelectedLeverage(value.toString())}
-                              className={cn(
-                                "h-9 font-mono transition-all",
-                                selectedLeverage === value.toString()
-                                  ? "bg-green-500 hover:bg-green-500/90 border-0"
-                                  : "hover:border-green-500/50 hover:bg-green-500/5 border-green-500/20"
-                              )}
-                            >
-                              {value}x
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        <div className="font-medium text-yellow-500">Medium Risk</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {FOREX_LEVERAGE_OPTIONS.filter(v => v > 20 && v <= 100).map((value) => (
-                            <Button
-                              key={value}
-                              variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                              onClick={() => setSelectedLeverage(value.toString())}
-                              className={cn(
-                                "h-9 font-mono transition-all",
-                                selectedLeverage === value.toString()
-                                  ? "bg-yellow-500 hover:bg-yellow-500/90 border-0"
-                                  : "hover:border-yellow-500/50 hover:bg-yellow-500/5 border-yellow-500/20"
-                              )}
-                            >
-                              {value}x
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  {pairInfo?.leverage_options && (
+                    <>
+                      {getVisibleRiskCategories(pairInfo.leverage_options.map(Number)).map((riskLevel) => {
+                        const options = getLeverageCategories(pairInfo.leverage_options.map(Number))[riskLevel as keyof ReturnType<typeof getLeverageCategories>];
+                        return options.length > 0 ? (
+                          <div key={riskLevel} className="space-y-2">
+                            <div className={cn(
+                              "font-medium",
+                              riskLevel === 'low' ? "text-green-500" :
+                              riskLevel === 'medium' ? "text-yellow-500" : 
+                              "text-red-500"
+                            )}>
+                              {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} Risk
+                            </div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {options.map((value) => (
+                                <Button
+                                  key={value}
+                                  variant={selectedLeverage === value.toString() ? "default" : "outline"}
+                                  onClick={() => setSelectedLeverage(value.toString())}
+                                  className={cn(
+                                    "h-9 font-mono transition-all",
+                                    selectedLeverage === value.toString()
+                                      ? `bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/90 border-0`
+                                      : `hover:border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/50 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/5 border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/20`
+                                  )}
+                                >
+                                  {value}x
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null;
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
 
-                      <div className="space-y-2">
-                        <div className="font-medium text-red-500">High Risk</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {FOREX_LEVERAGE_OPTIONS.filter(v => v > 100).map((value) => (
-                            <Button
-                              key={value}
-                              variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                              onClick={() => setSelectedLeverage(value.toString())}
-                              className={cn(
-                                "h-9 font-mono transition-all",
-                                selectedLeverage === value.toString()
-                                  ? "bg-red-500 hover:bg-red-500/90 border-0"
-                                  : "hover:border-red-500/50 hover:bg-red-500/5 border-red-500/20"
-                              )}
-                            >
-                              {value}x
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Only show confirm button for forex */}
-                  <div className="p-4 bg-gradient-to-t from-muted/10 border-t">
-                    <Button 
-                      onClick={handleConfirmLeverage}
-                      className={cn(
-                        "w-full",
-                        parseInt(selectedLeverage) <= 20
-                          ? "bg-green-500 hover:bg-green-500/90"
-                          : parseInt(selectedLeverage) <= 100
-                            ? "bg-yellow-500 hover:bg-yellow-500/90"
-                            : "bg-red-500 hover:bg-red-500/90"
-                      )}
-                    >
-                      Confirm Leverage
-                    </Button>
-                  </div>
-                </>
-              )}
+              {/* Only show confirm button */}
+              <div className="p-4 bg-gradient-to-t from-muted/10 border-t">
+                <Button 
+                  onClick={handleConfirmLeverage}
+                  className={cn(
+                    "w-full",
+                    parseInt(selectedLeverage) <= 20
+                      ? "bg-green-500 hover:bg-green-500/90"
+                      : parseInt(selectedLeverage) <= 100
+                        ? "bg-yellow-500 hover:bg-yellow-500/90"
+                        : "bg-red-500 hover:bg-red-500/90"
+                  )}
+                >
+                  Confirm Leverage
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>

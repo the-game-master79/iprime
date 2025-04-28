@@ -47,6 +47,7 @@ interface TradingPair {
   is_active: boolean;
   display_order: number;
   image_url?: string;
+  pip_value: number;
 }
 
 interface PairDialogState {
@@ -59,13 +60,14 @@ const defaultPairState = {
   symbol: '',
   name: '',
   short_name: '',
-  type: 'crypto' as const,
+  type: 'crypto' as 'crypto' | 'forex',
   min_leverage: 1,
   max_leverage: 100,
   leverage_options: [1, 2, 5, 10, 20, 50, 100],
   is_active: true,
   display_order: 0,
-  image_url: ''
+  image_url: '',
+  pip_value: 0.00001,
 };
 
 const Pairs = () => {
@@ -139,17 +141,24 @@ const Pairs = () => {
   const handleSavePair = async () => {
     try {
       setIsSaving(true);
+      
+      // Ensure pip_value is a number
+      const formData = {
+        ...formState,
+        pip_value: parseFloat(formState.pip_value.toString())
+      };
+
       const table = supabase.from('trading_pairs');
       
       const operation = dialogState.mode === 'create'
-        ? table.insert([formState])
-        : table.update(formState).eq('id', dialogState.pair?.id);
+        ? table.insert([formData])
+        : table.update(formData).eq('id', dialogState.pair?.id);
 
       const { error } = await operation;
       if (error) throw error;
 
       toast.success(`Trading pair ${dialogState.mode === 'create' ? 'created' : 'updated'} successfully`);
-      fetchPairs();
+      await fetchPairs(); // Use await to ensure data is refreshed
       setDialogState({ isOpen: false, mode: 'create' });
     } catch (error) {
       console.error('Error saving pair:', error);
@@ -157,6 +166,43 @@ const Pairs = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Add helper function to parse currencies from symbol
+  const parseCurrencies = (symbol: string) => {
+    if (symbol.startsWith('BINANCE:')) {
+      const pair = symbol.replace('BINANCE:', '');
+      return {
+        base: pair.replace('USDT', ''),
+        quote: 'USDT'
+      };
+    } else if (symbol.startsWith('FX:')) {
+      const [base, quote] = symbol.replace('FX:', '').split('/');
+      return { base, quote };
+    }
+    return { base: '', quote: '' };
+  };
+
+  // Add effect to update base/quote when symbol changes
+  useEffect(() => {
+    if (formState.symbol) {
+      const { base, quote } = parseCurrencies(formState.symbol);
+      setFormState(prev => ({
+        ...prev,
+        base_currency: base,
+        quote_currency: quote
+      }));
+    }
+  }, [formState.symbol]);
+
+  const handlePipValueChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+    
+    setFormState(prev => ({
+      ...prev,
+      pip_value: numValue
+    }));
   };
 
   return (
@@ -291,6 +337,24 @@ const Pairs = () => {
                 </div>
 
                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Base/Quote</Label>
+                  <div className="col-span-3 grid grid-cols-2 gap-4">
+                    <Input
+                      value={formState.base_currency || ''}
+                      disabled
+                      className="bg-muted"
+                      placeholder="Base Currency"
+                    />
+                    <Input
+                      value={formState.quote_currency || ''}
+                      disabled
+                      className="bg-muted"
+                      placeholder="Quote Currency"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="type" className="text-right">Type</Label>
                   <Select
                     value={formState.type}
@@ -335,6 +399,17 @@ const Pairs = () => {
                     value={formState.image_url || ''}
                     onChange={(e) => setFormState(prev => ({ ...prev, image_url: e.target.value }))}
                     className="col-span-3"
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="pip_value" className="text-right">Pip Value</Label>
+                  <Input
+                    id="pip_value"
+                    type="number"
+                    value={formState.pip_value}
+                    onChange={(e) => handlePipValueChange(e.target.value)}
+                    className="col-span-3 font-mono"
                   />
                 </div>
               </div>
