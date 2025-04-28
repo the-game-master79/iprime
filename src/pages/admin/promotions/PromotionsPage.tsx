@@ -53,9 +53,10 @@ interface Rank {
 
 const availableRoutes = [
   { value: "/dashboard", label: "Dashboard" },
-  { value: "/plans", label: "Investment Plans" },
-  { value: "/affiliate", label: "Affiliate Program" },
-  { value: "/rank", label: "My Rank" },
+  { value: "/plans", label: "Plans" },
+  { value: "/affiliate", label: "Affiliates" },
+  { value: "/deposit", label: "Deposit" },
+  { value: "/trade", label: "Trade" },
 ];
 
 const PromotionsPage = () => {
@@ -840,6 +841,9 @@ const PromotionsPage = () => {
                 placeholder="Enter image URL"
                 required
               />
+              <p className="text-xs text-muted-foreground">
+                Recommended size: 600x300 pixels (2:1 aspect ratio) for optimal display
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="link">Link To</Label>

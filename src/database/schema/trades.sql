@@ -67,11 +67,3 @@ CREATE TRIGGER check_margin_before_trade
 CREATE INDEX IF NOT EXISTS idx_trades_margin
 ON trades(user_id, status, margin_amount)
 WHERE status IN ('open', 'pending');
-
--- Update status enum to include cancelled
-ALTER TABLE trades 
-  DROP CONSTRAINT IF EXISTS trades_status_check;
-
-ALTER TABLE trades
-  ADD CONSTRAINT trades_status_check 
-  CHECK (status IN ('open', 'pending', 'closed', 'cancelled'));

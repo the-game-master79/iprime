@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { DashboardTopbar } from "@/components/shared/DashboardTopbar"; // Add this import
@@ -12,10 +12,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { TransactionTable } from "@/components/tables/TransactionTable"; // Add this import
 import { RankTable } from "@/components/dashboard/RankTable"; // Add this import
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 // Icons
 import {
-Copy, QrCode, Receipt, Trophy
+Copy, QrCode, Receipt, Trophy, ChevronLeft, ChevronRight // Add ChevronLeft, ChevronRight
 } from "lucide-react";
 import { PlusCircle, ArrowCircleUpRight, ShoppingCart, ShareNetwork } from "@phosphor-icons/react";
 
@@ -52,6 +59,15 @@ const getBalanceTextSize = (amount: number): string => {
   if (amount >= 1000000) return 'text-4xl sm:text-5xl';    // Millions
   return 'text-5xl sm:text-6xl';                           // Default
 };
+
+interface Promotion {
+  id: string;
+  title: string;
+  image_url: string;
+  link: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
 
 interface DashboardContentProps {
   loading: boolean;
@@ -115,6 +131,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   // Add this state near other state declarations
   const [directCount, setDirectCount] = useState(0);
+
+  // Add this state with other states
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
 
   // Data fetching functions
   const fetchUserProfile = async () => {
@@ -527,6 +546,22 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
+  // Add this function with other fetch functions
+  const fetchPromotions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPromotions(data || []);
+    } catch (error) {
+      console.error('Error fetching promotions:', error);
+    }
+  };
+
   // Effects
   useEffect(() => {
     let mounted = true;
@@ -541,7 +576,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         fetchCommissions(),
         fetchBusinessStats(),
         fetchWithdrawalStats(),
-        fetchClaimedRanks()
+        fetchClaimedRanks(),
+        fetchPromotions() // Add this line
       ]);
       setIsLoading(false);
     };
@@ -703,6 +739,47 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Image Carousel - Remove Card wrapper */}
+              {promotions.length > 0 && (
+                <Carousel
+                  opts={{
+                    align: "start",
+                    loop: promotions.length > 3,
+                  }}
+                  className="w-full"
+                >
+                  <CarouselContent className="-ml-2 md:-ml-4">
+                    {promotions.map((promo) => (
+                      <CarouselItem key={promo.id} className="pl-2 md:pl-4 md:basis-1/3 lg:basis-1/3">
+                        <Link to={promo.link}>
+                          <div className="overflow-hidden rounded-xl">
+                            <div className="transition-all duration-300 hover:opacity-90 hover:scale-[0.98]">
+                              <div className="aspect-[2/1] relative">
+                                <img 
+                                  src={promo.image_url} 
+                                  alt={promo.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  {promotions.length > 3 && (
+                    <>
+                      <CarouselPrevious className="hidden md:flex -left-12 shadow-md hover:bg-primary hover:text-white">
+                        <ChevronLeft className="h-5 w-5" />
+                      </CarouselPrevious>
+                      <CarouselNext className="hidden md:flex -right-12 shadow-md hover:bg-primary hover:text-white">
+                        <ChevronRight className="h-5 w-5" />
+                      </CarouselNext>
+                    </>
+                  )}
+                </Carousel>
+              )}
 
               {/* Referral Section */}
               <Card>

@@ -35,7 +35,7 @@ export const TradingActivity = ({
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
-      const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+      const currentPrice = parseFloat(currentPrices[trade.pair]?.price || '0');
       const pnl = calculatePnL(trade, currentPrice);
       return { totalPnL: acc.totalPnL + pnl };
     }, { totalPnL: 0 });

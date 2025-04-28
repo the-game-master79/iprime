@@ -102,6 +102,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
   // Add new state for trading pair info
   const [pairInfo, setPairInfo] = useState<TradingPairInfo | null>(null);
+  const [pipValue, setPipValue] = useState("0.00");
 
   useEffect(() => {
     if (!pair) {
@@ -164,7 +165,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [marginCallAlerts, setMarginCallAlerts] = useState<{[key: string]: boolean}>({});
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
-  const [pipValue, setPipValue] = useState('0.00');
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -374,12 +374,11 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   // Update all PnL calculations to use imported function
   const { totalPnL, openTradesCount } = useMemo(() => {
     return trades.reduce((acc, trade) => {
-      if (trade.status === 'open') { // Only calculate PnL for open trades
+      if (trade.status === 'open') {
         acc.openTradesCount++;
-        const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
-        acc.totalPnL += calculatePnL(trade, currentPrice);
-      } else if (trade.status === 'pending') {
-        acc.openTradesCount++; // Still count pending trades but don't add to PnL
+        const currentPrice = parseFloat(pairPrices[trade.pair]?.price || '0');
+        const pnl = calculatePnL(trade, currentPrice);
+        acc.totalPnL += pnl;
       }
       return acc;
     }, { totalPnL: 0, openTradesCount: 0 });
@@ -470,114 +469,30 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return Math.min(maxByBalance, maxByPair);
   }, [getMaxAffordableLots, pairInfo]);
 
-  const handleTrade = async (type: 'buy' | 'sell') => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "User not authenticated",
-        });
-        return;
-      }
-
-      // Validate lots
-      const lotsError = validateLots(lots);
-      if (lotsError) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: lotsError,
-        });
-        return;
-      }
-
-      // Get effective price based on order type and trade direction
-      const currentPrice = type === 'buy' 
-        ? parseFloat(pairPrices[defaultPair]?.ask || '0')
-        : parseFloat(pairPrices[defaultPair]?.bid || '0');
-
-      const effectivePrice = orderType === 'limit' 
-        ? parseFloat(limitPrice)
-        : currentPrice;
-
-      // Validate margin
-      const marginError = validateMargin(parseFloat(lots), effectivePrice, parseFloat(selectedLeverage));
-      if (marginError) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: marginError,
-        });
-        return;
-      }
-
-      // Calculate margin amount
-      const marginAmount = calculateRequiredMargin(
-        effectivePrice,
-        parseFloat(lots),
-        parseFloat(selectedLeverage),
-        defaultPair.includes('BINANCE:'),
-        defaultPair
-      );
-
-      // Create trade
-      const { data: trade, error } = await supabase
-        .from('trades')
-        .insert([{
-          user_id: user.id,
-          pair: defaultPair,
-          type,
-          status: orderType === 'limit' ? 'pending' : 'open',
-          open_price: effectivePrice,
-          lots: parseFloat(lots),
-          leverage: parseFloat(selectedLeverage),
-          order_type: orderType,
-          limit_price: orderType === 'limit' ? effectivePrice : null,
-          margin_amount: marginAmount
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Update local state
-      setTrades(prev => [{
-        id: trade.id,
-        pair: defaultPair,
-        type,
-        status: orderType === 'limit' ? 'pending' : 'open',
-        openPrice: effectivePrice,
-        lots: parseFloat(lots),
-        leverage: parseFloat(selectedLeverage),
-        orderType,
-        limitPrice: orderType === 'limit' ? effectivePrice : null,
-        openTime: Date.now(),
-        pnl: 0,
-        margin_amount: marginAmount
-      }, ...prev]);
-
-      // Reset form
-      setLimitPrice('');
-      setLots('0.01');
-
-      toast({
-        title: "Success",
-        description: orderType === 'limit'
-          ? `Limit order placed at $${effectivePrice}`
-          : `Market order executed at $${effectivePrice}`
-      });
-
-    } catch (error) {
-      console.error('Error placing trade:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to place trade"
-      });
+  const handleTradeClick = (type: 'buy' | 'sell') => {
+    if (showPanel && type === tradeType) {
+      setShowPanel(false);
+      setTradeType(null);
+    } else {
+      setTradeType(type);
+      setShowPanel(true);
     }
-  }
+  };
+
+  const formatPrice = (price: string | undefined) => {
+    if (!price) return '0.00000';
+    const value = parseFloat(price);
+    
+    if (defaultPair.includes('FX:')) {
+      const symbol = defaultPair.replace('FX:', '').replace('/', '');
+      if (FOREX_PAIRS_3_DECIMALS.includes(symbol)) {
+        return value.toFixed(3);
+      }
+      return value.toFixed(5);
+    }
+    
+    return value > 1 ? value.toFixed(2) : value.toFixed(5);
+  };
 
   // Update close trade handler to use imported calculatePnL
   const handleCloseTrade = async (tradeId: string) => {
@@ -585,31 +500,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
-      // If trade is pending, just mark as cancelled without PnL calculation
-      if (trade.status === 'pending') {
-        const { error } = await supabase
-          .from('trades')
-          .update({ status: 'cancelled' })
-          .eq('id', tradeId);
-
-        if (error) throw error;
-
-        // Update local state
-        setTrades(prevTrades =>
-          prevTrades.map(t =>
-            t.id === tradeId ? { ...t, status: 'cancelled' } : t
-          )
-        );
-
-        toast({
-          title: "Success",
-          description: "Order cancelled successfully"
-        });
-
-        return;
-      }
-
-      // Handle open trade closure with PnL calculation
       const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
       const pnl = calculatePnL(trade, closePrice);
 
@@ -698,64 +588,186 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     return null;
   };
 
-  // Update the useLimitOrders hook implementation 
-  useEffect(() => {
-    const channel = supabase
-      .channel('limit-orders')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'trades',
-          filter: `status=eq.open`,
-        },
-        async (payload) => {
-          try {
-            const executedTrade = payload.new as Trade;
-            if (executedTrade.orderType === 'limit') {
-              // Update local state
-              setTrades(prev => prev.map(t => 
-                t.id === executedTrade.id ? {
-                  ...t,
-                  status: 'open',
-                  openPrice: executedTrade.openPrice,
-                  margin_amount: executedTrade.margin_amount
-                } : t
-              ));
+  // Update the handler for executed trades
+  const handleLimitOrderExecuted = useCallback(async (tradeId: string) => {
+    try {
+      const trade = trades.find(t => t.id === tradeId);
+      if (!trade) return;
 
-              // Update user balance since margin will be deducted
-              const { data: { user } } = await supabase.auth.getUser();
-              if (user) {
-                const { data } = await supabase
-                  .from('profiles')
-                  .select('withdrawal_wallet')
-                  .eq('id', user.id)
-                  .single();
-                
-                if (data) {
-                  setUserBalance(data.withdrawal_wallet);
-                }
-              }
+      const currentPrice = trade.type === 'buy' 
+        ? parseFloat(pairPrices[trade.pair]?.ask || '0')
+        : parseFloat(pairPrices[trade.pair]?.bid || '0');
 
-              toast({
-                title: "Limit Order Executed",
-                description: `Order executed at $${executedTrade.openPrice}`,
-              });
-            }
-          } catch (error) {
-            console.error('Error handling limit order execution:', error);
-          }
-        }
-      )
-      .subscribe();
+      // Call the execute_limit_order stored procedure
+      const { data, error } = await supabase.rpc('execute_limit_order', {
+        p_trade_id: tradeId,
+        p_execution_price: currentPrice
+      });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+      if (error) throw error;
 
-  // ...existing code...
+      // Update local state
+      setTrades(prev => prev.map(t => 
+        t.id === tradeId ? {
+          ...t,
+          status: 'open',
+          openPrice: currentPrice,
+          margin_amount: data.margin_required
+        } : t
+      ));
+
+      // Update user balance
+      setUserBalance(data.withdrawal_wallet);
+
+      toast({
+        title: "Success",
+        description: `Limit order executed at $${currentPrice}`,
+      });
+
+    } catch (error) {
+      console.error('Error executing limit order:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to execute limit order",
+      });
+    }
+  }, [trades, pairPrices]);
+
+  // Use the limit orders hook
+  useLimitOrders(trades, pairPrices, handleLimitOrderExecuted);
+
+  // Update handleTrade function to include limit order handling
+  async function handleTrade(type: 'buy' | 'sell') {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "User not authenticated",
+        });
+        return;
+      }
+
+      const lotSize = parseFloat(lots);
+      const price = type === 'buy' 
+        ? parseFloat(pairPrices[defaultPair]?.ask || '0')
+        : parseFloat(pairPrices[defaultPair]?.bid || '0');
+      const leverageValue = parseFloat(selectedLeverage);
+
+      // Calculate margin amount for the new trade
+      const marginAmount = calculateRequiredMargin(
+        price,
+        lotSize,
+        leverageValue,
+        defaultPair.includes('BINANCE:'),
+        defaultPair
+      );
+
+      // Get current margin utilization from existing trades
+      const currentMarginUtilization = calculateTotalMarginUtilization(trades);
+      
+      // Check if total margin would exceed balance
+      if (currentMarginUtilization + marginAmount > userBalance) {
+        toast({
+          variant: "destructive",
+          title: "Insufficient Margin",
+          description: `Total margin (${(currentMarginUtilization + marginAmount).toFixed(2)}) would exceed available balance (${userBalance.toFixed(2)}). Please close some positions first.`
+        });
+        return;
+      }
+
+      // Validate lots
+      const lotsError = validateLots(lots);
+      if (lotsError) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: lotsError,
+        });
+        return;
+      }
+
+      // Validate margin
+      const marginError = validateMargin(lotSize, price, leverageValue);
+      if (marginError) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: marginError,
+        });
+        return;
+      }
+
+      const tradeData: Partial<Trade> = {
+        pair: defaultPair,
+        type,
+        status: orderType === 'limit' ? 'pending' : 'open',
+        openPrice: orderType === 'limit' ? parseFloat(limitPrice) : price,
+        lots: lotSize,
+        leverage: leverageValue,
+        orderType,
+        limitPrice: orderType === 'limit' ? parseFloat(limitPrice) : null,
+        openTime: Date.now(),
+        margin_amount: marginAmount
+      };
+
+      const { data: trade, error } = await supabase
+        .from('trades')
+        .insert([{
+          user_id: user.id,
+          pair: defaultPair,
+          type,
+          status: orderType === 'limit' ? 'pending' : 'open',
+          open_price: orderType === 'limit' ? parseFloat(limitPrice) : price,
+          lots: lotSize,
+          leverage: leverageValue,
+          order_type: orderType,
+          limit_price: orderType === 'limit' ? parseFloat(limitPrice) : null,
+          margin_amount: marginAmount
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add trade to local state
+      setTrades(prev => [{
+        ...tradeData,
+        id: trade.id,
+        pnl: 0,
+        margin_amount: marginAmount
+      } as Trade, ...prev]);
+
+      // Only deduct margin for market orders
+      const margin = calculateRequiredMargin(price, lotSize, leverageValue, defaultPair.includes('BINANCE:'), defaultPair);
+      setUserBalance(prev => prev - margin);
+
+      // Add order type specific message
+      toast({
+        title: "Success",
+        description: orderType === 'limit' 
+          ? `Limit order placed at $${limitPrice}`
+          : `Market order executed at $${price}`,
+      });
+
+      // Reset form
+      if (orderType === 'limit') {
+        setLimitPrice('');
+      }
+      setShowPanel(false);
+      setTradeType(null);
+      
+    } catch (error) {
+      console.error("Error placing trade:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to place trade",
+      });
+    }
+  }
 
   // Update fetchPairInfo effect
   useEffect(() => {
@@ -821,12 +833,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     };
   }, [activePairs]);
 
-  function formatPrice(price: string | undefined): React.ReactNode {
-    if (!price) return "0.00";
-    const parsedPrice = parseFloat(price);
-    if (isNaN(parsedPrice)) return "0.00";
-    return parsedPrice.toFixed(2);
-  }
   return (
     <div className="h-screen bg-background flex flex-col">
       <Topbar title={formattedPairName} />

@@ -257,26 +257,6 @@ const Trade = () => {
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
-      // Handle pending trade cancellation
-      if (trade.status === 'pending') {
-        const { error } = await supabase
-          .from('trades')
-          .update({ status: 'cancelled' })
-          .eq('id', tradeId);
-
-        if (error) throw error;
-
-        // Update local trades state to show cancelled status
-        setTrades(prev => prev.filter(t => t.id !== tradeId));
-
-        toast({
-          title: "Order Cancelled",
-          description: `Successfully cancelled ${trade.type} order for ${trade.pair}`
-        });
-        return;
-      }
-
-      // Handle regular trade closure (existing code)
       const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
       const pnl = calculatePnL(trade, closePrice);
       

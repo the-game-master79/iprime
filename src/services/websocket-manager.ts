@@ -306,14 +306,27 @@ export class WebSocketManager {
     this.liquidationCallbacks.push(callback);
   }
 
-  private checkLiquidations(symbol: string, price: number) {
-    const tradesForSymbol = this.activeTrades.filter(t => t.pair === symbol);
-    
-    tradesForSymbol.forEach(trade => {
-      if (checkLiquidation(trade, price)) {
-        this.liquidationCallbacks.forEach(cb => cb(trade.id));
+  private async checkLiquidations(symbol: string, price: number) {
+    const trades = this.activeTrades.filter(t => 
+      t.pair === symbol && 
+      t.status === 'open'
+    );
+
+    for (const trade of trades) {
+      try {
+        const { data, error } = await supabase.rpc('check_liquidation', {
+          p_trade_id: trade.id,
+          p_current_price: price
+        });
+
+        if (!error && data) {
+          // Notify subscribers if trade was liquidated
+          this.liquidationCallbacks.forEach(cb => cb(trade.id));
+        }
+      } catch (error) {
+        console.error('Error checking liquidation:', error);
       }
-    });
+    }
   }
 
   protected handlePriceUpdate(symbol: string, priceData: PriceData) {
