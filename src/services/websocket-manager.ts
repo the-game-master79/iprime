@@ -14,7 +14,7 @@ interface PriceData {
 
 type PriceCallback = (symbol: string, data: PriceData) => void;
 
-class WebSocketManager {
+export class WebSocketManager {
   private static instance: WebSocketManager;
   private cryptoWs: WebSocket | null = null;
   private forexWs: WebSocket | null = null;
@@ -25,6 +25,8 @@ class WebSocketManager {
   private activePairs = new Set<string>();
   private tradermadeApiKey: string;
   private lastPrices: Record<string, PriceData> = {};
+  private activeTrades: Trade[] = [];
+  private liquidationCallbacks: ((tradeId: string) => void)[] = [];
 
   private constructor() {
     this.tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
@@ -294,6 +296,29 @@ class WebSocketManager {
   private updatePrice(symbol: string, data: PriceData) {
     this.lastPrices[symbol] = data;
     this.notifySubscribers(symbol, data);
+  }
+
+  public setActiveTrades(trades: Trade[]) {
+    this.activeTrades = trades;
+  }
+
+  public onLiquidation(callback: (tradeId: string) => void) {
+    this.liquidationCallbacks.push(callback);
+  }
+
+  private checkLiquidations(symbol: string, price: number) {
+    const tradesForSymbol = this.activeTrades.filter(t => t.pair === symbol);
+    
+    tradesForSymbol.forEach(trade => {
+      if (checkLiquidation(trade, price)) {
+        this.liquidationCallbacks.forEach(cb => cb(trade.id));
+      }
+    });
+  }
+
+  protected handlePriceUpdate(symbol: string, priceData: PriceData) {
+    const price = parseFloat(priceData.bid);
+    this.checkLiquidations(symbol, price);
   }
 }
 

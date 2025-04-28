@@ -200,7 +200,15 @@ const Trade = () => {
         return;
       }
 
-      // Insert market trade
+      const liquidationPrice = calculateLiquidationPrice({
+        type: params.type,
+        openPrice: currentPrice,
+        lots: params.lots,
+        leverage: params.leverage,
+        pair: selectedPair,
+        margin_amount: marginAmount
+      } as Trade);
+
       const { data: trade, error } = await supabase
         .from('trades')
         .insert([{
@@ -212,12 +220,17 @@ const Trade = () => {
           lots: params.lots,
           leverage: params.leverage,
           order_type: 'market',
+          liquidation_price: liquidationPrice,
           margin_amount: marginAmount
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      // Setup liquidation monitoring
+      wsManager.setActiveTrades([
+        ...trades,
+        { ...trade, liquidationPrice }
+      ]);
 
       // Update trades state
       setTrades(prev => [{

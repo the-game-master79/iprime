@@ -171,3 +171,45 @@ export const calculateTradeInfo = (
     volumeUsd
   };
 };
+
+// Liquidation threshold percentage (e.g. 80% of margin)
+export const LIQUIDATION_THRESHOLD = 0.8;
+
+export const calculateLiquidationPrice = (
+  trade: Trade,
+  marginAmount: number
+): number => {
+  const { type, openPrice, lots, leverage, pair } = trade;
+  const isCrypto = pair.includes('BINANCE:');
+  
+  // Calculate price movement that would consume threshold % of margin
+  const maxLoss = marginAmount * LIQUIDATION_THRESHOLD;
+  
+  if (isCrypto) {
+    // For crypto: liquidation occurs when loss equals margin * threshold
+    const priceMove = maxLoss / (lots * leverage);
+    return type === 'buy' 
+      ? openPrice - priceMove 
+      : openPrice + priceMove;
+  }
+
+  // For forex
+  const standardLot = getStandardLotSize(pair);
+  const pipValue = getPipValue(pair);
+  const maxPips = maxLoss / (lots * standardLot * pipValue);
+  
+  return type === 'buy'
+    ? openPrice - (maxPips * pipValue)
+    : openPrice + (maxPips * pipValue);
+};
+
+export const checkLiquidation = (
+  trade: Trade, 
+  currentPrice: number
+): boolean => {
+  if (!trade.liquidationPrice) return false;
+  
+  return trade.type === 'buy'
+    ? currentPrice <= trade.liquidationPrice
+    : currentPrice >= trade.liquidationPrice;
+};

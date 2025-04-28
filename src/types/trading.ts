@@ -39,7 +39,8 @@ export interface Trade {
   orderType: 'market' | 'limit';
   limitPrice?: number;
   openTime: number;
-  margin_amount?: number;
+  liquidationPrice: number;
+  margin_amount: number;
 }
 
 export interface TradeParams {

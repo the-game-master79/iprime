@@ -176,17 +176,9 @@ export const TradeSidebar = ({
                   <TabsTrigger 
                     value="forex" 
                     className="flex items-center gap-2"
-                    disabled={isForexClosed}
                   >
                     <Globe className="h-4 w-4" />
-                    {!collapsed && (
-                      <div className="flex items-center gap-2">
-                        Forex
-                        <Badge variant="destructive" className="ml-1">
-                          Closed
-                        </Badge>
-                      </div>
-                    )}
+                    {!collapsed && "Forex"}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>

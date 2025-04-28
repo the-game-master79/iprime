@@ -209,6 +209,13 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     active={location.pathname === '/admin/pairs'}
                     collapsed={!sidebarOpen}
                   />
+                  <SidebarLink 
+                    to="/admin/live-rates"
+                    icon={<ChartLine className="h-5 w-5" />}
+                    label="Live Rates" 
+                    active={location.pathname === '/admin/live-rates'}
+                    collapsed={!sidebarOpen}
+                  />
                 </nav>
               </ScrollArea>
               

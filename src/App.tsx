@@ -51,7 +51,8 @@ const SettingsPage = lazy(() => import("@/pages/admin/settings/SettingsPage"));
 const SupportManagePage = lazy(() => import("@/pages/admin/support/SupportManagePage"));
 const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
 const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
-const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage")); // Add this line
+const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage"));
+const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates")); // Add this line
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
@@ -174,8 +175,9 @@ const App = () => {
                   <Route path="notices" element={<AdminNotices />} />
                   <Route path="support" element={<SupportManagePage />} />
                   <Route path="promotions" element={<PromotionsPage />} />
-                  <Route path="promocodes" element={<PromocodesPage />} /> {/* Add this line */}
+                  <Route path="promocodes" element={<PromocodesPage />} />
                   <Route path="pairs" element={<AdminPairs />} />
+                  <Route path="live-rates" element={<LiveRatesPage />} /> {/* Add this line */}
                 </Routes>
               }
             />
