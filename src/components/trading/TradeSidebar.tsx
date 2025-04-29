@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { MagnifyingGlass, ChartLine, Globe, ArrowsHorizontal } from "@phosphor-i
 import { TradingPair, PriceData } from "@/types/trading";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
+import { wsManager } from '@/services/websocket-manager';
 
 interface TradeSidebarProps {
   selectedPair: string;
@@ -34,6 +35,53 @@ export const TradeSidebar = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("crypto");
   const [priceAnimations, setPriceAnimations] = useState<{[key: string]: 'up' | 'down'}>({});
+  const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
+
+  // Move filtered pairs to useMemo before useEffect
+  const filteredPairs = useMemo(() => {
+    return tradingPairs.filter(pair => {
+      const matchesSearch = pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTab = activeTab === 'crypto' ? pair.type === 'crypto' : pair.type === 'forex';
+      return matchesSearch && matchesTab;
+    });
+  }, [tradingPairs, searchQuery, activeTab]);
+
+  // Subscribe to WebSocket price updates
+  useEffect(() => {
+    const pairsToWatch = filteredPairs.map(p => p.symbol);
+    
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      if (!pairsToWatch.includes(symbol)) return;
+
+      setLocalPrices(prev => {
+        const prevPrice = parseFloat(prev[symbol]?.bid || '0');
+        const newPrice = parseFloat(data.bid || '0');
+        
+        if (prevPrice !== newPrice) {
+          setPriceAnimations(prev => ({
+            ...prev,
+            [symbol]: newPrice > prevPrice ? 'up' : 'down'
+          }));
+        }
+
+        return { ...prev, [symbol]: data };
+      });
+    });
+
+    wsManager.watchPairs(pairsToWatch);
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(pairsToWatch);
+    };
+  }, [filteredPairs]);
+
+  // Clear animations after delay
+  useEffect(() => {
+    const timer = setTimeout(() => setPriceAnimations({}), 1000);
+    return () => clearTimeout(timer);
+  }, [localPrices]);
 
   // Add market status check
   const isForexClosed = !isForexTradingTime();
@@ -45,21 +93,6 @@ export const TradeSidebar = ({
     }
     setActiveTab(value);
   };
-
-  // Price animation effect
-  useEffect(() => {
-    const animations: {[key: string]: 'up' | 'down'} = {};
-    Object.entries(pairPrices).forEach(([symbol, data]) => {
-      const prevPrice = parseFloat(pairPrices[symbol]?.bid || '0');
-      const newPrice = parseFloat(data.bid || '0');
-      if (prevPrice !== newPrice) {
-        animations[symbol] = newPrice > prevPrice ? 'up' : 'down';
-      }
-    });
-    setPriceAnimations(animations);
-    const timer = setTimeout(() => setPriceAnimations({}), 1000);
-    return () => clearTimeout(timer);
-  }, [pairPrices]);
 
   const cryptoLotDecimals: Record<string, number> = {
     'BNBUSDT': 2,
@@ -100,14 +133,6 @@ export const TradeSidebar = ({
     return 5; // Default
   };
 
-  // Filter pairs based on search and tab
-  const filteredPairs = tradingPairs.filter(pair => {
-    const matchesSearch = pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === 'crypto' ? pair.type === 'crypto' : pair.type === 'forex';
-    return matchesSearch && matchesTab;
-  });
-
   return (
     <aside className={cn(
       "fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-card transition-all duration-300 mt-14",
@@ -138,16 +163,16 @@ export const TradeSidebar = ({
               priceAnimations[selectedPair] === 'up' && "text-green-500",
               priceAnimations[selectedPair] === 'down' && "text-red-500"
             )}>
-              ${parseFloat(pairPrices[selectedPair]?.bid || '0').toFixed(getDecimalPlaces(selectedPair))}
+              ${parseFloat(localPrices[selectedPair]?.bid || '0').toFixed(getDecimalPlaces(selectedPair))}
             </div>
             <div className={cn(
               "text-xs font-medium",
-              parseFloat(pairPrices[selectedPair]?.change || '0') >= 0 
+              parseFloat(localPrices[selectedPair]?.change || '0') >= 0 
                 ? "text-green-500" 
                 : "text-red-500"
             )}>
-              {parseFloat(pairPrices[selectedPair]?.change || '0') >= 0 ? '+' : ''}
-              {pairPrices[selectedPair]?.change || '0'}%
+              {parseFloat(localPrices[selectedPair]?.change || '0') >= 0 ? '+' : ''}
+              {localPrices[selectedPair]?.change || '0'}%
             </div>
           </div>
         )}
@@ -187,7 +212,7 @@ export const TradeSidebar = ({
             <ScrollArea className="flex-1">
               <div className="space-y-2 p-4">
                 {filteredPairs.map((pair) => {
-                  const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
+                  const priceData = localPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
                   const priceAnimation = priceAnimations[pair.symbol];
                   const decimals = getDecimalPlaces(pair.symbol);
                   

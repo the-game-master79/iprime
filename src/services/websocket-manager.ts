@@ -1,5 +1,6 @@
 import { toast } from "@/components/ui/use-toast";
 import { isForexTradingTime, getForexMarketStatus } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
 const TRADERMADE_WS_URL = 'wss://marketdata.tradermade.com/feedadv';
@@ -14,6 +15,18 @@ interface PriceData {
 
 type PriceCallback = (symbol: string, data: PriceData) => void;
 
+interface TradingPair {
+  symbol: string;
+  type: 'crypto' | 'forex';
+  name: string;
+  is_active: boolean;
+  pip_value: number;
+  min_lots: number;
+  max_lots: number;
+  base_currency: string;
+  quote_currency: string;
+}
+
 export class WebSocketManager {
   private static instance: WebSocketManager;
   private cryptoWs: WebSocket | null = null;
@@ -27,6 +40,7 @@ export class WebSocketManager {
   private lastPrices: Record<string, PriceData> = {};
   private activeTrades: Trade[] = [];
   private liquidationCallbacks: ((tradeId: string) => void)[] = [];
+  private tradingPairs: TradingPair[] = [];
 
   private constructor() {
     this.tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
@@ -52,32 +66,60 @@ export class WebSocketManager {
     this.subscribers.forEach(callback => callback(symbol, data));
   }
 
-  watchPairs(pairs: string[]) {
-    // Add new pairs to active pairs
-    pairs.forEach(pair => this.activePairs.add(pair));
-    this.connectToAll();
+  private async fetchTradingPairs(): Promise<void> {
+    try {
+      const { data, error } = await supabase
+        .from('trading_pairs')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      this.tradingPairs = data;
+    } catch (error) {
+      console.error('Error fetching trading pairs:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch trading pairs"
+      });
+    }
   }
 
-  unwatchPairs(pairs: string[]) {
-    // Remove pairs from active pairs
-    pairs.forEach(pair => this.activePairs.delete(pair));
-    this.reconnectIfNeeded();
-  }
+  async watchPairs(pairs: string[]) {
+    // Fetch trading pairs if not already loaded
+    if (this.tradingPairs.length === 0) {
+      await this.fetchTradingPairs();
+    }
 
-  private connectToAll() {
-    const cryptoPairs = Array.from(this.activePairs).filter(p => p.includes('BINANCE:'));
-    const forexPairs = Array.from(this.activePairs).filter(p => p.includes('FX:'));
+    // Filter pairs based on database info
+    const validPairs = pairs.filter(pair => 
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.is_active)
+    );
 
-    if (cryptoPairs.length > 0) this.connectCrypto(cryptoPairs);
-    
+    validPairs.forEach(pair => this.activePairs.add(pair));
+
+    // Group pairs by type
+    const groupedPairs = validPairs.reduce((acc, pair) => {
+      const pairInfo = this.tradingPairs.find(tp => tp.symbol === pair);
+      if (pairInfo) {
+        acc[pairInfo.type].push(pair);
+      }
+      return acc;
+    }, { crypto: [] as string[], forex: [] as string[] });
+
+    if (groupedPairs.crypto.length > 0) {
+      this.connectCrypto(groupedPairs.crypto);
+    }
+
     // Only connect to forex if market is open
-    if (forexPairs.length > 0 && isForexTradingTime()) {
-      this.connectForex(forexPairs);
-    } else if (forexPairs.length > 0) {
+    if (groupedPairs.forex.length > 0 && isForexTradingTime()) {
+      this.connectForex(groupedPairs.forex);
+    } else if (groupedPairs.forex.length > 0) {
       const { message } = getForexMarketStatus();
       console.log('Forex market closed:', message);
       // Notify subscribers about closed market status
-      forexPairs.forEach(pair => {
+      groupedPairs.forex.forEach(pair => {
         if (this.lastPrices[pair]) {
           this.notifySubscribers(pair, {
             ...this.lastPrices[pair],
@@ -86,6 +128,10 @@ export class WebSocketManager {
         }
       });
     }
+  }
+
+  getPairInfo(symbol: string): TradingPair | undefined {
+    return this.tradingPairs.find(p => p.symbol === symbol);
   }
 
   private sendMessage(ws: WebSocket | null, message: any, retry = 3): void {
@@ -277,12 +323,53 @@ export class WebSocketManager {
     };
   }
 
+  unwatchPairs(pairs: string[]) {
+    // Remove pairs from active pairs set
+    pairs.forEach(pair => this.activePairs.delete(pair));
+
+    // Store last known prices before disconnecting
+    const lastKnownPrices = { ...this.lastPrices };
+
+    // If no more active pairs, disconnect completely
+    if (this.activePairs.size === 0) {
+      this.disconnect();
+      return;
+    }
+
+    // Otherwise reconnect with remaining pairs
+    this.connectToAll();
+
+    // Restore last known prices for disconnected pairs
+    pairs.forEach(pair => {
+      if (lastKnownPrices[pair]) {
+        this.notifySubscribers(pair, {
+          ...lastKnownPrices[pair],
+          disconnected: true
+        });
+      }
+    });
+  }
+
   disconnect() {
-    if (this.cryptoWs?.readyState === WebSocket.OPEN) this.cryptoWs.close();
-    if (this.forexWs?.readyState === WebSocket.OPEN) this.forexWs.close();
-    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    // Close websocket connections
+    if (this.cryptoWs) {
+      this.cryptoWs.close();
+      this.cryptoWs = null;
+    }
+    if (this.forexWs) {
+      this.forexWs.close(); 
+      this.forexWs = null;
+    }
+
+    // Clear intervals and state
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    
     this.activePairs.clear();
-    this.subscribers.clear();
+    this.lastPrices = {};
+    this.reconnectAttempts = { crypto: 0, forex: 0 };
   }
 
   private reconnectIfNeeded() {
@@ -293,9 +380,35 @@ export class WebSocketManager {
     this.connectToAll();
   }
 
+  private connectToAll() {
+    const cryptoPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
+    );
+    const forexPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
+    );
+
+    if (cryptoPairs.length > 0) {
+      this.connectCrypto(cryptoPairs);
+    }
+
+    if (forexPairs.length > 0 && isForexTradingTime()) {
+      this.connectForex(forexPairs);
+    }
+  }
+
+  // Update price update handler to include pip values
   private updatePrice(symbol: string, data: PriceData) {
-    this.lastPrices[symbol] = data;
-    this.notifySubscribers(symbol, data);
+    const pairInfo = this.getPairInfo(symbol);
+    if (pairInfo) {
+      const enrichedData = {
+        ...data,
+        pipValue: pairInfo.pip_value,
+        lotSize: pairInfo.min_lots
+      };
+      this.lastPrices[symbol] = enrichedData;
+      this.notifySubscribers(symbol, enrichedData);
+    }
   }
 
   public setActiveTrades(trades: Trade[]) {

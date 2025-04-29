@@ -14,20 +14,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading";
 import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin } from "@/utils/trading";
-import { usePriceSubscriptions } from '@/hooks/use-price-subscriptions';
-
-// Add interfaces for price tables
-interface CryptoPrice {
-  symbol: string;
-  bid: number;
-  ask: number;
-}
-
-interface ForexPrice {
-  symbol: string;
-  bid: number;
-  ask: number;
-}
+import { wsManager } from '@/services/websocket-manager';
 
 const Trade = () => {
   const { isMobile } = useBreakpoints();
@@ -36,6 +23,7 @@ const Trade = () => {
 
   // Base states
   const [selectedPair, setSelectedPair] = useState(pair ? decodeURIComponent(pair) : '');
+  const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
@@ -45,8 +33,40 @@ const Trade = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [defaultLeverage, setDefaultLeverage] = useState(100);
 
-  // Replace the price subscription logic with hook
-  const pairPrices = usePriceSubscriptions();
+  // Update websocket subscription effect to handle forex pairs correctly
+  useEffect(() => {
+    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: priceData
+      }));
+    });
+
+    // Watch selected pair and any pairs from open trades
+    const formatPairForWs = (pair: string) => {
+      if (pair.startsWith('FX:')) {
+        return pair.replace('FX:', '').replace('/', ''); // Convert FX:EUR/USD to EURUSD
+      }
+      return pair;
+    };
+
+    const pairsToWatch = new Set([selectedPair]);
+    trades.forEach(trade => {
+      if (trade.status === 'open' || trade.status === 'pending') {
+        pairsToWatch.add(trade.pair);
+      }
+    });
+
+    // Format pairs for websocket
+    const formattedPairs = Array.from(pairsToWatch).map(formatPairForWs);
+    
+    wsManager.watchPairs(formattedPairs);
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(formattedPairs);
+    };
+  }, [selectedPair, trades]);
 
   // Effect to fetch user balance
   useEffect(() => {

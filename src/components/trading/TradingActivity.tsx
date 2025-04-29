@@ -9,23 +9,44 @@ import { Trade, PriceData } from "@/types/trading";
 import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { wsManager } from '@/services/websocket-manager';
 
 interface TradingActivityProps {
   trades: Trade[];
-  currentPrices: Record<string, PriceData>;
   onCloseTrade: (tradeId: string) => void;
   userBalance: number;
 }
 
 export const TradingActivity = ({ 
   trades, 
-  currentPrices, 
   onCloseTrade,
   userBalance = 0,
 }: TradingActivityProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
-  
+  const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
+
+  // Subscribe to WebSocket price updates
+  useEffect(() => {
+    const tradePairs = trades
+      .filter(t => t.status === 'open')
+      .map(t => t.pair);
+
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      setLocalPrices(prev => ({
+        ...prev,
+        [symbol]: data
+      }));
+    });
+
+    wsManager.watchPairs(Array.from(new Set(tradePairs)));
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(tradePairs);
+    };
+  }, [trades]);
+
   // Move all hooks before any conditional returns
   const filteredTrades = useMemo(() => ({
     open: trades.filter(t => t.status === 'open'),
@@ -35,17 +56,17 @@ export const TradingActivity = ({
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
-      const currentPrice = parseFloat(currentPrices[trade.pair]?.price || '0');
+      const currentPrice = parseFloat(localPrices[trade.pair]?.price || '0');
       const pnl = calculatePnL(trade, currentPrice);
       return { totalPnL: acc.totalPnL + pnl };
     }, { totalPnL: 0 });
-  }, [filteredTrades.open, currentPrices]);
+  }, [filteredTrades.open, localPrices]);
 
   const { totalMarginUsed, marginLevel, adjustedBalance } = useMemo(() => {
     const totalPnL = trades
       .filter(t => t.status === 'open')
       .reduce((acc, trade) => {
-        const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+        const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
         return acc + calculatePnL(trade, currentPrice);
       }, 0);
 
@@ -63,7 +84,7 @@ export const TradingActivity = ({
       marginLevel: level,
       adjustedBalance: adjustedBal
     };
-  }, [trades, userBalance, currentPrices]);
+  }, [trades, userBalance, localPrices]);
 
   // Move useEffect before conditional return
   useEffect(() => {
@@ -213,7 +234,7 @@ export const TradingActivity = ({
                 </thead>
                 <tbody className="text-sm">
                   {displayedTrades.map(trade => {
-                    const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+                    const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
                     // Calculate PnL based on trade status
                     const pnl = trade.status === 'closed' 
                       ? trade.pnl || 0

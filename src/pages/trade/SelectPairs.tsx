@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { TradesSheet } from "@/components/shared/TradesSheet";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePnL } from "@/utils/trading"; // Add this import
-import { getDecimalPlaces } from "@/config/decimals";
+import { wsManager } from '@/services/websocket-manager';
 
 const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
 
@@ -72,131 +72,86 @@ const SelectPairs = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [totalPnL, setTotalPnL] = useState(0);
   const [showTradesSheet, setShowTradesSheet] = useState(false);
+  const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
 
-  // Add effect to fetch trading pairs and set up price subscriptions
+  // Fetch trading pairs only once on mount
   useEffect(() => {
-    // Initial fetch of prices
-    const fetchInitialPrices = async () => {
-      // Fetch crypto prices
-      const { data: cryptoPrices } = await supabase
-        .from('crypto_prices')
-        .select('*');
+    const fetchTradingPairs = async () => {
+      const { data, error } = await supabase
+        .from('trading_pairs')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
 
-      // Fetch forex prices  
-      const { data: forexPrices } = await supabase
-        .from('forex_prices')
-        .select('*');
+      if (error) {
+        console.error('Error fetching trading pairs:', error);
+        return;
+      }
+      setTradingPairs(data);
 
-      const prices: Record<string, PriceData> = {};
-
-      // Format crypto prices
-      cryptoPrices?.forEach(price => {
-        prices[`BINANCE:${price.symbol}`] = {
-          price: price.bid.toString(),
-          bid: price.bid.toString(),
-          ask: price.ask.toString(),
-          change: '0.00'
-        };
-      });
-
-      // Format forex prices
-      forexPrices?.forEach(price => {
-        const symbol = `FX:${price.symbol.slice(0,3)}/${price.symbol.slice(3)}`;
-        prices[symbol] = {
-          price: price.bid.toString(),
-          bid: price.bid.toString(),
-          ask: price.ask.toString(),
-          change: '0.00'
-        };
-      });
-
-      setPairPrices(prices);
+      // Watch all active pairs immediately after fetching
+      if (data.length > 0) {
+        const allPairs = data.map(pair => pair.symbol);
+        wsManager.watchPairs(allPairs);
+      }
     };
 
-    // Set up real-time subscriptions
-    const cryptoSubscription = supabase
-      .channel('crypto-prices-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'crypto_prices' },
-        (payload) => {
-          const priceData = payload.new as CryptoPrice;
-          if (!priceData) return;
+    fetchTradingPairs();
 
-          setPairPrices(prev => ({
-            ...prev,
-            [`BINANCE:${priceData.symbol}`]: {
-              price: priceData.bid.toString(),
-              bid: priceData.bid.toString(),
-              ask: priceData.ask.toString(),
-              change: '0.00'
-            }
-          }));
-        }
-      )
-      .subscribe();
-
-    const forexSubscription = supabase
-      .channel('forex-prices-changes')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'forex_prices' },
-        (payload) => {
-          const priceData = payload.new as ForexPrice;
-          if (!priceData) return;
-
-          const symbol = `FX:${priceData.symbol.slice(0,3)}/${priceData.symbol.slice(3)}`;
-          setPairPrices(prev => ({
-            ...prev,
-            [symbol]: {
-              price: priceData.bid.toString(),
-              bid: priceData.bid.toString(),
-              ask: priceData.ask.toString(),
-              change: '0.00'
-            }
-          }));
-        }
-      )
-      .subscribe();
-
-    // Initialize data
-    fetchInitialPrices();
-
-    // Cleanup subscriptions
+    // Cleanup function to unwatch all pairs
     return () => {
-      supabase.removeChannel(cryptoSubscription);
-      supabase.removeChannel(forexSubscription);
+      if (tradingPairs.length > 0) {
+        wsManager.unwatchPairs(tradingPairs.map(p => p.symbol));
+      }
     };
   }, []);
 
-  const filteredPairs = useMemo(() => {
-    return Object.entries(pairPrices)
-      .filter(([symbol]) => {
-        const isCrypto = symbol.startsWith('BINANCE:');
-        return activeTab === 'crypto' ? isCrypto : !isCrypto;
-      })
-      .filter(([symbol]) => 
-        symbol.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      .map(([symbol, price]) => {
-        const isCrypto = symbol.startsWith('BINANCE:');
-        let shortName;
+  // Single WebSocket subscription for all price updates
+  useEffect(() => {
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      setPairPrices(prev => {
+        const prevPrice = parseFloat(prev[symbol]?.bid || '0');
+        const newPrice = parseFloat(data.bid || '0');
         
-        if (isCrypto) {
-          // For crypto, remove USDT and convert to uppercase (e.g., BTCUSDT -> BTC)
-          shortName = symbol.split(':')[1].toUpperCase().replace('USDT', '');
-        } else {
-          // For forex, format as EUR-USD from FX:EUR/USD
-          shortName = symbol.split(':')[1].toUpperCase().replace('/', '-');
+        if (prevPrice !== newPrice) {
+          setPriceAnimations(prev => ({
+            ...prev,
+            [symbol]: newPrice > prevPrice ? 'up' : 'down'
+          }));
         }
 
         return {
-          symbol,
-          name: symbol.split(':')[1], // Keep the display name as is
-          price: price.bid || '0',
-          short_name: shortName,
-          image_url: `https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//${shortName.toLowerCase()}.svg` // Keep image URLs lowercase
+          ...prev,
+          [symbol]: data
         };
       });
-  }, [pairPrices, activeTab, searchQuery]);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Clear animations after delay
+  useEffect(() => {
+    const timer = setTimeout(() => setPriceAnimations({}), 1000);
+    return () => clearTimeout(timer);
+  }, [pairPrices]);
+
+  // Update filteredPairs to handle both crypto and forex
+  const filteredPairs = useMemo(() => {
+    return tradingPairs
+      .filter(pair => pair.type === activeTab)
+      .filter(pair => 
+        pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .map(pair => ({
+        ...pair,
+        currentPrice: pairPrices[pair.symbol]?.bid || '0',
+        priceAnimation: priceAnimations[pair.symbol]
+      }));
+  }, [tradingPairs, activeTab, searchQuery, pairPrices, priceAnimations]);
 
   const handlePairSelect = (pair: string) => {
     // Format the pair correctly for the URL
@@ -219,21 +174,6 @@ const SelectPairs = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
-
-  // Add price animation effect
-  useEffect(() => {
-    const animations: Record<string, 'up' | 'down'> = {};
-    Object.entries(pairPrices).forEach(([symbol, data]) => {
-      const prevPrice = parseFloat(pairPrices[symbol]?.bid || '0');
-      const newPrice = parseFloat(data.bid || '0');
-      if (prevPrice !== newPrice) {
-        animations[symbol] = newPrice > prevPrice ? 'up' : 'down';
-      }
-    });
-    setPriceAnimations(animations);
-    const timer = setTimeout(() => setPriceAnimations({}), 1000);
-    return () => clearTimeout(timer);
-  }, [pairPrices]);
 
   // Add trades fetch effect
   useEffect(() => {
