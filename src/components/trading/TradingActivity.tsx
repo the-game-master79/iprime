@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react"; // Add this import
 import { supabase } from "@/lib/supabase"; // Add this import
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { Trade, PriceData } from "@/types/trading";
-import { calculatePnL } from "@/utils/trading";
+import { calculatePnL, calculatePipValue } from "@/utils/trading"; // Add calculatePipValue import
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { wsManager } from '@/services/websocket-manager';
@@ -17,6 +18,8 @@ interface TradingActivityProps {
   userBalance: number;
 }
 
+const ITEMS_PER_PAGE = 10; // Add pagination constants at the top
+
 export const TradingActivity = ({ 
   trades, 
   onCloseTrade,
@@ -25,13 +28,20 @@ export const TradingActivity = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
+  const [currentPage, setCurrentPage] = useState(1); // Add pagination state
 
-  // Subscribe to WebSocket price updates
+  // Track all unique trading pairs
+  const activePairs = useMemo(() => {
+    const pairs = new Set<string>();
+    trades.forEach(trade => {
+      // Include pairs from all trades regardless of status
+      pairs.add(trade.pair);
+    });
+    return Array.from(pairs);
+  }, [trades]);
+
+  // Subscribe to WebSocket price updates with persistent connections
   useEffect(() => {
-    const tradePairs = trades
-      .filter(t => t.status === 'open')
-      .map(t => t.pair);
-
     const unsubscribe = wsManager.subscribe((symbol, data) => {
       setLocalPrices(prev => ({
         ...prev,
@@ -39,20 +49,24 @@ export const TradingActivity = ({
       }));
     });
 
-    wsManager.watchPairs(Array.from(new Set(tradePairs)));
+    // Watch all pairs persistently
+    wsManager.watchPairs(activePairs, true);
 
     return () => {
       unsubscribe();
-      wsManager.unwatchPairs(tradePairs);
+      // Don't unwatch pairs on unmount since they're persistent
     };
-  }, [trades]);
+  }, [activePairs]); // Only re-run when active pairs change
 
   // Move all hooks before any conditional returns
   const filteredTrades = useMemo(() => ({
-    open: trades.filter(t => t.status === 'open'),
+    open: trades.filter(t => t.status === 'open').map(t => ({
+      ...t,
+      currentPrice: localPrices[t.pair]?.bid || t.openPrice
+    })),
     pending: trades.filter(t => t.status === 'pending'),
     closed: trades.filter(t => t.status === 'closed')
-  }), [trades]);
+  }), [trades, localPrices]);
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
@@ -113,6 +127,19 @@ export const TradingActivity = ({
   const freeMargin = adjustedBalance - totalMarginUsed;
   const displayedTrades = filteredTrades[activeTab];
 
+  // Add pagination helpers
+  const paginatedTrades = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return displayedTrades.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [displayedTrades, currentPage]);
+
+  const totalPages = Math.ceil(displayedTrades.length / ITEMS_PER_PAGE);
+
+  // Reset page when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
+
   const handleCloseTrade = async (tradeId: string) => {
     try {
       await onCloseTrade(tradeId);
@@ -121,6 +148,34 @@ export const TradingActivity = ({
         variant: "destructive",
         title: "Error",
         description: "Failed to close trade"
+      });
+    }
+  };
+
+  // Add handleCloseAllTrades function before the return statement
+  const handleCloseAllTrades = async () => {
+    try {
+      const openTrades = trades.filter(t => t.status === 'open');
+      
+      // Show confirmation dialog
+      if (!window.confirm(`Are you sure you want to close all ${openTrades.length} open trades?`)) {
+        return;
+      }
+
+      // Close all trades sequentially
+      for (const trade of openTrades) {
+        await onCloseTrade(trade.id);
+      }
+
+      toast({
+        title: "Success",
+        description: `Successfully closed ${openTrades.length} trades`
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to close all trades"
       });
     }
   };
@@ -203,11 +258,26 @@ export const TradingActivity = ({
               </TabsList>
             </Tabs>
             {activeTab === 'open' && (
-              <div className={cn(
-                "text-sm font-mono font-medium",
-                totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
-              )}>
-                ${totalPnL.toFixed(2)}
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "text-sm font-mono font-medium",
+                  totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
+                )}>
+                  ${totalPnL.toFixed(2)}
+                </div>
+                {filteredTrades.open.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCloseAllTrades();
+                    }}
+                    className="h-7 px-3 text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-50"
+                  >
+                    Close All
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -224,8 +294,8 @@ export const TradingActivity = ({
                     <th className="text-right p-2">Volume</th>
                     <th className="text-right p-2">Open Price</th>
                     <th className="text-right p-2">{activeTab === 'closed' ? 'Close Price' : 'Current Price'}</th>
-                    <th className="text-right p-2">T/P</th>
-                    <th className="text-right p-2">S/L</th>
+                    <th className="text-right p-2">Margin Used</th>
+                    <th className="text-right p-2">Pip Value</th>
                     <th className="text-left p-2">Position ID</th>
                     <th className="text-left p-2">Open Time</th>
                     {activeTab !== 'pending' && <th className="text-right p-2">P&L</th>}
@@ -233,7 +303,7 @@ export const TradingActivity = ({
                   </tr>
                 </thead>
                 <tbody className="text-sm">
-                  {displayedTrades.map(trade => {
+                  {paginatedTrades.map(trade => {
                     const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
                     // Calculate PnL based on trade status
                     const pnl = trade.status === 'closed' 
@@ -294,8 +364,12 @@ export const TradingActivity = ({
                         <td className="p-2 text-right font-mono">
                           {trade.status === 'pending' ? '-' : `$${currentPrice.toFixed(decimals)}`}
                         </td>
-                        <td className="p-2 text-right font-mono">{trade.takeProfit || '-'}</td>
-                        <td className="p-2 text-right font-mono">{trade.stopLoss || '-'}</td>
+                        <td className="p-2 text-right font-mono">
+                          ${trade.margin_amount?.toFixed(2) || '0.00'}
+                        </td>
+                        <td className="p-2 text-right font-mono">
+                          ${calculatePipValue(trade.lots, currentPrice || trade.openPrice, trade.pair).toFixed(2)}
+                        </td>
                         <td className="p-2 font-mono">{trade.id.slice(0, 8)}</td>
                         <td className="p-2">{openTime}</td>
                         {activeTab !== 'pending' && (
@@ -330,6 +404,36 @@ export const TradingActivity = ({
                   })}
                 </tbody>
               </table>
+
+              {/* Add pagination controls */}
+              {(activeTab === 'closed' || activeTab === 'pending') && displayedTrades.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between px-2 py-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {Math.min(currentPage * ITEMS_PER_PAGE, displayedTrades.length)} of {displayedTrades.length} trades
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
         )}

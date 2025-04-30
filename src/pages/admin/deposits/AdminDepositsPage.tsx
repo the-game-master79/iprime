@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import AdminLayout from "@/pages/admin/AdminLayout";
-import { ArrowDownUp, Download, Search, DollarSign } from "lucide-react";
+import { Download, Search, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PageHeader, StatCard } from "@/components/ui-components";
 

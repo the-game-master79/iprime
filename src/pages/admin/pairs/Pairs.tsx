@@ -70,6 +70,12 @@ const defaultPairState = {
   pip_value: 0.00001,
 };
 
+// Add helper function for generating leverage options
+const generateLeverageOptions = (maxLeverage: number): number[] => {
+  const baseOptions = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000];
+  return baseOptions.filter(opt => opt <= maxLeverage);
+};
+
 const Pairs = () => {
   const [pairs, setPairs] = useState<TradingPair[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -202,6 +208,18 @@ const Pairs = () => {
     setFormState(prev => ({
       ...prev,
       pip_value: numValue
+    }));
+  };
+
+  // Update max leverage handler
+  const handleMaxLeverageChange = (value: string) => {
+    const maxLeverage = parseInt(value);
+    if (isNaN(maxLeverage)) return;
+
+    setFormState(prev => ({
+      ...prev,
+      max_leverage: maxLeverage,
+      leverage_options: generateLeverageOptions(maxLeverage)
     }));
   };
 
@@ -387,7 +405,7 @@ const Pairs = () => {
                     id="max_leverage"
                     type="number"
                     value={formState.max_leverage}
-                    onChange={(e) => setFormState(prev => ({ ...prev, max_leverage: parseInt(e.target.value) }))}
+                    onChange={(e) => handleMaxLeverageChange(e.target.value)}
                     className="col-span-3"
                   />
                 </div>

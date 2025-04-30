@@ -5,15 +5,32 @@ import { supabase } from "@/lib/supabase";
 const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
 const TRADERMADE_WS_URL = 'wss://marketdata.tradermade.com/feedadv';
 const HEARTBEAT_INTERVAL = 30000;
+const PERFORMANCE_THRESHOLD = 100; // ms
+const CONNECTION_TIMEOUT = 10000; // 10s timeout
+const HEALTH_CHECK_INTERVAL = 10000; // 10s health check
+const CONNECTION_QUEUE_DELAY = 100; // 100ms between connection attempts
+const VISIBILITY_RECONNECT_DELAY = 1000; // 1s delay before reconnecting on visibility change
 
 interface PriceData {
   price: string;
   bid: string;
   ask: string;
   change: string;
+  timestamp?: number;
+  latency?: number;
+  source?: 'binance' | 'tradermade';
+  status?: 'active' | 'stale' | 'closed';
 }
 
-type PriceCallback = (symbol: string, data: PriceData) => void;
+type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+interface ConnectionStats {
+  messageCount: number;
+  errorCount: number;
+  avgLatency: number;
+  lastUpdate: number;
+  state: ConnectionState;
+}
 
 interface TradingPair {
   symbol: string;
@@ -27,11 +44,26 @@ interface TradingPair {
   quote_currency: string;
 }
 
+type PriceCallback = (symbol: string, data: PriceData) => void;
+type StatusChangeCallback = (stats: Record<'crypto' | 'forex', ConnectionStats>) => void;
+
+interface ConnectionQueue {
+  type: 'crypto' | 'forex';
+  pairs: string[];
+  resolve: () => void;
+  reject: (error: Error) => void;
+}
+
 export class WebSocketManager {
   private static instance: WebSocketManager;
   private cryptoWs: WebSocket | null = null;
   private forexWs: WebSocket | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private connectionStats: Record<'crypto' | 'forex', ConnectionStats> = {
+    crypto: this.createDefaultStats(),
+    forex: this.createDefaultStats()
+  };
+  private statusSubscribers = new Set<StatusChangeCallback>();
   private subscribers = new Set<PriceCallback>();
   private reconnectAttempts = { crypto: 0, forex: 0 };
   private readonly MAX_RECONNECT_ATTEMPTS = 5;
@@ -41,9 +73,42 @@ export class WebSocketManager {
   private activeTrades: Trade[] = [];
   private liquidationCallbacks: ((tradeId: string) => void)[] = [];
   private tradingPairs: TradingPair[] = [];
+  private connectionQueue: ConnectionQueue[] = [];
+  private isProcessingQueue = false;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private pageVisible: boolean = true;
+  private persistentPairs = new Set<string>();
+  private subscriptionCache: Record<string, PriceData> = {};
 
   private constructor() {
     this.tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
+    this.setupHealthCheck();
+    this.setupVisibilityHandler();
+  }
+
+  private setupHealthCheck() {
+    this.healthCheckInterval = setInterval(() => {
+      this.checkConnections();
+    }, HEALTH_CHECK_INTERVAL);
+  }
+
+  private checkConnections() {
+    ['crypto', 'forex'].forEach((type: 'crypto' | 'forex') => {
+      const ws = type === 'crypto' ? this.cryptoWs : this.forexWs;
+      if (ws && ws.readyState !== WebSocket.OPEN && this.activePairs.size > 0) {
+        this.handleConnectionError(type as 'crypto' | 'forex');
+      }
+    });
+  }
+
+  private createDefaultStats(): ConnectionStats {
+    return {
+      messageCount: 0,
+      errorCount: 0,
+      avgLatency: 0,
+      lastUpdate: Date.now(),
+      state: 'disconnected'
+    };
   }
 
   static getInstance(): WebSocketManager {
@@ -66,6 +131,21 @@ export class WebSocketManager {
     this.subscribers.forEach(callback => callback(symbol, data));
   }
 
+  public onStatusChange(callback: StatusChangeCallback): () => void {
+    this.statusSubscribers.add(callback);
+    // Send initial status
+    callback(this.connectionStats);
+    return () => this.statusSubscribers.delete(callback);
+  }
+
+  public offStatusChange(callback: StatusChangeCallback): void {
+    this.statusSubscribers.delete(callback);
+  }
+
+  private notifyStatusChange(): void {
+    this.statusSubscribers.forEach(callback => callback(this.connectionStats));
+  }
+
   private async fetchTradingPairs(): Promise<void> {
     try {
       const { data, error } = await supabase
@@ -86,7 +166,93 @@ export class WebSocketManager {
     }
   }
 
-  async watchPairs(pairs: string[]) {
+  private async processConnectionQueue() {
+    if (this.isProcessingQueue || this.connectionQueue.length === 0) return;
+
+    this.isProcessingQueue = true;
+    
+    while (this.connectionQueue.length > 0) {
+      const item = this.connectionQueue.shift();
+      if (!item) continue;
+
+      try {
+        if (item.type === 'crypto') {
+          await this.connectCryptoWithTimeout(item.pairs);
+        } else {
+          await this.connectForexWithTimeout(item.pairs);
+        }
+        item.resolve();
+      } catch (error) {
+        item.reject(error as Error);
+        this.handleConnectionError(item.type);
+      }
+
+      // Add delay between connections
+      await new Promise(resolve => setTimeout(resolve, CONNECTION_QUEUE_DELAY));
+    }
+
+    this.isProcessingQueue = false;
+  }
+
+  private connectCryptoWithTimeout(pairs: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Crypto connection timeout'));
+      }, CONNECTION_TIMEOUT);
+
+      try {
+        this.connectCrypto(pairs);
+        clearTimeout(timeout);
+        resolve();
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+  }
+
+  private connectForexWithTimeout(pairs: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Forex connection timeout'));
+      }, CONNECTION_TIMEOUT);
+
+      try {
+        this.connectForex(pairs);
+        clearTimeout(timeout);
+        resolve();
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+  }
+
+  private setupVisibilityHandler() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        const isVisible = document.visibilityState === 'visible';
+        this.pageVisible = isVisible;
+        
+        if (isVisible && this.persistentPairs.size > 0) {
+          // Reconnect with delay to avoid race conditions
+          setTimeout(() => this.reconnectIfNeeded(), VISIBILITY_RECONNECT_DELAY);
+        }
+      });
+    }
+  }
+
+  // Override watchPairs to support persistence
+  async watchPairs(pairs: string[], persistent: boolean = false) {
+    if (persistent) {
+      pairs.forEach(pair => this.persistentPairs.add(pair));
+    }
+    
+    // Cache existing prices before reconnecting
+    Object.entries(this.lastPrices).forEach(([symbol, data]) => {
+      this.subscriptionCache[symbol] = data;
+    });
+
     // Fetch trading pairs if not already loaded
     if (this.tradingPairs.length === 0) {
       await this.fetchTradingPairs();
@@ -108,13 +274,24 @@ export class WebSocketManager {
       return acc;
     }, { crypto: [] as string[], forex: [] as string[] });
 
+    // Queue connections instead of connecting directly
     if (groupedPairs.crypto.length > 0) {
-      this.connectCrypto(groupedPairs.crypto);
+      this.connectionQueue.push({
+        type: 'crypto',
+        pairs: groupedPairs.crypto,
+        resolve: () => {},
+        reject: (error) => console.error('Crypto connection failed:', error)
+      });
     }
 
     // Only connect to forex if market is open
     if (groupedPairs.forex.length > 0 && isForexTradingTime()) {
-      this.connectForex(groupedPairs.forex);
+      this.connectionQueue.push({
+        type: 'forex',
+        pairs: groupedPairs.forex,
+        resolve: () => {},
+        reject: (error) => console.error('Forex connection failed:', error)
+      });
     } else if (groupedPairs.forex.length > 0) {
       const { message } = getForexMarketStatus();
       console.log('Forex market closed:', message);
@@ -128,6 +305,8 @@ export class WebSocketManager {
         }
       });
     }
+
+    this.processConnectionQueue();
   }
 
   getPairInfo(symbol: string): TradingPair | undefined {
@@ -288,6 +467,8 @@ export class WebSocketManager {
         description: `Failed to connect to ${type} feed after multiple attempts. Please check your internet connection.`
       });
     }
+    this.connectionStats[type].state = 'error';
+    this.notifyStatusChange();
   }
 
   private setupHeartbeat() {
@@ -309,6 +490,8 @@ export class WebSocketManager {
     };
 
     ws.onclose = () => {
+      this.connectionStats[type].state = 'disconnected';
+      this.notifyStatusChange();
       if (this.reconnectAttempts[type] < this.MAX_RECONNECT_ATTEMPTS) {
         this.reconnectAttempts[type]++;
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts[type]), 30000);
@@ -350,7 +533,19 @@ export class WebSocketManager {
     });
   }
 
+  // Override disconnect to respect persistent pairs
   disconnect() {
+    if (this.persistentPairs.size > 0) {
+      // Only disconnect non-persistent pairs
+      const pairsToDisconnect = Array.from(this.activePairs)
+        .filter(pair => !this.persistentPairs.has(pair));
+      
+      if (pairsToDisconnect.length > 0) {
+        this.unwatchPairs(pairsToDisconnect);
+      }
+      return;
+    }
+
     // Close websocket connections
     if (this.cryptoWs) {
       this.cryptoWs.close();
@@ -366,49 +561,61 @@ export class WebSocketManager {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
-    
+
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+
+    this.connectionQueue = [];
+    this.isProcessingQueue = false;
     this.activePairs.clear();
     this.lastPrices = {};
     this.reconnectAttempts = { crypto: 0, forex: 0 };
   }
 
-  private reconnectIfNeeded() {
-    if (this.activePairs.size === 0) {
-      this.disconnect();
+  // Add method to remove persistent pairs
+  unwatchPersistentPairs(pairs: string[]) {
+    pairs.forEach(pair => this.persistentPairs.delete(pair));
+    this.unwatchPairs(pairs);
+  }
+
+  // Override updatePrice to cache prices
+  private updatePrice(symbol: string, data: PriceData) {
+    const startTime = performance.now();
+    const pairInfo = this.getPairInfo(symbol);
+    
+    if (!pairInfo || !this.validatePriceData(data)) {
+      console.warn(`Invalid price data received for ${symbol}`, data);
       return;
     }
-    this.connectToAll();
+
+    const enrichedData = {
+      ...data,
+      timestamp: Date.now(),
+      latency: performance.now() - startTime,
+      pipValue: pairInfo.pip_value,
+      lotSize: pairInfo.min_lots,
+      status: this.getPriceStatus(pairInfo.type)
+    };
+
+    this.lastPrices[symbol] = enrichedData;
+    this.subscriptionCache[symbol] = enrichedData;
+    this.updateConnectionStats(pairInfo.type, enrichedData.latency);
+    this.notifySubscribers(symbol, enrichedData);
+    this.checkLiquidations(symbol, parseFloat(data.bid));
   }
 
-  private connectToAll() {
-    const cryptoPairs = Array.from(this.activePairs).filter(pair =>
-      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
-    );
-    const forexPairs = Array.from(this.activePairs).filter(pair =>
-      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
-    );
-
-    if (cryptoPairs.length > 0) {
-      this.connectCrypto(cryptoPairs);
+  private getPriceStatus(type: 'crypto' | 'forex'): 'active' | 'stale' | 'closed' {
+    if (type === 'forex' && !isForexTradingTime()) {
+      return 'closed';
     }
-
-    if (forexPairs.length > 0 && isForexTradingTime()) {
-      this.connectForex(forexPairs);
-    }
+    const stats = this.connectionStats[type];
+    return Date.now() - stats.lastUpdate > 5000 ? 'stale' : 'active';
   }
 
-  // Update price update handler to include pip values
-  private updatePrice(symbol: string, data: PriceData) {
-    const pairInfo = this.getPairInfo(symbol);
-    if (pairInfo) {
-      const enrichedData = {
-        ...data,
-        pipValue: pairInfo.pip_value,
-        lotSize: pairInfo.min_lots
-      };
-      this.lastPrices[symbol] = enrichedData;
-      this.notifySubscribers(symbol, enrichedData);
-    }
+  public getConnectionStats(): Record<'crypto' | 'forex', ConnectionStats> {
+    return { ...this.connectionStats };
   }
 
   public setActiveTrades(trades: Trade[]) {
@@ -445,6 +652,64 @@ export class WebSocketManager {
   protected handlePriceUpdate(symbol: string, priceData: PriceData) {
     const price = parseFloat(priceData.bid);
     this.checkLiquidations(symbol, price);
+  }
+
+  private reconnectIfNeeded() {
+    if (!this.pageVisible) return;
+
+    if (this.activePairs.size === 0 && this.persistentPairs.size === 0) {
+      this.disconnect();
+      return;
+    }
+
+    // Restore cached prices
+    Object.entries(this.subscriptionCache).forEach(([symbol, data]) => {
+      if (this.activePairs.has(symbol) || this.persistentPairs.has(symbol)) {
+        this.notifySubscribers(symbol, {
+          ...data,
+          status: 'stale'
+        });
+      }
+    });
+
+    this.connectToAll();
+  }
+
+  private connectToAll() {
+    const cryptoPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
+    );
+    const forexPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
+    );
+
+    if (cryptoPairs.length > 0) {
+      this.connectCrypto(cryptoPairs);
+    }
+
+    if (forexPairs.length > 0 && isForexTradingTime()) {
+      this.connectForex(forexPairs);
+    }
+  }
+
+  private validatePriceData(data: PriceData): boolean {
+    return !!(
+      data.price && 
+      !isNaN(parseFloat(data.price)) &&
+      data.bid && 
+      !isNaN(parseFloat(data.bid)) &&
+      data.ask && 
+      !isNaN(parseFloat(data.ask))
+    );
+  }
+
+  private updateConnectionStats(type: 'crypto' | 'forex', latency: number): void {
+    const stats = this.connectionStats[type];
+    stats.messageCount++;
+    stats.avgLatency = 
+      (stats.avgLatency * (stats.messageCount - 1) + latency) / stats.messageCount;
+    stats.lastUpdate = Date.now();
+    this.notifyStatusChange(); // Add status notification
   }
 }
 

@@ -14,8 +14,9 @@ import { TradesSheet } from "@/components/shared/TradesSheet";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePnL } from "@/utils/trading"; // Add this import
 import { wsManager } from '@/services/websocket-manager';
+import { cryptoDecimals, forexDecimals } from "@/config/decimals";
 
-const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
+// const tradermadeApiKey = import.meta.env.VITE_TRADERMADE_API_KEY || '';
 
 // Add interface for trading pair
 interface TradingPair {
@@ -74,7 +75,7 @@ const SelectPairs = () => {
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
 
-  // Fetch trading pairs only once on mount
+  // Fetch trading pairs only once on mount and keep websocket connection alive
   useEffect(() => {
     const fetchTradingPairs = async () => {
       const { data, error } = await supabase
@@ -89,22 +90,22 @@ const SelectPairs = () => {
       }
       setTradingPairs(data);
 
-      // Watch all active pairs immediately after fetching
+      // Watch all active pairs immediately and persistently
       if (data.length > 0) {
         const allPairs = data.map(pair => pair.symbol);
-        wsManager.watchPairs(allPairs);
+        wsManager.watchPairs(allPairs, true); // Pass true to indicate persistent connection
       }
     };
 
     fetchTradingPairs();
 
-    // Cleanup function to unwatch all pairs
+    // Only unwatchPairs on component unmount
     return () => {
       if (tradingPairs.length > 0) {
         wsManager.unwatchPairs(tradingPairs.map(p => p.symbol));
       }
     };
-  }, []);
+  }, []); // Empty dependency array to run only once
 
   // Single WebSocket subscription for all price updates
   useEffect(() => {
@@ -138,7 +139,20 @@ const SelectPairs = () => {
     return () => clearTimeout(timer);
   }, [pairPrices]);
 
-  // Update filteredPairs to handle both crypto and forex
+  // Add helper function for decimal places
+  const getDecimalPlaces = (symbol: string): number => {
+    if (symbol.includes('BINANCE:')) {
+      const base = symbol.replace('BINANCE:', '');
+      return cryptoDecimals[base] ?? 5;
+    }
+    if (symbol.includes('FX:')) {
+      const base = symbol.replace('FX:', '').replace('/', '');
+      return forexDecimals[base] ?? 5;
+    }
+    return 5; // Default fallback
+  };
+
+  // Update filteredPairs to include decimal places
   const filteredPairs = useMemo(() => {
     return tradingPairs
       .filter(pair => pair.type === activeTab)
@@ -148,7 +162,7 @@ const SelectPairs = () => {
       )
       .map(pair => ({
         ...pair,
-        currentPrice: pairPrices[pair.symbol]?.bid || '0',
+        currentPrice: parseFloat(pairPrices[pair.symbol]?.bid || '0').toFixed(getDecimalPlaces(pair.symbol)),
         priceAnimation: priceAnimations[pair.symbol]
       }));
   }, [tradingPairs, activeTab, searchQuery, pairPrices, priceAnimations]);
@@ -261,7 +275,7 @@ const SelectPairs = () => {
   const isForexClosed = !isForexTradingTime();
   const forexMarketStatus = isForexClosed ? "Closed" : "Open";
 
-  // Update tab change handler to prevent forex selection when closed
+  // Remove any WebSocket reconnection logic from tab change handler
   const handleTabChange = (value: string) => {
     if (value === 'forex' && isForexClosed) {
       toast({
@@ -392,7 +406,7 @@ const SelectPairs = () => {
                             priceAnimation === 'down' ? "text-red-500" : 
                             "text-foreground"
                           )}>
-                            {priceData.bid}
+                            {parseFloat(priceData.bid).toFixed(getDecimalPlaces(pair.symbol))}
                           </span>
                           <span className={cn(
                             "text-xs px-2 py-0.5 rounded-full font-medium",

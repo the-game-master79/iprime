@@ -10,7 +10,8 @@ export const isJPYPair = (pair: string): boolean => {
 
 export const getStandardLotSize = (pair: string): number => {
   if (pair === 'FX:XAU/USD') return 100;
-  return 100000; // Default forex lot size
+  if (pair === 'BINANCE:DOTUSDT') return 50; // Special case for Polkadot
+  return pair.includes('BINANCE:') ? 1 : 100000; // Default: 1 for crypto, 100000 for forex
 };
 
 export const getPipValue = (pair: string): number => {
@@ -26,29 +27,24 @@ export const calculatePipValue = (
 ): number => {
   if (!pair || !price || !lots) return 0;
   
-  const standardLotSize = getStandardLotSize(pair);
-  const pipValue = getPipValueForPair(pair);
-  
   if (pair.includes('BINANCE:')) {
-    // For crypto: value per pip = position size * configured pip value
-    return lots * price * pipValue;
+    const pipSize = getPipValue(pair);
+    const standardLot = getStandardLotSize(pair);
+    // For DOT: pip value needs to account for 50-unit standard lot size
+    if (pair === 'BINANCE:DOTUSDT') {
+      return lots * price * pipSize * standardLot * 5; // Multiply by 5 to adjust for 50 units
+    }
+    return lots * price * pipSize * standardLot;
   }
   
   if (pair === 'FX:XAU/USD') {
-    // For gold: value per pip = lots * configured pip value
-    return lots * pipValue;
+    // For gold: 1 pip = 0.1, lot size = 100 oz
+    return lots * 100 * 0.1;
   }
 
-  // For forex: Calculate based on standard lot size and pip value from config
-  const positionSize = lots * standardLotSize;
-  
-  if (isJPYPair(pair)) {
-    // For JPY pairs: adjust for price scale
-    return (positionSize * pipValue) / price;
-  }
-  
-  // For standard forex: use configured pip value
-  return positionSize * pipValue;
+  // For forex pairs
+  const pipSize = isJPYPair(pair) ? 0.01 : 0.0001;
+  return lots * 100000 * pipSize;
 };
 
 export const calculatePriceDifference = (
@@ -93,9 +89,19 @@ export const calculateRequiredMargin = (
   if (!price || !lots || !leverage) return 0;
   
   const effectiveLeverage = Math.max(1, isJPYPair(pair) ? leverage * 20 : leverage);
-  const positionSize = isCrypto ? price * lots : price * lots * 100000;
-  const cappedPositionSize = Math.min(positionSize, 100000 * lots * (isCrypto ? 1 : 100000));
   
+  // Calculate position size based on instrument type
+  let positionSize;
+  if (isCrypto) {
+    const standardLot = getStandardLotSize(pair);
+    positionSize = price * lots * standardLot;
+  } else if (pair === 'FX:XAU/USD') {
+    positionSize = price * lots * 100;
+  } else {
+    positionSize = price * lots * 100000;
+  }
+  
+  const cappedPositionSize = Math.min(positionSize, 100000 * lots * (isCrypto ? 1 : 100000));
   return cappedPositionSize / effectiveLeverage;
 };
 

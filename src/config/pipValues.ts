@@ -2,12 +2,12 @@
 export const PIP_VALUES = {
   // Major cryptocurrencies with custom pip values
   'BINANCE:BTCUSDT': 0.0001,    // 1 pip = $0.0001 for BTC
-  'BINANCE:ETHUSDT': 0.00001,   // 1 pip = $0.00001 for others
+  'BINANCE:ETHUSDT': 0.0001,   // 1 pip = $0.00001 for others
   'BINANCE:BNBUSDT': 0.00001,
   'BINANCE:SOLUSDT': 0.01,
   'BINANCE:ADAUSDT': 0.00001,
   'BINANCE:DOGEUSDT': 0.1,
-  'BINANCE:DOTUSDT': 0.00001,
+  'BINANCE:DOTUSDT': 0.0001,    // Higher pip value for DOT's 50-unit lot size
   'BINANCE:TRXUSDT': 0.00001,
   
   // Default values

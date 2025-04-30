@@ -9,7 +9,8 @@ import { TradingPair, PriceData, TradeParams, Trade } from "@/types/trading"; //
 import { 
   calculateRequiredMargin, 
   isJPYPair, 
-  getStandardLotSize, 
+  getStandardLotSize,
+  calculatePipValue // Add this import
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +48,9 @@ export const TradingPanel = ({
   onSubscribe,
   trades = []
 }: TradingPanelProps) => {
+  // Add loading state
+  const [isExecutingTrade, setIsExecutingTrade] = useState(false);
+  
   // Add new state variables for static prices
   const [staticBidPrice, setStaticBidPrice] = useState('0');
   const [staticAskPrice, setStaticAskPrice] = useState('0');
@@ -134,16 +138,12 @@ export const TradingPanel = ({
     };
   };
 
-  // Add new helper to get visible risk categories
-  const getVisibleRiskCategories = (options: number[]) => {
-    if (!options?.length) return [];
-    const categories = getLeverageCategories(options);
-    return ['low', 'medium', 'high'].filter(risk => 
-      categories[risk as keyof typeof categories].length > 0
-    );
+  // Add helper to get max leverage from options
+  const getMaxLeverageFromOptions = (options: number[] = []): number => {
+    return options.length ? Math.max(...options) : 1;
   };
 
-  // Update effect to parse leverage options correctly
+  // Update leverage dialog section to show max leverage
   useEffect(() => {
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
     if (pair) {
@@ -175,7 +175,7 @@ export const TradingPanel = ({
     return calculateRequiredMargin(price, lotSize, leverageValue, isCrypto, selectedPair).toFixed(2);
   }, [lots, pairPrices, selectedLeverage, selectedPair]);
 
-  // Update tradingInfo calculation to use pair's pip value
+  // Update tradingInfo calculation to use calculatePipValue function
   const tradingInfo = useMemo(() => {
     if (!pairInfo) return {
       pipValue: '0.00',
@@ -186,20 +186,18 @@ export const TradingPanel = ({
 
     const lotSize = parseFloat(lots) || 0;
     const price = parseFloat(pairPrices[selectedPair]?.price || '0');
-    const pipValue = pairInfo.pip_value || 0;
     
-    // Calculate pip value based on lot size and current price
-    const calculatedPipValue = lotSize * price * pipValue;
-    
-    // Calculate volume
-    const isCrypto = selectedPair.includes('BINANCE:');
-    const standardLotSize = isCrypto ? 1 : selectedPair === 'FX:XAU/USD' ? 100 : 100000;
-    const volumeUnits = lotSize * standardLotSize;
+    // Calculate volume using standardLotSize utility
+    const standardLotSize = getStandardLotSize(selectedPair);
+    const volumeUnits = lotSize * standardLotSize; // This will now use 50 units for DOT
     const volumeUsd = volumeUnits * price;
     
+    // Calculate pip value using the utility function
+    const pipValue = calculatePipValue(lotSize, price, selectedPair);
+    
     return {
-      pipValue: calculatedPipValue.toFixed(2),
-      fees: '0.00', // No fees
+      pipValue: pipValue.toFixed(2),
+      fees: '0.00',
       volumeUnits: volumeUnits.toFixed(2),
       volumeUsd: volumeUsd.toFixed(2)
     };
@@ -274,8 +272,10 @@ export const TradingPanel = ({
     return null;
   };
 
-  // Update handleTrade to handle limit orders differently
-  const handleTrade = (type: 'buy' | 'sell') => {
+  // Update handleTrade to include loading state
+  const handleTrade = async (type: 'buy' | 'sell') => {
+    if (isExecutingTrade) return; // Prevent multiple clicks
+
     const error = validateTrade();
     if (error) {
       toast({
@@ -286,30 +286,48 @@ export const TradingPanel = ({
       return;
     }
 
-    const parsedLimitPrice = orderType === 'limit' ? parseFloat(limitPrice) : undefined;
-    
-    const params: TradeParams = {
-      type,
-      orderType,
-      lots: parseFloat(lots),
-      leverage: parseInt(selectedLeverage),
-      limitPrice: parsedLimitPrice,
-      // Set the open price to limit price for limit orders
-      openPrice: orderType === 'limit' ? parsedLimitPrice : undefined,
-    };
+    setIsExecutingTrade(true);
+    try {
+      const parsedLimitPrice = orderType === 'limit' ? parseFloat(limitPrice) : undefined;
+      
+      const params: TradeParams = {
+        type,
+        orderType,
+        lots: parseFloat(lots),
+        leverage: parseInt(selectedLeverage),
+        limitPrice: parsedLimitPrice,
+        openPrice: orderType === 'limit' ? parsedLimitPrice : undefined,
+      };
 
-    // For limit orders, show pending status message
-    if (orderType === 'limit') {
+      await onTrade(params);
+
+      // For limit orders, show pending status message
+      if (orderType === 'limit') {
+        toast({
+          title: "Limit Order Placed",
+          description: `${type.toUpperCase()} order placed at ${limitPrice}`,
+        });
+      }
+    } catch (error) {
       toast({
-        title: "Limit Order Placed",
-        description: `${type.toUpperCase()} order placed at ${limitPrice}`,
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to execute trade",
       });
+    } finally {
+      setIsExecutingTrade(false);
     }
-
-    onTrade(params);
   };
 
-  // Update handleLotsChange to consider affordable lots
+  // Update handleSetMaxLots function to enforce 2 decimals
+  const handleSetMaxLots = () => {
+    const maxAffordableLots = getMaxAffordableLots();
+    const maxPairLots = pairInfo?.max_lots || 0;
+    const effectiveMaxLots = Math.min(maxAffordableLots, maxPairLots);
+    setLots(effectiveMaxLots.toFixed(2)); // Always use 2 decimals for max
+  };
+
+  // Update handleLotsChange to enforce 2 decimal limit
   const handleLotsChange = (value: string) => {
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
     if (!pair) return;
@@ -326,6 +344,10 @@ export const TradingPanel = ({
       return;
     }
 
+    // Enforce 2 decimal limit
+    const [whole, decimal] = sanitizedValue.split('.');
+    if (decimal && decimal.length > 2) return;
+
     // Parse input value
     let numValue = parseFloat(sanitizedValue);
     
@@ -339,7 +361,37 @@ export const TradingPanel = ({
         numValue = effectiveMaxLots;
       }
       
-      setLots(numValue.toString());
+      // When user is typing, maintain original decimal places up to 2
+      if (sanitizedValue.includes('.')) {
+        setLots(numValue.toFixed(decimal ? decimal.length : 0));
+      } else {
+        setLots(numValue.toString());
+      }
+    }
+  };
+
+  // Update increment/decrement to use 2 decimals
+  const handleIncrementLots = () => {
+    const pair = tradingPairs.find(p => p.symbol === selectedPair);
+    if (!pair) return;
+
+    const currentValue = parseFloat(lots) || 0;
+    const newValue = currentValue + 0.01; // Always increment by 0.01
+    
+    if (newValue <= pair.max_lots) {
+      setLots(newValue.toFixed(2));
+    }
+  };
+
+  const handleDecrementLots = () => {
+    const pair = tradingPairs.find(p => p.symbol === selectedPair);
+    if (!pair) return;
+
+    const currentValue = parseFloat(lots) || 0;
+    const newValue = currentValue - 0.01; // Always decrement by 0.01
+    
+    if (newValue >= pair.min_lots) {
+      setLots(newValue.toFixed(2));
     }
   };
 
@@ -362,40 +414,7 @@ export const TradingPanel = ({
     }
   };
 
-  const handleIncrementLots = () => {
-    const pair = tradingPairs.find(p => p.symbol === selectedPair);
-    if (!pair) return;
-
-    const step = Math.pow(10, -getDecimalPlaces(selectedPair));
-    const currentValue = parseFloat(lots) || 0;
-    const newValue = currentValue + step;
-    
-    if (newValue <= pair.max_lots) {
-      setLots(newValue.toFixed(getDecimalPlaces(selectedPair)));
-    }
-  };
-
-  const handleDecrementLots = () => {
-    const pair = tradingPairs.find(p => p.symbol === selectedPair);
-    if (!pair) return;
-
-    const step = Math.pow(10, -getDecimalPlaces(selectedPair));
-    const currentValue = parseFloat(lots) || 0;
-    const newValue = currentValue - step;
-    
-    if (newValue >= pair.min_lots) {
-      setLots(newValue.toFixed(getDecimalPlaces(selectedPair)));
-    }
-  };
-
   // Add handleSetMaxLots function before return statement
-  const handleSetMaxLots = () => {
-    const maxAffordableLots = getMaxAffordableLots();
-    const maxPairLots = pairInfo?.max_lots || 0;
-    const effectiveMaxLots = Math.min(maxAffordableLots, maxPairLots);
-    setLots(effectiveMaxLots.toFixed(getDecimalPlaces(selectedPair)));
-  };
-
   // Add effect to adjust lots when pair changes
   useEffect(() => {
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
@@ -464,6 +483,22 @@ export const TradingPanel = ({
     };
   }, []);
 
+  function getVisibleRiskCategories(leverageOptions: number[]) {
+    const categories = getLeverageCategories(leverageOptions);
+    const visibleCategories: ('low' | 'medium' | 'high')[] = [];
+
+    if (categories.low.length > 0) {
+      visibleCategories.push('low');
+    }
+    if (categories.medium.length > 0) {
+      visibleCategories.push('medium');
+    }
+    if (categories.high.length > 0) {
+      visibleCategories.push('high');
+    }
+
+    return visibleCategories;
+  }
   return (
     <div className="w-[350px] border-l bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
@@ -572,12 +607,14 @@ export const TradingPanel = ({
                   "h-16 flex-col space-y-1 hover:bg-red-500/5 border-2",
                   "border-red-500/20 hover:border-red-500/30 text-red-500",
                   "transition-colors bg-red-500/5",
-                  "!items-start !justify-start"
+                  "!items-start !justify-start",
+                  isExecutingTrade && "opacity-50 cursor-not-allowed"
                 )}
                 onClick={() => handleTrade('sell')}
+                disabled={isExecutingTrade}
               >
                 <div className="text-xs font-normal text-left pl-2">
-                  {orderType === 'limit' ? 'Sell Limit at' : 'Sell at'}
+                  {isExecutingTrade ? 'Executing...' : orderType === 'limit' ? 'Sell Limit at' : 'Sell at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-left pl-2">
                   {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('sell')}
@@ -590,12 +627,14 @@ export const TradingPanel = ({
                   "h-16 flex-col space-y-1 hover:bg-blue-500/5 border-2",
                   "border-blue-500/20 hover:border-blue-500/30 text-blue-500",
                   "transition-colors bg-blue-500/5",
-                  "!items-start !justify-start"
+                  "!items-start !justify-start",
+                  isExecutingTrade && "opacity-50 cursor-not-allowed"
                 )}
                 onClick={() => handleTrade('buy')}
+                disabled={isExecutingTrade}
               >
                 <div className="text-xs font-normal text-right pr-2">
-                  {orderType === 'limit' ? 'Buy Limit at' : 'Buy at'}
+                  {isExecutingTrade ? 'Executing...' : orderType === 'limit' ? 'Buy Limit at' : 'Buy at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-right pr-2">
                   {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('buy')}
@@ -648,7 +687,8 @@ export const TradingPanel = ({
               <DialogHeader className="px-6 py-4 border-b">
                 <DialogTitle className="text-xl">Leverage Information</DialogTitle>
                 <DialogDescription className="text-sm">
-                  Choose your preferred leverage level. Higher leverage means higher risk.
+                  Choose your preferred leverage level (Max: {getMaxLeverageFromOptions(pairInfo?.leverage_options)}x). 
+                  Higher leverage means higher risk.
                 </DialogDescription>
               </DialogHeader>
               

@@ -13,7 +13,7 @@ import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
-import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Add calculatePipValue
+import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PriceData {
@@ -392,6 +392,22 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     
     return calculateRequiredMargin(price, lotSize, leverageValue, isCrypto, defaultPair).toFixed(2);
   }, [lots, pairPrices, selectedLeverage, defaultPair]);
+
+  // Update pip value calculation with proper lot size handling
+  useEffect(() => {
+    if (!defaultPair) return;
+
+    const lotSize = parseFloat(lots) || 0;
+    const price = parseFloat(pairPrices[defaultPair]?.price || '0');
+    
+    if (price && lotSize) {
+      // Use calculatePipValue which internally handles all pair types correctly
+      const pipValueAmount = calculatePipValue(lotSize, price, defaultPair);
+      setPipValue(pipValueAmount.toFixed(2));
+    } else {
+      setPipValue('0.00');
+    }
+  }, [defaultPair, lots, pairPrices[defaultPair]?.price]); // Only recalculate when these values change
 
   // Add handleLotsChange function before the return statement
   const handleLotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
