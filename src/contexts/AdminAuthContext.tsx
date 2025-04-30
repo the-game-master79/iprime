@@ -1,15 +1,115 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 interface AdminAuthContextType {
   isAdminAuthenticated: boolean;
-  loginAdmin: (email: string, password: string) => Promise<boolean>;
-  logoutAdmin: () => Promise<void>;
   isLoading: boolean;
+  checkAdminStatus: () => Promise<void>;
+  loginAdmin: (email: string, password: string) => Promise<void>;
+  logoutAdmin: () => Promise<void>;
 }
 
-const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
+const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
+
+export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setIsAdminAuthenticated(false);
+        return;
+      }
+
+      // Check if user has admin role
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      setIsAdminAuthenticated(profile?.role === 'admin');
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdminAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginAdmin = async (email: string, password: string) => {
+    try {
+      // First sign in the user
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (signInError) throw signInError;
+      if (!authData.user) throw new Error('No user returned from login');
+
+      // Check if user has admin role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      
+      if (profile?.role !== 'admin') {
+        // Sign out if not admin
+        await supabase.auth.signOut();
+        throw new Error('Not authorized to access admin panel');
+      }
+
+      setIsAdminAuthenticated(true);
+    } catch (error) {
+      setIsAdminAuthenticated(false);
+      throw error;
+    }
+  };
+
+  const logoutAdmin = async () => {
+    try {
+      await supabase.auth.signOut();
+      setIsAdminAuthenticated(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  useEffect(() => {
+    checkAdminStatus();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAdminStatus();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return (
+    <AdminAuthContext.Provider value={{ 
+      isAdminAuthenticated, 
+      isLoading,
+      checkAdminStatus,
+      loginAdmin,
+      logoutAdmin
+    }}>
+      {children}
+    </AdminAuthContext.Provider>
+  );
+};
 
 export const useAdminAuth = () => {
   const context = useContext(AdminAuthContext);
@@ -19,135 +119,19 @@ export const useAdminAuth = () => {
   return context;
 };
 
-export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    checkAdminStatus();
-  }, []);
-
-  const checkAdminStatus = async () => {
-    try {
-      setIsLoading(true);
-      const adminAuth = localStorage.getItem('adminAuth');
-      const adminEmail = localStorage.getItem('adminEmail');
-      const adminPassword = localStorage.getItem('adminPassword');
-
-      if (adminAuth === 'true' && adminEmail && adminPassword) {
-        // Validate stored credentials
-        const { data, error } = await supabase.rpc('validate_admin', {
-          admin_email: adminEmail,
-          admin_password: adminPassword
-        });
-
-        if (error || !data.success) {
-          throw new Error('Invalid admin session');
-        }
-        setIsAdminAuthenticated(true);
-      } else {
-        setIsAdminAuthenticated(false);
-        localStorage.removeItem('adminAuth');
-        localStorage.removeItem('adminEmail');
-        localStorage.removeItem('adminPassword');
-      }
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdminAuthenticated(false);
-      localStorage.removeItem('adminAuth');
-      localStorage.removeItem('adminEmail');
-      localStorage.removeItem('adminPassword');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loginAdmin = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.rpc('validate_admin', {
-        admin_email: email,
-        admin_password: password
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        setIsAdminAuthenticated(true);
-        localStorage.setItem('adminAuth', 'true');
-        localStorage.setItem('adminEmail', email);
-        localStorage.setItem('adminPassword', password);
-        return true;
-      }
-
-      throw new Error('Invalid admin credentials');
-    } catch (error) {
-      console.error('Admin login error:', error);
-      throw error;
-    }
-  };
-
-  const logoutAdmin = async () => {
-    try {
-      setIsAdminAuthenticated(false);
-      localStorage.removeItem('adminAuth');
-      localStorage.removeItem('adminEmail');
-      localStorage.removeItem('adminPassword');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  return (
-    <AdminAuthContext.Provider value={{ 
-      isAdminAuthenticated, 
-      loginAdmin, 
-      logoutAdmin,
-      isLoading 
-    }}>
-      {children}
-    </AdminAuthContext.Provider>
-  );
-};
-
 export const RequireAdminAuth = ({ children }: { children: ReactNode }) => {
   const { isAdminAuthenticated, isLoading } = useAdminAuth();
-  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Add check for loading state
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // Prevent infinite redirects by checking location
-  if (!isAdminAuthenticated && location.pathname !== '/admin/login') {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-};
-
-// Add error boundaries
-export class ErrorBoundary extends React.Component<
-  { children: React.ReactNode, fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode, fallback: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
+  useEffect(() => {
+    if (!isLoading && !isAdminAuthenticated) {
+      navigate('/auth/login');
     }
-    return this.props.children;
+  }, [isAdminAuthenticated, isLoading, navigate]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
   }
-}
+
+  return isAdminAuthenticated ? <>{children}</> : null;
+};

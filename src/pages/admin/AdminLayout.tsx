@@ -16,7 +16,8 @@ import {
   Bell as BellIcon,
   CaretLeft,
   ChartLine,
-  Tag
+  Tag,
+  TrendUp // Add this import
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -124,6 +125,14 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     label="Dashboard" 
                     active={location.pathname === '/admin/dashboard'} 
                     collapsed={!sidebarOpen} 
+                  />
+                  {/* Add the trades link here */}
+                  <SidebarLink 
+                    to="/admin/trades"
+                    icon={<TrendUp className="h-5 w-5" />}
+                    label="Trading Activity" 
+                    active={location.pathname === '/admin/trades'}
+                    collapsed={!sidebarOpen}
                   />
                   <SidebarLink 
                     to="/admin/users" 
@@ -263,7 +272,7 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
             </header>
           )}
 
-          <div className="container py-4 md:py-8">
+          <div className="py-4 px-8 md:py-8">
             {children}
           </div>
         </main>

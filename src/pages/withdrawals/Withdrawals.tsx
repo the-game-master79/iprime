@@ -568,7 +568,27 @@ const Withdrawals = () => {
                               <Label className="text-xs font-normal">Select Cryptocurrency</Label>
                               <Select 
                                 value={formData.cryptoId} 
-                                onValueChange={(value) => setFormData(prev => ({ ...prev, cryptoId: value, network: '' }))}
+                                onValueChange={(value) => {
+                                  const selectedMethod = depositMethods.find(m => m.id === value);
+                                  const networks = getNetworksForCrypto(selectedMethod?.crypto_symbol || '');
+                                  
+                                  // Auto-select network if it matches crypto symbol
+                                  let autoNetwork = '';
+                                  if (selectedMethod?.crypto_symbol && networks.length > 0) {
+                                    const matchingNetwork = networks.find(
+                                      n => n.toLowerCase() === selectedMethod.crypto_symbol?.toLowerCase()
+                                    );
+                                    if (matchingNetwork) {
+                                      autoNetwork = matchingNetwork;
+                                    }
+                                  }
+
+                                  setFormData(prev => ({ 
+                                    ...prev, 
+                                    cryptoId: value,
+                                    network: autoNetwork
+                                  }));
+                                }}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select cryptocurrency" />
@@ -589,7 +609,8 @@ const Withdrawals = () => {
                             </div>
 
                             {formData.cryptoId && networks.length > 0 && networks.some(network => 
-                              shouldShowNetworkSelect(
+                              // Only show network select if no automatic match found
+                              formData.network === '' && shouldShowNetworkSelect(
                                 depositMethods.find(m => m.id === formData.cryptoId)?.crypto_symbol,
                                 network
                               )

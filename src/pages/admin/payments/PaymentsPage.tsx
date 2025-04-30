@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ArrowDownUp, Download, Filter, Search, DollarSign, CreditCard, ArrowUpCircle, ArrowDownCircle, ChevronDown, Clock } from "lucide-react";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -13,19 +13,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Transaction {
   id: string;
   user_id: string;
   amount: number;
-  type: 'deposit' | 'withdrawal' | 'commission' | 'investment' | 'adjustment' | 'investment_closure';
-  status: 'Pending' | 'Processing' | 'Completed' | 'Failed';
+  type: 'deposit' | 'withdrawal' | 'commission' | 'subscription' | 'adjustment' | 'investment_closure';
+  status: 'Pending' | 'Processing' | 'Completed' | 'Failed' | 'cancelled' | 'approved' | 'rejected';
   created_at: string;
   method?: string;
   user_name?: string;
   crypto_name?: string;
   crypto_symbol?: string;
+  email?: string;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 const PaymentsPage = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -37,6 +53,7 @@ const PaymentsPage = () => {
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("created_at"); // Default sort by date
   const [sortOrder, setSortOrder] = useState("desc"); // Default newest first
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchTransactions();
@@ -95,7 +112,8 @@ const PaymentsPage = () => {
         status: d.status,
         created_at: d.created_at,
         method: d.crypto_name ? `${d.crypto_name} (${d.crypto_symbol})` : 'Unknown',
-        user_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : d.user_id
+        user_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : d.user_id,
+        email: d.profiles?.email
       }));
 
       // Format plan subscriptions
@@ -103,11 +121,12 @@ const PaymentsPage = () => {
         id: s.id,
         user_id: s.user_id,
         amount: s.amount,
-        type: 'investment' as const,
+        type: 'subscription' as const, // Changed from 'investment'
         status: s.status,
         created_at: s.created_at,
-        method: 'Plan Subscription',
-        user_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : s.user_id
+        method: 'Compute Subscription',
+        user_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : s.user_id,
+        email: s.profiles?.email
       }));
 
       // Combine all transactions
@@ -139,7 +158,11 @@ const PaymentsPage = () => {
       (tx.user_name || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesType = filterType ? tx.type.toLowerCase() === filterType.toLowerCase() : true;
-    const matchesStatus = filterStatus ? tx.status === filterStatus : true;
+    const matchesStatus = filterStatus ? 
+      (tx.status.toLowerCase() === filterStatus.toLowerCase() || 
+       (filterStatus.toLowerCase() === 'completed' && tx.status.toLowerCase() === 'approved') ||
+       (filterStatus.toLowerCase() === 'failed' && tx.status.toLowerCase() === 'rejected')
+      ) : true;
     
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -155,12 +178,24 @@ const PaymentsPage = () => {
     return aValue > bValue ? 1 : -1;
   });
 
+  // Paginate transactions
+  const paginatedTransactions = sortedTransactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const totalPages = Math.ceil(sortedTransactions.length / ITEMS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
-      setSortDirection("asc");
+      setSortBy(field);
+      setSortOrder("asc");
     }
   };
 
@@ -175,7 +210,7 @@ const PaymentsPage = () => {
     .reduce((sum, tx) => sum + tx.amount, 0);
 
   const totalSubscriptions = transactions
-    .filter(tx => tx.type === 'investment')
+    .filter(tx => tx.type === 'subscription')
     .reduce((sum, tx) => sum + tx.amount, 0);
 
   const pendingTransactions = transactions
@@ -192,22 +227,18 @@ const PaymentsPage = () => {
         <StatCard
           title="Total Transactions"
           value={transactions.length.toString()}
-          icon={<CreditCard className="h-4 w-4" />}
         />
         <StatCard
           title="Total Deposits"
           value={`$${totalDeposits.toLocaleString()}`}
-          icon={<ArrowDownCircle className="h-4 w-4" />}
         />
         <StatCard
           title="Total Investments"
           value={`$${totalSubscriptions.toLocaleString()}`}
-          icon={<DollarSign className="h-4 w-4" />}
         />
         <StatCard
           title="Pending Transactions"
           value={pendingTransactions.toString()}
-          icon={<Clock className="h-4 w-4" />}
         />
       </div>
 
@@ -224,61 +255,27 @@ const PaymentsPage = () => {
           </div>
           
           <div className="flex flex-wrap items-center gap-4">
-            <Select 
-              value={filterType || "all"} 
-              onValueChange={handleFilterTypeChange}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Filter Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="deposit">Deposits</SelectItem>
-                <SelectItem value="withdrawal">Withdrawals</SelectItem>
-                <SelectItem value="commission">Commissions</SelectItem>
-                <SelectItem value="investment">Investments</SelectItem>
-                <SelectItem value="adjustment">Adjustments</SelectItem>
-                <SelectItem value="investment_closure">Investment Closures</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select 
-              value={filterStatus || "all"} 
-              onValueChange={handleFilterStatusChange}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Filter Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Completed">Completed</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Processing">Processing</SelectItem>
-                <SelectItem value="Failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Sort By" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_at">Date</SelectItem>
-                <SelectItem value="amount">Amount</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="type">Type</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={sortOrder} onValueChange={setSortOrder}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Sort Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desc">Newest First</SelectItem>
-                <SelectItem value="asc">Oldest First</SelectItem>
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Sort By <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleSort("created_at")}>
+                  Date {sortBy === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("amount")}>
+                  Amount {sortBy === "amount" && (sortOrder === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("status")}>
+                  Status {sortBy === "status" && (sortOrder === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("type")}>
+                  Type {sortBy === "type" && (sortOrder === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {(filterType || filterStatus) && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -292,117 +289,62 @@ const PaymentsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("id")}
-                  >
-                    ID
-                    {sortField === "id" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("userName")}
-                  >
-                    User
-                    {sortField === "userName" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("amount")}
-                  >
-                    Amount
-                    {sortField === "amount" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("type")}
-                  >
-                    Type
-                    {sortField === "type" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("method")}
-                  >
-                    Method
-                    {sortField === "method" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("date")}
-                  >
-                    Date
-                    {sortField === "date" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status
-                    {sortField === "status" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Type & Method</TableHead>
+                <TableHead>Date & Time</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">Loading transactions...</TableCell>
+                  <TableCell colSpan={6} className="text-center">Loading transactions...</TableCell>
                 </TableRow>
-              ) : sortedTransactions.length === 0 ? (
+              ) : paginatedTransactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">No transactions found</TableCell>
+                  <TableCell colSpan={6} className="text-center">No transactions found</TableCell>
                 </TableRow>
               ) : (
-                sortedTransactions.map((tx) => (
+                paginatedTransactions.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell className="font-medium">{tx.id}</TableCell>
-                    <TableCell>{tx.user_name || tx.user_id}</TableCell>
-                    <TableCell>${tx.amount.toLocaleString()}</TableCell>
+                    <TableCell>{tx.email || 'N/A'}</TableCell>
+                    <TableCell className="font-bold">${tx.amount.toLocaleString()}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                        ${tx.type === 'deposit' ? 'bg-green-100 text-green-800' : 
-                          tx.type === 'investment' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'}`}>
-                        {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
-                      </span>
+                      <div className="inline-flex items-center gap-2">
+                        <span className={`rounded-md px-2 py-1 text-xs font-medium w-fit
+                          ${tx.type === 'deposit' ? 'bg-green-100 text-green-800' : 
+                            tx.type === 'subscription' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'}`}>
+                          {tx.type === 'subscription' ? 'Subscription' : tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}
+                          {tx.method && ` • ${tx.method}`}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell>{tx.method || '-'}</TableCell>
-                    <TableCell>{new Date(tx.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {new Date(tx.created_at).toLocaleString('en-US', {
+                        timeZone: 'Asia/Kolkata',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </TableCell>
                     <TableCell>
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
-                        ${tx.status === 'Completed' ? 'bg-green-100 text-green-800' : 
+                        ${tx.status === 'Completed' || tx.status === 'approved' ? 'bg-green-100 text-green-800' : 
                           tx.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                          tx.status === 'Processing' ? 'bg-blue-100 text-blue-800' :
-                          'bg-red-100 text-red-800'}`}>
-                        {tx.status}
+                          tx.status === 'Processing' || tx.status === 'cancelled' ? 'bg-blue-100 text-blue-800' :
+                          tx.status === 'Failed' || tx.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'}`}>
+                        {tx.status === 'approved' ? 'Completed' : 
+                         tx.status === 'rejected' ? 'Failed' :
+                         tx.status === 'cancelled' ? 'Cancelled' :
+                         tx.status}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -410,6 +352,30 @@ const PaymentsPage = () => {
               )}
             </TableBody>
           </Table>
+
+          {!isLoading && sortedTransactions.length > 0 && (
+            <div className="flex items-center justify-center py-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    {currentPage > 1 && (
+                      <PaginationPrevious 
+                        onClick={() => handlePageChange(currentPage - 1)}
+                      />
+                    )}
+                  </PaginationItem>
+                  {/* Page numbers here if needed */}
+                  <PaginationItem>
+                    {currentPage !== totalPages && (
+                      <PaginationNext 
+                        onClick={() => handlePageChange(currentPage + 1)}
+                      />
+                    )}
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>

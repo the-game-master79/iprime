@@ -52,7 +52,8 @@ const SupportManagePage = lazy(() => import("@/pages/admin/support/SupportManage
 const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
 const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
 const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage"));
-const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates")); // Add this line
+const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates"));
+const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage")); // Add this line
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
@@ -177,6 +178,7 @@ const App = () => {
                   <Route path="promotions" element={<PromotionsPage />} />
                   <Route path="promocodes" element={<PromocodesPage />} />
                   <Route path="pairs" element={<AdminPairs />} />
+                  <Route path="trades" element={<TradesPage />} /> {/* Add this line */}
                   <Route path="live-rates" element={<LiveRatesPage />} /> {/* Add this line */}
                 </Routes>
               }

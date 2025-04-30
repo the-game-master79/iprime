@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Location } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Eye, EyeOff } from "lucide-react";
@@ -8,8 +8,15 @@ import { PageTransition } from "@/components/ui-components";
 import AdminLayout from "./AdminLayout";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+}
+
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,8 +29,12 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
+      if (!loginAdmin) {
+        throw new Error('Login service not available');
+      }
+
       await loginAdmin(email, password);
-      const from = (location.state as any)?.from?.pathname || "/admin/dashboard";
+      const from = (location.state as LocationState)?.from?.pathname || "/admin/dashboard";
       navigate(from, { replace: true });
       toast({
         title: "Login Successful",
@@ -33,7 +44,7 @@ const AdminLogin = () => {
       console.error('Login error:', error);
       toast({
         title: "Authentication Failed", 
-        description: error.message || "Invalid admin credentials or not authorized.",
+        description: error.message || "Invalid credentials or not authorized.",
         variant: "destructive",
       });
     } finally {

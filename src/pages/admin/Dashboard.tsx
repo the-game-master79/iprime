@@ -117,25 +117,21 @@ const AdminDashboard = () => {
           <StatCard
             title="Registered Users"
             value={stats.totalUsers.toLocaleString()}
-            icon={<Users className="h-4 w-4" />}
             loading={loading}
           />
           <StatCard
-            title="Affiliates Count"
+            title="Affiliates Count" 
             value={stats.totalReferrers.toLocaleString()}
-            icon={<UserCheck className="h-4 w-4" />}
             loading={loading}
           />
           <StatCard
             title="Total Deposits"
             value={`$${stats.totalApprovedDeposits.toLocaleString()}`}
-            icon={<DollarSign className="h-4 w-4" />}
             loading={loading}
           />
           <StatCard
             title="Total Plans"
             value={`$${stats.totalPlansValue.toLocaleString()}`}
-            icon={<UserPlus className="h-4 w-4" />}
             loading={loading}
           />
         </div>

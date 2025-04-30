@@ -1,49 +1,54 @@
-import React, { useState, useEffect } from "react";
-import { ArrowDownUp, Download, Search, Users, LineChart, BarChart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, ChartLine, ChartBarHorizontal, Copy, MagnifyingGlass, ArrowsDownUp, DownloadSimple } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader, StatCard} from "@/components/ui-components";
+import {  Select,  SelectContent,  SelectItem,  SelectTrigger,  SelectValue,} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { 
-  PageHeader,
-  StatCard
-} from "@/components/ui-components";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useToast } from "@/hooks/use-toast";
+import { ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+const ITEMS_PER_PAGE = 10;
 
 interface Affiliate {
   id: string;
   name: string;
-  referrals: number;
+  referrals: {
+    unique: number;
+    total: number;
+  };
   directCount: number;
   commissions: number;
+  rank_bonus: number;
   joinDate: string;
   email: string;
+  referral_code: string;
   lastReferralDate?: string;
   isRecentlyActive?: boolean;
 }
 
-// Add these objects outside component for reusability
+interface DownlineUser {
+  id: string;
+  email: string;
+  referral_code: string;
+  level: number;
+  created_at: string;
+}
+
 const SORT_OPTIONS = [
   { value: "commissions", label: "Commissions" },
   { value: "directCount", label: "Direct Referrals" },
@@ -51,13 +56,16 @@ const SORT_OPTIONS = [
   { value: "joinDate", label: "Join Date" }
 ] as const;
 
-// Add this helper function before the component
 const formatDate = (date: Date) => {
-  return date.toLocaleDateString('en-US', {
-    day: '2-digit',
+  return date.toLocaleString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',  
     month: 'short',
-    year: 'numeric'
-  }).toUpperCase();
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 };
 
 const AffiliatesPage = () => {
@@ -67,6 +75,15 @@ const AffiliatesPage = () => {
   const [sortField, setSortField] = useState<string>("joinDate"); // Change default value
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [totalCommissions, setTotalCommissions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showDownlines, setShowDownlines] = useState(false);
+  const [selectedAffiliate, setSelectedAffiliate] = useState<Affiliate | null>(null);
+  const [downlines, setDownlines] = useState<DownlineUser[]>([]);
+  const { toast } = useToast();
+  const [directEligibleCount, setDirectEligibleCount] = useState(0);
+  const [singleDirectCount, setSingleDirectCount] = useState(0);
+  const [zeroDirectCount, setZeroDirectCount] = useState(0);
+  
 
   useEffect(() => {
     fetchAffiliates();
@@ -104,7 +121,7 @@ const AffiliatesPage = () => {
         .from('transactions')
         .select('amount, type, user_id, status')
         .eq('status', 'Completed')
-        .or('type.eq.commission,type.eq.rank_bonus'); // Include both types
+        .in('type', ['commission', 'rank_bonus']);
 
       if (transactionsError) throw transactionsError;
 
@@ -119,17 +136,28 @@ const AffiliatesPage = () => {
           rel.referrer_id === profile.id && 
           rel.level === 1
         ) || [];
-        
-        // Calculate total referrals (all levels)
-        const totalReferrals = relationships?.filter(rel => 
-          rel.referrer_id === profile.id
-        ).length || 0;
 
-        // Calculate total earnings from both commission and rank bonus transactions
-        const totalEarnings = (transactions || [])
-          .filter(tx => tx.user_id === profile.id)
-          .filter(tx => tx.type === 'commission' || tx.type === 'rank_bonus') // Explicitly check both types
-          .reduce((sum, tx) => sum + Number(tx.amount), 0); // Use Number() to ensure proper addition
+        // Get all relationships for this referrer
+        const allReferrals = relationships?.filter(rel => 
+          rel.referrer_id === profile.id
+        ) || [];
+
+        // Calculate unique referrals by counting unique referred_ids
+        const uniqueReferralsCount = new Set(
+          allReferrals.map(rel => rel.referred_id)
+        ).size;
+
+        // Total referrals including repeated appearances
+        const totalReferralsCount = allReferrals.length;
+
+        // Calculate total earnings separated by type
+        const userTransactions = transactions?.filter(tx => tx.user_id === profile.id) || [];
+        const commissionEarnings = userTransactions
+          .filter(tx => tx.type === 'commission')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        const rankBonusEarnings = userTransactions
+          .filter(tx => tx.type === 'rank_bonus')
+          .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
         const lastReferral = directReferrals[0];
         const lastReferralDate = lastReferral ? new Date(lastReferral.created_at) : null;
@@ -139,9 +167,14 @@ const AffiliatesPage = () => {
           id: profile.id,
           name: `${profile.first_name} ${profile.last_name}`,
           email: profile.email || '',
-          referrals: totalReferrals, // All downline members
-          directCount: directReferrals.length, // Only direct referrals
-          commissions: totalEarnings,
+          referral_code: profile.referral_code || '',
+          referrals: {
+            unique: uniqueReferralsCount,
+            total: totalReferralsCount
+          },
+          directCount: directReferrals.length,
+          commissions: commissionEarnings,
+          rank_bonus: rankBonusEarnings,
           status: profile.status || 'Active',
           joinDate: formatDate(new Date(profile.created_at)),
           lastReferralDate: lastReferralDate ? formatDate(lastReferralDate) : undefined,
@@ -150,6 +183,15 @@ const AffiliatesPage = () => {
       }) || [];
 
       setAffiliates(processedAffiliates);
+
+      // Calculate affiliates by direct count categories
+      const eligibleAffiliates = processedAffiliates.filter(a => a.directCount >= 2);
+      const singleDirectAffiliates = processedAffiliates.filter(a => a.directCount === 1);
+      const zeroDirectAffiliates = processedAffiliates.filter(a => a.directCount === 0);
+      
+      setDirectEligibleCount(eligibleAffiliates.length);
+      setSingleDirectCount(singleDirectAffiliates.length);
+      setZeroDirectCount(zeroDirectAffiliates.length);
 
       // Calculate overall total commissions - include both commission types
       const overallCommissions = (transactions || [])
@@ -167,8 +209,7 @@ const AffiliatesPage = () => {
   // Filter and sort affiliates
   const filteredAffiliates = affiliates.filter(
     (affiliate) =>
-      affiliate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      affiliate.email.toLowerCase().includes(searchTerm.toLowerCase())
+      affiliate.email.toLowerCase().includes(searchTerm.toLowerCase()) // Remove name search
   );
 
   const sortedAffiliates = [...filteredAffiliates].sort((a, b) => {
@@ -193,50 +234,111 @@ const AffiliatesPage = () => {
 
   // Calculate statistics
   const totalAffiliates = affiliates.length;
-  const activeAffiliates = affiliates.filter(a => a.isRecentlyActive).length;
-  const totalReferrals = affiliates.reduce((sum, a) => sum + a.referrals, 0);
+  const totalReferrals = affiliates.reduce((sum, a) => sum + a.referrals.total, 0);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  // After sorting logic, add pagination
+  const totalPages = Math.ceil(sortedAffiliates.length / ITEMS_PER_PAGE);
+  const paginatedAffiliates = sortedAffiliates.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleViewDownlines = async (affiliate: Affiliate) => {
+    try {
+      const { data, error } = await supabase
+        .from('referral_relationships')
+        .select(`
+          referred:referred_id(
+            id,
+            email,
+            referral_code
+          ),
+          level,
+          created_at
+        `)
+        .eq('referrer_id', affiliate.id)
+        .order('level', { ascending: true });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast({
+          title: "No Downlines",
+          description: "This affiliate has no downline members yet.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const formattedDownlines = data.map(item => ({
+        id: item.referred.id,
+        email: item.referred.email,
+        referral_code: item.referred.referral_code,
+        level: item.level,
+        created_at: formatDate(new Date(item.created_at))
+      }));
+
+      setDownlines(formattedDownlines);
+      setSelectedAffiliate(affiliate);
+      setShowDownlines(true);
+    } catch (error) {
+      console.error('Error fetching downlines:', error);
+    }
+  };
+
+  // Add this helper function to group downlines by level
+  const groupDownlinesByLevel = (downlines: DownlineUser[]) => {
+    const levels = [...new Set(downlines.map(d => d.level))].sort((a, b) => a - b);
+    return levels.map(level => ({
+      level,
+      members: downlines.filter(d => d.level === level)
+    }));
+  };
 
   return (
     <AdminLayout>
       <PageHeader 
         title="Affiliate Management" 
         description="Monitor and manage affiliate partners and their commissions"
-        action={
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            Export Data
-          </Button>
-        }
       />
 
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         <StatCard
-          title="Total Affiliates"
+          title="Network Overview"
           value={totalAffiliates.toString()}
-          icon={<Users className="h-4 w-4" />}
+          description={`Total Downlines: ${totalReferrals.toString()}`}
         />
         <StatCard
-          title="Active Affiliates (48h)"
-          value={activeAffiliates.toString()}
-          icon={<Users className="h-4 w-4" />}
-          description="Referenced in last 48 hours"
+          title="Direct Eligibility"
+          value={directEligibleCount.toString()}
+          description={
+            <div className="space-y-1">
+              <div className="text-xs space-y-0.5">
+                <p className="text-yellow-600">{singleDirectCount} with 1 direct</p>
+                <p className="text-red-600">{zeroDirectCount} with 0 directs</p>
+              </div>
+            </div>
+          }
         />
         <StatCard
-          title="Total Referrals"
-          value={totalReferrals.toString()}
-          icon={<LineChart className="h-4 w-4" />}
-        />
-        <StatCard
-          title="Total Commissions"
+          title="Network Earnings"
           value={`$${totalCommissions.toLocaleString()}`}
-          icon={<BarChart className="h-4 w-4" />}
+          description={`Rank Bonus: $${affiliates.reduce((sum, a) => sum + a.rank_bonus, 0).toLocaleString()}`}
         />
       </div>
 
       <div className="bg-background border rounded-lg shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b">
           <div className="relative w-full sm:w-auto">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <MagnifyingGlass className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" weight="bold" />
             <Input
               placeholder="Search affiliates..."
               className="pl-8 w-full sm:w-[300px]"
@@ -245,75 +347,187 @@ const AffiliatesPage = () => {
             />
           </div>
           
-          {/* Add sorting controls */}
-          <div className="flex items-center gap-2">
-            <Select
-              value={sortField}
-              onValueChange={(value) => setSortField(value)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                {SORT_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-              className="w-9 h-9"
-            >
-              <ArrowDownUp className={`h-4 w-4 transition-transform ${
-                sortDirection === "desc" ? "rotate-180" : ""
-              }`} />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Sort By <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => {
+                setSortField("joinDate");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}>
+                Join Date {sortField === "joinDate" && (sortDirection === "asc" ? "↑" : "↓")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setSortField("directCount");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}>
+                Direct Count {sortField === "directCount" && (sortDirection === "asc" ? "↑" : "↓")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setSortField("commissions");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}>
+                Commissions {sortField === "commissions" && (sortDirection === "asc" ? "↑" : "↓")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setSortField("rank_bonus");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}>
+                Rank Bonus {sortField === "rank_bonus" && (sortDirection === "asc" ? "↑" : "↓")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Total Referrals</TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Total Downlines</TableHead>
                 <TableHead>Commissions</TableHead>
+                <TableHead>Rank Bonus</TableHead>
                 <TableHead>Join Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAffiliates.map((affiliate) => (
-                <TableRow key={affiliate.id}>
-                  <TableCell className="font-medium">{affiliate.id}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{affiliate.name}</span>
-                      <span className={`text-xs ${
-                        affiliate.directCount === 0 
-                          ? 'text-red-500' 
-                          : affiliate.directCount === 1 
-                          ? 'text-yellow-500' 
-                          : 'text-green-500'
-                      }`}>
-                        Direct Referrals: {affiliate.directCount}/2
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{affiliate.referrals}</TableCell>
-                  <TableCell>${affiliate.commissions}</TableCell>
-                  <TableCell>{affiliate.joinDate}</TableCell>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">Loading affiliates...</TableCell>
                 </TableRow>
-              ))}
+              ) : paginatedAffiliates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">No affiliates found</TableCell>
+                </TableRow>
+              ) : (
+                paginatedAffiliates.map((affiliate) => (
+                  <TableRow key={affiliate.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{affiliate.id}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => copyToClipboard(affiliate.id)}
+                        >
+                          <Copy className="h-3 w-3" weight="bold" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <span>{affiliate.email}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {affiliate.referral_code}
+                        </Badge>
+                        <span className={`text-xs ${
+                          affiliate.directCount === 0 
+                            ? 'text-red-500' 
+                            : affiliate.directCount === 1 
+                            ? 'text-yellow-500' 
+                            : 'text-green-500'
+                        }`}>
+                          {affiliate.directCount}/2
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div 
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => handleViewDownlines(affiliate)}
+                      >
+                        {affiliate.referrals.unique}
+                        {affiliate.referrals.total > affiliate.referrals.unique && 
+                          ` (${affiliate.referrals.total - affiliate.referrals.unique} Repeated)`
+                        }
+                      </div>
+                    </TableCell>
+                    <TableCell>${affiliate.commissions}</TableCell>
+                    <TableCell>${affiliate.rank_bonus}</TableCell>
+                    <TableCell>
+                      <div className="whitespace-nowrap">{affiliate.joinDate}</div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>
+
+        {!isLoading && sortedAffiliates.length > 0 && (
+          <div className="flex items-center justify-center py-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  {currentPage > 1 && (
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(currentPage - 1)}
+                    />
+                  )}
+                </PaginationItem>
+                <PaginationItem>
+                  {currentPage !== totalPages && (
+                    <PaginationNext 
+                      onClick={() => handlePageChange(currentPage + 1)}
+                    />
+                  )}
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
+
+      <Dialog open={showDownlines} onOpenChange={setShowDownlines}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader className="py-3">
+            <DialogTitle className="text-base">
+              Network - {selectedAffiliate?.email}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[50vh]">
+            <Accordion type="single" collapsible className="w-full">
+              {groupDownlinesByLevel(downlines).map(({ level, members }) => (
+                <AccordionItem value={`level-${level}`} key={level} className="border-b last:border-b-0">
+                  <AccordionTrigger className="py-3 px-3 hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline">Level {level}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {members.length} member{members.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="py-2 px-3">
+                    <div className="space-y-1.5">
+                      {members.map((member) => (
+                        <div 
+                          key={member.id} 
+                          className="flex items-center justify-between py-1.5 px-2 rounded-md bg-muted/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{member.email}</span>
+                            <Badge variant="outline" className="text-[10px] h-5">
+                              {member.referral_code}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {member.created_at}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

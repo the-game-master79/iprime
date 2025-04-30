@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ArrowDownUp, CheckSquare, Download, Search, XSquare, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { ArrowDownUp, ChevronDown, CheckSquare, XSquare, Search } from "lucide-react";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,17 +7,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader, StatCard } from "@/components/ui-components";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const ITEMS_PER_PAGE = 10;
 
 interface Withdrawal {
   id: string;
   user_id: string;
   amount: number;
-  crypto_name: string;
+  crypto_name: string; 
   crypto_symbol: string;
   network: string;
   wallet_address: string;
   status: 'Pending' | 'Processing' | 'Completed' | 'Failed';
   created_at: string;
+  user_email: string; // Changed from nested object to direct string
 }
 
 const AdminWithdrawalsPage = () => {
@@ -28,6 +44,7 @@ const AdminWithdrawalsPage = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchWithdrawals();
@@ -38,11 +55,20 @@ const AdminWithdrawalsPage = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('withdrawals')
-        .select('*')
+        .select(`
+          *,
+          profiles!withdrawals_user_id_fkey(email)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setWithdrawals(data || []);
+
+      const withdrawalsWithEmail = data?.map(w => ({
+        ...w,
+        user_email: w.profiles.email || 'N/A' // Map the email directly
+      })) || [];
+
+      setWithdrawals(withdrawalsWithEmail);
     } catch (error) {
       console.error('Error fetching withdrawals:', error);
       toast({
@@ -185,6 +211,14 @@ const AdminWithdrawalsPage = () => {
     return 0;
   });
 
+  // Modify sortedWithdrawals to include pagination
+  const paginatedWithdrawals = sortedWithdrawals.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const totalPages = Math.ceil(sortedWithdrawals.length / ITEMS_PER_PAGE);
+
   const clearFilters = () => {
     setFilterStatus(null);
   };
@@ -194,34 +228,24 @@ const AdminWithdrawalsPage = () => {
       <PageHeader 
         title="Withdrawal Management" 
         description="Review and process user withdrawal requests"
-        action={
-          <Button variant="outline" className="gap-1">
-            <Download className="h-4 w-4" />
-            Export Withdrawals
-          </Button>
-        }
       />
 
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <StatCard
           title="Total Withdrawals"
           value={totalWithdrawals.toString()}
-          icon={<DollarSign className="h-4 w-4" />}
         />
         <StatCard
           title="Pending Requests"
           value={pendingWithdrawals.toString()}
-          icon={<Clock className="h-4 w-4" />}
         />
         <StatCard
           title="Total Amount"
           value={`$${totalAmount.toLocaleString()}`}
-          icon={<DollarSign className="h-4 w-4" />}
         />
         <StatCard
           title="Pending Amount"
           value={`$${pendingAmount.toLocaleString()}`}
-          icon={<CheckCircle className="h-4 w-4" />}
         />
       </div>
 
@@ -236,28 +260,29 @@ const AdminWithdrawalsPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              variant={filterStatus === "Pending" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setFilterStatus(filterStatus === "Pending" ? null : "Pending")}
-            >
-              Pending
-            </Button>
-            <Button 
-              variant={filterStatus === "Completed" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setFilterStatus(filterStatus === "Completed" ? null : "Completed")}
-            >
-              Completed
-            </Button>
-            <Button 
-              variant={filterStatus === "Failed" ? "secondary" : "ghost"} 
-              size="sm"
-              onClick={() => setFilterStatus(filterStatus === "Failed" ? null : "Failed")}
-            >
-              Failed
-            </Button>
+          <div className="flex flex-wrap items-center gap-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Sort By <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleSort("created_at")}>
+                  Date {sortField === "created_at" && (sortDirection === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("amount")}>
+                  Amount {sortField === "amount" && (sortField === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("status")}>
+                  Status {sortField === "status" && (sortDirection === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSort("crypto_name")}>
+                  Method {sortField === "crypto_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {filterStatus && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 Clear Filters
@@ -270,96 +295,31 @@ const AdminWithdrawalsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]">
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("id")}
-                  >
-                    ID
-                    {sortField === "id" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("user_id")}
-                  >
-                    User
-                    {sortField === "user_id" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("amount")}
-                  >
-                    Amount
-                    {sortField === "amount" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("crypto_name")}
-                  >
-                    Method
-                    {sortField === "crypto_name" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("wallet_address")}
-                  >
-                    Wallet Address
-                    {sortField === "wallet_address" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("created_at")}
-                  >
-                    Date
-                    {sortField === "created_at" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead>
-                  <button 
-                    className="flex items-center gap-1 hover:text-foreground"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status
-                    {sortField === "status" && (
-                      <ArrowDownUp className="h-3 w-3" />
-                    )}
-                  </button>
-                </TableHead>
+                <TableHead>ID</TableHead>
+                <TableHead>Email</TableHead> {/* Add new column */}
+                <TableHead>Amount</TableHead>
+                <TableHead>Method</TableHead>
+                <TableHead>Wallet Address</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedWithdrawals.map((withdrawal) => (
+              {paginatedWithdrawals.map((withdrawal) => (
                 <TableRow key={withdrawal.id}>
                   <TableCell className="font-medium">{withdrawal.id}</TableCell>
-                  <TableCell>{withdrawal.user_id}</TableCell>
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {withdrawal.user_email}
+                    </span>
+                  </TableCell>
                   <TableCell>${withdrawal.amount.toLocaleString()}</TableCell>
                   <TableCell>
-                    {withdrawal.crypto_name} ({withdrawal.crypto_symbol})
-                    <div className="text-xs text-muted-foreground">
-                      Network: {withdrawal.network}
+                    <div className="inline-flex items-center gap-2">
+                      <span className="rounded-md px-2 py-1 text-xs font-medium w-fit bg-gray-100 text-gray-800">
+                        {withdrawal.crypto_name} ({withdrawal.crypto_symbol}) • {withdrawal.network}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -367,7 +327,18 @@ const AdminWithdrawalsPage = () => {
                       {withdrawal.wallet_address}
                     </div>
                   </TableCell>
-                  <TableCell>{new Date(withdrawal.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell>
+                    {new Date(withdrawal.created_at).toLocaleString('en-US', {
+                      timeZone: 'Asia/Kolkata',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: true
+                    })}
+                  </TableCell>
                   <TableCell>
                     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium
                       ${withdrawal.status === 'Completed' ? 'bg-green-100 text-green-800' : 
@@ -383,21 +354,19 @@ const AdminWithdrawalsPage = () => {
                         <>
                           <Button 
                             variant="ghost" 
-                            size="sm" 
-                            className="text-green-500"
+                            size="icon"
+                            className="h-8 w-8 text-green-500"
                             onClick={() => handleApprove(withdrawal.id)}
                           >
-                            <CheckSquare className="h-4 w-4 mr-1" />
-                            Approve
+                            <CheckSquare className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
-                            size="sm" 
-                            className="text-red-500"
+                            size="icon"
+                            className="h-8 w-8 text-red-500"
                             onClick={() => handleReject(withdrawal.id)}
                           >
-                            <XSquare className="h-4 w-4 mr-1" />
-                            Reject
+                            <XSquare className="h-4 w-4" />
                           </Button>
                         </>
                       )}
@@ -415,6 +384,29 @@ const AdminWithdrawalsPage = () => {
             </TableBody>
           </Table>
         </div>
+
+        {!isLoading && sortedWithdrawals.length > 0 && (
+          <div className="flex items-center justify-center py-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  {currentPage > 1 && (
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(currentPage - 1)}
+                    />
+                  )}
+                </PaginationItem>
+                <PaginationItem>
+                  {currentPage !== totalPages && (
+                    <PaginationNext 
+                      onClick={() => handlePageChange(currentPage + 1)}
+                    />
+                  )}
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

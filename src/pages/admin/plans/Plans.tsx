@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash, Briefcase } from "lucide-react";
+import { Plus, Pencil, Trash } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,8 +46,7 @@ const Plans = () => {
     try {
       const { data, error } = await supabase
         .from('plans')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
 
       if (error) throw error;
       setPlans(data || []);
@@ -275,7 +274,16 @@ const Plans = () => {
                 <Card key={plan.id}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      {plan.name}
+                      <div className="flex items-center gap-2">
+                        {plan.name}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          plan.status === 'active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {plan.status}
+                        </span>
+                      </div>
                       <div className="flex gap-2">
                         <Button 
                           variant="ghost" 
@@ -301,7 +309,7 @@ const Plans = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span>Investment:</span>
-                          <span>${plan.investment}</span>
+                          <span>${plan.investment.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Returns:</span>
@@ -316,8 +324,8 @@ const Plans = () => {
                       <div className="space-y-2">
                         <h4 className="font-semibold">Benefits:</h4>
                         <ul className="list-disc list-inside space-y-1 text-sm">
-                          {plan.benefits.split('\n').map((benefit, index) => (
-                            <li key={index}>{benefit.trim()}</li>
+                          {plan.benefits.split('•').filter(Boolean).map((benefit, index) => (
+                            <li key={index} className="text-muted-foreground">{benefit.trim()}</li>
                           ))}
                         </ul>
                       </div>
