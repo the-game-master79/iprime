@@ -21,10 +21,18 @@ import {
 } from "@/components/ui/carousel";
 
 // Icons
-import {
-Copy, QrCode, Receipt, Trophy, ChevronLeft, ChevronRight // Add ChevronLeft, ChevronRight
-} from "lucide-react";
-import { PlusCircle, ArrowCircleUpRight, ShoppingCart, ShareNetwork } from "@phosphor-icons/react";
+import { 
+  Copy as CopyIcon,
+  QrCode as QrCodeIcon, 
+  Receipt as ReceiptIcon, 
+  Trophy as TrophyIcon,
+  CaretLeft,
+  CaretRight,
+  PlusCircle,
+  ArrowCircleUpRight,
+  ShoppingCartSimple,
+  ShareNetwork
+} from "@phosphor-icons/react";
 
 // Utilities
 import { useToast } from "@/hooks/use-toast";
@@ -698,7 +706,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         size="sm"
                         onClick={() => navigate('/plans')}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        <ShoppingCartSimple className="h-4 w-4 mr-2" />
                         Buy Computes
                       </Button>
                     </div>
@@ -771,10 +779,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   {promotions.length > 3 && (
                     <>
                       <CarouselPrevious className="hidden md:flex -left-12 shadow-md hover:bg-primary hover:text-white">
-                        <ChevronLeft className="h-5 w-5" />
+                        <CaretLeft className="h-5 w-5" weight="regular" />
                       </CarouselPrevious>
                       <CarouselNext className="hidden md:flex -right-12 shadow-md hover:bg-primary hover:text-white">
-                        <ChevronRight className="h-5 w-5" />
+                        <CaretRight className="h-5 w-5" weight="regular" />
                       </CarouselNext>
                     </>
                   )}
@@ -803,10 +811,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         />
                         <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
                           <Button size="sm" variant="ghost" onClick={handleShowQrCode}>
-                            <QrCode className="h-4 w-4" />
+                            <QrCodeIcon className="h-4 w-4" weight="regular" />
                           </Button>
                           <Button size="sm" variant="ghost" onClick={handleCopyLink}>
-                            <Copy className="h-4 w-4" />
+                            <CopyIcon className="h-4 w-4" weight="regular" />
                           </Button>
                         </div>
                       </div>
@@ -826,11 +834,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   <Tabs defaultValue="transactions" className="w-full">
                     <TabsList className="inline-flex mb-6">
                       <TabsTrigger value="transactions">
-                        <Receipt className="h-4 w-4 mr-2" />
+                        <ReceiptIcon className="h-4 w-4 mr-2" weight="regular" />
                         Transactions
                       </TabsTrigger>
                       <TabsTrigger value="ranks">
-                        <Trophy className="h-4 w-4 mr-2" />
+                        <TrophyIcon className="h-4 w-4 mr-2" weight="regular" />
                         Ranks
                       </TabsTrigger>
                     </TabsList>

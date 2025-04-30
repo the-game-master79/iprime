@@ -15,9 +15,16 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface TopbarProps {
   title: string;
+  variant?: 'default' | 'minimal' | 'transparent';
+  hideBalance?: boolean;
+  hideNotifications?: boolean;
+  hideBackButton?: boolean;
+  className?: string;
+  backButtonAction?: () => void;
 }
 
 interface Notice {
@@ -32,7 +39,15 @@ interface Notice {
   user_id: string | null;
 }
 
-export const Topbar = ({ title }: TopbarProps) => {
+export const Topbar = ({ 
+  title, 
+  variant = 'default',
+  hideBalance = false,
+  hideNotifications = false,
+  hideBackButton = false,
+  className,
+  backButtonAction
+}: TopbarProps) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [balance, setBalance] = useState(0);
@@ -126,39 +141,34 @@ export const Topbar = ({ title }: TopbarProps) => {
     }
   };
 
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-[1200px] items-center px-4">
-        <div className="flex flex-1 items-center justify-between gap-4">
-          {/* Left section */}
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="flex items-center gap-2"
-              onClick={() => window.history.back()}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="hidden md:block">
-              <h1 className="text-xl font-semibold">{title}</h1>
-            </div>
+  const renderDefaultContent = () => (
+    <>
+      <div className="flex items-center gap-4">
+        {!hideBackButton && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={backButtonAction || (() => window.history.back())}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
+        <div className="hidden md:block">
+          <h1 className="text-xl font-semibold">{title}</h1>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {!hideBalance && (
+          <div onClick={handleBalanceClick} className="flex items-center gap-2 rounded-full border bg-card px-4 py-1.5 shadow-sm transition-colors hover:bg-accent">
+            <span className="text-sm font-medium">${balance.toLocaleString()}</span>
+            <Plus className="h-4 w-4 rounded-full bg-primary p-0.5 text-white hover:bg-primary/90" />
           </div>
+        )}
 
-          {/* Right section */}
-          <div className="flex items-center gap-4">
-            {/* Balance */}
-            <div 
-              onClick={handleBalanceClick}
-              className="flex items-center gap-2 rounded-full border bg-card px-4 py-1.5 shadow-sm transition-colors hover:bg-accent"
-            >
-              <span className="text-sm font-medium">
-                ${balance.toLocaleString()}
-              </span>
-              <Plus className="h-4 w-4 rounded-full bg-primary p-0.5 text-white hover:bg-primary/90" />
-            </div>
-
-            {/* Notifications */}
+        {!hideNotifications && (
+          <>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
@@ -213,34 +223,74 @@ export const Topbar = ({ title }: TopbarProps) => {
             </DropdownMenu>
 
             <Separator orientation="vertical" className="h-6" />
+          </>
+        )}
 
-            {/* User Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <UserCircle className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate('/profile')}>
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-red-600">
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <UserCircle className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => navigate('/profile')}>
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-red-600">
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </>
+  );
+
+  const renderMinimalContent = () => (
+    <>
+      <div className="flex flex-col items-center gap-1">
+        <img 
+          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade-1.svg" 
+          alt="CloudTrade Logo" 
+          className="h-8 w-auto" 
+        />
+      </div>
+      
+      <div className="flex items-center gap-4">
+        <h1 className="text-xl font-semibold">{title}</h1>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-full hover:bg-primary/10"
+          onClick={() => navigate('/profile')}
+        >
+          <UserCircle className="h-5 w-5" />
+        </Button>
+      </div>
+    </>
+  );
+
+  return (
+    <header className={cn(
+      "sticky top-0 z-50 w-full",
+      variant === 'default' && "border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      variant === 'minimal' && "bg-transparent",
+      variant === 'transparent' && "absolute bg-transparent border-none",
+      className
+    )}>
+      <div className="container flex h-14 max-w-[1200px] items-center px-4">
+        <div className="flex flex-1 items-center justify-between gap-4">
+          {variant === 'minimal' ? renderMinimalContent() : renderDefaultContent()}
         </div>
       </div>
       
-      {/* Mobile title */}
-      <div className="border-b md:hidden">
-        <div className="container px-4 py-2">
-          <h1 className="text-lg font-semibold">{title}</h1>
+      {variant === 'default' && (
+        <div className="border-b md:hidden">
+          <div className="container px-4 py-2">
+            <h1 className="text-lg font-semibold">{title}</h1>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 };

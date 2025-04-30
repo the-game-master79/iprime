@@ -57,6 +57,9 @@ const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage")); // Add
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
+// Add Account import with other lazy imports
+const Account = lazy(() => import("@/pages/account/Account"));
+
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +116,7 @@ const App = () => {
 
             {/* Protected Routes */}
             <Route path="/dashboard" element={<AuthGuard requireAuth><Dashboard /></AuthGuard>} />
+            <Route path="/account" element={<AuthGuard requireAuth><Account /></AuthGuard>} />
             <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
             <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
             <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
