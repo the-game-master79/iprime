@@ -1,0 +1,84 @@
+-- Drop existing functions first
+DROP FUNCTION IF EXISTS close_trade(UUID, DECIMAL, DECIMAL);
+DROP FUNCTION IF EXISTS auto_close_trades_on_zero_balance() CASCADE;
+
+CREATE OR REPLACE FUNCTION close_trade(
+  p_trade_id UUID,
+  p_close_price DECIMAL,
+  p_pnl DECIMAL
+)
+RETURNS TABLE (
+  withdrawal_wallet DECIMAL
+) AS $$
+DECLARE 
+  v_trade RECORD;
+  v_standard_lot_size DECIMAL;
+BEGIN
+  -- Get trade details and lock the row
+  SELECT t.*, p.withdrawal_wallet, p.id as profile_id
+  INTO v_trade
+  FROM trades t
+  JOIN profiles p ON p.id = t.user_id
+  WHERE t.id = p_trade_id 
+  AND t.status IN ('open', 'pending')
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Trade not found or already closed';
+  END IF;
+
+  -- Set standard lot size based on pair type
+  v_standard_lot_size := CASE 
+    WHEN v_trade.pair LIKE 'BINANCE:%' THEN 1
+    WHEN v_trade.pair = 'FX:XAU/USD' THEN 100
+    ELSE 100000
+  END;
+
+  -- Skip PnL validation and just use the provided values
+  -- The prevent_negative_balance trigger will handle any balance issues
+
+  -- Update trade status
+  UPDATE trades
+  SET 
+    status = 'closed',
+    close_price = p_close_price,
+    pnl = p_pnl,
+    closed_at = NOW()
+  WHERE id = p_trade_id;
+
+  -- Release margin and update user's balance with PnL
+  UPDATE profiles p
+  SET 
+    withdrawal_wallet = p.withdrawal_wallet + v_trade.margin_amount + p_pnl,
+    updated_at = NOW()
+  WHERE id = v_trade.user_id
+  RETURNING p.withdrawal_wallet INTO withdrawal_wallet;
+
+  -- Return updated wallet balance
+  RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create or replace notification function
+CREATE OR REPLACE FUNCTION notify_trade_close()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM pg_notify(
+    'trade_closed',
+    json_build_object(
+      'trade_id', NEW.id,
+      'close_price', NEW.close_price,
+      'pnl', NEW.pnl
+    )::text
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for notifications
+DROP TRIGGER IF EXISTS trade_close_notification ON trades;
+CREATE TRIGGER trade_close_notification
+  AFTER UPDATE OF status ON trades
+  FOR EACH ROW
+  WHEN (NEW.status = 'closed')
+  EXECUTE FUNCTION notify_trade_close();

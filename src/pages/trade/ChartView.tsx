@@ -861,10 +861,10 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                 <Badge variant="outline" className="rounded-sm bg-white text-primary">Web</Badge>
               </div>
               
-              {/* Balance */}
+              {/* Balance with null check */}
               <div className="flex flex-col">
                 <span className="text-2xl font-semibold text-white">
-                  ${userBalance.toLocaleString()}
+                  ${(userBalance ?? 0).toLocaleString()}
                 </span>
               </div>
             </div>

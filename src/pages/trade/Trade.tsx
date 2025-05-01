@@ -15,6 +15,7 @@ import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading";
 import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin } from "@/utils/trading";
 import { wsManager, ConnectionMode } from '@/services/websocket-manager';
+import { MarginWatchDog } from "@/components/trading/MarginWatchDog";
 
 const Trade = () => {
   const { isMobile } = useBreakpoints();
@@ -304,7 +305,28 @@ const Trade = () => {
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
-      const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      // Determine which price table to query based on pair type
+      const priceTable = trade.pair.includes('BINANCE:') ? 'crypto_prices' : 'forex_prices';
+      const symbol = trade.pair.includes('BINANCE:') 
+        ? trade.pair.replace('BINANCE:', '')
+        : trade.pair.replace('FX:', '').replace('/', '');
+
+      // Get the current price from appropriate price table
+      const { data: priceData, error: priceError } = await supabase
+        .from(priceTable)
+        .select('bid')
+        .eq('symbol', symbol)
+        .single();
+
+      if (priceError) {
+        throw new Error('Could not fetch current price');
+      }
+
+      const closePrice = priceData?.bid || parseFloat(pairPrices[trade.pair]?.bid || '0');
+      if (!closePrice) {
+        throw new Error('Invalid closing price');
+      }
+
       const pnl = calculatePnL(trade, closePrice);
       
       const { data, error } = await supabase
@@ -317,7 +339,11 @@ const Trade = () => {
       if (error) throw error;
 
       // Update local trades state
-      setTrades(prev => prev.filter(t => t.id !== tradeId));
+      setTrades(prev => prev.map(t => 
+        t.id === tradeId 
+          ? { ...t, status: 'closed', pnl } 
+          : t
+      ));
       
       // Update balance if data contains new wallet amount
       if (data?.withdrawal_wallet) {
@@ -326,14 +352,15 @@ const Trade = () => {
 
       toast({
         title: "Trade Closed",
-        description: `Successfully closed trade for ${trade.pair}`
+        description: `Successfully closed trade with P&L: $${pnl.toFixed(2)}`
       });
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Error closing trade:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to close trade"
+        description: error.message || "Failed to close trade"
       });
     }
   };
@@ -419,6 +446,12 @@ const Trade = () => {
       currentPrices={pairPrices}
       onCloseTrade={handleCloseTrade}
     >
+      <MarginWatchDog
+        trades={trades}
+        currentPrices={pairPrices}
+        userBalance={userBalance}
+        onCloseTrade={handleCloseTrade}
+      />
       {isMobile ? (
         <div className="flex flex-col h-full bg-background">
           {/* Mobile view layout */}

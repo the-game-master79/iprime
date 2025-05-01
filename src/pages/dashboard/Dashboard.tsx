@@ -304,14 +304,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (!user) return;
 
       // Get total business volume and rank directly from total_business_volumes
-      const { data: volumeData, error: volumeError } = await supabase
+      const { data: volumeData } = await supabase
         .from('total_business_volumes')
         .select('total_amount, business_rank')
         .eq('user_id', user.id)
         .single();
 
-      if (volumeError) throw volumeError;
-
+      // Set default values if no data exists
       const businessVolume = volumeData?.total_amount || 0;
       const currentRankTitle = volumeData?.business_rank || 'New Member';
 
@@ -323,19 +322,22 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
       if (ranksError) throw ranksError;
 
-      // Find current and next rank based on stored rank title
-      const currentRank = ranks.find(r => r.title === currentRankTitle) || ranks[0];
+      // Default to first rank if no rank is found
+      const currentRank = ranks.find(r => r.title === currentRankTitle) || ranks[0] || { 
+        title: 'New Member',
+        business_amount: 0,
+        bonus: 0
+      };
+      
       const currentRankIndex = ranks.findIndex(r => r.title === currentRankTitle);
       const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
 
       // Calculate progress to next rank
       let progress = 0;
-      if (nextRank) {
+      if (nextRank && currentRank) {
         const progressCalc = ((businessVolume - currentRank.business_amount) / 
           (nextRank.business_amount - currentRank.business_amount)) * 100;
         progress = Math.min(100, Math.max(0, progressCalc));
-      } else {
-        progress = 100;
       }
 
       setBusinessStats({
@@ -353,10 +355,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
     } catch (error) {
       console.error('Error fetching business stats:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load business stats",
-        variant: "destructive"
+      // Set default values on error
+      setBusinessStats({
+        currentRank: 'New Member',
+        totalVolume: 0,
+        rankBonus: 0,
+        nextRank: null,
+        progress: 0,
+        targetVolume: 0
       });
     }
   };

@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Trade } from "@/types/trade";
 import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 import { wsManager } from '@/services/websocket-manager';
+import { VisuallyHidden } from '@/components/ui/visually-hidden';
+import { DialogTitle } from "@/components/ui/dialog";
 
 interface PriceData {
   price: string;
@@ -107,14 +109,13 @@ export function TradesSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="bottom" 
-        className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0"
+        className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0 rounded-t-xl"
       >
-        {/* Drag handle */}
-        <div className="h-6 relative flex items-center justify-center">
-          <div 
-            role="presentation"
-            className="h-1 w-12 rounded-full bg-muted/50" 
-          />
+        <div className="py-4 px-4 border-b">
+          <DialogTitle>Active Trades</DialogTitle>
+          <VisuallyHidden>
+            View and manage your active trading positions
+          </VisuallyHidden>
         </div>
 
         {/* Header */}
