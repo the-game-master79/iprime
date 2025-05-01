@@ -62,8 +62,7 @@ export function TradesSheet({
   onCloseTrade,
   calculatePnL
 }: TradesSheetProps) {
-  const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
-  const [closedTrades, setClosedTrades] = useState<Trade[]>([]);
+  const [activeTab, setActiveTab] = useState<'open' | 'pending'>('open');
   const [isLoading, setIsLoading] = useState(false);
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
 
@@ -112,54 +111,8 @@ export function TradesSheet({
     }
   }, [open]);
 
-  // Fetch closed trades when tab changes to 'closed'
-  useEffect(() => {
-    const fetchClosedTrades = async () => {
-      if (activeTab !== 'closed') return;
-      
-      setIsLoading(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data: trades, error } = await supabase
-          .from('trades')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'closed')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const formattedTrades: Trade[] = trades.map(trade => ({
-          id: trade.id,
-          pair: trade.pair,
-          type: trade.type,
-          status: trade.status,
-          openPrice: trade.open_price,
-          lots: trade.lots,
-          leverage: trade.leverage,
-          orderType: trade.order_type,
-          limitPrice: trade.limit_price,
-          openTime: new Date(trade.created_at).getTime(),
-          pnl: trade.pnl || 0
-        }));
-
-        setClosedTrades(formattedTrades);
-      } catch (error) {
-        console.error('Error fetching closed trades:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchClosedTrades();
-  }, [activeTab]);
-
-  // Use different trade sources based on active tab
-  const displayedTrades = activeTab === 'closed' 
-    ? closedTrades 
-    : openTrades.filter(trade => trade.status === activeTab);
+  // Use trades filtered by active tab
+  const displayedTrades = openTrades.filter(trade => trade.status === activeTab);
 
   // Add price formatting helper
   const formatPrice = (price: number, symbol: string) => {
@@ -170,181 +123,99 @@ export function TradesSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="bottom" 
-        className="h-[92vh] p-0 flex flex-col overflow-hidden border-t-0 cursor-grab active:cursor-grabbing touch-none"
-        aria-describedby="trades-sheet-description"
+        className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0"
       >
-        <VisuallyHidden asChild>
-          <DialogTitle>Trading Positions</DialogTitle>
-        </VisuallyHidden>
-        <VisuallyHidden asChild>
-          <DialogDescription id="trades-sheet-description">
-            View and manage your active, pending and closed trading positions
-          </DialogDescription>
-        </VisuallyHidden>
-
-        {/* Make entire drag handle area interactive */}
-        <div className="relative pb-1 cursor-grab active:cursor-grabbing">
-          {/* Visual indicator for dragging */}
+        {/* Drag handle */}
+        <div className="h-6 relative flex items-center justify-center">
           <div 
             role="presentation"
-            className="absolute left-1/2 -translate-x-1/2 top-3 h-1 w-12 rounded-full bg-muted hover:bg-muted/80 transition-colors" 
+            className="h-1 w-12 rounded-full bg-muted/50" 
           />
         </div>
 
-        <div className="px-4 py-3 border-b bg-muted/50 backdrop-blur-sm">
-          <Tabs defaultValue="open" onValueChange={(value) => setActiveTab(value as 'open' | 'pending' | 'closed')} className="flex-1">
-            <TabsList className="grid w-full grid-cols-3 p-1 rounded-lg">
-              <TabsTrigger value="open" className="rounded-md">
+        {/* Header */}
+        <div className="px-3 py-2 backdrop-blur-sm">
+          <Tabs defaultValue="open" onValueChange={(value) => setActiveTab(value as 'open' | 'pending')} className="flex-1">
+            <TabsList className="h-8 p-1">
+              <TabsTrigger value="open" className="text-xs px-3">
                 Open ({openTrades.filter(t => t.status === 'open').length})
               </TabsTrigger>
-              <TabsTrigger value="pending" className="rounded-md">
+              <TabsTrigger value="pending" className="text-xs px-3">
                 Pending ({openTrades.filter(t => t.status === 'pending').length})
-              </TabsTrigger>
-              <TabsTrigger value="closed" className="rounded-md">
-                Closed ({closedTrades.length})
               </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-safe">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-3 py-2">
           {isLoading ? (
             <div className="h-full flex items-center justify-center">
-              <div className="text-muted-foreground animate-pulse">Loading trades...</div>
+              <div className="text-sm text-muted-foreground animate-pulse">Loading...</div>
             </div>
           ) : displayedTrades.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <div className="text-lg font-medium mb-2">No {activeTab} trades</div>
-              <p className="text-sm text-muted-foreground max-w-[280px]">
-                Your {activeTab} trades will appear here once you start trading
+            <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="text-sm font-medium mb-1">No {activeTab} trades</div>
+              <p className="text-xs text-muted-foreground max-w-[280px]">
+                Your {activeTab} trades will appear here
               </p>
             </div>
           ) : (
-            <div className="space-y-4 py-4">
-              {activeTab === 'closed' ? (
-                <div className="space-y-8">
-                  {groupTradesByDate(displayedTrades).map(([date, group]) => (
-                    <div key={date} className="space-y-3">
-                      <div className="sticky top-0 z-10 flex items-center justify-between px-2 py-2 bg-background/80 backdrop-blur-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium">{date}</div>
-                          <Badge variant="secondary" className="h-5 text-xs font-normal">
-                            {group.trades.length} trades
-                          </Badge>
-                        </div>
-                        <div className={cn(
-                          "font-mono text-sm font-medium px-2 py-0.5 rounded-md",
-                          group.totalPnL > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                        )}>
-                          ${group.totalPnL.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {group.trades.map(trade => (
-                          <div 
-                            key={trade.id} 
-                            className="flex items-center justify-between p-4 bg-card hover:bg-accent transition-colors rounded-xl border shadow-sm"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={cn(
-                                "mt-1.5 h-2 w-2 rounded-full ring-2 ring-offset-2",
-                                trade.type === 'buy' 
-                                  ? "bg-blue-500 ring-blue-500/20" 
-                                  : "bg-red-500 ring-red-500/20"
-                              )} />
-                              <div>
-                                <div className="font-medium">{trade.pair.split(':')[1]}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {trade.type.toUpperCase()} {trade.lots} Lots
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Entry @ ${formatPrice(trade.openPrice, trade.pair)}
-                                </div>
-                              </div>
-                            </div>
-                            <div className={cn(
-                              "text-sm font-medium font-mono px-2 py-1 rounded-md",
-                              trade.pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                            )}>
-                              ${trade.pnl?.toFixed(2)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : displayedTrades.map(trade => {
+            <div className="space-y-2">
+              {displayedTrades.map(trade => {
                 const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
-                const pnl = trade.status === 'closed' 
-                  ? trade.pnl 
-                  : calculatePnL(trade, currentPrice);
+                const pnl = trade.status === 'closed' ? trade.pnl : calculatePnL(trade, currentPrice);
                 
                 return (
                   <div 
                     key={trade.id} 
-                    className="flex flex-col gap-4 p-4 bg-card hover:bg-accent transition-colors rounded-xl border shadow-sm"
+                    className="flex flex-col p-3 bg-card hover:bg-accent/50 rounded-lg border"
                   >
+                    {/* Top row - Trade info and P&L */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <div className={cn(
-                          "h-2.5 w-2.5 rounded-full ring-2 ring-offset-2",
-                          trade.type === 'buy' 
-                            ? "bg-blue-500 ring-blue-500/20" 
-                            : "bg-red-500 ring-red-500/20"
+                          "mt-1 h-2 w-2 rounded-full",
+                          trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
                         )} />
-                        <div className="font-medium">{trade.pair.split(':')[1]}</div>
-                      </div>
-                      {trade.status === 'pending' ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onCloseTrade?.(trade.id)}
-                          className="h-8 px-3 text-xs font-medium hover:bg-red-50 hover:text-red-600"
-                        >
-                          Cancel Order
-                        </Button>
-                      ) : (
-                        <div className={cn(
-                          "px-2 py-1 rounded-md text-sm font-medium font-mono",
-                          pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                        )}>
-                          ${pnl.toFixed(2)}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="space-y-1">
-                        <div className="text-muted-foreground">
-                          {trade.type.toUpperCase()} {trade.lots} Lots
-                        </div>
-                        {trade.status === 'pending' ? (
-                          <div className="text-muted-foreground">
-                            Limit @ ${formatPrice(trade.limitPrice || 0, trade.pair)}
+                        <div className="space-y-0.5">
+                          <div className="text-sm font-medium">{trade.pair.split(':')[1]}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {trade.type.toUpperCase()} {trade.lots} Lots @ ${formatPrice(trade.openPrice, trade.pair)}
                           </div>
-                        ) : (
-                          <>
-                            <div className="text-muted-foreground">
-                              Entry @ ${formatPrice(trade.openPrice, trade.pair)}
-                            </div>
-                            <div className="text-muted-foreground">
+                          {trade.status === 'open' && (
+                            <div className="text-xs text-muted-foreground">
                               Current: ${formatPrice(currentPrice, trade.pair)}
                             </div>
-                          </>
-                        )}
+                          )}
+                        </div>
                       </div>
-                      {trade.status === 'open' && onCloseTrade && (
+                      <div className={cn(
+                        "text-xs font-medium px-2 py-1 rounded-md",
+                        pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                      )}>
+                        ${pnl.toFixed(2)}
+                      </div>
+                    </div>
+
+                    {/* Bottom row - Close button */}
+                    {trade.status === 'open' && onCloseTrade && (
+                      <div className="-mx-3 -mb-3 mt-3 border-t">
                         <Button
-                          variant="destructive"
-                          size="sm"
+                          variant="ghost"
+                          size="sm" 
                           onClick={() => onCloseTrade(trade.id)}
-                          className="h-8 px-3 text-xs font-medium"
+                          className={cn(
+                            "w-full rounded-none h-9 text-xs font-medium",
+                            pnl > 0 
+                              ? "bg-green-500/5 text-green-500 hover:bg-green-500/10 hover:text-green-600" 
+                              : "bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                          )}
                         >
                           Close Position
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

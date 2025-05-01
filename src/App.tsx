@@ -59,6 +59,7 @@ import AdminPairs from "@/pages/admin/pairs/Pairs";
 
 // Add Account import with other lazy imports
 const Account = lazy(() => import("@/pages/account/Account"));
+const Performance = lazy(() => import("@/pages/performance/Performance")); // Move Performance import here
 
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
@@ -187,6 +188,13 @@ const App = () => {
                 </Routes>
               }
             />
+
+            {/* Change Performance route from PrivateRoute to AuthGuard */}
+            <Route path="/performance" element={
+              <AuthGuard requireAuth>
+                <Performance />
+              </AuthGuard>
+            } />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -10,13 +10,14 @@ import { MagnifyingGlass, ChartLine, Globe, X } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { TradesSheet } from "@/components/shared/TradesSheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePnL } from "@/utils/trading";
 import { wsManager } from '@/services/websocket-manager';
 import { cryptoDecimals, forexDecimals } from "@/config/decimals";
 import { NavigationFooter } from "@/components/shared/NavigationFooter";
 import { motion, AnimatePresence } from "framer-motion";
+import { TradesSheet } from "@/components/shared/TradesSheet";
 
 const SelectPairs = () => {
   const { toast } = useToast();
@@ -261,6 +262,32 @@ const SelectPairs = () => {
     return trades.filter(t => t.pair === pairSymbol && t.status === 'open');
   };
 
+  // Add grouping helper
+  const groupTradesByDate = (trades: Trade[]) => {
+    return trades.reduce((acc, trade) => {
+      const date = new Date(trade.openTime);
+      const dateKey = date.toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          trades: [],
+          totalPnL: 0,
+        };
+      }
+      
+      const currentPrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      const pnl = calculatePnL(trade, currentPrice);
+      acc[dateKey].trades.push(trade);
+      acc[dateKey].totalPnL += pnl;
+      
+      return acc;
+    }, {} as Record<string, { trades: Trade[], totalPnL: number }>);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b">
@@ -468,9 +495,9 @@ const SelectPairs = () => {
           open={showTradesSheet}
           onOpenChange={setShowTradesSheet}
           trades={trades}
-          pairPrices={pairPrices}
           onCloseTrade={handleCloseTrade}
-          calculatePnL={calculatePnL}
+          calculatePnL={(trade, currentPrice) => calculatePnL(trade, currentPrice)}
+          pairPrices={pairPrices}
         />
 
         <NavigationFooter />
