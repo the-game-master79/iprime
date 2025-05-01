@@ -499,6 +499,47 @@ export const TradingPanel = ({
 
     return visibleCategories;
   }
+
+  // Add price animation state
+  const [priceAnimations, setPriceAnimations] = useState<{[key: string]: 'up' | 'down'}>({});
+
+  // Update price state to include last values for comparison
+  const [lastPrices, setLastPrices] = useState({
+    bid: '0',
+    ask: '0'
+  });
+
+  // Update price effect to handle animations
+  useEffect(() => {
+    if (pairPrices[selectedPair]) {
+      const newBid = pairPrices[selectedPair].bid;
+      const newAsk = pairPrices[selectedPair].ask;
+      
+      // Compare with last prices
+      if (parseFloat(newBid) !== parseFloat(lastPrices.bid)) {
+        setPriceAnimations(prev => ({
+          ...prev,
+          bid: parseFloat(newBid) > parseFloat(lastPrices.bid) ? 'up' : 'down'
+        }));
+      }
+      
+      if (parseFloat(newAsk) !== parseFloat(lastPrices.ask)) {
+        setPriceAnimations(prev => ({
+          ...prev,
+          ask: parseFloat(newAsk) > parseFloat(lastPrices.ask) ? 'up' : 'down'
+        }));
+      }
+
+      setLastPrices({ bid: newBid, ask: newAsk });
+      setStaticBidPrice(formatPrice(newBid));
+      setStaticAskPrice(formatPrice(newAsk));
+
+      // Clear animations after delay
+      const timer = setTimeout(() => setPriceAnimations({}), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedPair, pairPrices[selectedPair]?.bid, pairPrices[selectedPair]?.ask]);
+
   return (
     <div className="w-[350px] border-l bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
@@ -519,11 +560,23 @@ export const TradingPanel = ({
             <div className="ml-auto flex gap-2">
               <div className="bg-muted px-2 py-1 rounded-md">
                 <div className="text-xs text-muted-foreground">Bid</div>
-                <div className="font-mono">{formatPrice(pairPrices[selectedPair]?.bid)}</div>
+                <div className={cn(
+                  "font-mono transition-colors",
+                  priceAnimations.bid === 'up' && "text-green-500",
+                  priceAnimations.bid === 'down' && "text-red-500"
+                )}>
+                  {formatPrice(pairPrices[selectedPair]?.bid)}
+                </div>
               </div>
               <div className="bg-muted px-2 py-1 rounded-md">
                 <div className="text-xs text-muted-foreground">Ask</div>
-                <div className="font-mono">{formatPrice(pairPrices[selectedPair]?.ask)}</div>
+                <div className={cn(
+                  "font-mono transition-colors",
+                  priceAnimations.ask === 'up' && "text-green-500",
+                  priceAnimations.ask === 'down' && "text-red-500"
+                )}>
+                  {formatPrice(pairPrices[selectedPair]?.ask)}
+                </div>
               </div>
             </div>
           </div>

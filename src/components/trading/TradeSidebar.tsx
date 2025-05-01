@@ -7,9 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MagnifyingGlass, ChartLine, Globe, ArrowsHorizontal } from "@phosphor-icons/react";
 import { TradingPair, PriceData } from "@/types/trading";
-import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
-import { wsManager } from '@/services/websocket-manager';
+import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 
 interface TradeSidebarProps {
   selectedPair: string;
@@ -47,13 +46,9 @@ export const TradeSidebar = ({
     });
   }, [tradingPairs, searchQuery, activeTab]);
 
-  // Subscribe to WebSocket price updates
+  // Subscribe to WebSocket price updates with FULL mode
   useEffect(() => {
-    const pairsToWatch = filteredPairs.map(p => p.symbol);
-    
     const unsubscribe = wsManager.subscribe((symbol, data) => {
-      if (!pairsToWatch.includes(symbol)) return;
-
       setLocalPrices(prev => {
         const prevPrice = parseFloat(prev[symbol]?.bid || '0');
         const newPrice = parseFloat(data.bid || '0');
@@ -69,13 +64,13 @@ export const TradeSidebar = ({
       });
     });
 
-    wsManager.watchPairs(pairsToWatch);
+    // Watch all pairs in FULL mode
+    wsManager.watchPairs(tradingPairs.map(p => p.symbol), ConnectionMode.FULL);
 
     return () => {
       unsubscribe();
-      wsManager.unwatchPairs(pairsToWatch);
     };
-  }, [filteredPairs]);
+  }, [tradingPairs]); // Only depend on tradingPairs changes
 
   // Clear animations after delay
   useEffect(() => {

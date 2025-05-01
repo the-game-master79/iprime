@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, memo } from 'react';
+import { useBreakpoints } from "@/hooks/use-breakpoints";
 
 interface TradingViewWidgetProps {
   symbol: string;
@@ -7,6 +8,7 @@ interface TradingViewWidgetProps {
 
 function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
+  const { isMobile } = useBreakpoints();
 
   useEffect(() => {
     if (container.current) {
@@ -24,14 +26,16 @@ function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) 
         "style": "1",
         "locale": "en",
         "enable_publishing": false,
-        "hide_top_toolbar": false,
-        "hide_side_toolbar": false,
-        "allow_symbol_change": false,
+        "hide_top_toolbar": isMobile,
+        "hide_symbol": isMobile,
+        "hide_legend": isMobile,
         "save_image": false,
+        "calendar": false,
+        "hide_volume": false,
         "support_host": "https://www.tradingview.com",
         "container_id": "tradingview_chart",
-        "hide_volume": false,
-        "calendar": false,
+        "hide_side_toolbar": isMobile,
+        "withdateranges": false,
         "details": false,
         "hotlist": false,
         "width": "100%",
@@ -46,7 +50,7 @@ function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) 
         container.current.innerHTML = '';
       }
     };
-  }, [symbol, theme]);
+  }, [symbol, theme, isMobile]);
 
   return (
     <div className="tradingview-widget-container flex flex-col h-full w-full relative" ref={container}>

@@ -4,11 +4,6 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Trade } from "@/types/trade";
-import { VisuallyHidden } from "@/components/ui/visually-hidden";
-import { DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
-import { calculatePnL } from "@/utils/trading";
 import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 import { wsManager } from '@/services/websocket-manager';
 
@@ -66,43 +61,32 @@ export function TradesSheet({
   const [isLoading, setIsLoading] = useState(false);
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
 
-  // Modified WebSocket subscription effect
+  // Modified WebSocket subscription effect - remove fetchInitialPrices
   useEffect(() => {
-    // Get all unique pairs from both open and pending trades
     const tradePairs = openTrades
       .filter(t => t.status === 'open' || t.status === 'pending')
       .map(t => t.pair);
 
     const uniquePairs = Array.from(new Set(tradePairs));
     
-    const unsubscribe = wsManager.subscribe((symbol, data) => {
-      setLocalPrices(prev => {
-        const prevPrice = parseFloat(prev[symbol]?.bid || '0');
-        const newPrice = parseFloat(data.bid || '0');
-        
-        // Only update if the price has actually changed
-        if (prevPrice === newPrice) {
-          return prev;
-        }
-
-        return {
+    if (uniquePairs.length > 0) {
+      // Just setup WebSocket subscription directly
+      const unsubscribe = wsManager.subscribe((symbol, data) => {
+        setLocalPrices(prev => ({
           ...prev,
           [symbol]: data
-        };
+        }));
       });
-    });
 
-    if (uniquePairs.length > 0) {
+      // Watch pairs will trigger initial price updates through the WebSocket
       wsManager.watchPairs(uniquePairs);
-    }
 
-    return () => {
-      unsubscribe();
-      if (uniquePairs.length > 0) {
+      return () => {
+        unsubscribe();
         wsManager.unwatchPairs(uniquePairs);
-      }
-    };
-  }, [openTrades]); // Only depend on trades changes, not on open state
+      };
+    }
+  }, [openTrades]);
 
   // Reset to open tab when sheet opens/closes
   useEffect(() => {

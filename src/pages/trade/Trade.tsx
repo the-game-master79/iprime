@@ -14,7 +14,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
 import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading";
 import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin } from "@/utils/trading";
-import { wsManager } from '@/services/websocket-manager';
+import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 
 const Trade = () => {
   const { isMobile } = useBreakpoints();
@@ -33,8 +33,10 @@ const Trade = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [defaultLeverage, setDefaultLeverage] = useState(100);
 
-  // Update websocket subscription effect to handle forex pairs correctly
+  // Effect for single pair websocket (Chart/Panel)
   useEffect(() => {
+    if (!selectedPair) return;
+
     const unsubscribe = wsManager.subscribe((symbol, priceData) => {
       setPairPrices(prev => ({
         ...prev,
@@ -42,31 +44,56 @@ const Trade = () => {
       }));
     });
 
-    // Watch selected pair and any pairs from open trades
-    const formatPairForWs = (pair: string) => {
-      if (pair.startsWith('FX:')) {
-        return pair.replace('FX:', '').replace('/', ''); // Convert FX:EUR/USD to EURUSD
-      }
-      return pair;
-    };
-
-    const pairsToWatch = new Set([selectedPair]);
-    trades.forEach(trade => {
-      if (trade.status === 'open' || trade.status === 'pending') {
-        pairsToWatch.add(trade.pair);
-      }
-    });
-
-    // Format pairs for websocket
-    const formattedPairs = Array.from(pairsToWatch).map(formatPairForWs);
-    
-    wsManager.watchPairs(formattedPairs);
+    wsManager.watchPairs([selectedPair], ConnectionMode.SINGLE);
 
     return () => {
       unsubscribe();
-      wsManager.unwatchPairs(formattedPairs);
+      wsManager.unwatchPairs([selectedPair]);
     };
-  }, [selectedPair, trades]);
+  }, [selectedPair]);
+
+  // Separate effect for minimal mode websocket (Trading Activity)
+  useEffect(() => {
+    const activeTradePairs = trades
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .map(t => t.pair);
+
+    if (activeTradePairs.length === 0) return;
+
+    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: priceData
+      }));
+    });
+
+    wsManager.watchPairs(activeTradePairs, ConnectionMode.MINIMAL);
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(activeTradePairs);
+    };
+  }, [trades]);
+
+  // Effect for full mode websocket (Sidebar)
+  useEffect(() => {
+    if (!tradingPairs.length) return;
+
+    const allPairs = tradingPairs.map(p => p.symbol);
+    const unsubscribe = wsManager.subscribe((symbol, priceData) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: priceData
+      }));
+    });
+
+    wsManager.watchPairs(allPairs, ConnectionMode.FULL);
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(allPairs);
+    };
+  }, [tradingPairs]);
 
   // Effect to fetch user balance
   useEffect(() => {

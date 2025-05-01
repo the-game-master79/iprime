@@ -1,16 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { Topbar } from "@/components/shared/Topbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import TradingViewWidget from "@/components/charts/TradingViewWidget";
-import { cn } from "@/lib/utils";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { TradesSheet } from "@/components/shared/TradesSheet";
 import { useLimitOrders } from '@/hooks/use-limit-orders';
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
 import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
@@ -851,8 +849,44 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
   return (
     <div className="h-screen bg-background flex flex-col">
-      <Topbar title={formattedPairName} />
+      {/* Balance Card */}
+      <div className="px-4 pt-4">
+        <div className="bg-primary rounded-xl border-gray-200">
+          <div className="p-4">
+            <div className="flex flex-col gap-4">
+              {/* Badges */}
+              <div className="flex gap-2">
+                <Badge variant="outline" className="rounded-sm bg-white text-primary">Pro</Badge>
+                <Badge variant="outline" className="rounded-sm bg-white text-primary">MT5</Badge>
+                <Badge variant="outline" className="rounded-sm bg-white text-primary">Web</Badge>
+              </div>
+              
+              {/* Balance */}
+              <div className="flex flex-col">
+                <span className="text-2xl font-semibold text-white">
+                  ${userBalance.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
+      {/* Add back button and pair name */}
+      <div className="px-4 pt-3 flex items-center gap-4">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate('/trade/select')}
+          className="h-8 px-2"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+        </Button>
+        <div className="flex items-center">
+          <span className="text-lg font-semibold">{formattedPairName}</span>
+        </div>
+      </div>
+
       {/* Add margin call alerts */}
       {Object.keys(marginCallAlerts).length > 0 && (
         <div className="bg-red-50 border-b border-red-100">
@@ -867,74 +901,35 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         </div>
       )}
 
-      <div className="bg-muted/30">
-        <div className="container mx-auto px-4 mt-6">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center justify-between w-full gap-4">
-              <div 
-                className="bg-muted rounded-lg px-4 py-2 flex flex-col cursor-pointer hover:bg-muted/70 transition-colors"
-                onClick={() => setShowTradesSheet(true)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="text-lg font-mono font-medium">
-                    ${formatPrice(pairPrices[defaultPair]?.price)}
-                  </div>
-                  <Badge 
-                    variant={parseFloat(pairPrices[defaultPair]?.change || '0') < 0 ? "destructive" : "success"} 
-                    className="h-6"
-                  >
-                    {parseFloat(pairPrices[defaultPair]?.change || '0') > 0 ? '+' : ''}{pairPrices[defaultPair]?.change}%
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-muted-foreground">Open</span>
-                  <Badge variant="outline" className="h-5 text-xs">
-                    {openTradesCount} trades
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="bg-muted rounded-lg px-4 py-2 cursor-pointer hover:bg-muted/70 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground">P&L (Live)</div>
-                  {openTradesCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent sheet from opening
-                        handleCloseAllTrades();
-                      }}
-                      className="h-6 px-2 text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
-                    >
-                      Close All
-                    </Button>
-                  )}
-                </div>
-                <div
-                  className={cn(
-                    "text-2xl font-mono font-medium text-center",
-                    totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
-                  )}
-                  onClick={() => setShowTradesSheet(true)}
-                >
-                  ${totalPnL.toFixed(2)}
-                </div>
-              </div>
-
-              <TradesSheet
-                open={showTradesSheet}
-                onOpenChange={setShowTradesSheet}
-                trades={trades}
-                pairPrices={pairPrices}
-                onCloseTrade={handleCloseTrade}
-                calculatePnL={calculatePnL}
-              />
-
-            </div>
+      {/* Stats Card */}
+      <div className="px-4 pt-3">
+        <div 
+          className="relative overflow-hidden bg-card rounded-xl border shadow-sm transition-all 
+                   hover:shadow-md active:scale-[0.99] cursor-pointer"
+          onClick={() => setShowTradesSheet(true)}
+        >
+          <div className="p-4 flex items-center justify-between">
+            <Badge variant="outline">
+              Positions ({trades.filter(t => t.status === 'open').length})
+            </Badge>
+            <Badge 
+              variant={totalPnL > 0 ? "success" : "destructive"}
+              className="font-mono"
+            >
+              {totalPnL > 0 ? `Profit +$${totalPnL.toFixed(2)}` : `Loss -$${Math.abs(totalPnL).toFixed(2)}`}
+            </Badge>
           </div>
         </div>
       </div>
+
+      <TradesSheet
+        open={showTradesSheet}
+        onOpenChange={setShowTradesSheet}
+        trades={trades}
+        pairPrices={pairPrices}
+        onCloseTrade={handleCloseTrade}
+        calculatePnL={calculatePnL}
+      />
 
       <div className="container mx-auto px-4 flex-1">
         <div className="flex flex-col h-full relative bg-white rounded-xl mt-4">
@@ -973,11 +968,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                         <span>Max Lots</span>
                         <span className="font-mono text-foreground">
                           {effectiveMaxLots.toFixed(2)}
-                          {effectiveMaxLots < (pairInfo?.max_lots || 0) && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              (Balance limited)
-                            </span>
-                          )}
                         </span>
                       </div>
                     </div>

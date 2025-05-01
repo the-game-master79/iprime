@@ -1,86 +1,60 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react"; // Add this import
-import { supabase } from "@/lib/supabase"; // Add this import
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { Trade, PriceData } from "@/types/trading";
-import { calculatePnL, calculatePipValue } from "@/utils/trading"; // Add calculatePipValue import
+import { calculatePnL, calculatePipValue } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { wsManager } from '@/services/websocket-manager';
 
 interface TradingActivityProps {
   trades: Trade[];
   onCloseTrade: (tradeId: string) => void;
   userBalance: number;
+  currentPrices: Record<string, PriceData>; // Add this prop
 }
 
-const ITEMS_PER_PAGE = 10; // Add pagination constants at the top
+const ITEMS_PER_PAGE = 10;
 
 export const TradingActivity = ({ 
   trades, 
   onCloseTrade,
   userBalance = 0,
+  currentPrices, // Add this prop
 }: TradingActivityProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
-  const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
-  const [currentPage, setCurrentPage] = useState(1); // Add pagination state
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Track all unique trading pairs
-  const activePairs = useMemo(() => {
-    const pairs = new Set<string>();
-    trades.forEach(trade => {
-      // Include pairs from all trades regardless of status
-      pairs.add(trade.pair);
-    });
-    return Array.from(pairs);
-  }, [trades]);
-
-  // Subscribe to WebSocket price updates with persistent connections
-  useEffect(() => {
-    const unsubscribe = wsManager.subscribe((symbol, data) => {
-      setLocalPrices(prev => ({
-        ...prev,
-        [symbol]: data
-      }));
-    });
-
-    // Watch all pairs persistently
-    wsManager.watchPairs(activePairs, true);
-
-    return () => {
-      unsubscribe();
-      // Don't unwatch pairs on unmount since they're persistent
-    };
-  }, [activePairs]); // Only re-run when active pairs change
-
-  // Move all hooks before any conditional returns
+  // Remove WebSocket related state and effects
+  
+  // Update filteredTrades to use currentPrices instead of localPrices
   const filteredTrades = useMemo(() => ({
     open: trades.filter(t => t.status === 'open').map(t => ({
       ...t,
-      currentPrice: localPrices[t.pair]?.bid || t.openPrice
+      currentPrice: currentPrices[t.pair]?.bid || t.openPrice
     })),
     pending: trades.filter(t => t.status === 'pending'),
     closed: trades.filter(t => t.status === 'closed')
-  }), [trades, localPrices]);
+  }), [trades, currentPrices]);
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
-      const currentPrice = parseFloat(localPrices[trade.pair]?.price || '0');
+      const currentPrice = parseFloat(currentPrices[trade.pair]?.price || '0');
       const pnl = calculatePnL(trade, currentPrice);
       return { totalPnL: acc.totalPnL + pnl };
     }, { totalPnL: 0 });
-  }, [filteredTrades.open, localPrices]);
+  }, [filteredTrades.open, currentPrices]);
 
   const { totalMarginUsed, marginLevel, adjustedBalance } = useMemo(() => {
     const totalPnL = trades
       .filter(t => t.status === 'open')
       .reduce((acc, trade) => {
-        const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
+        const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
         return acc + calculatePnL(trade, currentPrice);
       }, 0);
 
@@ -98,7 +72,7 @@ export const TradingActivity = ({
       marginLevel: level,
       adjustedBalance: adjustedBal
     };
-  }, [trades, userBalance, localPrices]);
+  }, [trades, userBalance, currentPrices]);
 
   // Move useEffect before conditional return
   useEffect(() => {
@@ -304,7 +278,7 @@ export const TradingActivity = ({
                 </thead>
                 <tbody className="text-sm">
                   {paginatedTrades.map(trade => {
-                    const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
+                    const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
                     // Calculate PnL based on trade status
                     const pnl = trade.status === 'closed' 
                       ? trade.pnl || 0

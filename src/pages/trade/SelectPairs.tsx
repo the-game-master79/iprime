@@ -5,15 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AlertTriangle } from "lucide-react"; 
 import { MagnifyingGlass, ChartLine, Globe, X } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePnL } from "@/utils/trading";
-import { wsManager } from '@/services/websocket-manager';
+import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 import { cryptoDecimals, forexDecimals } from "@/config/decimals";
 import { NavigationFooter } from "@/components/shared/NavigationFooter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,6 +33,40 @@ const SelectPairs = () => {
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [showSearch, setShowSearch] = useState(false);
 
+  // Add fetchInitialPrices implementation
+  const fetchInitialPrices = async () => {
+    try {
+      const { data: livePrices, error } = await supabase
+        .from('live_prices')
+        .select('*');
+
+      if (error) throw error;
+
+      // Update prices state with fetched data
+      const formattedPrices = livePrices.reduce((acc, price) => ({
+        ...acc,
+        [price.symbol]: {
+          price: price.bid_price,
+          bid: price.bid_price,
+          ask: price.ask_price,
+          change: '0.00'
+        }
+      }), {});
+
+      setPairPrices(prev => ({
+        ...prev,
+        ...formattedPrices
+      }));
+
+      // Reconnect WebSocket after fetching initial prices
+      if (tradingPairs.length > 0) {
+        wsManager.watchPairs(tradingPairs.map(p => p.symbol), ConnectionMode.FULL);
+      }
+    } catch (error) {
+      console.error('Error fetching initial prices:', error);
+    }
+  };
+
   // Fetch trading pairs only once on mount and keep websocket connection alive
   useEffect(() => {
     const fetchTradingPairs = async () => {
@@ -50,20 +82,18 @@ const SelectPairs = () => {
       }
       setTradingPairs(data);
 
-      // Watch all active pairs immediately and persistently
+      // Watch all pairs immediately with FULL mode
       if (data.length > 0) {
         const allPairs = data.map(pair => pair.symbol);
-        wsManager.watchPairs(allPairs, true); // Pass true to indicate persistent connection
+        wsManager.watchPairs(allPairs, ConnectionMode.FULL);
       }
     };
 
     fetchTradingPairs();
-
-    // Only unwatchPairs on component unmount
+    
+    // Cleanup function
     return () => {
-      if (tradingPairs.length > 0) {
-        wsManager.unwatchPairs(tradingPairs.map(p => p.symbol));
-      }
+      wsManager.disconnect(); // Use disconnect instead of unwatchPairs to ensure clean shutdown
     };
   }, []); // Empty dependency array to run only once
 
@@ -133,13 +163,12 @@ const SelectPairs = () => {
     navigate(`/trade/chart/${encodedPair}`);
   };
 
-  // Add visibility change handler
+  // Update visibility change handler
   useEffect(() => {
     const handleVisibilityChange = () => {
-      const visible = document.visibilityState === 'visible';
-      if (visible) {
-        // Fetch latest prices when page becomes visible
-        fetchInitialPrices();
+      if (document.visibilityState === 'visible' && tradingPairs.length > 0) {
+        const allPairs = tradingPairs.map(pair => pair.symbol);
+        wsManager.watchPairs(allPairs, ConnectionMode.FULL);
       }
     };
 
@@ -147,7 +176,7 @@ const SelectPairs = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [tradingPairs]); // Add tradingPairs as dependency
 
   // Add trades fetch effect
   useEffect(() => {
@@ -507,8 +536,4 @@ const SelectPairs = () => {
 };
 
 export default SelectPairs;
-
-function fetchInitialPrices() {
-  throw new Error("Function not implemented.");
-}
 
