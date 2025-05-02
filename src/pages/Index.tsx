@@ -18,6 +18,7 @@ import { useState } from "react";
 import { OrbitingCircles } from "@/components/magicui/orbiting-circles";
 import { Fire, Brain, Cpu, Globe, ShieldStar, Users, Gift, Envelope, Lightning, Cloud } from "@phosphor-icons/react";
 import { Navbar } from "@/components/shared/Navbar";
+import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
 import { Companies } from "@/components/shared/Companies";
 import { SEO } from "@/components/shared/SEO";
@@ -644,37 +645,7 @@ const Index = () => {
               </div>
           </section>
 
-          {/* Footer */}
-          <footer className="border-t bg-background/5 py-8 md:py-12">
-            <div className="container max-w-[1200px] mx-auto px-4">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <img 
-                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
-                    alt="ProfitLink Logo" 
-                    className="h-8 w-auto" 
-                  />
-                </div>
-                <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center">
-                  <Link to="#" className="text-sm text-muted-foreground hover:text-foreground">
-                    Terms of Service
-                  </Link>
-                  <Link to="#" className="text-sm text-muted-foreground hover:text-foreground">
-                    Privacy Policy
-                  </Link>
-                  <button 
-                    onClick={() => setShowContact(true)} 
-                    className="text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Contact Us
-                  </button>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  © {new Date().getFullYear()} CloudForex. All rights reserved.
-                </div>
-              </div>
-            </div>
-          </footer>
+          <Footer />
 
           {/* Contact Dialog */}
           <Dialog open={showContact} onOpenChange={setShowContact}>
