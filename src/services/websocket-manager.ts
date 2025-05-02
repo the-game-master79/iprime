@@ -63,6 +63,7 @@ export class WebSocketManager {
   private tradingPairs: TradingPair[] = [];
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private apiKeyRetryTimeout: NodeJS.Timeout | null = null;
+  private isReconnecting: boolean = false;
   private connectionState: { [key: string]: ConnectionState } = {
     crypto: { status: 'disconnected' },
     forex: { status: 'disconnected' }

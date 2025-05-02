@@ -355,10 +355,18 @@ const SelectPairs = () => {
                 Positions ({trades.filter(t => t.status === 'open').length})
               </Badge>
               <Badge 
-                variant={totalPnL > 0 ? "success" : "destructive"}
-                className="font-mono"
+                variant={totalPnL === 0 ? "outline" : totalPnL > 0 ? "success" : "destructive"}
+                className={cn(
+                  "font-mono",
+                  totalPnL === 0 && "text-muted-foreground bg-muted"
+                )}
               >
-                {totalPnL > 0 ? `Profit +$${totalPnL.toFixed(2)}` : `Loss -$${Math.abs(totalPnL).toFixed(2)}`}
+                {totalPnL === 0 ? 
+                  '$0.00' : 
+                  totalPnL > 0 ? 
+                    `Profit +$${totalPnL.toFixed(2)}` : 
+                    `Loss -$${Math.abs(totalPnL).toFixed(2)}`
+                }
               </Badge>
             </div>
           </div>
@@ -415,7 +423,7 @@ const SelectPairs = () => {
                       <span className="font-medium">Forex</span>
                     </div>
                   </TabsTrigger>
-                </TabsList>
+                  </TabsList>
                 
                 <Button
                   variant="ghost" 

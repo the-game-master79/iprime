@@ -8,6 +8,7 @@ import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 import { wsManager } from '@/services/websocket-manager';
 import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import { DialogTitle } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface PriceData {
   price: string;
@@ -60,10 +61,11 @@ export function TradesSheet({
   calculatePnL
 }: TradesSheetProps) {
   const [activeTab, setActiveTab] = useState<'open' | 'pending'>('open');
-  const [isLoading, setIsLoading] = useState(false);
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
+  const [isPriceLoaded, setIsPriceLoaded] = useState<Record<string, boolean>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Modified WebSocket subscription effect - remove fetchInitialPrices
+  // Modified WebSocket subscription effect
   useEffect(() => {
     const tradePairs = openTrades
       .filter(t => t.status === 'open' || t.status === 'pending')
@@ -72,17 +74,24 @@ export function TradesSheet({
     const uniquePairs = Array.from(new Set(tradePairs));
     
     if (uniquePairs.length > 0) {
-      // Just setup WebSocket subscription directly
+      setIsPriceLoaded(prev => {
+        const next = { ...prev };
+        uniquePairs.forEach(pair => next[pair] = false);
+        return next;
+      });
+
       const unsubscribe = wsManager.subscribe((symbol, data) => {
         setLocalPrices(prev => ({
           ...prev,
           [symbol]: data
         }));
+        setIsPriceLoaded(prev => ({
+          ...prev,
+          [symbol]: true
+        }));
       });
 
-      // Watch pairs will trigger initial price updates through the WebSocket
       wsManager.watchPairs(uniquePairs);
-
       return () => {
         unsubscribe();
         wsManager.unwatchPairs(uniquePairs);
@@ -103,6 +112,23 @@ export function TradesSheet({
   // Add price formatting helper
   const formatPrice = (price: number, symbol: string) => {
     return price.toFixed(getDecimalPlaces(symbol));
+  };
+
+  // Add handler to check if price is loaded
+  const handleCloseTrade = async (tradeId: string) => {
+    const trade = openTrades.find(t => t.id === tradeId);
+    if (!trade) return;
+
+    if (!isPriceLoaded[trade.pair]) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please wait for price data to load",
+      });
+      return;
+    }
+
+    await onCloseTrade(tradeId);
   };
 
   return (
@@ -189,15 +215,17 @@ export function TradesSheet({
                         <Button
                           variant="ghost"
                           size="sm" 
-                          onClick={() => onCloseTrade(trade.id)}
+                          onClick={() => handleCloseTrade(trade.id)}
+                          disabled={!isPriceLoaded[trade.pair]}
                           className={cn(
                             "w-full rounded-none h-9 text-xs font-medium",
+                            !isPriceLoaded[trade.pair] && "opacity-50 cursor-not-allowed",
                             pnl > 0 
                               ? "bg-green-500/5 text-green-500 hover:bg-green-500/10 hover:text-green-600" 
                               : "bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:text-red-600"
                           )}
                         >
-                          Close Position
+                          {!isPriceLoaded[trade.pair] ? 'Loading...' : 'Close Position'}
                         </Button>
                       </div>
                     )}

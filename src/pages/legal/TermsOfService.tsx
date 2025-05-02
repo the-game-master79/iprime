@@ -81,7 +81,19 @@ const TermsOfService = () => {
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold mb-4">7. Contact Us</h2>
+              <h2 className="text-2xl font-semibold mb-4">7. Third-Party Services</h2>
+              <p className="mb-4">
+                Our platform utilizes various third-party services to enhance user experience:
+              </p>
+              <ul className="list-disc pl-6 mb-4">
+                <li>Charts are powered by <a href="https://www.tradingview.com/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">TradingView</a></li>
+                <li>Payment processing through secure payment gateways</li>
+                <li>Market data from licensed data providers</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold mb-4">8. Contact Us</h2>
               <p className="mb-4">
                 For questions about these Terms of Service, please contact us at:
               </p>

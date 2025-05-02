@@ -160,9 +160,11 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [marginUtilized, setMarginUtilized] = useState(0);
   const [isPageVisible, setIsPageVisible] = useState(true);
+  
   const [marginCallAlerts, setMarginCallAlerts] = useState<{[key: string]: boolean}>({});
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [limitPrice, setLimitPrice] = useState('');
+  const [isPriceLoaded, setIsPriceLoaded] = useState(false);
 
   useEffect(() => {
     const fetchUserBalance = async () => {
@@ -243,6 +245,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
     let connections: { [key: string]: WebSocket } = {};
     let heartbeats: { [key: string]: NodeJS.Timeout } = {};
+    setIsPriceLoaded(false); // Reset on new connection
 
     // Get all unique pairs from open trades and current chart
     const getAllPairs = () => {
@@ -287,6 +290,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                   change: data.P
                 }
               }));
+              setIsPriceLoaded(true);
             }
           } catch (error) {
             console.error('Error handling crypto message:', error);
@@ -326,6 +330,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                   change: prev[`FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`]?.change || '0.00'
                 }
               }));
+              setIsPriceLoaded(true);
             }
           } catch (error) {
             console.error('Error handling forex message:', error);
@@ -653,6 +658,15 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
   // Update handleTrade function to include limit order handling
   async function handleTrade(type: 'buy' | 'sell') {
+    if (!isPriceLoaded) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please wait for price data to load",
+      });
+      return;
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -1016,19 +1030,25 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                       variant="outline"
                       className="flex-1 h-12 shadow-sm text-white border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
                       onClick={() => handleTrade('sell')}
+                      disabled={!isPriceLoaded}
                     >
                       <div className="flex flex-col">
                         <span>Sell</span>
-                        <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.bid)}</span>
+                        <span className="text-xs font-mono">
+                          {!isPriceLoaded ? 'Loading...' : `$${formatPrice(pairPrices[defaultPair]?.bid)}`}
+                        </span>
                       </div>
                     </Button>
                     <Button 
                       className="flex-1 h-12 shadow-sm bg-primary hover:bg-primary/90"
                       onClick={() => handleTrade('buy')}
+                      disabled={!isPriceLoaded}
                     >
                       <div className="flex flex-col">
                         <span>Buy</span>
-                        <span className="text-xs font-mono">${formatPrice(pairPrices[defaultPair]?.ask)}</span>
+                        <span className="text-xs font-mono">
+                          {!isPriceLoaded ? 'Loading...' : `$${formatPrice(pairPrices[defaultPair]?.ask)}`}
+                        </span>
                       </div>
                     </Button>
                   </div>
