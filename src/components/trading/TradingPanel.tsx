@@ -540,6 +540,14 @@ export const TradingPanel = ({
     }
   }, [selectedPair, pairPrices[selectedPair]?.bid, pairPrices[selectedPair]?.ask]);
 
+  // Add handler for limit tab click
+  const handleLimitTabClick = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Limit orders will be available in the next update",
+    });
+  };
+
   return (
     <div className="w-[350px] border-l bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
@@ -581,11 +589,11 @@ export const TradingPanel = ({
             </div>
           </div>
 
-          {/* Add Order Type Tabs */}
-          <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
+          {/* Update Order Type Tabs */}
+          <Tabs value={orderType} onValueChange={(value) => value === 'limit' ? handleLimitTabClick() : setOrderType(value as 'market' | 'limit')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="market">Market Order</TabsTrigger>
-              <TabsTrigger value="limit">Limit Order</TabsTrigger>
+              <TabsTrigger value="limit" disabled className="opacity-50">Limit Order</TabsTrigger>
             </TabsList>
           </Tabs>
 

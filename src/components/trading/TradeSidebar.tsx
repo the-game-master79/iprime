@@ -9,6 +9,7 @@ import { MagnifyingGlass, ChartLine, Globe, ArrowsHorizontal } from "@phosphor-i
 import { TradingPair, PriceData } from "@/types/trading";
 import { isForexTradingTime } from "@/lib/utils";
 import { wsManager, ConnectionMode } from '@/services/websocket-manager';
+import { Badge } from "@/components/ui/badge";
 
 interface TradeSidebarProps {
   selectedPair: string;
@@ -196,9 +197,19 @@ export const TradeSidebar = ({
                   <TabsTrigger 
                     value="forex" 
                     className="flex items-center gap-2"
+                    disabled={isForexClosed}
                   >
                     <Globe className="h-4 w-4" />
-                    {!collapsed && "Forex"}
+                    {!collapsed && (
+                      <>
+                        Forex
+                        {isForexClosed && (
+                          <Badge variant="destructive" className="ml-1 text-[10px] px-1 py-0">
+                            Closed
+                          </Badge>
+                        )}
+                      </>
+                    )}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>

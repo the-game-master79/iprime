@@ -175,7 +175,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setWithdrawalBalance(totalBalance);
 
       if (profileData.data?.referral_code) {
-        setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}&tab=register`);
+        setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}`);
       }
 
       // Calculate total invested amount from approved subscriptions

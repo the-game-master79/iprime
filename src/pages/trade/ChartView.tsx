@@ -861,6 +861,17 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     };
   }, [activePairs]);
 
+  // Add handler for limit tab click
+  const handleLimitTabClick = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Limit orders will be available in the next update",
+    });
+  };
+
+  function cn(...classes: (string | undefined | null | false)[]): string {
+    return classes.filter(Boolean).join(' ');
+  }
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Balance Card */}
@@ -927,10 +938,18 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
               Positions ({trades.filter(t => t.status === 'open').length})
             </Badge>
             <Badge 
-              variant={totalPnL > 0 ? "success" : "destructive"}
-              className="font-mono"
+              variant={totalPnL === 0 ? "outline" : totalPnL > 0 ? "success" : "destructive"}
+              className={cn(
+                "font-mono",
+                totalPnL === 0 && "text-muted-foreground bg-muted"
+              )}
             >
-              {totalPnL > 0 ? `Profit +$${totalPnL.toFixed(2)}` : `Loss -$${Math.abs(totalPnL).toFixed(2)}`}
+              {totalPnL === 0 ? 
+                '$0.00' : 
+                totalPnL > 0 ? 
+                  `Profit +$${totalPnL.toFixed(2)}` : 
+                  `-$${Math.abs(totalPnL).toFixed(2)}`
+              }
             </Badge>
           </div>
         </div>
@@ -958,10 +977,10 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
               <div className="bg-background/80 backdrop-blur-sm border rounded-xl shadow-lg">
                 <div className="p-4 space-y-4">
                   {/* Order Type Selector */}
-                  <Tabs value={orderType} onValueChange={(value) => setOrderType(value as 'market' | 'limit')}>
+                  <Tabs value={orderType} onValueChange={(value) => value === 'limit' ? handleLimitTabClick() : setOrderType(value as 'market' | 'limit')}>
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="market">Market Order</TabsTrigger>
-                      <TabsTrigger value="limit">Limit Order</TabsTrigger>
+                      <TabsTrigger value="limit" disabled className="opacity-50">Limit Order</TabsTrigger>
                     </TabsList>
                   </Tabs>
 

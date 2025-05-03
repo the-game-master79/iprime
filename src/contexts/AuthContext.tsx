@@ -22,33 +22,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check active sessions and sets the user
+    let mounted = true;
+
     const initializeAuth = async () => {
       try {
+        // Clear any stale session data first
+        const existingSession = await supabase.auth.getSession();
+        if (!existingSession.data.session) {
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+
+        // Set up auth state change listener
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (mounted) {
+            if (event === 'SIGNED_OUT') {
+              setUser(null);
+              localStorage.clear();
+              sessionStorage.clear();
+            } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              setUser(session?.user ?? null);
+            }
+            setLoading(false);
+          }
+        });
+
+        // Initial session check
         const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
+        if (mounted) {
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+
+        return () => {
+          subscription.unsubscribe();
+        };
       } catch (error) {
         console.error('Error checking auth session:', error);
-      } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setUser(null);
+        }
       }
     };
 
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      mounted = false;
+    };
+  }, [navigate]);
 
   const logout = async () => {
     try {
+      // Clear any stored session data
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Sign out from Supabase
       await supabase.auth.signOut();
+      
+      // Clear local state
       setUser(null);
+      
+      // Redirect to login
       navigate('/auth/login', { replace: true });
     } catch (error) {
       console.error('Error logging out:', error);
