@@ -1,5 +1,4 @@
-import { Trade, PriceData } from "@/types/trading";
-import { getPipValueForPair } from '@/config/pipValues';
+import { Trade, PriceData, TradingPair } from "@/types/trading";
 
 const FOREX_PAIRS_JPY = ['USDJPY', 'EURJPY', 'GBPJPY'];
 
@@ -11,40 +10,39 @@ export const isJPYPair = (pair: string): boolean => {
 export const getStandardLotSize = (pair: string): number => {
   if (pair === 'FX:XAU/USD') return 100;
   if (pair === 'BINANCE:DOTUSDT') return 50; // Special case for Polkadot
+  if (pair === 'BINANCE:POLUSDT') return 5; // 5x the volume for POLUSDT
   return pair.includes('BINANCE:') ? 1 : 100000; // Default: 1 for crypto, 100000 for forex
-};
-
-export const getPipValue = (pair: string): number => {
-  if (!pair) return 0;
-  // Use consistent pip values from config
-  return getPipValueForPair(pair);
 };
 
 export const calculatePipValue = (
   lots: number,
   price: number,
-  pair: string
+  pair: string,
+  tradingPairs?: TradingPair[] // Make tradingPairs optional
 ): number => {
-  if (!pair || !price || !lots) return 0;
+  if (!pair || !price || !lots || !tradingPairs?.length) return 0;
+  
+  const pairInfo = tradingPairs.find(p => p.symbol === pair);
+  if (!pairInfo?.pip_value) return 0; // Add null check for pip_value
+  
+  const standardLot = getStandardLotSize(pair);
+  const pipSize = pairInfo.pip_value;
+
+  // Standard lot size for forex is 100,000 units
+  const STANDARD_LOT = 100000;
+  
+  // Calculate units based on selected lots
+  const units = lots * STANDARD_LOT;
   
   if (pair.includes('BINANCE:')) {
-    const pipSize = getPipValue(pair);
-    const standardLot = getStandardLotSize(pair);
-    // For DOT: pip value needs to account for 50-unit standard lot size
-    if (pair === 'BINANCE:DOTUSDT') {
-      return lots * price * pipSize * standardLot * 5; // Multiply by 5 to adjust for 50 units
-    }
-    return lots * price * pipSize * standardLot;
+    // For crypto pairs, use simpler calculation since price is in USD directly
+    return pairInfo.pip_value * units;
   }
   
-  if (pair === 'FX:XAU/USD') {
-    // For gold: 1 pip = 0.1, lot size = 100 oz
-    return lots * 100 * 0.1;
-  }
-
-  // For forex pairs
-  const pipSize = isJPYPair(pair) ? 0.01 : 0.0001;
-  return lots * 100000 * pipSize;
+  // For forex pairs, use the proper pip value formula
+  // Pip Value = (pip size / current price) × units
+  // For JPY pairs, pip size is 0.01, for others it's 0.0001
+  return (pairInfo.pip_value / price) * units;
 };
 
 export const calculatePriceDifference = (
@@ -57,26 +55,46 @@ export const calculatePriceDifference = (
     : openPrice - currentPrice;
 };
 
-export const calculatePnL = (trade: Trade, currentPrice: number): number => {
+// Calculate price difference in pips
+export const calculatePriceDifferenceInPips = (
+  tradeType: 'buy' | 'sell',
+  currentPrice: number,
+  openPrice: number,
+  pair: string,
+  tradingPairs: TradingPair[]
+): number => {
+  const pairInfo = tradingPairs.find(p => p.symbol === pair);
+  if (!pairInfo) return 0;
+
+  const priceDiff = tradeType === 'buy' 
+    ? currentPrice - openPrice 
+    : openPrice - currentPrice;
+  return priceDiff / pairInfo.pip_value;
+};
+
+// Update PnL calculation to use pip-based calculation
+export const calculatePnL = (trade: Trade, currentPrice: number, tradingPairs?: TradingPair[]): number => {
   if (!currentPrice || !trade.openPrice) return 0;
   
-  const priceDiff = trade.type === 'buy' 
-    ? currentPrice - trade.openPrice 
-    : trade.openPrice - currentPrice;
+  if (!tradingPairs?.length) {
+    const priceDiff = trade.type === 'buy' 
+      ? currentPrice - trade.openPrice 
+      : trade.openPrice - currentPrice;
+    return priceDiff * trade.lots * getStandardLotSize(trade.pair);
+  }
 
-  if (trade.pair.includes('BINANCE:')) {
-    // For crypto: PnL = (price difference * lots)
-    return priceDiff * trade.lots;
-  }
+  const pairInfo = tradingPairs.find(p => p.symbol === trade.pair);
+  if (!pairInfo?.pip_value) return 0;
+
+  // Calculate pips moved (price difference / pip value)
+  const pipsMoved = Math.abs(currentPrice - trade.openPrice) / pairInfo.pip_value;
   
-  if (trade.pair === 'FX:XAU/USD') {
-    // For gold: PnL = (price difference * lots * 100)
-    return priceDiff * trade.lots * 100;
-  }
+  // Calculate pip value for actual lot size (not just 1 lot)
+  const pipValue = calculatePipValue(trade.lots, currentPrice, trade.pair, tradingPairs);
   
-  // For forex: PnL = (price difference * lots * standard lot size)
-  const standardLotSize = 100000;
-  return priceDiff * trade.lots * standardLotSize;
+  // Calculate PnL using: pips moved × pip value
+  // For sell trades, make the result negative
+  return (trade.type === 'buy' ? 1 : -1) * pipsMoved * pipValue;
 };
 
 export const calculateRequiredMargin = (
@@ -145,7 +163,8 @@ export const calculateTradeInfo = (
   lots: number, 
   pair: string, 
   prices: Record<string, PriceData>,
-  leverage: number
+  leverage: number,
+  tradingPairs: TradingPair[]
 ): TradeInfo => {
   const price = parseFloat(prices[pair]?.price || '0');
   const isCrypto = pair.includes('BINANCE:');
@@ -174,7 +193,7 @@ export const calculateTradeInfo = (
     volumeUsd = volumeUnits * price;
   }
 
-  const pipValue = calculatePipValue(lots, price, pair);
+  const pipValue = calculatePipValue(lots, price, pair, tradingPairs);
   const margin = volumeUsd / leverage;
 
   return {

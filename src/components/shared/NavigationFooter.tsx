@@ -10,7 +10,7 @@ export function NavigationFooter() {
   const isTradeRoute = location.pathname.startsWith('/trade');
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 border-t bg-background/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 mb-4">
+    <div className="fixed bottom-0 left-0 right-0 border-t border-[#525252] bg-background/60 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 mb-4">
       <div className="container max-w-lg mx-auto">
         <div className="grid h-16 grid-cols-3">
           <button

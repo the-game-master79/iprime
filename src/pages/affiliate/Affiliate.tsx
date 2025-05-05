@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Topbar } from "@/components/shared/Topbar";
+import { BalanceCard } from "@/components/shared/BalanceCards";
 import {
   Accordion,
   AccordionContent,
@@ -309,74 +310,45 @@ const Affiliate = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gray-50">
+    <div className="min-h-[100dvh] bg-background">
       <Topbar title="Affiliate Dashboard" />
 
       {/* Stats Overview */}
-      <div className="px-4 md:px-8 lg:container mb-6 mt-6">
+      <div className="container max-w-[1000px] mx-auto px-4 mb-6 mt-6">
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
-          <Card className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Total Referrals</p>
-                <div className="text-2xl font-bold">{teamData.length}</div>
-              </div>
-            </CardContent>
-          </Card>
+          <BalanceCard 
+            label="Total Referrals"
+            amount={teamData.length}
+            variant="referrals"
+            valueClassName="font-mono"
+          />
 
-          <Card className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Commission Earned</p>
-                <div className="text-2xl font-bold">${totalCommissions.toLocaleString()}</div>
-              </div>
-            </CardContent>
-          </Card>
+          <BalanceCard 
+            label="Commission Earned"
+            amount={totalCommissions}
+            variant="commission"
+          />
 
-          <Card className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Business Volume</p>
-                <div className="text-2xl font-bold">${totalBusiness.toLocaleString()}</div>
-                <div className="text-xs text-muted-foreground">
-                  Personal: ${userBusiness.toLocaleString()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <BalanceCard 
+            label="Business Volume"
+            amount={totalBusiness}
+            variant="business"
+          />
 
-          <Card className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Direct Referrals</p>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  userDirectCount === 0 ? "text-red-500" :
-                  userDirectCount === 1 ? "text-yellow-500" :
-                  "text-green-500"
-                )}>{userDirectCount}/2</div>
-                {userDirectCount < 2 && (
-                  <p className={cn(
-                    "text-xs rounded-full px-2 py-0.5 w-fit",
-                    userDirectCount === 0 
-                      ? "text-red-800 bg-red-100"
-                      : "text-amber-800 bg-amber-100"
-                  )}>
-                    {2 - userDirectCount} more needed
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <BalanceCard 
+            label="Direct Referrals"
+            amount={userDirectCount}
+            variant="direct"
+          />
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="px-2 md:px-8 lg:container">
+      <div className="container max-w-[1000px] mx-auto px-4">
         <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
           {/* Left Sidebar - Only visible on desktop */}
           <div className="hidden lg:block space-y-4 sm:space-y-6">
-            <Card>
+            <Card className="bg-card">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle>Share with your Network</CardTitle>
               </CardHeader>
@@ -418,11 +390,40 @@ const Affiliate = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Move Commission Rates below share card in desktop */}
+            <Card className="bg-card">
+              <Accordion type="single" collapsible>
+                <AccordionItem value="commission-rates">
+                  <AccordionTrigger className="px-4 sm:px-6">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base sm:text-lg">Commission Rates</CardTitle>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="px-4 sm:px-6 pb-4 space-y-2">
+                      {commissionStructure.map((level) => (
+                        <div 
+                          key={level.level} 
+                          className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">Level {level.level}</span>
+                            <span className="text-xs text-muted-foreground">{level.description}</span>
+                          </div>
+                          <span className="font-medium text-green-600">{level.percentage}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </Card>
           </div>
 
-          {/* Mobile Share Section - Only visible on mobile */}
+          {/* Mobile Share Section */}
           <div className="lg:hidden space-y-4">
-            <Card>
+            <Card className="bg-card">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle>Share</CardTitle>
               </CardHeader>
@@ -469,14 +470,12 @@ const Affiliate = () => {
           {/* Main Content Area */}
           <div className="space-y-4 sm:space-y-6 w-full">
             {/* Network Structure */}
-            <Card>
+            <Card className="bg-card">
               <CardHeader className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <CardTitle>Network Structure</CardTitle>
-                  
-                  {/* Team Status Legends */}
-                  {teamData.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <CardTitle>Network Structure</CardTitle>
+                    {teamData.length > 0 && (
                       <Select
                         value={legendType}
                         onValueChange={(value) => setLegendType(value as "investments" | "directCount")}
@@ -489,9 +488,14 @@ const Affiliate = () => {
                           <SelectItem value="directCount">Direct Referrals</SelectItem>
                         </SelectContent>
                       </Select>
-                      
+                    )}
+                  </div>
+
+                  {/* Team Status Legends below title */}
+                  {teamData.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
                       {legendType === "investments" ? (
-                        <div className="flex flex-wrap gap-3">
+                        <>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-green-500" />
                             <span className="text-sm text-muted-foreground">Active Plans</span>
@@ -504,18 +508,18 @@ const Affiliate = () => {
                             <div className="w-3 h-3 rounded-full bg-red-500" />
                             <span className="text-sm text-muted-foreground">Inactive</span>
                           </div>
-                        </div>
+                        </>
                       ) : (
-                        <div className="flex flex-wrap gap-3">
+                        <>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-green-500" />
                             <span className="text-sm text-muted-foreground">2+ Direct Referrals</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-amber-500" />
-                            <span className="text-sm text-muted-foreground"> 2 Direct Referrals</span>
+                            <span className="text-sm text-muted-foreground">≤2 Direct Referrals</span>
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -532,7 +536,11 @@ const Affiliate = () => {
                 ) : (
                   <Accordion type="single" collapsible className="w-full divide-y">
                     {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
-                      <AccordionItem value={`level-${level}`} key={level} className="border-none">
+                      <AccordionItem 
+                        value={`level-${level}`} 
+                        key={level} 
+                        className="border-none bg-secondary/50 dark:bg-secondary/10"
+                      >
                         <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline">
                           <div>
                             <p className="font-medium text-sm text-left">Level {level}</p>
@@ -612,35 +620,6 @@ const Affiliate = () => {
                   </Accordion>
                 )}
               </CardContent>
-            </Card>
-
-            {/* Commission Rates - Mobile & Desktop */}
-            <Card>
-              <Accordion type="single" collapsible>
-                <AccordionItem value="commission-rates">
-                  <AccordionTrigger className="px-4 sm:px-6">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-base sm:text-lg">Commission Rates</CardTitle>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="px-4 sm:px-6 pb-4 space-y-2">
-                      {commissionStructure.map((level) => (
-                        <div 
-                          key={level.level} 
-                          className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Level {level.level}</span>
-                            <span className="text-xs text-muted-foreground">{level.description}</span>
-                          </div>
-                          <span className="font-medium text-green-600">{level.percentage}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
             </Card>
           </div>
         </div>

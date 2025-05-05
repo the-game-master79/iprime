@@ -8,11 +8,13 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
 import { TradesSheet } from "@/components/shared/TradesSheet";
 import { useLimitOrders } from '@/hooks/use-limit-orders';
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ChevronLeftCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
 import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ForexCryptoSheet } from "@/components/shared/ForexCryptoSheet";
 
 interface PriceData {
   price: string;
@@ -89,6 +91,8 @@ interface TradingPairInfo {
   min_leverage: number;
   max_leverage: number;
   max_lots: number;
+  leverage_options: number[]; // Add leverage_options
+  pip_value: number; // Add pip_value field
 }
 
 // Add margin call threshold constant (80%)
@@ -101,6 +105,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   // Add new state for trading pair info
   const [pairInfo, setPairInfo] = useState<TradingPairInfo | null>(null);
   const [pipValue, setPipValue] = useState("0.00");
+  const [showForexCryptoSheet, setShowForexCryptoSheet] = useState(false);
 
   useEffect(() => {
     if (!pair) {
@@ -398,19 +403,28 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
 
   // Update pip value calculation with proper lot size handling
   useEffect(() => {
-    if (!defaultPair) return;
+    if (!defaultPair || !pairInfo) return;
 
     const lotSize = parseFloat(lots) || 0;
     const price = parseFloat(pairPrices[defaultPair]?.price || '0');
     
-    if (price && lotSize) {
-      // Use calculatePipValue which internally handles all pair types correctly
-      const pipValueAmount = calculatePipValue(lotSize, price, defaultPair);
-      setPipValue(pipValueAmount.toFixed(2));
+    if (price && lotSize && pairInfo.pip_value) {
+      let pipValue;
+      if (defaultPair.includes('BINANCE:')) {
+        // For crypto: pipValue = lots * pip_value
+        pipValue = lotSize * pairInfo.pip_value;
+      } else if (defaultPair === 'FX:XAU/USD') {
+        // For gold: pipValue = (pip_value / price) * (lots * 100)
+        pipValue = (pairInfo.pip_value / price) * (lotSize * 100);
+      } else {
+        // For forex: pipValue = (pip_value / price) * (lots * 100000)
+        pipValue = (pairInfo.pip_value / price) * (lotSize * 100000);
+      }
+      setPipValue(pipValue.toFixed(2));
     } else {
       setPipValue('0.00');
     }
-  }, [defaultPair, lots, pairPrices[defaultPair]?.price]); // Only recalculate when these values change
+  }, [defaultPair, lots, pairPrices[defaultPair]?.price, pairInfo]); // Only recalculate when these values change
 
   // Add handleLotsChange function before the return statement
   const handleLotsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -804,7 +818,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       
       const { data, error } = await supabase
         .from('trading_pairs')
-        .select('symbol, name, min_leverage, max_leverage, max_lots')
+        .select('symbol, name, min_leverage, max_leverage, max_lots, leverage_options, pip_value')
         .eq('symbol', defaultPair)
         .single();
 
@@ -814,6 +828,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       }
 
       setPairInfo(data);
+      setSelectedLeverage(data.min_leverage.toString()); // Set default leverage to min_leverage
     };
 
     fetchPairInfo();
@@ -869,6 +884,11 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     });
   };
 
+  const handlePairSelect = (pair: string) => {
+    navigate(`/trade/${encodeURIComponent(pair)}`);
+    setShowForexCryptoSheet(false);
+  };
+
   function cn(...classes: (string | undefined | null | false)[]): string {
     return classes.filter(Boolean).join(' ');
   }
@@ -876,60 +896,38 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     <div className="h-screen bg-background flex flex-col">
       {/* Balance Card */}
       <div className="px-4 pt-4">
-        <div className="bg-primary rounded-xl border-gray-200">
+        <div className="bg-[#141414] rounded-xl border border-[#525252]">
           <div className="p-4">
             <div className="flex flex-col gap-4">
               {/* Badges */}
               <div className="flex gap-2">
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">Pro</Badge>
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">MT5</Badge>
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">Web</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Pro</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">MT5</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Web</Badge>
               </div>
               
-              {/* Balance with null check */}
+              {/* Balance */}
               <div className="flex flex-col">
                 <span className="text-2xl font-semibold text-white">
-                  ${(userBalance ?? 0).toLocaleString()}
+                  ${userBalance.toLocaleString()}
                 </span>
               </div>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Add back button and pair name */}
-      <div className="px-4 pt-3 flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate('/trade/select')}
-          className="h-8 px-2"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-        </Button>
-        <div className="flex items-center">
-          <span className="text-lg font-semibold">{formattedPairName}</span>
-        </div>
-      </div>
 
-      {/* Add margin call alerts */}
-      {Object.keys(marginCallAlerts).length > 0 && (
-        <div className="bg-red-50 border-b border-red-100">
-          <div className="container mx-auto px-4 py-2">
-            <Alert variant="destructive" className="border-red-500/30">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-red-700">
-                Warning: One or more positions are nearing margin call level. Consider adding funds or reducing position sizes.
-              </AlertDescription>
-            </Alert>
-          </div>
-        </div>
-      )}
+      {/* ForexCryptoSheet Component */}
+      <ForexCryptoSheet
+        open={showForexCryptoSheet}
+        onOpenChange={setShowForexCryptoSheet}
+        onPairSelect={handlePairSelect}
+      />
 
       {/* Stats Card */}
       <div className="px-4 pt-3">
         <div 
-          className="relative overflow-hidden bg-card rounded-xl border shadow-sm transition-all 
+          className="relative overflow-hidden bg-card rounded-xl border border-[#525252] shadow-sm transition-all 
                    hover:shadow-md active:scale-[0.99] cursor-pointer"
           onClick={() => setShowTradesSheet(true)}
         >
@@ -955,6 +953,46 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         </div>
       </div>
 
+      
+      {/* Add back button, pair name, and FX icon */}
+      <div className="px-4 pt-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/trade/select')}
+            className="h-8 px-2"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted">
+              <ChevronLeftCircle className="h-4 w-4" />
+            </div>
+          </Button>
+          <span className="text-lg font-semibold">{formattedPairName}</span>
+        </div>
+        <Button 
+          variant="secondary" 
+          size="sm" 
+          onClick={() => setShowForexCryptoSheet(true)}
+          className="h-8 px-2"
+        >
+          All FX
+        </Button>
+      </div>
+
+      {/* Add margin call alerts */}
+      {Object.keys(marginCallAlerts).length > 0 && (
+        <div className="bg-red-50 border-b border-red-100">
+          <div className="container mx-auto px-4 py-2">
+            <Alert variant="destructive" className="border-red-500/30">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-red-700">
+                Warning: One or more positions are nearing margin call level. Consider adding funds or reducing position sizes.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </div>
+      )}
+      
       <TradesSheet
         open={showTradesSheet}
         onOpenChange={setShowTradesSheet}
@@ -965,82 +1003,63 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       />
 
       <div className="container mx-auto px-4 flex-1">
-        <div className="flex flex-col h-full relative bg-white rounded-xl mt-4">
+        <div className="flex flex-col h-full relative rounded-xl mt-4">
           {/* Chart container */}
-          <div className="flex-1 min-h-0 pb-[calc(1rem+240px)]"> {/* Add padding bottom to account for controls */}
+          <div className="flex-1 min-h-0 pb-[calc(1rem+240px)] rounded-xl overflow-hidden"> {/* Added rounded corners */}
             <TradingViewWidget symbol={formattedSymbol} />
           </div>
 
           {/* Trading Controls */}
           <div className="absolute bottom-0 inset-x-0">
             <div className="container mx-auto px-4 pb-5">
-              <div className="bg-background/80 backdrop-blur-sm border rounded-xl shadow-lg">
+              <div className="backdrop-blur-sm border border-[#525252] rounded-xl shadow-lg"> {/* Removed white background */}
                 <div className="p-4 space-y-4">
-                  {/* Order Type Selector */}
-                  <Tabs value={orderType} onValueChange={(value) => value === 'limit' ? handleLimitTabClick() : setOrderType(value as 'market' | 'limit')}>
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="market">Market Order</TabsTrigger>
-                      <TabsTrigger value="limit" disabled className="opacity-50">Limit Order</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-
+                  {/* Removed symbol display */}
+                  
                   {/* Trade Info Panel */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground">
-                      <div className="flex justify-between items-center">
-                        <span>Margin</span>
-                        <span className="font-mono text-foreground">${marginRequired}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Pip Value</span>
-                        <span className="font-mono text-foreground">
-                          ${pipValue}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span>Max Lots</span>
-                        <span className="font-mono text-foreground">
-                          {effectiveMaxLots.toFixed(2)}
-                        </span>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className="flex-1 text-center">
+                      Margin: ${marginRequired}
+                    </Badge>
+                    <Badge variant="outline" className="flex-1 text-center">
+                      Max Lots: {effectiveMaxLots.toFixed(2)}
+                    </Badge>
+                    <Badge variant="outline" className="flex-1 text-center">
+                      Pip Value: ${pipValue}
+                    </Badge>
+                  </div>
+
+                  {/* Lots Input with Leverage Button */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="number"
+                        value={lots}
+                        onChange={handleLotsChange}
+                        placeholder="Enter size"
+                        className="w-full text-right pr-16 font-mono"
+                        min={0}
+                        max={effectiveMaxLots}
+                        step={0.01}
+                      />
+                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
+                        lots
                       </div>
                     </div>
-
-                    {/* Lots Input */}
-                    <div className="w-full space-y-2">
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          value={lots}
-                          onChange={handleLotsChange}
-                          placeholder="Enter size"
-                          className="w-full text-right pr-16 font-mono"
-                          min={0}
-                          max={effectiveMaxLots}
-                          step={0.01}
-                        />
-                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
-                          lots
-                        </div>
-                      </div>
-
-                      {/* Limit Price Input - only show for limit orders */}
-                      {orderType === 'limit' && (
-                        <div className="relative">
-                          <Input
-                            type="number"
-                            value={limitPrice}
-                            onChange={(e) => setLimitPrice(e.target.value)}
-                            placeholder="Enter limit price"
-                            className="w-full text-right pr-16 font-mono"
-                            min={0}
-                            step={0.00001}
-                          />
-                          <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
-                            price
-                          </div>
-                        </div>
+                    <Button 
+                      variant="secondary" 
+                      className={cn(
+                        "h-10 px-4 rounded-lg",
+                        parseInt(selectedLeverage) <= 20
+                          ? "text-green-500"
+                          : parseInt(selectedLeverage) <= 100
+                            ? "text-yellow-500"
+                            : "text-red-500"
                       )}
-                    </div>
+                      onClick={() => setShowLeverageDialog(true)}
+                    >
+                      {selectedLeverage}x
+                    </Button>
                   </div>
 
                   {/* Trade Buttons */}
@@ -1059,7 +1078,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                       </div>
                     </Button>
                     <Button 
-                      className="flex-1 h-12 shadow-sm bg-primary hover:bg-primary/90"
+                      className="flex-1 h-12 shadow-sm bg-blue-500 hover:bg-blue-600 text-white"
                       onClick={() => handleTrade('buy')}
                       disabled={!isPriceLoaded}
                     >
@@ -1075,9 +1094,99 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
               </div>
             </div>
           </div>
-
         </div>
       </div>
+
+      {/* Add leverage dialog box */}
+      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
+        <DialogContent className="p-0 overflow-hidden rounded-lg"> {/* Added margin */}
+          <DialogHeader className="px-6 py-4 border-b border-[#525252]">
+            <DialogTitle className="text-xl">Leverage Information</DialogTitle>
+            <DialogDescription className="text-sm">
+              Choose your preferred leverage level (Max: {pairInfo?.max_leverage}x). Higher leverage means higher risk.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Selection</label>
+              <div className={cn(
+                "border border-[#525252] rounded-lg p-4 text-center",
+                parseInt(selectedLeverage) <= 20 
+                  ? "bg-green-500/5 border-green-500/10" 
+                  : parseInt(selectedLeverage) <= 100
+                    ? "bg-yellow-500/5 border-yellow-500/10"
+                    : "bg-red-500/5 border-red-500/10"
+              )}>
+                <span className={cn(
+                  "text-3xl font-bold",
+                  parseInt(selectedLeverage) <= 20 
+                    ? "text-green-500" 
+                    : parseInt(selectedLeverage) <= 100
+                      ? "text-yellow-500"
+                      : "text-red-500"
+                )}>{selectedLeverage}x</span>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {pairInfo?.leverage_options && (
+                <>
+                  {['low', 'medium', 'high'].map((riskLevel) => {
+                    const options = pairInfo.leverage_options.filter(value => 
+                      riskLevel === 'low' ? value <= 20 :
+                      riskLevel === 'medium' ? value > 20 && value <= 100 :
+                      value > 100
+                    );
+                    return options.length > 0 ? (
+                      <div key={riskLevel} className="space-y-2">
+                        <div className={cn(
+                          "font-medium",
+                          riskLevel === 'low' ? "text-green-500" :
+                          riskLevel === 'medium' ? "text-yellow-500" : 
+                          "text-red-500"
+                        )}>
+                          {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} Risk
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {options.map((value) => (
+                            <Button
+                              key={value}
+                              variant={selectedLeverage === value.toString() ? "default" : "outline"}
+                              onClick={() => setSelectedLeverage(value.toString())}
+                              className={cn(
+                                "h-9 font-mono transition-all",
+                                selectedLeverage === value.toString()
+                                  ? `bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/90 border-0`
+                                  : `hover:border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/50 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/5 border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/20`
+                              )}
+                            >
+                              {value}x
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+          <div className="p-4 bg-gradient-to-t from-muted/10 border-t border-[#525252]">
+            <Button 
+              onClick={() => setShowLeverageDialog(false)}
+              className={cn(
+                "w-full",
+                parseInt(selectedLeverage) <= 20
+                  ? "bg-green-500 hover:bg-green-500/90"
+                  : parseInt(selectedLeverage) <= 100
+                    ? "bg-yellow-500 hover:bg-yellow-500/90"
+                    : "bg-red-500 hover:bg-red-500/90"
+              )}
+            >
+              Confirm Leverage
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

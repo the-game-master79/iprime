@@ -1,16 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { 
-  Users, 
-  UserPlus, 
-  DollarSign,
   DownloadCloud,
-  UserCheck
 } from "lucide-react";
 import { PageHeader, StatCard } from "@/components/ui-components";
 import AdminLayout from "./AdminLayout";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DashboardStats {
   totalUsers: number;

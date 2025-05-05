@@ -45,6 +45,26 @@ const groupTradesByDate = (trades: Trade[]) => {
   );
 };
 
+// Helper to group trades by pair and type
+const groupTradesByPairAndType = (trades: Trade[]) => {
+  const grouped = trades.reduce((acc, trade) => {
+    const key = `${trade.pair}-${trade.type}`;
+    if (!acc[key]) {
+      acc[key] = {
+        ...trade,
+        originalTrades: [],
+        lots: 0,
+        pnl: 0,
+      };
+    }
+    acc[key].originalTrades.push(trade);
+    acc[key].lots += trade.lots;
+    acc[key].pnl += trade.pnl || 0;
+    return acc;
+  }, {} as Record<string, Trade & { originalTrades: Trade[] }>);
+  return Object.values(grouped);
+};
+
 interface TradesSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,6 +84,46 @@ export function TradesSheet({
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
   const [isPriceLoaded, setIsPriceLoaded] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  // Calculate total PnL
+  const totalPnL = openTrades
+    .filter(t => t.status === 'open')
+    .reduce((sum, trade) => {
+      const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
+      return sum + calculatePnL(trade, currentPrice);
+    }, 0);
+
+  // Check if a position is hedged
+  const isHedgedPosition = (trade: Trade) => {
+    return openTrades.some(t =>
+      t.id !== trade.id &&
+      t.pair === trade.pair &&
+      t.type !== trade.type &&
+      t.lots === trade.lots
+    );
+  };
+
+  // Handle closing all trades
+  const handleCloseAllTrades = async () => {
+    if (!window.confirm(`Are you sure you want to close all open trades?`)) return;
+
+    try {
+      for (const trade of openTrades.filter(t => t.status === 'open')) {
+        await onCloseTrade?.(trade.id);
+      }
+      toast({
+        title: "Success",
+        description: "All trades closed successfully",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to close all trades",
+      });
+    }
+  };
 
   // Modified WebSocket subscription effect
   useEffect(() => {
@@ -109,6 +169,11 @@ export function TradesSheet({
   // Use trades filtered by active tab
   const displayedTrades = openTrades.filter(trade => trade.status === activeTab);
 
+  // Use grouped trades for display
+  const groupedTrades = groupTradesByPairAndType(
+    openTrades.filter(trade => trade.status === activeTab)
+  );
+
   // Add price formatting helper
   const formatPrice = (price: number, symbol: string) => {
     return price.toFixed(getDecimalPlaces(symbol));
@@ -131,17 +196,40 @@ export function TradesSheet({
     await onCloseTrade(tradeId);
   };
 
+  // Toggle group expansion
+  const toggleGroupExpansion = (groupKey: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent 
         side="bottom" 
         className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0 rounded-t-xl"
       >
-        <div className="py-4 px-4 border-b">
+        <div className="py-4 px-4 border-b border-[#525252] flex justify-between items-center">
           <DialogTitle>Active Trades</DialogTitle>
-          <VisuallyHidden>
-            View and manage your active trading positions
-          </VisuallyHidden>
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "text-sm font-mono font-medium",
+              totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
+            )}>
+              Total PnL: ${totalPnL.toFixed(2)}
+            </div>
+            {openTrades.some(t => t.status === 'open') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCloseAllTrades}
+                className="text-xs text-red-500 hover:text-red-600"
+              >
+                Close All
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Header */}
@@ -164,7 +252,7 @@ export function TradesSheet({
             <div className="h-full flex items-center justify-center">
               <div className="text-sm text-muted-foreground animate-pulse">Loading...</div>
             </div>
-          ) : displayedTrades.length === 0 ? (
+          ) : groupedTrades.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-4">
               <div className="text-sm font-medium mb-1">No {activeTab} trades</div>
               <p className="text-xs text-muted-foreground max-w-[280px]">
@@ -173,30 +261,39 @@ export function TradesSheet({
             </div>
           ) : (
             <div className="space-y-2">
-              {displayedTrades.map(trade => {
-                const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
-                const pnl = trade.status === 'closed' ? trade.pnl : calculatePnL(trade, currentPrice);
-                
+              {groupedTrades.map(group => {
+                const currentPrice = parseFloat(localPrices[group.pair]?.bid || '0');
+                const pnl = group.status === 'closed' ? group.pnl : calculatePnL(group, currentPrice);
+                const groupKey = `${group.pair}-${group.type}`;
+                const isExpanded = expandedGroups[groupKey] || false;
+
                 return (
                   <div 
-                    key={trade.id} 
-                    className="flex flex-col p-3 bg-card hover:bg-accent/50 rounded-lg border"
+                    key={groupKey} 
+                    className="flex flex-col p-3 bg-card hover:bg-accent/50 rounded-lg border border-[#525252]"
                   >
-                    {/* Top row - Trade info and P&L */}
+                    {/* Top row - Group info and P&L */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-3">
                         <div className={cn(
                           "mt-1 h-2 w-2 rounded-full",
-                          trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
+                          group.type === 'buy' ? "bg-blue-500" : "bg-red-500"
                         )} />
                         <div className="space-y-0.5">
-                          <div className="text-sm font-medium">{trade.pair.split(':')[1]}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {trade.type.toUpperCase()} {trade.lots} Lots @ ${formatPrice(trade.openPrice, trade.pair)}
+                          <div className="text-sm font-medium flex items-center gap-2">
+                            {group.pair.split(':')[1]}
+                            {group.originalTrades.length > 1 && (
+                              <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-md">
+                                x{group.originalTrades.length}
+                              </span>
+                            )}
                           </div>
-                          {trade.status === 'open' && (
+                          <div className="text-xs text-muted-foreground">
+                            {group.type.toUpperCase()} {group.lots} Lots @ ${formatPrice(group.openPrice, group.pair)}
+                          </div>
+                          {group.status === 'open' && (
                             <div className="text-xs text-muted-foreground">
-                              Current: ${formatPrice(currentPrice, trade.pair)}
+                              Current: ${formatPrice(currentPrice, group.pair)}
                             </div>
                           )}
                         </div>
@@ -209,23 +306,51 @@ export function TradesSheet({
                       </div>
                     </div>
 
+                    {/* Expandable details */}
+                    {group.originalTrades.length > 1 && (
+                      <div className="mt-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleGroupExpansion(groupKey)}
+                          className="text-xs w-full"
+                        >
+                          {isExpanded ? "Hide Details" : "View Details"}
+                        </Button>
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1">
+                            {group.originalTrades.map(trade => (
+                              <div 
+                                key={trade.id} 
+                                className="flex justify-between text-xs p-2 bg-muted rounded-md"
+                              >
+                                <span>{trade.id.slice(0, 8)}</span>
+                                <span>{trade.lots} Lots</span>
+                                <span>${calculatePnL(trade, currentPrice).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Bottom row - Close button */}
-                    {trade.status === 'open' && onCloseTrade && (
-                      <div className="-mx-3 -mb-3 mt-3 border-t">
+                    {group.status === 'open' && onCloseTrade && (
+                      <div className="-mx-3 -mb-3 mt-3 border-t border-[#525252]">
                         <Button
                           variant="ghost"
                           size="sm" 
-                          onClick={() => handleCloseTrade(trade.id)}
-                          disabled={!isPriceLoaded[trade.pair]}
+                          onClick={() => handleCloseTrade(group.id)}
+                          disabled={!isPriceLoaded[group.pair]}
                           className={cn(
                             "w-full rounded-none h-9 text-xs font-medium",
-                            !isPriceLoaded[trade.pair] && "opacity-50 cursor-not-allowed",
+                            !isPriceLoaded[group.pair] && "opacity-50 cursor-not-allowed",
                             pnl > 0 
                               ? "bg-green-500/5 text-green-500 hover:bg-green-500/10 hover:text-green-600" 
                               : "bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:text-red-600"
                           )}
                         >
-                          {!isPriceLoaded[trade.pair] ? 'Loading...' : 'Close Position'}
+                          {!isPriceLoaded[group.pair] ? 'Loading...' : 'Close Position'}
                         </Button>
                       </div>
                     )}

@@ -27,11 +27,11 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
         replace: true 
       });
     } else if (user && authPage) {
-      // Preserve the return URL from login state if it exists
-      const returnPath = location.state?.from || '/dashboard';
+      // Navigate to platform instead of dashboard
+      const returnPath = location.state?.from || '/platform';
       navigate(returnPath, { replace: true });
     }
-  }, [user, loading, requireAuth, authPage, navigate, location]);
+  }, [user, loading, navigate, location]);
 
   if (loading) {
     return (

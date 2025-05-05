@@ -1,32 +1,21 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, DollarSign, Clock, Percent, ArrowRight, BadgeCheck, ArrowRightIcon, Circle, CheckCircle2 } from "lucide-react";
+import { DollarSign, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Removed ShellLayout
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Topbar } from "@/components/shared/Topbar"; // Added Topbar import
+import { BalanceCard } from "@/components/shared/BalanceCards"; // Add this import
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
+
+import { AvailablePlanVariant, ActivePlanVariant } from "@/components/shared/PlanCardVariants";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger
-} from "@/components/ui/dialog";
-import { 
-  Cpu, 
-  HardDrive, 
-  DatabaseZap, 
-  BarChart2, 
-  Send, 
-  MoveRight 
-} from "lucide-react";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger 
+} from "@/components/ui/accordion";
 
 interface Plan {
   id: string;
@@ -186,7 +175,7 @@ const Plans = () => {
           return {
             ...subscription.plans,
             subscription_id: subscription.id,
-            subscription_date: subscription.created_at,
+            subscription_date: format(new Date(subscription.created_at), "MMMM d, yyyy"),
             actual_earnings: totalEarnings,
             days_credited: daysCredited,
             last_earning_date: lastEarningDate
@@ -222,7 +211,7 @@ const Plans = () => {
       if (userProfile.withdrawal_wallet < plan.investment) {
         toast({
           title: "Insufficient Balance", 
-          description: `Need $${plan.investment} in your wallet to subscribe to this plan. Available balance: $${userProfile.withdrawal_wallet}`,
+          description: `Need ${plan.investment} USD in your wallet to subscribe to this plan. Available balance: ${userProfile.withdrawal_wallet} USD`,
           variant: "destructive"
         });
         return;
@@ -299,7 +288,7 @@ const Plans = () => {
       const amountNeeded = requiredAmount - currentBalance;
       toast({
         title: "Insufficient Balance",
-        description: `You need $${amountNeeded.toLocaleString()} more to subscribe to this plan`,
+        description: `You need ${amountNeeded.toLocaleString()} USD more to subscribe to this plan`,
         variant: "destructive"
       });
       return;
@@ -393,31 +382,39 @@ const Plans = () => {
     <div className="min-h-screen bg-background">
       <Topbar title="Buy Computes" />
       
-      <div className="container py-6 px-4">
-        {/* Add balance display */}
-        <div className="mb-6 p-4 bg-card rounded-lg border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Available Balance</p>
-              <p className="text-2xl font-bold">${userProfile?.withdrawal_wallet.toLocaleString() || '0'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Invested</p>
-              <p className="text-2xl font-bold">${totalInvested.toLocaleString()}</p>
-            </div>
-          </div>
+      <div className="container mx-auto max-w-[1000px] py-6 px-4">
+        {/* Balance cards section */}
+        <div className="grid gap-4 md:grid-cols-2 mb-8">
+          <BalanceCard 
+            label="Available to Invest"
+            amount={userProfile?.withdrawal_wallet || 0}
+            variant="default"
+          />
+          <BalanceCard
+            label="Total Invested"
+            amount={totalInvested}
+            variant="success"
+          />
         </div>
 
-        <Alert className="mb-8 bg-muted border-primary/20">
-          <Info className="h-5 w-5 text-primary" />
-          <AlertTitle className="text-primary">Start earning with Computes</AlertTitle>
-          <AlertDescription className="mt-2 text-muted-foreground space-y-2">
-            <p>• A compute will start trading in your account automatically.</p>
-            <p>• You can use your existing balance to subscribe to any compute available.</p>
-            <p>• You can close a Compute anytime, and get your refunds. (Deductions Apply)</p>
-          </AlertDescription>
-        </Alert>
-        
+        <Accordion type="single" collapsible defaultValue="info" className="mb-8">
+          <AccordionItem value="info" className="bg-card/30 border border-primary/20 rounded-lg overflow-hidden">
+            <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>div>div]:rotate-180">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-primary" />
+                <span className="font-medium text-primary">Start earning with Computes</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <div className="text-muted-foreground space-y-2">
+                <p>• A compute will start trading in your account automatically.</p>
+                <p>• You can use your existing balance to subscribe to any compute available.</p>
+                <p>• You can close a Compute anytime, and get your refunds. (Deductions Apply)</p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
         <Tabs defaultValue="available" className="space-y-8">
           <div className="flex items-center justify-between">
             <TabsList className="w-[400px]">
@@ -425,136 +422,20 @@ const Plans = () => {
               <TabsTrigger value="subscribed" className="flex-1 relative">
                 Active Computes
                 {subscribedPlans.length > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                  <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
                     {subscribedPlans.length}
                   </span>
                 )}
               </TabsTrigger>
-              </TabsList>
+            </TabsList>
           </div>
 
           <TabsContent value="available" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="border border-border/40 bg-card/60">
-                    <CardHeader className="p-4 pb-2 space-y-2">
-                      <div className="h-3 w-16 bg-muted/60 rounded animate-pulse mb-1" />
-                      <div className="h-5 w-24 bg-muted/60 rounded animate-pulse" />
-                      <div className="h-3 w-full bg-muted/60 rounded animate-pulse mt-1" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                      <div className="space-y-3">
-                        <div className="h-3 w-4/5 bg-muted/60 rounded animate-pulse" />
-                        <div className="h-3 w-3/4 bg-muted/60 rounded animate-pulse" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                plans.map((plan) => (
-                  <Card key={plan.id} className={cn(
-                    "relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40",
-                    selectedPlan === plan.id && "ring-1 ring-primary"
-                  )}>
-                    {/* Move gradient div here and add negative z-index */}
-                    <div className={cn(
-                      "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse -z-10",
-                      getRandomGradient()
-                    )} />
-                    
-                    <CardHeader className="p-4 pb-2 space-y-2 relative z-10">
-                      <div>
-                        <CardTitle className="text-base sm:text-lg font-medium">
-                          {plan.name}
-                        </CardTitle>
-                        <CardDescription className="text-xs sm:text-sm mt-0.5 line-clamp-2">
-                          {plan.description}
-                        </CardDescription>
-                      </div>
-                      <div className="pt-1">
-                        <span className="text-xs text-muted-foreground">$</span>
-                        <span className="text-3xl sm:text-4xl font-bold tracking-tight">
-                          {plan.investment.toLocaleString()}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-2 space-y-4 relative z-10">
-                      <div className="space-y-2">
-                        <div className="rounded border bg-card/50 p-3">
-                          <div className="flex items-center justify-between space-x-2 sm:space-x-4">
-                            <div>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-sm sm:text-lg font-semibold">{plan.duration_days}</span>
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">days</span>
-                              </div>
-                            </div>
-                            <Separator orientation="vertical" className="h-8" />
-                            <div>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">Total ROI</p>
-                              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                <span className="text-sm sm:text-lg font-semibold">
-                                  {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
-                                </span>
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">
-                                  (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Button 
-                        className="w-full text-xs sm:text-sm h-8 sm:h-9 mb-2"
-                        variant="default"
-                        onClick={() => handleInvestClick(plan.id)}
-                      >
-                        <span className="flex items-center justify-center w-full">
-                          Invest Now
-                          <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-                        </span>
-                      </Button>
-
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            className="w-full text-xs sm:text-sm h-8 sm:h-9"
-                            variant="secondary"
-                          >
-                            View Benefits
-                            <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>{plan.name} Benefits</DialogTitle>
-                            <DialogDescription>
-                              Detailed benefits breakdown for this investment plan
-                            </DialogDescription>
-                          </DialogHeader>
-                          <ul className="space-y-4 mt-4">
-                            {plan.benefits.split('•').filter(Boolean).map((benefit, idx) => (
-                              <li key={idx} className="flex items-start gap-3">
-                                {idx === 0 && <Cpu className="h-5 w-5 text-primary shrink-0" />}
-                                {idx === 1 && <HardDrive className="h-5 w-5 text-primary shrink-0" />}
-                                {idx === 2 && <DatabaseZap className="h-5 w-5 text-primary shrink-0" />}
-                                {idx === 3 && <BarChart2 className="h-5 w-5 text-primary shrink-0" />}
-                                {idx === 4 && <Send className="h-5 w-5 text-primary shrink-0" />}
-                                {idx === 5 && <MoveRight className="h-5 w-5 text-primary shrink-0" />}
-                                <span className="text-sm">{benefit.trim()}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </DialogContent>
-                      </Dialog>
-
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+            <AvailablePlanVariant 
+              plans={plans}
+              loading={loading}
+              onInvest={handleInvestClick}
+            />
           </TabsContent>
 
           <TabsContent value="subscribed">
@@ -577,144 +458,10 @@ const Plans = () => {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-                {subscribedPlans.map((plan) => {
-                  const remainingDuration = Math.max(
-                    plan.duration_days - (plan.days_credited || 0),
-                    0
-                  );
-
-                  const progress = Math.min(
-                    ((plan.days_credited || 0) / plan.duration_days) * 100,
-                    100
-                  );
-
-                  return (
-                    <Card 
-                      key={plan.subscription_id}
-                      className="relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40"
-                    >
-                      <CardHeader className="p-4 pb-2 space-y-2">
-                        <div>
-                          <CardTitle className="text-base sm:text-lg font-medium">
-                            {plan.name}
-                          </CardTitle>
-                          <CardDescription className="text-xs sm:text-sm mt-0.5">
-                            Subscribed on {format(new Date(plan.subscription_date || ''), 'do MMMM yyyy')}
-                          </CardDescription>
-                        </div>
-                        <div className="pt-1">
-                          <span className="text-xs text-muted-foreground">$</span>
-                          <span className="text-3xl sm:text-4xl font-bold tracking-tight">
-                            {plan.investment.toLocaleString()}
-                          </span>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-2 space-y-4">
-                        <div className="space-y-2">
-                          <div className="rounded border bg-card/50 p-3">
-                            <div className="flex items-center justify-between space-x-2 sm:space-x-4">
-                              <div>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
-                                <div className="flex items-baseline gap-1">
-                                  <span className="text-sm sm:text-lg font-semibold">{plan.duration_days}</span>
-                                  <span className="text-[10px] sm:text-xs text-muted-foreground">days</span>
-                                </div>
-                              </div>
-                              <Separator orientation="vertical" className="h-8" />
-                              <div>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground">Total ROI</p>
-                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                  <span className="text-sm sm:text-lg font-semibold">
-                                    {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
-                                  </span>
-                                  <span className="text-[10px] sm:text-xs text-muted-foreground">
-                                    (${((plan.investment * plan.returns_percentage * plan.duration_days) / 100).toFixed(2)})
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="rounded border bg-card/50 p-3">
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-[10px] sm:text-xs text-muted-foreground">Progress</span>
-                                <span className="text-[10px] sm:text-xs font-medium">{Math.round(progress)}%</span>
-                              </div>
-                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-primary"
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={cn(
-                            "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
-                            getRandomGradient()
-                          )} />
-                        </div>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="destructive" 
-                              className="w-full text-xs sm:text-sm h-8 sm:h-9"
-                            >
-                              Cancel Plan
-                              <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel Investment Plan</AlertDialogTitle>
-                              <AlertDialogDescription className="space-y-4">
-                                <p>Are you sure you want to cancel this investment plan? The refund will be processed with the following deductions:</p>
-                                
-                                {(() => {
-                                  const { forexFee, adminFee, refundAmount } = calculateRefundAmount(plan.investment);
-                                  return (
-                                    <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
-                                      <div className="flex justify-between">
-                                        <span>Original Investment:</span>
-                                        <span className="font-medium">${plan.investment.toLocaleString()}</span>
-                                      </div>
-                                      <div className="flex justify-between text-destructive">
-                                        <span>Forex Fee (10%):</span>
-                                        <span>-${forexFee.toLocaleString()}</span>
-                                      </div>
-                                      <div className="flex justify-between text-destructive">
-                                        <span>Admin Fee (5%):</span>
-                                        <span>-${adminFee.toLocaleString()}</span>
-                                      </div>
-                                      <Separator className="my-2" />
-                                      <div className="flex justify-between font-medium">
-                                        <span>Final Refund Amount:</span>
-                                        <span>${refundAmount.toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Keep Plan</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleCancelSubscription(plan)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Confirm Cancellation
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+              <ActivePlanVariant 
+                plans={subscribedPlans}
+                onCancel={handleCancelSubscription}
+              />
             )}
           </TabsContent>
         </Tabs>
@@ -731,16 +478,16 @@ const Plans = () => {
                 <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Current Balance:</span>
-                    <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()}</span>
+                    <span className="font-medium">{userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
                   </div>
                   <div className="flex justify-between text-destructive">
                     <span>Investment Amount:</span>
-                    <span>-${planToSubscribe?.investment.toLocaleString()}</span>
+                    <span>-{planToSubscribe?.investment.toLocaleString()} USD</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-medium">
                     <span>Remaining Balance:</span>
-                    <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()}</span>
+                    <span>{((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
                   </div>
                 </div>
               </div>

@@ -327,7 +327,7 @@ const Trade = () => {
         throw new Error('Invalid closing price');
       }
 
-      const pnl = calculatePnL(trade, closePrice);
+      const pnl = calculatePnL(trade, closePrice, tradingPairs); // Pass tradingPairs
       
       const { data, error } = await supabase
         .rpc('close_trade', {
@@ -483,7 +483,7 @@ const Trade = () => {
             isSidebarOpen ? "mt-[300px]" : "mt-0"
           )}>
             <div className="absolute inset-0 p-3">
-              <div className="w-full h-full rounded-xl border overflow-hidden bg-card">
+              <div className="w-full h-full rounded-xl overflow-hidden">
                 <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
               </div>
             </div>
@@ -517,7 +517,7 @@ const Trade = () => {
             )}>
               {/* Chart container */}
               <div className="flex-1 min-h-0 p-3">
-                <div className="w-full h-full rounded-xl border overflow-hidden bg-card">
+                <div className="w-full h-full rounded-xl overflow-hidden bg-card shadow-sm">
                   <TradingViewWidget symbol={formatTradingViewSymbol(selectedPair)} />
                 </div>
               </div>
@@ -529,6 +529,7 @@ const Trade = () => {
                   currentPrices={pairPrices} 
                   onCloseTrade={handleCloseTrade} 
                   userBalance={userBalance}
+                  tradingPairs={tradingPairs}
                 />
               </div>
             </div>

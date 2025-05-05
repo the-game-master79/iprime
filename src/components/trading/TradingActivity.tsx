@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
-import { Trade, PriceData } from "@/types/trading";
+import { Trade, PriceData, TradingPair } from "@/types/trading";
 import { calculatePnL, calculatePipValue } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ interface TradingActivityProps {
   onCloseTrade: (tradeId: string) => void;
   userBalance: number;
   currentPrices: Record<string, PriceData>; // Add this prop
+  tradingPairs: TradingPair[]; // Add this prop
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -25,16 +26,49 @@ export const TradingActivity = ({
   onCloseTrade,
   userBalance = 0,
   currentPrices, // Add this prop
+  tradingPairs, // Add this prop
 }: TradingActivityProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Change this line to default to true
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRowExpansion = (key: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   // Remove WebSocket related state and effects
-  
-  // Update filteredTrades to use currentPrices instead of localPrices
+
+  // Add new helper to merge trades
+  const mergeTrades = (trades: Trade[]) => {
+    const mergedMap = trades.reduce((acc, trade) => {
+      const key = `${trade.pair}-${trade.type}`;
+      if (!acc[key]) {
+        acc[key] = {
+          ...trade,
+          lots: 0,
+          margin_amount: 0,
+          originalTrades: []
+        };
+      }
+      acc[key].lots += trade.lots;
+      acc[key].margin_amount += (trade.margin_amount || 0);
+      acc[key].originalTrades.push(trade);
+      return acc;
+    }, {} as Record<string, Trade & { originalTrades: Trade[] }>);
+
+    return Object.values(mergedMap);
+  };
+
+  // Update filteredTrades to use merged trades
   const filteredTrades = useMemo(() => ({
-    open: trades.filter(t => t.status === 'open').map(t => ({
+    open: mergeTrades(trades.filter(t => t.status === 'open')).map(t => ({
       ...t,
       currentPrice: currentPrices[t.pair]?.bid || t.openPrice
     })),
@@ -114,9 +148,17 @@ export const TradingActivity = ({
     setCurrentPage(1);
   }, [activeTab]);
 
-  const handleCloseTrade = async (tradeId: string) => {
+  // Update handleCloseTrade to handle merged positions
+  const handleCloseTrade = async (mergedTrade: Trade & { originalTrades?: Trade[] }) => {
     try {
-      await onCloseTrade(tradeId);
+      if (mergedTrade.originalTrades) {
+        // Close all trades in the merged position
+        for (const trade of mergedTrade.originalTrades) {
+          await onCloseTrade(trade.id);
+        }
+      } else {
+        await onCloseTrade(mergedTrade.id);
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -152,6 +194,21 @@ export const TradingActivity = ({
         description: "Failed to close all trades"
       });
     }
+  };
+
+  // Update isHedgedPosition to check all trades in pair
+  const isHedgedPosition = (trade: Trade) => {
+    if (trade.status !== 'open') return false;
+    
+    // For non-expanded trades, check against all trades
+    const oppositeType = trade.type === 'buy' ? 'sell' : 'buy';
+    return trades
+      .filter(t => t.status === 'open' && t.pair === trade.pair)
+      .some(t => 
+        t.id !== trade.id && 
+        t.type === oppositeType && 
+        t.lots === trade.lots
+      );
   };
 
   // Only return null after all hooks
@@ -198,19 +255,19 @@ export const TradingActivity = ({
     return 5; // Default for unknown symbols
   };
 
-  // Update helper to format order info with proper decimals
+  // Update getOrderInfo to only show limit price for pending orders
   const getOrderInfo = (trade: Trade) => {
     if (trade.status === 'pending' && trade.orderType === 'limit' && trade.limitPrice) {
       const decimals = getDecimalPlaces(trade.pair);
-      return `Limit ${trade.type.toUpperCase()} @ $${trade.limitPrice.toFixed(decimals)}`;
+      return `@ $${trade.limitPrice.toFixed(decimals)}`;
     }
-    return `${trade.type.toUpperCase()} ${trade.lots} Lots`;
+    return ''; // Return empty string since we'll show type in badge
   };
 
   return (
     <>
       <div className={cn(
-        "bg-card border-t shadow-lg h-[300px] flex flex-col",
+        "bg-card border-t border-[#525252] shadow-lg h-[300px] flex flex-col",
         !isExpanded && "h-10"
       )}>
         <div 
@@ -262,7 +319,7 @@ export const TradingActivity = ({
             <div className="w-full min-w-max p-4">
               <table className="w-full">
                 <thead className="text-xs text-muted-foreground font-medium">
-                  <tr className="border-b">
+                  <tr className="border-b border-[#525252]">
                     <th className="text-left p-2">Symbol</th>
                     <th className="text-left p-2">Type</th>
                     <th className="text-right p-2">Volume</th>
@@ -302,78 +359,168 @@ export const TradingActivity = ({
                     
                     const imageUrl = `https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/${symbolName}.svg`;
                     
+                    const isExpanded = expandedRows.has(trade.pair + trade.type);
+                    const hasMultipleTrades = trade.originalTrades?.length > 1;
+                    
                     return (
-                      <tr key={trade.id} className="border-b border-border/50 hover:bg-accent/50">
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            <img 
-                              src={imageUrl}
-                              className="h-5 w-5"
-                              onError={(e) => {
-                                e.currentTarget.src = 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/generic.svg';
-                              }}
-                            />
-                            <span>{pairSymbol}</span>
-                          </div>
-                        </td>
-                        <td className="p-2">
-                          <div className="flex items-center gap-2">
-                            {trade.status === 'pending' ? (
-                              <span className="text-yellow-500">Pending</span>
-                            ) : (
-                              <div className={cn(
-                                "h-2 w-2 rounded-full",
-                                trade.type === 'buy' ? "bg-blue-500" : "bg-red-500"
-                              )} />
-                            )}
-                            {getOrderInfo(trade)}
-                          </div>
-                        </td>
-                        <td className="p-2 text-right">
-                          <Badge variant="outline" className="font-mono">
-                            {trade.lots}
-                          </Badge>
-                        </td>
-                        <td className="p-2 text-right font-mono">${trade.openPrice.toFixed(decimals)}</td>
-                        <td className="p-2 text-right font-mono">
-                          {trade.status === 'pending' ? '-' : `$${currentPrice.toFixed(decimals)}`}
-                        </td>
-                        <td className="p-2 text-right font-mono">
-                          ${trade.margin_amount?.toFixed(2) || '0.00'}
-                        </td>
-                        <td className="p-2 text-right font-mono">
-                          ${calculatePipValue(trade.lots, currentPrice || trade.openPrice, trade.pair).toFixed(2)}
-                        </td>
-                        <td className="p-2 font-mono">{trade.id.slice(0, 8)}</td>
-                        <td className="p-2">{openTime}</td>
-                        {activeTab !== 'pending' && (
-                          <td className="p-2 text-right">
-                            <div className={cn(
-                              "font-mono",
-                              pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
-                            )}>
-                              ${pnl.toFixed(2)}
+                      <React.Fragment key={trade.pair + trade.type}>
+                        <tr 
+                          className={cn(
+                            "border-b border-[#525252] hover:bg-accent/50",
+                            hasMultipleTrades && "cursor-pointer"
+                          )}
+                          onClick={() => hasMultipleTrades && toggleRowExpansion(trade.pair + trade.type)}
+                        >
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src={imageUrl}
+                                className="h-5 w-5"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/generic.svg';
+                                }}
+                              />
+                              {hasMultipleTrades && (
+                                <Badge variant="outline" className="text-xs">
+                                  x{trade.originalTrades.length}
+                                </Badge>
+                              )}
+                              <span>{pairSymbol}</span>
                             </div>
                           </td>
-                        )}
-                        <td className="p-2 text-right">
-                          {(trade.status === 'pending' || trade.status === 'open') && (
-                            <Button
-                              variant="ghost"
-                              size="sm" 
-                              onClick={() => handleCloseTrade(trade.id)}
-                              className={cn(
-                                "h-7 px-2",
-                                trade.status === 'pending' 
-                                  ? "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                  : "text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              {trade.status === 'pending' ? (
+                                <Badge variant="outline" className="text-yellow-500 border-yellow-500/20">Pending</Badge>
+                              ) : (
+                                <>
+                                  <Badge variant={trade.type === 'buy' ? 'default' : 'destructive'} className="text-xs">
+                                    {trade.type.toUpperCase()}
+                                  </Badge>
+                                  {isHedgedPosition(trade) && (
+                                    <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/20">
+                                      Hedged
+                                    </Badge>
+                                  )}
+                                </>
                               )}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                              {getOrderInfo(trade)}
+                            </div>
+                          </td>
+                          <td className="p-2 text-right">
+                            <Badge variant="outline" className="font-mono">
+                              {trade.lots}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-right font-mono">${trade.openPrice.toFixed(decimals)}</td>
+                          <td className="p-2 text-right font-mono">
+                            {trade.status === 'pending' ? '-' : `$${currentPrice.toFixed(decimals)}`}
+                          </td>
+                          <td className="p-2 text-right font-mono">
+                            ${trade.margin_amount?.toFixed(2) || '0.00'}
+                          </td>
+                          <td className="p-2 text-right font-mono">
+                            ${calculatePipValue(trade.lots, currentPrice || trade.openPrice, trade.pair, tradingPairs).toFixed(2)}
+                          </td>
+                          <td className="p-2 font-mono">{trade.id.slice(0, 8)}</td>
+                          <td className="p-2">{openTime}</td>
+                          {activeTab !== 'pending' && (
+                            <td className="p-2 text-right">
+                              <div className={cn(
+                                "font-mono",
+                                pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
+                              )}>
+                                ${pnl.toFixed(2)}
+                              </div>
+                            </td>
                           )}
-                        </td>
-                      </tr>
+                          <td className="p-2 text-right">
+                            {(trade.status === 'pending' || trade.status === 'open') && (
+                              <Button
+                                variant="ghost"
+                                size="sm" 
+                                onClick={() => handleCloseTrade(trade)}
+                                className={cn(
+                                  "h-7 px-2",
+                                  trade.status === 'pending' 
+                                    ? "text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    : "text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                )}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+
+                        {/* Expanded details row */}
+                        {hasMultipleTrades && isExpanded && (
+                          <tr className="bg-accent/30">
+                            <td colSpan={11} className="p-1">
+                              <table className="w-full text-sm">
+                                <thead className="text-xs text-muted-foreground">
+                                  <tr>
+                                    <th className="text-left p-1">ID</th>
+                                    <th className="text-right p-1">Volume</th>
+                                    <th className="text-right p-1">Open Price</th>
+                                    <th className="text-right p-1">Current Price</th>
+                                    <th className="text-right p-1">Margin</th>
+                                    <th className="text-right p-1">P&L</th>
+                                    <th className="text-right p-1">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {trade.originalTrades.map(subTrade => {
+                                    const subPnl = calculatePnL(subTrade, currentPrice);
+                                    const isSubTradeHedged = trade.originalTrades.some(t => 
+                                      t.id !== subTrade.id &&
+                                      t.pair === subTrade.pair && 
+                                      t.type === (subTrade.type === 'buy' ? 'sell' : 'buy') &&
+                                      t.lots === subTrade.lots
+                                    );
+                                    
+                                    return (
+                                      <tr key={subTrade.id} className="border-t border-[#525252]/50">
+                                        <td className="p-1 font-mono">
+                                          <div className="flex items-center gap-2">
+                                            {subTrade.id.slice(0, 8)}
+                                            {isSubTradeHedged && (
+                                              <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/20">
+                                                Hedged
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="p-1 text-right">{subTrade.lots}</td>
+                                        <td className="p-1 text-right">${subTrade.openPrice.toFixed(decimals)}</td>
+                                        <td className="p-1 text-right">${currentPrice.toFixed(decimals)}</td>
+                                        <td className="p-1 text-right">${subTrade.margin_amount?.toFixed(2)}</td>
+                                        <td className={cn(
+                                          "p-1 text-right font-mono",
+                                          subPnl > 0 ? "text-green-500" : "text-red-500"
+                                        )}>${subPnl.toFixed(2)}</td>
+                                        <td className="p-1 text-right">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleCloseTrade(subTrade);
+                                            }}
+                                            className="h-7 px-2 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -381,7 +528,7 @@ export const TradingActivity = ({
 
               {/* Add pagination controls */}
               {(activeTab === 'closed' || activeTab === 'pending') && displayedTrades.length > ITEMS_PER_PAGE && (
-                <div className="flex items-center justify-between px-2 py-4 border-t">
+                <div className="flex items-center justify-between px-2 py-4 border-t border-[#525252]">
                   <div className="text-sm text-muted-foreground">
                     Showing {Math.min(currentPage * ITEMS_PER_PAGE, displayedTrades.length)} of {displayedTrades.length} trades
                   </div>
@@ -414,7 +561,7 @@ export const TradingActivity = ({
       </div>
 
       {/* Updated Margin Information container - removed leverage section */}
-      <div className="bg-card border-t flex items-center px-4 py-2">
+      <div className="bg-card border-t border-[#525252] flex items-center px-4 py-2">
         <div className="flex items-center justify-between w-full gap-8">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Balance:</span>

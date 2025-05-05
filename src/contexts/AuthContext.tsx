@@ -75,17 +75,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
-      // Clear any stored session data
+      // Clear any stored session data first
+      await supabase.auth.signOut();
       localStorage.clear();
       sessionStorage.clear();
-      
-      // Sign out from Supabase
-      await supabase.auth.signOut();
       
       // Clear local state
       setUser(null);
       
-      // Redirect to login
+      // Redirect to login with replace to prevent back navigation
       navigate('/auth/login', { replace: true });
     } catch (error) {
       console.error('Error logging out:', error);

@@ -7,11 +7,10 @@ import { DashboardTopbar } from "@/components/shared/DashboardTopbar"; // Add th
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { TransactionTable } from "@/components/tables/TransactionTable"; // Add this import
 import { RankTable } from "@/components/dashboard/RankTable"; // Add this import
+import { AmountCard } from "@/components/shared/AmountCard";
 import {
   Carousel,
   CarouselContent,
@@ -19,19 +18,16 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Icons
 import { 
-  Copy as CopyIcon,
-  QrCode as QrCodeIcon, 
-  Receipt as ReceiptIcon, 
-  Trophy as TrophyIcon,
+  Copy,
+  QrCode,
   CaretLeft,
   CaretRight,
-  PlusCircle,
-  ArrowCircleUpRight,
-  ShoppingCartSimple,
-  ShareNetwork
+  ShareNetwork,
+  XCircle,
 } from "@phosphor-icons/react";
 
 // Utilities
@@ -92,6 +88,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // State management
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [referralCode, setReferralCode] = useState("");
   const [referralLink, setReferralLink] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [showQrCode, setShowQrCode] = useState(false);
@@ -142,6 +139,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   // Add this state with other states
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [showDirectsDialog, setShowDirectsDialog] = useState(false);
 
   // Data fetching functions
   const fetchUserProfile = async () => {
@@ -175,6 +173,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setWithdrawalBalance(totalBalance);
 
       if (profileData.data?.referral_code) {
+        setReferralCode(profileData.data.referral_code);
         setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}`);
       }
 
@@ -527,7 +526,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (pageNumber === 1) {
         setTransactions(data || []);
       } else {
-        setTransactions(prev => [...prev, ...(data || [])]);
+        // Filter out any duplicate transactions by ID
+        setTransactions(prev => {
+          const existingIds = new Set(prev.map(tx => tx.id));
+          const newTransactions = (data || []).filter(tx => !existingIds.has(tx.id));
+          return [...prev, ...newTransactions];
+        });
       }
       
       setHasMore((count || 0) > to + 1);
@@ -644,117 +648,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     navigate(isMobile ? '/trade/select' : '/trade');
   };
 
+  const handleDirectsClick = () => {
+    setShowDirectsDialog(true);
+  };
+
   return (
-    <div className="min-h-[100dvh] bg-gray-50">
+    <div className="min-h-[100dvh] bg-[#000000]">
       <DashboardTopbar />
 
       <main className="py-8">
-        <div className="container mx-auto px-4 max-w-[1200px]">
+        <div className="container mx-auto px-4 max-w-[1000px]">
           {loading || isLoading ? (
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
             <div className="space-y-8">
-              {/* Balance Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-primary border-gray-200">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-white mb-1">Available Balance</span>
-                        <span className="text-2xl font-semibold text-white">
-                          ${withdrawalBalance.toLocaleString()}
-                        </span>
-                        <div className="flex flex-col text-xs text-white/80 mt-1">
-                          <span>Wallet: ${(userProfile?.withdrawal_wallet || 0).toLocaleString()}</span>
-                          <span>Bonus: ${(userProfile?.multiplier_bonus || 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate('/deposit')}
-                          className="whitespace-nowrap bg-white border-white text-primary hover:bg-white/90"
-                        >
-                          <PlusCircle className="h-4 w-4 mr-2" />
-                          Deposit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate('/withdrawals')}
-                          className="whitespace-nowrap bg-transparent border-white text-white hover:bg-white/20"
-                        >
-                          <ArrowCircleUpRight className="h-4 w-4 mr-2 " />
-                          Withdraw
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border-gray-200">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-muted-foreground mb-1">Active AI Computes</span>
-                        <span className="text-2xl font-semibold">
-                          ${totalInvested.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          {activePlans.count} Compute{activePlans.count !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate('/plans')}
-                      >
-                        <ShoppingCartSimple className="h-4 w-4 mr-2" />
-                        Buy Computes
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border-gray-200">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-muted-foreground mb-1">Current Rank</span>
-                        <span className="text-2xl font-semibold">
-                          {businessStats.currentRank || 'New Member'}
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate('/affiliate')}
-                      >
-                        <ShareNetwork className="h-4 w-4 mr-2" />
-                        Affiliate Dashboard
-                      </Button>
-                    </div>
-                    {businessStats.nextRank && (
-                      <div className="mt-2">
-                        <div className="h-1 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-500" 
-                            style={{ width: `${businessStats.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          {Math.round(businessStats.progress)}% to {businessStats.nextRank.title}
-                        </span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Image Carousel - Remove Card wrapper */}
+              {/* Image Carousel - Moved to top */}
               {promotions.length > 0 && (
                 <Carousel
                   opts={{
@@ -795,123 +705,244 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 </Carousel>
               )}
 
-              {/* Referral Section */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <div className="flex-1 w-full space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-medium">Your Referral Link</div>
-                        <Badge 
-                          variant={directCount >= 2 ? "success" : "secondary"}
-                          className="text-xs"
-                        >
-                          {directCount}/2 Directs
-                        </Badge>
-                      </div>
-                      <div className="relative">
-                        <Input
-                          readOnly
-                          value={referralLink}
-                          className="pr-20 font-mono text-sm"
-                        />
-                        <div className="absolute right-0 top-0 h-full flex items-center gap-1 pr-1">
-                          <Button size="sm" variant="ghost" onClick={handleShowQrCode}>
-                            <QrCodeIcon className="h-4 w-4" weight="regular" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={handleCopyLink}>
-                            <CopyIcon className="h-4 w-4" weight="regular" />
-                          </Button>
-                        </div>
+              {/* Referral and Logo Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Referral Card */}
+                <div className="bg-[#141414] rounded-2xl p-2">
+                  <div className="flex items-center gap-4 w-full">
+                    <div className="relative flex-1">
+                      <Input
+                        readOnly
+                        value={referralCode}
+                        className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
+                      />
+                      <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        onClick={handleCopyLink}
+                        className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                      >
+                        <Copy className="h-5 w-5 text-white" weight="regular" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="outline"
+                        onClick={handleShowQrCode}
+                        className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                      >
+                        <QrCode className="h-5 w-5 text-white" weight="regular" />
+                      </Button>
+                      <div 
+                        className={cn(
+                          "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
+                          directCount >= 2 ? "bg-[#20BF55]" : 
+                          directCount === 1 ? "bg-[#FFA500]" : 
+                          "bg-[#FF005C]"
+                        )}
+                        onClick={handleDirectsClick}
+                      >
+                        <span className="text-sm font-medium text-white">{directCount}/2</span>
                       </div>
                     </div>
-                    {qrCodeUrl && (
-                      <div className="h-24 w-24 p-2 bg-white rounded-lg shadow-sm">
-                        <img src={qrCodeUrl} alt="QR Code" className="w-full h-full" />
-                      </div>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Trading Card */}
+                <div 
+                  className="bg-[#141414] rounded-2xl p-2 overflow-hidden relative cursor-pointer"
+                  onClick={() => navigate('/trade')}
+                >
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//arrowct.png"
+                    alt="Arrow CT"
+                    className="absolute inset-0 w-full h-full object-cover rounded-xl"
+                  />
+                  <div className="relative z-10 h-full flex items-center justify-between px-4">
+                    <img 
+                      src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
+                      alt="CloudTrade"
+                      className="h-8 w-auto"
+                    />
+                    <Button 
+                      className="bg-white text-black hover:bg-white/90"
+                    >
+                      Trade Now
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR Code Modal */}
+              {showQrCode && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowQrCode(false)}>
+                  <div className="bg-[#141414] p-4 rounded-xl w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-medium text-white">Share Your Referral Code</h3>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => setShowQrCode(false)}
+                        className="hover:bg-white/10"
+                      >
+                        <XCircle className="h-5 w-5 text-white" weight="regular" />
+                      </Button>
+                    </div>
+                    
+                    <div className="flex justify-center bg-white p-3 rounded-lg">
+                      <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48" />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={referralCode}
+                        className="font-mono text-sm bg-[#1E1E1E] border-0"
+                      />
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={handleCopyLink}
+                        className="bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                      >
+                        <Copy className="h-5 w-5 text-white" weight="regular" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Balance Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <AmountCard
+                  title="Available to invest"
+                  amount={withdrawalBalance}
+                  subtitle={(userProfile?.multiplier_bonus || 0).toString()}
+                />
+
+                <AmountCard
+                  variant="compute"
+                  title="AI Computes"
+                  amount={totalInvested}
+                  activePlans={activePlans.count}
+                />
+
+                <AmountCard
+                  variant="rank"
+                  title="Current Rank"
+                  amount={0}
+                  currentRank={businessStats.currentRank || 'New Member'}
+                  nextRank={businessStats.nextRank?.title}
+                  progress={businessStats.progress}
+                />
+              </div>
 
               {/* Tabs Section */}
-              <Card>
-                <CardContent className="p-6">
-                  <Tabs defaultValue="transactions" className="w-full">
-                    <TabsList className="inline-flex mb-6">
-                      <TabsTrigger value="transactions">
-                        <ReceiptIcon className="h-4 w-4 mr-2" weight="regular" />
-                        Transactions
-                      </TabsTrigger>
-                      <TabsTrigger value="ranks">
-                        <TrophyIcon className="h-4 w-4 mr-2" weight="regular" />
-                        Ranks
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent 
-                      value="transactions" 
-                      className="space-y-3 data-[state=active]:animate-in data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0"
-                    >
-                      <div className="overflow-x-auto">
-                        {transactions.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            No transactions found
+              <div>
+                <Tabs defaultValue="transactions" className="w-full">
+                  <TabsList>
+                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                    <TabsTrigger value="ranks">Ranks</TabsTrigger>
+                  </TabsList>
+                  <TabsContent 
+                    value="transactions" 
+                    className="space-y-3 w-full"
+                  >
+                    {transactions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No transactions found
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <TransactionTable 
+                          transactions={transactions} 
+                          onCopyId={handleCopyId}
+                        />
+                        
+                        {hasMore && (
+                          <div className="py-4 text-center">
+                            <Button
+                              variant="outline"
+                              onClick={handleLoadMore}
+                              disabled={isLoadingMore}
+                              className="w-full sm:w-auto"
+                            >
+                              {isLoadingMore ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
+                                  Loading...
+                                </>
+                              ) : (
+                                'Load More'
+                              )}
+                            </Button>
                           </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <TransactionTable 
-                              transactions={transactions} 
-                              onCopyId={handleCopyId}
-                            />
-                            
-                            {hasMore && (
-                              <div className="py-4 text-center">
-                                <Button
-                                  variant="outline"
-                                  onClick={handleLoadMore}
-                                  disabled={isLoadingMore}
-                                  className="w-full sm:w-auto"
-                                >
-                                  {isLoadingMore ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
-                                      Loading...
-                                    </>
-                                  ) : (
-                                    'Load More'
-                                  )}
-                                </Button>
-                              </div>
-                            )}
+                        )}
 
-                            {!hasMore && transactions.length > 0 && (
-                              <div className="py-4 text-center text-sm text-muted-foreground">
-                                End of your Transactions
-                              </div>
-                            )}
+                        {!hasMore && transactions.length > 0 && (
+                          <div className="py-4 text-center text-sm text-white">
+                            End of your Transactions
                           </div>
                         )}
                       </div>
-                    </TabsContent>
+                    )}
+                  </TabsContent>
 
-                    <TabsContent value="ranks" className="space-y-4">
-                      <RankTable
-                        ranks={ranks}
-                        businessVolume={businessStats.totalVolume}
-                        currentRank={businessStats.currentRank}
-                        claimedRanks={claimedRanks}
-                        claimingRank={claimingRank}
-                        onClaimBonus={handleClaimRankBonus}
-                      />
-                    </TabsContent>
-                  </Tabs>
-                  </CardContent>
-                </Card>
+                  <TabsContent value="ranks" className="space-y-4 w-full">
+                    <RankTable
+                      ranks={ranks}
+                      businessVolume={businessStats.totalVolume}
+                      currentRank={businessStats.currentRank}
+                      claimedRanks={claimedRanks}
+                      claimingRank={claimingRank}
+                      onClaimBonus={handleClaimRankBonus}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>
-            )}
+            </div>
+          )}
         </div>
       </main>
+
+      <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
+        <AlertDialogContent className="bg-[#141414] border-0">
+          <div className="absolute right-4 top-4">
+            <Button
+              variant="ghost"
+              className="h-6 w-6 p-0 hover:bg-white/10"
+              onClick={() => setShowDirectsDialog(false)}
+            >
+              <XCircle className="h-4 w-4" />
+            </Button>
+          </div>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl mb-6">Direct Referral Status</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-6">
+              <div className="flex items-center justify-center">
+                <span className={cn(
+                  "text-7xl font-bold",
+                  directCount >= 2 ? "text-[#20BF55]" : 
+                  directCount === 1 ? "text-[#FFA500]" : 
+                  "text-[#FF005C]"
+                )}>
+                  {directCount}/2
+                </span>
+              </div>
+              
+              <p className="text-center text-base">
+                {directCount >= 2 ? (
+                  "Congratulations! You have achieved the required direct referrals. You can now earn commissions and bonuses."
+                ) : (
+                  `You need ${2 - directCount} more direct referral${2 - directCount > 1 ? 's' : ''} to start earning commissions and bonuses.`
+                )}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

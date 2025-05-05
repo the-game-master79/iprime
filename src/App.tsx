@@ -22,7 +22,7 @@ import MarginCalculator from "@/pages/trading/MarginCalculator";
 import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load routes
-const Dashboard = lazy(() => import("./pages/dashboard/Dashboard"));
+const Platform = lazy(() => import("./pages/dashboard/Platform"));
 const Plans = lazy(() => import("./pages/plans/Plans")); 
 const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
 const Payments = lazy(() => import("./pages/payments/Payments"));
@@ -58,8 +58,9 @@ const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
 // Add Account import with other lazy imports
-const Account = lazy(() => import("@/pages/account/Account"));
-const Performance = lazy(() => import("@/pages/performance/Performance")); // Move Performance import here
+const Account = lazy(() => import("@/pages/account/Account")); 
+const Performance = lazy(() => import("@/pages/performance/Performance"));
+const DesignSystem = lazy(() => import("@/pages/design-system/DesignSystem")); // Add DesignSystem import
 
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
@@ -116,7 +117,7 @@ const App = () => {
             <Route path="/auth/login" element={<Login />} />
 
             {/* Protected Routes */}
-            <Route path="/dashboard" element={<AuthGuard requireAuth><Dashboard /></AuthGuard>} />
+            <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
             <Route path="/account" element={<AuthGuard requireAuth><Account /></AuthGuard>} />
             <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
             <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
@@ -195,7 +196,7 @@ const App = () => {
                 <Performance />
               </AuthGuard>
             } />
-
+            <Route path="/design" element={<DesignSystem />} /> {/* Add route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

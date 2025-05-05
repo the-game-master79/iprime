@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { Brain } from "lucide-react";
 import { TradingPair, PriceData, TradeParams, Trade } from "@/types/trading"; // Add this import
 import { 
   calculateRequiredMargin, 
@@ -13,8 +12,8 @@ import {
   calculatePipValue // Add this import
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from '@supabase/supabase-js'; // Import Supabase client
+import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 
 interface SubscriptionPlan {
   id: string;
@@ -59,8 +58,6 @@ export const TradingPanel = ({
   const [showLeverageDialog, setShowLeverageDialog] = useState(false);
   const [selectedLeverage, setSelectedLeverage] = useState(defaultLeverage.toString());
   const [pairInfo, setPairInfo] = useState<TradingPair | null>(null);
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [limitPrice, setLimitPrice] = useState('');
 
   // Add crypto decimal limits mapping
   const cryptoLotDecimals: Record<string, number> = {
@@ -193,7 +190,7 @@ export const TradingPanel = ({
     const volumeUsd = volumeUnits * price;
     
     // Calculate pip value using the utility function
-    const pipValue = calculatePipValue(lotSize, price, selectedPair);
+    const pipValue = calculatePipValue(lotSize, price, selectedPair, tradingPairs);
     
     return {
       pipValue: pipValue.toFixed(2),
@@ -201,7 +198,7 @@ export const TradingPanel = ({
       volumeUnits: volumeUnits.toFixed(2),
       volumeUsd: volumeUsd.toFixed(2)
     };
-  }, [lots, pairPrices, selectedPair, pairInfo]);
+  }, [lots, pairPrices, selectedPair, pairInfo, tradingPairs]);
 
   // Format price helper
   const formatPrice = (price: string | undefined) => {
@@ -234,24 +231,10 @@ export const TradingPanel = ({
     return null;
   };
 
-  // Add this helper to validate limit price
-  const validateLimitPrice = () => {
-    const price = parseFloat(limitPrice);
-    if (!price || price <= 0) {
-      return "Please enter a valid limit price";
-    }
-    return null;
-  };
-
   // Update validateTrade to include limit price validation
   const validateTrade = () => {
     const basicValidation = validateLots(lots);
     if (basicValidation) return basicValidation;
-
-    if (orderType === 'limit') {
-      const limitValidation = validateLimitPrice();
-      if (limitValidation) return limitValidation;
-    }
 
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
     if (!pair) return "Invalid trading pair";
@@ -288,26 +271,14 @@ export const TradingPanel = ({
 
     setIsExecutingTrade(true);
     try {
-      const parsedLimitPrice = orderType === 'limit' ? parseFloat(limitPrice) : undefined;
-      
       const params: TradeParams = {
         type,
-        orderType,
+        orderType: 'market',
         lots: parseFloat(lots),
         leverage: parseInt(selectedLeverage),
-        limitPrice: parsedLimitPrice,
-        openPrice: orderType === 'limit' ? parsedLimitPrice : undefined,
       };
 
       await onTrade(params);
-
-      // For limit orders, show pending status message
-      if (orderType === 'limit') {
-        toast({
-          title: "Limit Order Placed",
-          description: `${type.toUpperCase()} order placed at ${limitPrice}`,
-        });
-      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -431,13 +402,6 @@ export const TradingPanel = ({
     }
   }, [selectedPair, userBalance, selectedLeverage]); // Remove pairPrices from dependencies
 
-  // Add this effect to update limit price when order type changes
-  useEffect(() => {
-    if (orderType === 'limit') {
-      setLimitPrice(formatPrice(pairPrices[selectedPair]?.bid) || '0');
-    }
-  }, [orderType]);
-
   // Add effect to update static prices
   useEffect(() => {
     if (pairPrices[selectedPair]) {
@@ -540,16 +504,8 @@ export const TradingPanel = ({
     }
   }, [selectedPair, pairPrices[selectedPair]?.bid, pairPrices[selectedPair]?.ask]);
 
-  // Add handler for limit tab click
-  const handleLimitTabClick = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Limit orders will be available in the next update",
-    });
-  };
-
   return (
-    <div className="w-[350px] border-l bg-card p-4">
+    <div className="w-[350px] border-l border-[#525252] bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
         <div className="space-y-4">
           {/* Price info section */}
@@ -589,15 +545,7 @@ export const TradingPanel = ({
             </div>
           </div>
 
-          {/* Update Order Type Tabs */}
-          <Tabs value={orderType} onValueChange={(value) => value === 'limit' ? handleLimitTabClick() : setOrderType(value as 'market' | 'limit')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="market">Market Order</TabsTrigger>
-              <TabsTrigger value="limit" disabled className="opacity-50">Limit Order</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {/* Quick trade form */}
+          {/* Quick trade form - Removed Tabs section */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-sm font-medium">
@@ -644,30 +592,16 @@ export const TradingPanel = ({
                 </Button>
               </div>
             </div>
-
-            {/* Update Limit Price Input */}
-            {orderType === 'limit' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Limit Price</label>
-                <Input
-                  type="number"
-                  value={limitPrice}
-                  onChange={(e) => setLimitPrice(e.target.value)}
-                  className="text-right font-mono"
-                />
-              </div>
-            )}
           </div>
 
-          {/* Trade buttons section */}
+          {/* Trade buttons section - Updated colors */}
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <Button
-                variant="outline"
                 className={cn(
-                  "h-16 flex-col space-y-1 hover:bg-red-500/5 border-2",
-                  "border-red-500/20 hover:border-red-500/30 text-red-500",
-                  "transition-colors bg-red-500/5",
+                  "h-16 flex-col space-y-1",
+                  "bg-red-500 hover:bg-red-600 border-0",
+                  "text-white font-medium",
                   "!items-start !justify-start",
                   isExecutingTrade && "opacity-50 cursor-not-allowed"
                 )}
@@ -675,19 +609,18 @@ export const TradingPanel = ({
                 disabled={isExecutingTrade}
               >
                 <div className="text-xs font-normal text-left pl-2">
-                  {isExecutingTrade ? 'Executing...' : orderType === 'limit' ? 'Sell Limit at' : 'Sell at'}
+                  {isExecutingTrade ? 'Executing...' : 'Sell at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-left pl-2">
-                  {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('sell')}
+                  {getDisplayPrice('sell')}
                 </div>
               </Button>
 
               <Button
-                variant="outline"
                 className={cn(
-                  "h-16 flex-col space-y-1 hover:bg-blue-500/5 border-2",
-                  "border-blue-500/20 hover:border-blue-500/30 text-blue-500",
-                  "transition-colors bg-blue-500/5",
+                  "h-16 flex-col space-y-1",
+                  "bg-blue-500 hover:bg-blue-600 border-0",
+                  "text-white font-medium",
                   "!items-start !justify-start",
                   isExecutingTrade && "opacity-50 cursor-not-allowed"
                 )}
@@ -695,10 +628,10 @@ export const TradingPanel = ({
                 disabled={isExecutingTrade}
               >
                 <div className="text-xs font-normal text-right pr-2">
-                  {isExecutingTrade ? 'Executing...' : orderType === 'limit' ? 'Buy Limit at' : 'Buy at'}
+                  {isExecutingTrade ? 'Executing...' : 'Buy at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-right pr-2">
-                  {orderType === 'limit' ? limitPrice || '0.00' : getDisplayPrice('buy')}
+                  {getDisplayPrice('buy')}
                 </div>
               </Button>
             </div>
@@ -835,14 +768,18 @@ export const TradingPanel = ({
           </Dialog>
         </div>
 
-        {/* AI Trading button moved to bottom */}
-        <div className="pt-4 border-t">
+        {/* Replace AI Trading button with image button */}
+        <div className="pt-4 border-t border-[#525252]">
+          {/* Removed DemoTrade component */}
           <Button
             className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
             onClick={() => navigate('/plans')}
           >
-            <Brain className="w-4 h-4 mr-2" />
-            Subscribe to Computes
+            <img 
+              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-computes.svg"
+              alt="Subscribe to AI Computes"
+              className="w-full h-full object-fit-cover rounded-md"
+            />
           </Button>
         </div>
       </div>

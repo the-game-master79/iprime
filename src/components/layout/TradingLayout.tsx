@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { DepositDialog } from "@/components/dialogs/DepositDialog";
-import { ArrowLeftCircle, PlusCircle, Menu } from "lucide-react";
+import { ArrowLeftCircle, PlusCircle, Menu, ChevronLeftCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 
@@ -45,22 +45,22 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
 
   return (
     <div className="flex h-screen">
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-[#525252] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-full items-center justify-between gap-2 px-2 md:px-4">
           <div className="flex items-center gap-2">
             <Button 
               variant="ghost" 
               size="icon"
               onClick={() => navigate(-1)}
-              className="h-8 w-8 md:h-10 md:w-10"
+              className="h-8 w-8"
             >
-              <ArrowLeftCircle className="h-4 w-4 md:h-5 md:w-5" />
+              <ChevronLeftCircle className="h-12 w-12" />
             </Button>
             
             {!isMobile && (
               <Link to="/" className="flex items-center gap-2">
                 <img 
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade-1.svg" 
+                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg" 
                   alt="CloudTrade Logo" 
                   className="h-8 w-auto" 
                 />
@@ -89,7 +89,7 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
               className="h-8 md:h-10 bg-[#FFA500] text-black hover:bg-[#FFA500]/90"
             >
               <PlusCircle className="h-4 w-4" />
-              {!isMobile && <span className="ml-2">Deposit</span>}
+              {!isMobile && <span className="ml-2">Add funds</span>}
             </Button>
           </div>
         </div>

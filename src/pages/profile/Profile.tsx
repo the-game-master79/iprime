@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format, subYears } from "date-fns"; // Add this import
 import { countries as countryList } from "@/data/countries"; // Rename import to avoid conflict
 import { Topbar } from "@/components/shared/Topbar";
+import { KycVariant } from "@/components/shared/KycVariants";
 
 // Add these validation helpers at the top of the file, before the Profile component
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -600,20 +601,20 @@ const Profile = () => {
   const defaultTab = searchParams.get('tab') || 'personal';
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-black">
       <Topbar title="Profile & KYC" />
 
       <main className="py-6">
-        <div className="container">
+        <div className="container mx-auto max-w-[1000px]">
           {isLoading ? (
             <div className="flex items-center justify-center h-[400px]">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
             <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8">
-                <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                <TabsTrigger value="kyc">KYC Verification</TabsTrigger>
+              <TabsList className="w-fit mb-8 h-12 rounded-xl p-1 bg-[#212121]">
+                <TabsTrigger value="personal" className="rounded-lg h-10 px-6">Personal Info</TabsTrigger>
+                <TabsTrigger value="kyc" className="rounded-lg h-10 px-6">KYC Verification</TabsTrigger>
               </TabsList>
 
               <TabsContent value="personal" className="space-y-6">
@@ -770,7 +771,7 @@ const Profile = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2 pt-4 border-t">
+                    <div className="space-y-2 pt-4 border-t border-secondary">
                       <h3 className="font-medium">Add Referral Code</h3>
                       <p className="text-sm text-muted-foreground">
                         If someone referred you to our platform, you can add their referral code here
@@ -817,96 +818,20 @@ const Profile = () => {
               </TabsContent>
 
               <TabsContent value="kyc">
-                {/* KYC content */}
                 <div className="space-y-6">
                   {isLoadingKyc ? (
-                      <div className="flex items-center justify-center p-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      </div>
-                    ) : userData.kycStatus === 'completed' ? (
-                      <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                            <Check className="h-6 w-6 text-green-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-green-800">Verification Complete</h3>
-                            <p className="text-sm text-green-700">
-                              Your identity has been verified successfully. You now have full access to all platform features.
-                            </p>
-                            {kycData && kycData.updated_at && (
-                              <div className="mt-3 flex gap-2 text-xs text-green-700">
-                                <span className="flex items-center gap-1">
-                                  <ShieldAlert className="h-4 w-4" />
-                                  Verified on {new Date(kycData.updated_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : userData.kycStatus === 'processing' ? (
-                      <div className="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                            <Clock className="h-6 w-6 text-yellow-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-yellow-800">Verification In Progress</h3>
-                            <p className="text-sm text-yellow-700">
-                              Your documents are being reviewed. This usually takes 1-2 business days.
-                            </p>
-                            {kycData && (
-                              <div className="mt-3 flex gap-2 text-xs text-yellow-700">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
-                                  Submitted on {new Date(kycData.created_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : userData.kycStatus === 'rejected' ? (
-                      <div className="p-4 rounded-lg border bg-red-50 border-red-200">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                            <AlertTriangle className="h-6 w-6 text-red-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-red-800">Verification Rejected</h3>
-                            <p className="text-sm text-red-700">
-                              Your verification was not successful. Please submit new documents following the guidelines below.
-                            </p>
-                            {kycData && kycData.updated_at && (
-                              <div className="mt-3 flex gap-2 text-xs text-red-700">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-4 w-4" />
-                                  Rejected on {new Date(kycData.updated_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Shield className="h-6 w-6 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-blue-800">Verification Required</h3>
-                            <p className="text-sm text-blue-700">
-                              Please complete your KYC verification to unlock all platform features.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-center p-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <KycVariant 
+                      status={userData.kycStatus || 'required'} 
+                      date={kycData?.updated_at ? new Date(kycData.updated_at) : undefined}
+                    />
+                  )}
 
-                    {/* Show KYC form for rejected, pending or initial state */}
-                    {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
+                  {/* Show KYC form for rejected, pending or initial state */}
+                  {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
                       <div className="space-y-8">
                         {/* Personal Details Section */}
                         <div className="space-y-4">
@@ -1013,7 +938,7 @@ const Profile = () => {
                         </div>
 
                         {/* Document Identification Section */}
-                        <div className="space-y-4 pt-4 border-t">
+                        <div className="space-y-4 pt-4 border-t border-secondary">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <CreditCard className="h-4 w-4 text-blue-600" />
@@ -1061,7 +986,7 @@ const Profile = () => {
                         </div>
 
                         {/* Document Upload Section */}
-                        <div className="space-y-4 pt-4 border-t">
+                        <div className="space-y-4 pt-4 border-t border-secondary">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                               <Upload className="h-4 w-4 text-blue-600" />
@@ -1138,8 +1063,8 @@ const Profile = () => {
         </div>
       </main>
 
-      {/* Add logout button at the bottom */}
-      <div className="container mx-auto py-6 border-t mt-8">
+      {/* Update logout container */}
+      <div className="container mx-auto max-w-[1000px] py-6 border-t border-secondary mt-8">
         <Button 
           variant="destructive" 
           onClick={handleLogout}

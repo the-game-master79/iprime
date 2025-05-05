@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MagnifyingGlass, ChartLine, Globe, ArrowsHorizontal } from "@phosphor-icons/react";
 import { TradingPair, PriceData } from "@/types/trading";
 import { isForexTradingTime } from "@/lib/utils";
 import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 import { Badge } from "@/components/ui/badge";
+import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 
 interface TradeSidebarProps {
   selectedPair: string;
@@ -33,7 +33,7 @@ export const TradeSidebar = ({
   onToggleCollapse
 }: TradeSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("crypto");
+  const [activeTab, setActiveTab] = useState("forex"); // Default to "forex"
   const [priceAnimations, setPriceAnimations] = useState<{[key: string]: 'up' | 'down'}>({});
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
 
@@ -90,52 +90,18 @@ export const TradeSidebar = ({
     setActiveTab(value);
   };
 
-  const cryptoLotDecimals: Record<string, number> = {
-    'BNBUSDT': 2,
-    'DOTUSDT': 3,
-    'ETHUSDT': 2,
-    'DOGEUSDT': 5,
-    'BTCUSDT': 2,
-    'TRXUSDT': 4,
-    'LINKUSDT': 2,
-    'ADAUSDT': 4,
-    'SOLUSDT': 2,
-  };
-
-  const forexLotDecimals: Record<string, number> = {
-    'EURUSD': 5,
-    'GBPUSD': 5,
-    'USDJPY': 3,
-    'USDCHF': 5,
-    'AUDUSD': 5,
-    'USDCAD': 5,
-    'EURGBP': 5,
-    'EURJPY': 3,
-    'GBPJPY': 3,
-    'XAUUSD': 2
-  };
-
-  const getDecimalPlaces = (symbol: string): number => {
-    if (symbol.includes('BINANCE:')) {
-      const base = symbol.replace('BINANCE:', '');
-      return cryptoLotDecimals[base] ?? 5;
-    }
-    
-    if (symbol.includes('FX:')) {
-      const base = symbol.replace('FX:', '').replace('/', '');
-      return forexLotDecimals[base] ?? 5;
-    }
-    
-    return 5; // Default
+  // Update to use imported getDecimalPlaces
+  const getDisplayDecimals = (symbol: string): number => {
+    return getDecimalPlaces(symbol);
   };
 
   return (
     <aside className={cn(
-      "fixed inset-y-0 left-0 z-20 flex flex-col border-r bg-card transition-all duration-300 mt-14",
+      "fixed inset-y-0 left-0 z-20 flex flex-col border-r border-[#525252] bg-card transition-all duration-300 mt-14",
       collapsed ? "w-20" : "w-72",
       !isOpen && "-translate-x-full"
     )}>
-      <div className="flex flex-col items-center border-b">
+      <div className="flex flex-col items-center border-b border-[#525252]">
         <div className="flex h-14 w-full items-center justify-between px-4">
           <div className={cn("font-semibold", collapsed && "hidden")}>
             Markets
@@ -159,7 +125,7 @@ export const TradeSidebar = ({
               priceAnimations[selectedPair] === 'up' && "text-green-500",
               priceAnimations[selectedPair] === 'down' && "text-red-500"
             )}>
-              ${parseFloat(localPrices[selectedPair]?.bid || '0').toFixed(getDecimalPlaces(selectedPair))}
+              ${parseFloat(localPrices[selectedPair]?.bid || '0').toFixed(getDisplayDecimals(selectedPair))}
             </div>
             <div className={cn(
               "text-xs font-medium",
@@ -190,10 +156,6 @@ export const TradeSidebar = ({
 
               <Tabs value={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="crypto" className="flex items-center gap-2">
-                    <ChartLine className="h-4 w-4" />
-                    {!collapsed && "Crypto"}
-                  </TabsTrigger>
                   <TabsTrigger 
                     value="forex" 
                     className="flex items-center gap-2"
@@ -211,6 +173,10 @@ export const TradeSidebar = ({
                       </>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger value="crypto" className="flex items-center gap-2">
+                    <ChartLine className="h-4 w-4" />
+                    {!collapsed && "Crypto"}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -220,7 +186,7 @@ export const TradeSidebar = ({
                 {filteredPairs.map((pair) => {
                   const priceData = localPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
                   const priceAnimation = priceAnimations[pair.symbol];
-                  const decimals = getDecimalPlaces(pair.symbol);
+                  const decimals = getDisplayDecimals(pair.symbol);
                   
                   return (
                     <Button

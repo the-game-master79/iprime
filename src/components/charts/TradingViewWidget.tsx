@@ -6,13 +6,19 @@ interface TradingViewWidgetProps {
   theme?: "light" | "dark";
 }
 
-function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) {
+function TradingViewWidget({ symbol, theme = "dark" }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
   const { isMobile } = useBreakpoints();
 
   useEffect(() => {
+    // Clean up any existing content
     if (container.current) {
+      const existingWidget = container.current.querySelector('script');
+      if (existingWidget) {
+        existingWidget.remove();
+      }
       container.current.innerHTML = '';
+      
       const script = document.createElement("script");
       script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
       script.type = "text/javascript";
@@ -45,26 +51,31 @@ function TradingViewWidget({ symbol, theme = "light" }: TradingViewWidgetProps) 
       container.current.appendChild(script);
     }
 
+    // Cleanup function
     return () => {
       if (container.current) {
+        const existingWidget = container.current.querySelector('script');
+        if (existingWidget) {
+          existingWidget.remove();
+        }
         container.current.innerHTML = '';
       }
     };
-  }, [symbol, theme, isMobile]);
+  }, [theme, isMobile, symbol]); // Add symbol to dependencies
 
   return (
-    <div className="tradingview-widget-container flex flex-col h-full w-full relative" ref={container}>
+    <div className="tradingview-widget-container flex flex-col h-full w-full relative bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" ref={container}>
       <div 
         id="tradingview_chart" 
-        className="flex-1 w-full"
-        style={{ height: "calc(100% - 32px)" }}
+        className="flex-1 w-full overflow-hidden"
+        style={{ height: "calc(100% - 28px)" }}
       />
-      <div className="tradingview-widget-copyright h-8 px-2 flex items-center text-xs text-muted-foreground">
+      <div className="tradingview-widget-copyright h-7 px-3 flex items-center justify-end text-xs text-muted-foreground/80 bg-background/50 backdrop-blur-sm">
         <a 
           href="https://www.tradingview.com/" 
           rel="noopener nofollow" 
           target="_blank"
-          className="hover:text-primary"
+          className="hover:text-primary transition-colors duration-200"
         >
           Track all markets on TradingView
         </a>

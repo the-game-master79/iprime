@@ -24,7 +24,7 @@ const SelectPairs = () => {
   const [userBalance, setUserBalance] = useState(0);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("crypto");
+  const [activeTab, setActiveTab] = useState("forex"); // Default to "forex"
   const [pairPrices, setPairPrices] = useState<Record<string, PriceData>>({});
   const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down'>>({});
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -150,6 +150,7 @@ const SelectPairs = () => {
         pair.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         pair.symbol.toLowerCase().includes(searchQuery.toLowerCase())
       )
+      .sort((a, b) => a.type === 'forex' ? -1 : 1) // Forex first, then Crypto
       .map(pair => ({
         ...pair,
         currentPrice: parseFloat(pairPrices[pair.symbol]?.bid || '0').toFixed(getDecimalPlaces(pair.symbol)),
@@ -319,17 +320,17 @@ const SelectPairs = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-[#525252]">
         {/* Balance Card */}
         <div className="px-4 pt-4">
-          <div className="bg-primary rounded-xl border-gray-200">
+          <div className="bg-[#141414] rounded-xl border border-[#525252]">
             <div className="p-4">
               <div className="flex flex-col gap-4">
                 {/* Badges */}
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="rounded-sm bg-white text-primary">Pro</Badge>
-                  <Badge variant="outline" className="rounded-sm bg-white text-primary">MT5</Badge>
-                  <Badge variant="outline" className="rounded-sm bg-white text-primary">Web</Badge>
+                  <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Pro</Badge>
+                  <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">MT5</Badge>
+                  <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Web</Badge>
                 </div>
                 
                 {/* Balance */}
@@ -346,7 +347,7 @@ const SelectPairs = () => {
         {/* Stats Card */}
         <div className="px-4 py-3">
           <div 
-            className="relative overflow-hidden bg-card rounded-xl border shadow-sm transition-all 
+            className="relative overflow-hidden bg-card rounded-xl border border-[#525252] shadow-sm transition-all 
                      hover:shadow-md active:scale-[0.99] cursor-pointer"
             onClick={() => setShowTradesSheet(true)}
           >
@@ -383,7 +384,7 @@ const SelectPairs = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute inset-x-0 top-0 z-50 bg-background/95 backdrop-blur-sm rounded-xl shadow-lg border"
+                  className="absolute inset-x-0 top-0 z-50 bg-background/95 backdrop-blur-sm rounded-xl shadow-lg border border-[#525252]"
                 >
                   <div className="relative">
                     <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -408,22 +409,18 @@ const SelectPairs = () => {
               )}
             </AnimatePresence>
 
-            <Tabs defaultValue="crypto" onValueChange={handleTabChange}>
+            <Tabs defaultValue="forex" onValueChange={handleTabChange}>
               <div className="flex items-center justify-between">
-                <TabsList className="grid w-[calc(100%-44px)] grid-cols-2 h-12 rounded-xl p-1">
-                  <TabsTrigger value="crypto" className="rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <ChartLine className="h-4 w-4" weight="bold" />
-                      <span className="font-medium">Crypto</span>
-                    </div>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="forex" className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    Forex
                   </TabsTrigger>
-                  <TabsTrigger value="forex" className="rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4" weight="bold" />
-                      <span className="font-medium">Forex</span>
-                    </div>
+                  <TabsTrigger value="crypto" className="flex items-center gap-2">
+                    <ChartLine className="h-4 w-4" />
+                    Crypto
                   </TabsTrigger>
-                  </TabsList>
+                </TabsList>
                 
                 <Button
                   variant="ghost" 
@@ -450,7 +447,7 @@ const SelectPairs = () => {
                         disabled={isDisabled}
                         onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
                         className={cn(
-                          "w-full text-left bg-card hover:bg-accent rounded-lg border p-3",
+                          "w-full text-left bg-card hover:bg-accent rounded-lg border border-[#525252] p-3",
                           "transition-all duration-200 active:scale-[0.98]",
                           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                           isDisabled && "opacity-50 cursor-not-allowed"
@@ -493,7 +490,7 @@ const SelectPairs = () => {
                           </div>
 
                           {activeTrades.length > 0 && (
-                            <div className="-mx-3 -mb-3 border-t">
+                            <div className="-mx-3 -mb-3 border-[#525252]">
                               <div className={cn(
                                 "px-3 py-2 flex items-center justify-between text-xs",
                                 activeTrades.reduce((sum, trade) => {

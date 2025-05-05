@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User, LineChart, ArrowLeftRight } from "lucide-react";
 import { PlusCircle, ArrowCircleUpRight } from "@phosphor-icons/react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -20,7 +19,6 @@ import {
 } from "@/components/ui/pagination";
 import { Topbar } from "@/components/shared/Topbar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { DialogContent } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { NavigationFooter } from "@/components/shared/NavigationFooter";
 
@@ -267,24 +265,23 @@ export default function Account() {
 
       <div className="container max-w-4xl mx-auto px-4 py-6">
         {/* Balance Card */}
-        <Card className="bg-primary border-gray-200 mb-6">
+        <Card className="bg-[#141414] border border-[#525252] mb-6">
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
               {/* Badges */}
               <div className="flex gap-2">
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">Pro</Badge>
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">MT5</Badge>
-                <Badge variant="outline" className="rounded-sm bg-white text-primary">Web</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Pro</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">MT5</Badge>
+                <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary">Web</Badge>
               </div>
               
               {/* Balance */}
               <div className="flex flex-col">
-                <span className="text-sm text-white/80 mb-1">Available Balance</span>
+                <span className="text-sm text-white/80 mb-1">Available to trade</span>
                 <span className="text-2xl font-semibold text-white">
                   ${userBalance.toLocaleString()}
                 </span>
                 <div className="flex flex-col text-xs text-white/80 mt-1">
-                  <span>Wallet: ${(userProfile?.withdrawal_wallet || 0).toLocaleString()}</span>
                   <span>Bonus: ${(userProfile?.multiplier_bonus || 0).toLocaleString()}</span>
                 </div>
               </div>
@@ -292,16 +289,15 @@ export default function Account() {
               {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button 
-                  variant="secondary" 
-                  className="flex-1 bg-white hover:bg-white/90 text-primary font-medium"
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                   onClick={() => navigate('/deposit')}
                 >
                   <PlusCircle className="h-5 w-5 mr-2" weight="regular" />
-                  Deposit
+                  Add funds
                 </Button>
                 <Button 
-                  variant="outline" 
-                  className="flex-1 border-white text-white bg-transparent"
+                  variant="secondary" 
+                  className="flex-1"
                   onClick={() => navigate('/withdrawals')}
                 >
                   <ArrowCircleUpRight className="h-5 w-5 mr-2" weight="regular" />
@@ -313,8 +309,8 @@ export default function Account() {
         </Card>
 
         {/* Trading Activity */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start gap-4 h-auto bg-transparent border-b rounded-none">
+        <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="justify-start">
             <TabsTrigger value="open">
               Open ({trades.filter(t => t.status === 'open').length})
             </TabsTrigger>
@@ -326,8 +322,8 @@ export default function Account() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Only show total PnL for open and closed tabs */}
-          {activeTab !== 'pending' && (
+          {/* Only show total PnL for open and closed tabs when there are trades */}
+          {activeTab !== 'pending' && trades.length > 0 && (
             <div className="flex items-center justify-between pt-4 px-2">
               <span className="text-sm text-muted-foreground">Total P&L</span>
               <span className={cn(
@@ -373,7 +369,7 @@ export default function Account() {
                               <div
                                 key={trade.id}
                                 className={cn(
-                                  "flex items-start justify-between p-2 border rounded-lg",
+                                  "flex items-start justify-between p-2 border border-[#525252] rounded-lg",
                                   "cursor-pointer hover:bg-accent/50 transition-colors" // Remove condition to make all trades clickable
                                 )}
                                 onClick={() => handleTradeClick(trade)}
@@ -410,7 +406,7 @@ export default function Account() {
                                   )}>
                                     ${pnl.toFixed(2)}
                                   </div>
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-[#7d7d7d]">
                                     {trade.status === 'open' ? (
                                       `${formatPrice(parseFloat(pairPrices[trade.pair]?.bid || '0'), trade.pair)}`
                                     ) : trade.status === 'closed' ? (
@@ -438,7 +434,7 @@ export default function Account() {
                       <div
                         key={trade.id}
                         className={cn(
-                          "flex items-start justify-between p-2 border rounded-lg",
+                          "flex items-start justify-between p-2 border border-[#525252] rounded-lg",
                           "cursor-pointer hover:bg-accent/50 transition-colors" // Remove condition to make all trades clickable
                         )}
                         onClick={() => handleTradeClick(trade)}
@@ -521,7 +517,7 @@ export default function Account() {
 
       {/* Trade Details Sheet */}
       <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent side="right" className="sm:max-w-[500px]">
+        <SheetContent side="right" className="sm:max-w-[400px]">
           <SheetHeader className="pb-4">
             <SheetTitle>Trade #{selectedTrade?.id.slice(0, 8)}</SheetTitle>
           </SheetHeader>

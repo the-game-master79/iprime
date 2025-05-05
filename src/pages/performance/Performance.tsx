@@ -180,7 +180,7 @@ export default function Performance() {
       <ScrollArea className="h-[calc(100vh-5rem)]">
         <div className="container max-w-lg mx-auto p-4 space-y-4">
 
-          <Card>
+          <Card className="bg-[#141414] border-[#525252]">
             <CardHeader className="p-4 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-medium">Distribution Analysis</CardTitle>
               <Select value={chartView} onValueChange={(value: 'trades' | 'pnl') => setChartView(value)}>
@@ -194,73 +194,79 @@ export default function Performance() {
               </Select>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieChartData[chartView]}
-                      cx="50%"
-                      cy="45%"
-                      labelLine={false}
-                      label={({
-                        cx,
-                        cy,
-                        midAngle,
-                        innerRadius,
-                        outerRadius,
-                        percent,
-                        name
-                      }) => {
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                        const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
-                        const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
-                        return (
-                          <text
-                            x={x}
-                            y={y}
-                            fill="white"
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize={12}
-                          >
-                            {`${(percent * 100).toFixed(0)}%`}
-                          </text>
-                        );
-                      }}
-                      outerRadius={100}
-                      innerRadius={60}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {pieChartData[chartView].map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={COLORS[index % COLORS.length]}
-                          strokeWidth={2}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => [
-                        chartView === 'trades' 
-                          ? `${value} trades` 
-                          : formatValue(value),
-                        undefined
-                      ]}
-                    />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value) => <span className="text-sm">{value}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {stats.totalTrades === 0 ? (
+                <div className="h-[250px] w-full flex items-center justify-center text-muted-foreground">
+                  No trades found
+                </div>
+              ) : (
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieChartData[chartView]}
+                        cx="50%"
+                        cy="45%"
+                        labelLine={false}
+                        label={({
+                          cx,
+                          cy,
+                          midAngle,
+                          innerRadius,
+                          outerRadius,
+                          percent,
+                          name
+                        }) => {
+                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+                          const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              fill="white"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontSize={12}
+                            >
+                              {`${(percent * 100).toFixed(0)}%`}
+                            </text>
+                          );
+                        }}
+                        outerRadius={100}
+                        innerRadius={60}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieChartData[chartView].map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => [
+                          chartView === 'trades' 
+                            ? `${value} trades` 
+                            : formatValue(value),
+                          undefined
+                        ]}
+                      />
+                      <Legend 
+                        verticalAlign="bottom" 
+                        height={36}
+                        formatter={(value) => <span className="text-sm">{value}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-2 gap-4">
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
                   Win Rate
@@ -268,16 +274,22 @@ export default function Performance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="text-2xl font-bold">
-                  {stats.winRate.toFixed(1)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.winningTrades} / {stats.totalTrades} trades
-                </p>
+                {stats.totalTrades === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">
+                      {stats.winRate.toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.winningTrades} / {stats.totalTrades} trades
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
                   Profit Factor
@@ -285,57 +297,71 @@ export default function Performance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="text-2xl font-bold">
-                  {stats.profitFactor.toFixed(2)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Profit/Loss ratio
-                </p>
+                {stats.totalTrades === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">
+                      {stats.profitFactor.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Profit/Loss ratio
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
+          <Card className="bg-[#141414] border-[#525252]">
             <CardHeader className="p-4">
               <CardTitle className="text-sm font-medium">P&L Chart</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
-              <div className="h-[200px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="date"
-                      fontSize={12}
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                    />
-                    <YAxis 
-                      fontSize={12}
-                      tick={{ fill: 'hsl(var(--muted-foreground))' }}
-                      tickFormatter={(value) => formatValue(value)}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [formatValue(value), 'P&L']}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        borderColor: 'hsl(var(--border))',
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="pnl" 
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {chartData.length === 0 ? (
+                <div className="h-[200px] w-full flex items-center justify-center text-muted-foreground">
+                  No trades found
+                </div>
+              ) : (
+                <div className="h-[200px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                      <XAxis 
+                        dataKey="date"
+                        fontSize={12}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                      />
+                      <YAxis 
+                        fontSize={12}
+                        tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(value) => formatValue(value)}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => [formatValue(value), 'P&L']}
+                        contentStyle={{
+                          backgroundColor: '#141414',
+                          borderColor: '#525252',
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="pnl" 
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-2 gap-4">
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
                   Highest Profit
@@ -343,16 +369,22 @@ export default function Performance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="text-2xl font-bold text-green-500">
-                  {formatValue(stats.highestProfit)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Avg: {formatValue(stats.avgWin)}
-                </p>
+                {stats.totalTrades === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold text-green-500">
+                      {formatValue(stats.highestProfit)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Avg: {formatValue(stats.avgWin)}
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium flex items-center justify-between">
                   Highest Loss
@@ -360,71 +392,85 @@ export default function Performance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="text-2xl font-bold text-red-500">
-                  {formatValue(Math.abs(stats.highestLoss))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Avg: {formatValue(stats.avgLoss)}
-                </p>
+                {stats.totalTrades === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold text-red-500">
+                      {formatValue(Math.abs(stats.highestLoss))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Avg: {formatValue(stats.avgLoss)}
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Add new section for pair performance */}
           <div className="grid grid-cols-2 gap-4 pb-20">
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium">
                   Top Performing Pairs
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="space-y-3">
-                  {stats.pairStats.slice(0, 3).map((pair, index) => (
-                    <div key={pair.pair} className="flex justify-between items-center">
-                      <div className="flex gap-2 items-center">
-                        <span className="text-sm font-medium">{index + 1}.</span>
-                        <span className="text-sm">{pair.pair.replace('BINANCE:', '').replace('FX:', '')}</span>
+                {stats.pairStats.length === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.pairStats.slice(0, 3).map((pair, index) => (
+                      <div key={pair.pair} className="flex justify-between items-center">
+                        <div className="flex gap-2 items-center">
+                          <span className="text-sm font-medium">{index + 1}.</span>
+                          <span className="text-sm">{pair.pair.replace('BINANCE:', '').replace('FX:', '')}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-medium text-green-500">
+                            {formatValue(pair.totalPnL)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            WR: {pair.winRate.toFixed(1)}%
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-sm font-medium text-green-500">
-                          {formatValue(pair.totalPnL)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          WR: {pair.winRate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-[#141414] border-[#525252]">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm font-medium">
                   Worst Performing Pairs
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="space-y-3">
-                  {stats.pairStats.slice(-3).reverse().map((pair, index) => (
-                    <div key={pair.pair} className="flex justify-between items-center">
-                      <div className="flex gap-2 items-center">
-                        <span className="text-sm font-medium">{index + 1}.</span>
-                        <span className="text-sm">{pair.pair.replace('BINANCE:', '').replace('FX:', '')}</span>
+                {stats.pairStats.length === 0 ? (
+                  <div className="text-muted-foreground">No trades found</div>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.pairStats.slice(-3).reverse().map((pair, index) => (
+                      <div key={pair.pair} className="flex justify-between items-center">
+                        <div className="flex gap-2 items-center">
+                          <span className="text-sm font-medium">{index + 1}.</span>
+                          <span className="text-sm">{pair.pair.replace('BINANCE:', '').replace('FX:', '')}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-sm font-medium text-red-500">
+                            {formatValue(pair.totalPnL)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            WR: {pair.winRate.toFixed(1)}%
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-sm font-medium text-red-500">
-                          {formatValue(pair.totalPnL)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          WR: {pair.winRate.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
