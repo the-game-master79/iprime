@@ -75,26 +75,22 @@ export const calculatePriceDifferenceInPips = (
 // Update PnL calculation to use pip-based calculation
 export const calculatePnL = (trade: Trade, currentPrice: number, tradingPairs?: TradingPair[]): number => {
   if (!currentPrice || !trade.openPrice) return 0;
-  
-  if (!tradingPairs?.length) {
-    const priceDiff = trade.type === 'buy' 
-      ? currentPrice - trade.openPrice 
-      : trade.openPrice - currentPrice;
-    return priceDiff * trade.lots * getStandardLotSize(trade.pair);
+
+  const priceDiff = trade.type === 'buy' 
+    ? currentPrice - trade.openPrice 
+    : trade.openPrice - currentPrice;
+    
+  // Calculate PnL based on pair type using standard lot sizes
+  if (trade.pair.includes('BINANCE:')) {
+    // For crypto pairs, use lots directly
+    return priceDiff * trade.lots;
+  } else if (trade.pair === 'FX:XAU/USD') {
+    // For gold, each lot is 100 oz
+    return priceDiff * trade.lots * 100;
+  } else {
+    // For forex pairs, use standard lot size (100,000)
+    return priceDiff * trade.lots * 100000;
   }
-
-  const pairInfo = tradingPairs.find(p => p.symbol === trade.pair);
-  if (!pairInfo?.pip_value) return 0;
-
-  // Calculate pips moved (price difference / pip value)
-  const pipsMoved = Math.abs(currentPrice - trade.openPrice) / pairInfo.pip_value;
-  
-  // Calculate pip value for actual lot size (not just 1 lot)
-  const pipValue = calculatePipValue(trade.lots, currentPrice, trade.pair, tradingPairs);
-  
-  // Calculate PnL using: pips moved × pip value
-  // For sell trades, make the result negative
-  return (trade.type === 'buy' ? 1 : -1) * pipsMoved * pipValue;
 };
 
 export const calculateRequiredMargin = (

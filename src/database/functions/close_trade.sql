@@ -25,12 +25,8 @@ BEGIN
     RAISE EXCEPTION 'Trade not found or already closed';
   END IF;
 
-  -- Calculate adjusted PnL based on pair type
-  v_adjusted_pnl := CASE
-    WHEN v_trade.pair LIKE 'BINANCE:%' THEN p_pnl  -- Crypto pairs use actual PnL
-    WHEN v_trade.pair = 'FX:XAU/USD' THEN p_pnl / 100  -- Gold uses 100x scaling
-    ELSE p_pnl / 100000  -- Forex pairs use 100,000x scaling
-  END;
+  -- Calculate adjusted PnL (no scaling needed now since calculatePnL handles it)
+  v_adjusted_pnl := p_pnl;
 
   -- Update trade status with original PnL for display
   UPDATE trades
