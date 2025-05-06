@@ -18,7 +18,6 @@ import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
-import MarginCalculator from "@/pages/trading/MarginCalculator";
 import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load routes
@@ -33,7 +32,6 @@ const SupportPage = lazy(() => import("./pages/support/SupportPage"));
 const Trade = lazy(() => import("./pages/trade/Trade"));
 
 // Add new lazy imports
-const TradingPage = lazy(() => import("@/pages/trading/TradingPage"));
 const InvestingPage = lazy(() => import("@/pages/investing/InvestingPage")); 
 const PartnersPage = lazy(() => import("@/pages/partners/PartnersPage"));
 const CompanyPage = lazy(() => import("@/pages/company/CompanyPage"));
@@ -106,14 +104,12 @@ const App = () => {
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/home" element={<Index />} />
-            <Route path="/trading" element={<TradingPage />} />
             <Route path="/investing" element={<InvestingPage />} />
             <Route path="/partners" element={<PartnersPage />} />
             <Route path="/company" element={<CompanyPage />} />
             <Route path="/legal/privacy" element={<PrivacyPolicy />} />
             <Route path="/legal/terms" element={<TermsOfService />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/margin-calculator" element={<MarginCalculator />} />
             <Route path="/auth/login" element={<Login />} />
 
             {/* Protected Routes */}
