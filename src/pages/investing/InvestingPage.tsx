@@ -5,7 +5,6 @@ import { Lightning } from "@phosphor-icons/react";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
-import { Companies } from "@/components/shared/Companies";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,11 +59,11 @@ const InvestingPage = () => {
         description="Choose from our range of investment plans designed for optimal returns. Start investing with CloudForex today."
         keywords="investment plans, forex investment, crypto investment, trading investment, high return investment"
       />
-      <div className="min-h-screen bg-[#F3F4F6]">
+      <div className="min-h-screen bg-background">
         {/* Magic Gradient Background */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse-slower" />
-          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-r from-pink-500/20 to-orange-500/20 rounded-full blur-3xl animate-pulse-slowest" />
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse-slower" />
+          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-r from-pink-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse-slowest" />
         </div>
 
         <Navbar />
@@ -72,7 +71,7 @@ const InvestingPage = () => {
         <main className="relative z-10">
           <Hero 
             badge={{
-              icon: <Lightning className="h-5 w-5 animate-pulse" />,
+              icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />,
               text: "Investment Plans"
             }}
             title="Grow Your Wealth"
@@ -83,8 +82,6 @@ const InvestingPage = () => {
             }}
           />
 
-          <Companies />
-
           {/* Investment Plans */}
           <section className="py-16">
             <div className="container max-w-[1200px] mx-auto px-4">
@@ -92,31 +89,31 @@ const InvestingPage = () => {
                 {loading ? (
                   // Loading skeletons
                   Array.from({ length: 3 }).map((_, i) => (
-                    <Card key={i} className="border border-border/40 bg-card/60">
+                    <Card key={i} className="border border-border/20 bg-card/40 backdrop-blur-sm">
                       <CardHeader className="p-4 pb-2 space-y-2">
-                        <div className="h-3 w-16 bg-muted/60 rounded animate-pulse mb-1" />
-                        <div className="h-5 w-24 bg-muted/60 rounded animate-pulse" />
-                        <div className="h-3 w-full bg-muted/60 rounded animate-pulse mt-1" />
+                        <div className="h-3 w-16 bg-muted/20 rounded animate-pulse mb-1" />
+                        <div className="h-5 w-24 bg-muted/20 rounded animate-pulse" />
+                        <div className="h-3 w-full bg-muted/20 rounded animate-pulse mt-1" />
                       </CardHeader>
                       <CardContent className="p-4 pt-2">
                         <div className="space-y-3">
-                          <div className="h-3 w-4/5 bg-muted/60 rounded animate-pulse" />
-                          <div className="h-3 w-3/4 bg-muted/60 rounded animate-pulse" />
+                          <div className="h-3 w-4/5 bg-muted/20 rounded animate-pulse" />
+                          <div className="h-3 w-3/4 bg-muted/20 rounded animate-pulse" />
                         </div>
                       </CardContent>
                     </Card>
                   ))
                 ) : (
                   plans.map((plan) => (
-                    <Card key={plan.id} className="relative transition-all duration-300 hover:shadow-lg overflow-hidden border-border/40">
+                    <Card key={plan.id} className="relative transition-all duration-300 hover:shadow-xl overflow-hidden border-border/20 bg-card/40 backdrop-blur-sm hover:bg-card/60">
                       <div className={cn(
-                        "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-50 blur-3xl transition-transform duration-1000 animate-pulse",
-                        "bg-gradient-to-r from-primary/20 to-primary/10"
+                        "absolute -top-32 -right-32 w-[300px] h-[300px] rounded-full opacity-30 blur-3xl transition-transform duration-1000 animate-pulse",
+                        "bg-gradient-to-r from-primary/30 to-primary/20"
                       )} />
                       
-                      <CardHeader className="p-4 pb-2 space-y-2">
+                      <CardHeader className="p-4 pb-2 space-y-2 relative z-10">
                         <div>
-                          <CardTitle className="text-base sm:text-lg font-medium">
+                          <CardTitle className="text-base sm:text-lg font-medium text-primary">
                             {plan.name}
                           </CardTitle>
                           <CardDescription className="text-xs sm:text-sm mt-0.5 line-clamp-2">
@@ -125,27 +122,27 @@ const InvestingPage = () => {
                         </div>
                         <div className="pt-1">
                           <span className="text-xs text-muted-foreground">$</span>
-                          <span className="text-3xl sm:text-4xl font-bold tracking-tight">
+                          <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                             {plan.investment.toLocaleString()}
                           </span>
                         </div>
                       </CardHeader>
 
-                      <CardContent className="p-4 pt-2 space-y-4">
-                        <div className="rounded border bg-card/50 p-3">
+                      <CardContent className="p-4 pt-2 space-y-4 relative z-10">
+                        <div className="rounded border border-border/20 bg-background/50 backdrop-blur-sm p-3">
                           <div className="flex items-center justify-between space-x-4">
                             <div>
                               <p className="text-[10px] sm:text-xs text-muted-foreground">Duration</p>
                               <div className="flex items-baseline gap-1">
-                                <span className="text-sm sm:text-lg font-semibold">{plan.duration_days}</span>
+                                <span className="text-sm sm:text-lg font-semibold text-foreground">{plan.duration_days}</span>
                                 <span className="text-[10px] sm:text-xs text-muted-foreground">days</span>
                               </div>
                             </div>
-                            <Separator orientation="vertical" className="h-8" />
+                            <Separator orientation="vertical" className="h-8 bg-border/20" />
                             <div>
                               <p className="text-[10px] sm:text-xs text-muted-foreground">Total ROI</p>
                               <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-1">
-                                <span className="text-sm sm:text-lg font-semibold">
+                                <span className="text-sm sm:text-lg font-semibold text-foreground">
                                   {(plan.returns_percentage * plan.duration_days).toFixed(1)}%
                                 </span>
                                 <span className="text-[10px] sm:text-xs text-muted-foreground">
@@ -158,7 +155,7 @@ const InvestingPage = () => {
 
                         <div className="grid gap-2">
                           <Link to="/auth/login">
-                            <Button className="w-full text-xs sm:text-sm h-8 sm:h-9">
+                            <Button className="w-full text-xs sm:text-sm h-8 sm:h-9 bg-primary/90 hover:bg-primary">
                               Choose {plan.name}
                               <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                             </Button>
@@ -166,7 +163,7 @@ const InvestingPage = () => {
 
                           <Button 
                             variant="secondary" 
-                            className="w-full text-xs sm:text-sm h-8 sm:h-9"
+                            className="w-full text-xs sm:text-sm h-8 sm:h-9 bg-secondary/80 hover:bg-secondary"
                             onClick={() => {
                               setSelectedPlan(plan);
                               setShowBenefits(true);
@@ -189,9 +186,9 @@ const InvestingPage = () => {
 
         {/* Benefits Dialog */}
         <Dialog open={showBenefits} onOpenChange={setShowBenefits}>
-          <DialogContent>
+          <DialogContent className="bg-card/95 backdrop-blur-sm border-border/20">
             <DialogHeader>
-              <DialogTitle>{selectedPlan?.name} Benefits</DialogTitle>
+              <DialogTitle className="text-primary">{selectedPlan?.name} Benefits</DialogTitle>
               <DialogDescription>
                 Detailed benefits breakdown for this investment plan
               </DialogDescription>
@@ -205,7 +202,7 @@ const InvestingPage = () => {
                   {idx === 3 && <BarChart2 className="h-5 w-5 text-primary shrink-0" />}
                   {idx === 4 && <Send className="h-5 w-5 text-primary shrink-0" />}
                   {idx === 5 && <MoveRight className="h-5 w-5 text-primary shrink-0" />}
-                  <span className="text-sm">{benefit.trim()}</span>
+                  <span className="text-sm text-foreground/90">{benefit.trim()}</span>
                 </li>
               ))}
             </ul>

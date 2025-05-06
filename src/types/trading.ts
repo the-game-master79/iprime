@@ -32,6 +32,7 @@ export interface Trade {
   type: 'buy' | 'sell';
   status: 'open' | 'pending' | 'closed';
   openPrice: number;
+  closePrice?: number;  // Add this field
   lots: number;
   currentPrice?: number;
   pnl?: number;

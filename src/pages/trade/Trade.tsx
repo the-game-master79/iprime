@@ -305,31 +305,20 @@ const Trade = () => {
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
-      // Determine which price table to query based on pair type
-      const priceTable = trade.pair.includes('BINANCE:') ? 'crypto_prices' : 'forex_prices';
-      const symbol = trade.pair.includes('BINANCE:') 
-        ? trade.pair.replace('BINANCE:', '')
-        : trade.pair.replace('FX:', '').replace('/', '');
+      // Get current price from websocket feed
+      const closePrice = trade.type === 'buy'
+        ? parseFloat(pairPrices[trade.pair]?.bid || '0')
+        : parseFloat(pairPrices[trade.pair]?.ask || '0');
 
-      // Get the current price from appropriate price table
-      const { data: priceData, error: priceError } = await supabase
-        .from(priceTable)
-        .select('bid')
-        .eq('symbol', symbol)
-        .single();
-
-      if (priceError) {
-        throw new Error('Could not fetch current price');
-      }
-
-      const closePrice = priceData?.bid || parseFloat(pairPrices[trade.pair]?.bid || '0');
       if (!closePrice) {
-        throw new Error('Invalid closing price');
+        throw new Error('No valid close price available');
       }
 
-      const pnl = calculatePnL(trade, closePrice, tradingPairs); // Pass tradingPairs
-      
-      const { data, error } = await supabase
+      // Calculate PnL
+      const pnl = calculatePnL(trade, closePrice);
+
+      // Call close_trade function
+      const { data: newBalance, error } = await supabase
         .rpc('close_trade', {
           p_trade_id: tradeId,
           p_close_price: closePrice,
@@ -338,27 +327,28 @@ const Trade = () => {
 
       if (error) throw error;
 
-      // Update local trades state
-      setTrades(prev => prev.map(t => 
-        t.id === tradeId 
-          ? { ...t, status: 'closed', pnl } 
+      // Update local state
+      setTrades(prev => 
+        prev.map(t => t.id === tradeId 
+          ? { ...t, status: 'closed', closePrice, pnl } 
           : t
-      ));
-      
-      // Update balance if data contains new wallet amount
-      if (data?.withdrawal_wallet) {
-        setUserBalance(data.withdrawal_wallet);
+        )
+      );
+
+      // Update balance
+      if (typeof newBalance === 'number') {
+        setUserBalance(newBalance);
       }
 
       toast({
-        title: "Trade Closed",
-        description: `Successfully closed trade with P&L: $${pnl.toFixed(2)}`
+        title: "Success",
+        description: `Trade closed at ${closePrice} with P&L: $${pnl.toFixed(2)}`
       });
 
     } catch (error: any) {
       console.error('Error closing trade:', error);
       toast({
-        variant: "destructive",
+        variant: "destructive", 
         title: "Error",
         description: error.message || "Failed to close trade"
       });

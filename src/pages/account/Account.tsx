@@ -259,6 +259,54 @@ export default function Account() {
     }
   };
 
+  const handleCloseTrade = async (tradeId: string) => {
+    try {
+      const trade = trades.find(t => t.id === tradeId);
+      if (!trade) return;
+
+      const closePrice = trade.type === 'buy'
+        ? parseFloat(pairPrices[trade.pair]?.bid || '0')
+        : parseFloat(pairPrices[trade.pair]?.ask || '0');
+
+      if (!closePrice) {
+        throw new Error('No valid close price available');
+      }
+
+      // Calculate PnL
+      const pnl = calculatePnL(trade, closePrice);
+
+      // Call close_trade function
+      const { data: newBalance, error } = await supabase.rpc('close_trade', {
+        p_trade_id: tradeId,
+        p_close_price: closePrice,
+        p_pnl: pnl
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
+
+      // Update balance if returned
+      if (typeof newBalance === 'number') {
+        setUserBalance(newBalance);
+      }
+
+      toast({
+        title: "Success",
+        description: `Trade closed with P&L: $${pnl.toFixed(2)}`
+      });
+
+    } catch (error: any) {
+      console.error('Error closing trade:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to close trade" 
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Topbar title="Account" variant="minimal" />

@@ -25,7 +25,7 @@ export const Navbar = () => {
 
   return (
     <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[1200px]">
-      <div className="mx-auto backdrop-blur-sm bg-background/95 border rounded-2xl px-2 py-2">
+      <div className="mx-auto backdrop-blur-sm bg-background/95 border border-[#525252] rounded-2xl px-2 py-2">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
@@ -35,29 +35,6 @@ export const Navbar = () => {
             />
           </Link>
           <nav className="hidden md:flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button 
-                  className={cn(
-                    "text-sm font-medium px-4 py-2 rounded-2xl transition-colors flex items-center gap-1",
-                    "text-muted-foreground",
-                    "hover:text-primary hover:bg-primary/10",
-                    (isActive('/trading') || isActive('/margin-calculator')) && "text-primary bg-primary/10"
-                  )}
-                >
-                  Trading
-                  <CaretDown className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => handleNavigation('/trading')}>
-                  Trading Platform
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNavigation('/margin-calculator')}>
-                  Margin Calculator
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             {['investing', 'partners', 'company'].map((item) => (
               <button 
                 key={item}

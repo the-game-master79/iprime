@@ -6,9 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Trade } from "@/types/trade";
 import { getDecimalPlaces } from "@/config/decimals"; // Add this import
 import { wsManager } from '@/services/websocket-manager';
-import { VisuallyHidden } from '@/components/ui/visually-hidden';
 import { DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { 
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction
+} from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 interface PriceData {
   price: string;
@@ -80,11 +90,14 @@ export function TradesSheet({
   onCloseTrade,
   calculatePnL
 }: TradesSheetProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'open' | 'pending'>('open');
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
   const [isPriceLoaded, setIsPriceLoaded] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [tradeToClose, setTradeToClose] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   // Calculate total PnL
   const totalPnL = openTrades
@@ -106,22 +119,32 @@ export function TradesSheet({
 
   // Handle closing all trades
   const handleCloseAllTrades = async () => {
-    if (!window.confirm(`Are you sure you want to close all open trades?`)) return;
+    setIsLoading(true);
+    let failed = 0;
 
     try {
       for (const trade of openTrades.filter(t => t.status === 'open')) {
-        await onCloseTrade?.(trade.id);
+        try {
+          await onCloseTrade?.(trade.id);
+        } catch {
+          failed++;
+        }
       }
-      toast({
-        title: "Success",
-        description: "All trades closed successfully",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to close all trades",
-      });
+
+      if (failed === 0) {
+        toast({
+          title: "Success",
+          description: "All trades closed successfully"
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Warning",
+          description: `Failed to close ${failed} trades`
+        });
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -193,7 +216,45 @@ export function TradesSheet({
       return;
     }
 
-    await onCloseTrade(tradeId);
+    setTradeToClose(tradeId);
+  };
+
+  // Update close execution handler
+  const executeClose = async () => {
+    if (!tradeToClose) return;
+    
+    setIsClosing(true);
+    try {
+      const trade = openTrades.find(t => t.id === tradeToClose);
+      if (!trade) return;
+
+      await onCloseTrade(tradeToClose);
+      
+      // First close the sheet
+      onOpenChange(false);
+      
+      // Clear trade state
+      setTradeToClose(null);
+      setIsClosing(false);
+
+      // Add small delay before navigation
+      setTimeout(() => {
+        navigate(`/trade/chart/${encodeURIComponent(trade.pair)}`);
+      }, 100);
+
+      toast({
+        title: "Success",
+        description: "Trade closed successfully"
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive", 
+        title: "Error",
+        description: "Failed to close trade"
+      });
+      setIsClosing(false);
+      setTradeToClose(null);
+    }
   };
 
   // Toggle group expansion
@@ -205,162 +266,184 @@ export function TradesSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="bottom" 
-        className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0 rounded-t-xl"
-      >
-        <div className="py-4 px-4 border-b border-[#525252] flex justify-between items-center">
-          <DialogTitle>Active Trades</DialogTitle>
-          <div className="flex items-center gap-4">
-            <div className={cn(
-              "text-sm font-mono font-medium",
-              totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
-            )}>
-              Total PnL: ${totalPnL.toFixed(2)}
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent 
+          side="bottom" 
+          className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0 rounded-t-xl"
+        >
+          <div className="py-4 px-4 border-b border-[#525252] flex justify-between items-center">
+            <DialogTitle>Active Trades</DialogTitle>
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                "text-sm font-mono font-medium",
+                totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
+              )}>
+                ${totalPnL.toFixed(2)}
+              </div>
+              {openTrades.some(t => t.status === 'open') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCloseAllTrades}
+                  className="text-xs text-red-500 hover:text-red-600"
+                >
+                  Close All
+                </Button>
+              )}
             </div>
-            {openTrades.some(t => t.status === 'open') && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCloseAllTrades}
-                className="text-xs text-red-500 hover:text-red-600"
-              >
-                Close All
-              </Button>
-            )}
           </div>
-        </div>
 
-        {/* Header */}
-        <div className="px-3 py-2 backdrop-blur-sm">
-          <Tabs defaultValue="open" onValueChange={(value) => setActiveTab(value as 'open' | 'pending')} className="flex-1">
-            <TabsList className="h-8 p-1">
-              <TabsTrigger value="open" className="text-xs px-3">
-                Open ({openTrades.filter(t => t.status === 'open').length})
-              </TabsTrigger>
-              <TabsTrigger value="pending" className="text-xs px-3">
-                Pending ({openTrades.filter(t => t.status === 'pending').length})
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+          {/* Header */}
+          <div className="px-3 py-2 backdrop-blur-sm">
+            <Tabs defaultValue="open" onValueChange={(value) => setActiveTab(value as 'open' | 'pending')} className="flex-1">
+              <TabsList className="h-8 p-1">
+                <TabsTrigger value="open" className="text-xs px-3">
+                  Open ({openTrades.filter(t => t.status === 'open').length})
+                </TabsTrigger>
+                <TabsTrigger value="pending" className="text-xs px-3">
+                  Pending ({openTrades.filter(t => t.status === 'pending').length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-3 py-2">
-          {isLoading ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-sm text-muted-foreground animate-pulse">Loading...</div>
-            </div>
-          ) : groupedTrades.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-4">
-              <div className="text-sm font-medium mb-1">No {activeTab} trades</div>
-              <p className="text-xs text-muted-foreground max-w-[280px]">
-                Your {activeTab} trades will appear here
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {groupedTrades.map(group => {
-                const currentPrice = parseFloat(localPrices[group.pair]?.bid || '0');
-                const pnl = group.status === 'closed' ? group.pnl : calculatePnL(group, currentPrice);
-                const groupKey = `${group.pair}-${group.type}`;
-                const isExpanded = expandedGroups[groupKey] || false;
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-sm text-muted-foreground animate-pulse">Loading...</div>
+              </div>
+            ) : groupedTrades.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <div className="text-sm font-medium mb-1">No {activeTab} trades</div>
+                <p className="text-xs text-muted-foreground max-w-[280px]">
+                  Your {activeTab} trades will appear here
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {groupedTrades.map(group => {
+                  const currentPrice = parseFloat(localPrices[group.pair]?.bid || '0');
+                  const pnl = group.status === 'closed' ? group.pnl : calculatePnL(group, currentPrice);
+                  const groupKey = `${group.pair}-${group.type}`;
+                  const isExpanded = expandedGroups[groupKey] || false;
 
-                return (
-                  <div 
-                    key={groupKey} 
-                    className="flex flex-col p-3 bg-card hover:bg-accent/50 rounded-lg border border-[#525252]"
-                  >
-                    {/* Top row - Group info and P&L */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          "mt-1 h-2 w-2 rounded-full",
-                          group.type === 'buy' ? "bg-blue-500" : "bg-red-500"
-                        )} />
-                        <div className="space-y-0.5">
-                          <div className="text-sm font-medium flex items-center gap-2">
-                            {group.pair.split(':')[1]}
-                            {group.originalTrades.length > 1 && (
-                              <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-md">
-                                x{group.originalTrades.length}
-                              </span>
+                  return (
+                    <div 
+                      key={groupKey} 
+                      className="flex flex-col p-3 bg-card hover:bg-accent/50 rounded-lg border border-[#525252]"
+                    >
+                      {/* Top row - Group info and P&L */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className={cn(
+                            "mt-1 h-2 w-2 rounded-full",
+                            group.type === 'buy' ? "bg-blue-500" : "bg-red-500"
+                          )} />
+                          <div className="space-y-0.5">
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {group.pair.split(':')[1]}
+                              {group.originalTrades.length > 1 && (
+                                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-md">
+                                  x{group.originalTrades.length}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {group.type.toUpperCase()} {group.lots} Lots @ ${formatPrice(group.openPrice, group.pair)}
+                            </div>
+                            {group.status === 'open' && (
+                              <div className="text-xs text-muted-foreground">
+                                Current: ${formatPrice(currentPrice, group.pair)}
+                              </div>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {group.type.toUpperCase()} {group.lots} Lots @ ${formatPrice(group.openPrice, group.pair)}
-                          </div>
-                          {group.status === 'open' && (
-                            <div className="text-xs text-muted-foreground">
-                              Current: ${formatPrice(currentPrice, group.pair)}
+                        </div>
+                        <div className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-md",
+                          pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+                        )}>
+                          ${pnl.toFixed(2)}
+                        </div>
+                      </div>
+
+                      {/* Expandable details */}
+                      {group.originalTrades.length > 1 && (
+                        <div className="mt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleGroupExpansion(groupKey)}
+                            className="text-xs w-full"
+                          >
+                            {isExpanded ? "Hide Details" : "View Details"}
+                          </Button>
+                          {isExpanded && (
+                            <div className="mt-2 space-y-1">
+                              {group.originalTrades.map(trade => (
+                                <div 
+                                  key={trade.id} 
+                                  className="flex justify-between text-xs p-2 bg-muted rounded-md"
+                                >
+                                  <span>{trade.id.slice(0, 8)}</span>
+                                  <span>{trade.lots} Lots</span>
+                                  <span>${calculatePnL(trade, currentPrice).toFixed(2)}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
-                      </div>
-                      <div className={cn(
-                        "text-xs font-medium px-2 py-1 rounded-md",
-                        pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                      )}>
-                        ${pnl.toFixed(2)}
-                      </div>
+                      )}
+
+                      {/* Bottom row - Close button */}
+                      {group.status === 'open' && onCloseTrade && (
+                        <div className="-mx-3 -mb-3 mt-3 border-t border-[#525252]">
+                          <Button
+                            variant="ghost"
+                            size="sm" 
+                            onClick={() => handleCloseTrade(group.id)}
+                            disabled={!isPriceLoaded[group.pair]}
+                            className={cn(
+                              "w-full rounded-none h-9 text-xs font-medium",
+                              !isPriceLoaded[group.pair] && "opacity-50 cursor-not-allowed",
+                              pnl > 0 
+                                ? "bg-green-500/5 text-green-500 hover:bg-green-500/10 hover:text-green-600" 
+                                : "bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                            )}
+                          >
+                            {!isPriceLoaded[group.pair] ? 'Loading...' : 'Close Position'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
-                    {/* Expandable details */}
-                    {group.originalTrades.length > 1 && (
-                      <div className="mt-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleGroupExpansion(groupKey)}
-                          className="text-xs w-full"
-                        >
-                          {isExpanded ? "Hide Details" : "View Details"}
-                        </Button>
-                        {isExpanded && (
-                          <div className="mt-2 space-y-1">
-                            {group.originalTrades.map(trade => (
-                              <div 
-                                key={trade.id} 
-                                className="flex justify-between text-xs p-2 bg-muted rounded-md"
-                              >
-                                <span>{trade.id.slice(0, 8)}</span>
-                                <span>{trade.lots} Lots</span>
-                                <span>${calculatePnL(trade, currentPrice).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Bottom row - Close button */}
-                    {group.status === 'open' && onCloseTrade && (
-                      <div className="-mx-3 -mb-3 mt-3 border-t border-[#525252]">
-                        <Button
-                          variant="ghost"
-                          size="sm" 
-                          onClick={() => handleCloseTrade(group.id)}
-                          disabled={!isPriceLoaded[group.pair]}
-                          className={cn(
-                            "w-full rounded-none h-9 text-xs font-medium",
-                            !isPriceLoaded[group.pair] && "opacity-50 cursor-not-allowed",
-                            pnl > 0 
-                              ? "bg-green-500/5 text-green-500 hover:bg-green-500/10 hover:text-green-600" 
-                              : "bg-red-500/5 text-red-500 hover:bg-red-500/10 hover:text-red-600"
-                          )}
-                        >
-                          {!isPriceLoaded[group.pair] ? 'Loading...' : 'Close Position'}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+      <AlertDialog open={!!tradeToClose} onOpenChange={() => setTradeToClose(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close Position</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to close this position? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeClose}
+              disabled={isClosing}
+            >
+              {isClosing ? "Closing..." : "Close Position"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

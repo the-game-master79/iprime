@@ -24,11 +24,11 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
   return (
     <section className="pt-24 pb-12">
       <div className="container max-w-[1200px] mx-auto px-4">
-        <div className="bg-white/80 backdrop-blur-sm p-2 rounded-2xl border">
-          <div className="border rounded-xl p-8 md:p-10 relative overflow-hidden">
+        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-2xl border border-border/50">
+          <div className="border border-border/50 rounded-xl p-8 md:p-10 relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute w-[500px] h-[500px] -top-[200px] -right-[200px] bg-gradient-to-br from-primary/5 to-primary/0 blur-3xl rounded-full animate-pulse-slow" />
+              <div className="absolute w-[500px] h-[500px] -top-[200px] -right-[200px] bg-gradient-to-br from-primary/10 to-primary/5 blur-3xl rounded-full animate-pulse-slow" />
             </div>
 
             <div className="relative flex flex-col md:flex-row items-center justify-between gap-8">
@@ -38,15 +38,15 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
                   {/* AI Trading Badge */}
                   <div className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
                     {badge.icon}
-                    <span className="ml-2">Advanced AI Trading</span>
+                    <span className="ml-2">{badge.text}</span>
                   </div>
                   {/* CPU Power Badge */}
-                  <div className="inline-flex items-center rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-600">
+                  <div className="inline-flex items-center rounded-full bg-orange-500/10 px-3 py-1 text-sm font-medium text-orange-400">
                     <Cpu className="h-4 w-4" />
                     <span className="ml-2">2X CPU Power</span>
                   </div>
                   {/* Active Users Badge */}
-                  <div className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-600">
+                  <div className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-400">
                     <Users className="h-4 w-4" />
                     <span className="ml-2">50,000+ Active Users</span>
                   </div>
@@ -54,7 +54,7 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
                   {badges?.map((extraBadge, i) => (
                     <div 
                       key={i}
-                      className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-600"
+                      className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-sm font-medium text-amber-400"
                     >
                       {extraBadge.icon}
                       <span className="ml-2">{extraBadge.text}</span>
@@ -62,13 +62,13 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
                   ))}
                 </div>
 
-                <h1 className="text-4xl pb-2 md:text-6xl font-bold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground/80 to-foreground/90">{title}</h1>
+                <h1 className="text-4xl pb-2 md:text-6xl font-bold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground/90 to-foreground/80">{title}</h1>
                 <p className="text-xl text-muted-foreground">{description}</p>
                 {action && (
                   <Link to={action.href} className="block pt-4">
                     <Button 
                       size="lg"
-                      className="gap-2 rounded-xl px-8 bg-primary text-white text-md hover:bg-primary/90 transition-colors"
+                      className="gap-2 rounded-xl px-8 bg-primary hover:bg-primary/90 text-primary-foreground text-md transition-colors"
                     >
                       {action.text}
                       <ArrowRight className="h-5 w-5" />

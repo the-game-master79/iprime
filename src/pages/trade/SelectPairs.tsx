@@ -229,34 +229,45 @@ const SelectPairs = () => {
       const trade = trades.find(t => t.id === tradeId);
       if (!trade) return;
 
-      const closePrice = parseFloat(pairPrices[trade.pair]?.bid || '0');
+      const closePrice = trade.type === 'buy'
+        ? parseFloat(pairPrices[trade.pair]?.bid || '0')
+        : parseFloat(pairPrices[trade.pair]?.ask || '0');
+
+      if (!closePrice) {
+        throw new Error('No valid close price available');
+      }
+
+      // Calculate PnL
       const pnl = calculatePnL(trade, closePrice);
 
-      const { error: closeError } = await supabase
-        .rpc('close_trade', {
-          p_trade_id: tradeId,
-          p_close_price: closePrice,
-          p_pnl: pnl
-        });
+      // Call close_trade function
+      const { data: newBalance, error } = await supabase.rpc('close_trade', {
+        p_trade_id: tradeId,
+        p_close_price: closePrice,
+        p_pnl: pnl
+      });
 
-      if (closeError) throw closeError;
+      if (error) throw error;
 
       // Update local state
-      setTrades(prevTrades =>
-        prevTrades.map(t =>
-          t.id === tradeId ? { ...t, status: 'closed', pnl } : t
-        )
-      );
+      setTrades(prev => prev.filter(t => t.id !== tradeId));
+
+      // Update balance
+      if (typeof newBalance === 'number') {
+        setUserBalance(newBalance);
+      }
 
       toast({
-        title: "Success",
-        description: `Trade closed with P&L: $${pnl.toFixed(2)}`,
+        title: "Success", 
+        description: `Trade closed with P&L: $${pnl.toFixed(2)}`
       });
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Error closing trade:', error);
       toast({
+        variant: "destructive",
         title: "Error",
-        description: "Failed to close trade"
+        description: error.message || "Failed to close trade"
       });
     }
   };

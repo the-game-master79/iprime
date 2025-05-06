@@ -3,23 +3,21 @@ DROP FUNCTION IF EXISTS close_trade(UUID, DECIMAL, DECIMAL);
 DROP FUNCTION IF EXISTS auto_close_trades_on_zero_balance() CASCADE;
 
 CREATE OR REPLACE FUNCTION close_trade(
-  p_trade_id UUID,
+  p_trade_id UUID,  
   p_close_price DECIMAL,
   p_pnl DECIMAL
-)
-RETURNS TABLE (
-  withdrawal_wallet DECIMAL
-) AS $$
-DECLARE 
+) RETURNS DECIMAL AS $$
+DECLARE
   v_trade RECORD;
-  v_standard_lot_size DECIMAL;
+  v_withdrawal_wallet DECIMAL;
+  v_adjusted_pnl DECIMAL;
 BEGIN
   -- Get trade details and lock the row
-  SELECT t.*, p.withdrawal_wallet, p.id as profile_id
+  SELECT t.*, p.withdrawal_wallet, p.id as profile_id 
   INTO v_trade
   FROM trades t
   JOIN profiles p ON p.id = t.user_id
-  WHERE t.id = p_trade_id 
+  WHERE t.id = p_trade_id
   AND t.status IN ('open', 'pending')
   FOR UPDATE;
 
@@ -27,17 +25,14 @@ BEGIN
     RAISE EXCEPTION 'Trade not found or already closed';
   END IF;
 
-  -- Set standard lot size based on pair type
-  v_standard_lot_size := CASE 
-    WHEN v_trade.pair LIKE 'BINANCE:%' THEN 1
-    WHEN v_trade.pair = 'FX:XAU/USD' THEN 100
-    ELSE 100000
+  -- Calculate adjusted PnL based on pair type
+  v_adjusted_pnl := CASE
+    WHEN v_trade.pair LIKE 'BINANCE:%' THEN p_pnl  -- Crypto pairs use actual PnL
+    WHEN v_trade.pair = 'FX:XAU/USD' THEN p_pnl / 100  -- Gold uses 100x scaling
+    ELSE p_pnl / 100000  -- Forex pairs use 100,000x scaling
   END;
 
-  -- Skip PnL validation and just use the provided values
-  -- The prevent_negative_balance trigger will handle any balance issues
-
-  -- Update trade status
+  -- Update trade status with original PnL for display
   UPDATE trades
   SET 
     status = 'closed',
@@ -46,16 +41,15 @@ BEGIN
     closed_at = NOW()
   WHERE id = p_trade_id;
 
-  -- Release margin and update user's balance with PnL
+  -- Release margin and update user's balance with ONLY the adjusted PnL
   UPDATE profiles p
   SET 
-    withdrawal_wallet = p.withdrawal_wallet + v_trade.margin_amount + p_pnl,
+    withdrawal_wallet = p.withdrawal_wallet + v_adjusted_pnl, -- Remove margin_amount
     updated_at = NOW()
   WHERE id = v_trade.user_id
-  RETURNING p.withdrawal_wallet INTO withdrawal_wallet;
+  RETURNING withdrawal_wallet INTO v_withdrawal_wallet;
 
-  -- Return updated wallet balance
-  RETURN NEXT;
+  RETURN v_withdrawal_wallet;
 END;
 $$ LANGUAGE plpgsql;
 

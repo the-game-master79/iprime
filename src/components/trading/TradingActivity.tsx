@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
 import { Trade, PriceData, TradingPair } from "@/types/trading";
-import { calculatePnL, calculatePipValue } from "@/utils/trading";
+import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
@@ -48,33 +48,58 @@ export const TradingActivity = ({
   // Add new helper to merge trades
   const mergeTrades = (trades: Trade[]) => {
     const mergedMap = trades.reduce((acc, trade) => {
-      const key = `${trade.pair}-${trade.type}`;
+      // Create a unique key including the trade ID to avoid duplicates
+      const key = `${trade.pair}-${trade.type}-${trade.id}`;
       if (!acc[key]) {
         acc[key] = {
           ...trade,
           lots: 0,
           margin_amount: 0,
-          originalTrades: []
+          originalTrades: [],
+          mergeKey: key // Store the key for later use
         };
       }
       acc[key].lots += trade.lots;
       acc[key].margin_amount += (trade.margin_amount || 0);
       acc[key].originalTrades.push(trade);
       return acc;
-    }, {} as Record<string, Trade & { originalTrades: Trade[] }>);
+    }, {} as Record<string, Trade & { originalTrades: Trade[]; mergeKey: string }>);
 
     return Object.values(mergedMap);
   };
 
-  // Update filteredTrades to use merged trades
-  const filteredTrades = useMemo(() => ({
-    open: mergeTrades(trades.filter(t => t.status === 'open')).map(t => ({
-      ...t,
-      currentPrice: currentPrices[t.pair]?.bid || t.openPrice
-    })),
-    pending: trades.filter(t => t.status === 'pending'),
-    closed: trades.filter(t => t.status === 'closed')
-  }), [trades, currentPrices]);
+  // Add copy functionality helper
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    toast({
+      title: "Copied",
+      description: "Position ID copied to clipboard"
+    });
+  };
+
+  // Update filteredTrades to properly handle closed trades
+  const filteredTrades = useMemo(() => {
+    const openTrades = trades.filter(t => 
+      t.status === 'open' && 
+      t.orderType !== 'limit'
+    );
+
+    const pendingTrades = trades.filter(t => 
+      t.status === 'pending' || 
+      (t.status === 'open' && t.orderType === 'limit')
+    );
+
+    const closedTrades = trades.filter(t => t.status === 'closed');
+
+    return {
+      open: mergeTrades(openTrades).map(t => ({
+        ...t,
+        currentPrice: currentPrices[t.pair]?.bid || t.openPrice
+      })),
+      pending: pendingTrades,
+      closed: closedTrades
+    };
+  }, [trades, currentPrices]);
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
@@ -138,8 +163,26 @@ export const TradingActivity = ({
   // Add pagination helpers
   const paginatedTrades = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return displayedTrades.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [displayedTrades, currentPage]);
+    // Map trades to include current prices before pagination
+    const tradesWithPrices = displayedTrades.map(trade => {
+      const currentPrice = trade.status === 'open' 
+        ? parseFloat(currentPrices[trade.pair]?.bid || trade.openPrice.toString())
+        : trade.closePrice || trade.openPrice;
+      
+      const pnl = trade.status === 'closed'
+        ? trade.pnl || 0
+        : trade.status === 'open'
+          ? calculatePnL(trade, currentPrice)
+          : 0;
+  
+      return {
+        ...trade,
+        currentPrice,
+        pnl
+      };
+    });
+    return tradesWithPrices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [displayedTrades, currentPage, currentPrices]);
 
   const totalPages = Math.ceil(displayedTrades.length / ITEMS_PER_PAGE);
 
@@ -161,7 +204,7 @@ export const TradingActivity = ({
       }
     } catch (error) {
       toast({
-        variant: "destructive",
+        variant: "destructive", 
         title: "Error",
         description: "Failed to close trade"
       });
@@ -294,7 +337,7 @@ export const TradingActivity = ({
                   "text-sm font-mono font-medium",
                   totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
                 )}>
-                  ${totalPnL.toFixed(2)}
+                  {totalPnL.toFixed(2)} USD
                 </div>
                 {filteredTrades.open.length > 0 && (
                   <Button
@@ -326,11 +369,10 @@ export const TradingActivity = ({
                     <th className="text-right p-2">Open Price</th>
                     <th className="text-right p-2">{activeTab === 'closed' ? 'Close Price' : 'Current Price'}</th>
                     <th className="text-right p-2">Margin Used</th>
-                    <th className="text-right p-2">Pip Value</th>
                     <th className="text-left p-2">Position ID</th>
                     <th className="text-left p-2">Open Time</th>
                     {activeTab !== 'pending' && <th className="text-right p-2">P&L</th>}
-                    <th className="text-right p-2">Action</th>
+                    {activeTab !== 'closed' && <th className="text-right p-2">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="text-sm">
@@ -363,13 +405,13 @@ export const TradingActivity = ({
                     const hasMultipleTrades = trade.originalTrades?.length > 1;
                     
                     return (
-                      <React.Fragment key={trade.pair + trade.type}>
+                      <React.Fragment key={trade.mergeKey || trade.id}>
                         <tr 
                           className={cn(
                             "border-b border-[#525252] hover:bg-accent/50",
                             hasMultipleTrades && "cursor-pointer"
                           )}
-                          onClick={() => hasMultipleTrades && toggleRowExpansion(trade.pair + trade.type)}
+                          onClick={() => hasMultipleTrades && toggleRowExpansion(trade.mergeKey || trade.id)}
                         >
                           <td className="p-2">
                             <div className="flex items-center gap-2">
@@ -412,17 +454,33 @@ export const TradingActivity = ({
                               {trade.lots}
                             </Badge>
                           </td>
-                          <td className="p-2 text-right font-mono">${trade.openPrice.toFixed(decimals)}</td>
+                          <td className="p-2 text-right font-mono">{trade.openPrice.toFixed(decimals)}</td>
                           <td className="p-2 text-right font-mono">
-                            {trade.status === 'pending' ? '-' : `$${currentPrice.toFixed(decimals)}`}
+                            {trade.status === 'closed' 
+                              ? (trade.closePrice || 0).toFixed(decimals)
+                              : trade.status === 'pending' 
+                                ? '-' 
+                                : trade.currentPrice.toFixed(decimals)}
                           </td>
                           <td className="p-2 text-right font-mono">
-                            ${trade.margin_amount?.toFixed(2) || '0.00'}
+                            {trade.margin_amount?.toFixed(2) || '0.00'} USD
                           </td>
-                          <td className="p-2 text-right font-mono">
-                            ${calculatePipValue(trade.lots, currentPrice || trade.openPrice, trade.pair, tradingPairs).toFixed(2)}
+                          <td className="p-2 font-mono">
+                            <div className="flex items-center gap-2">
+                              <span>{trade.id.slice(0, 8)}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyId(trade.id);
+                                }}
+                                className="h-6 w-6 p-0 hover:bg-accent"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </td>
-                          <td className="p-2 font-mono">{trade.id.slice(0, 8)}</td>
                           <td className="p-2">{openTime}</td>
                           {activeTab !== 'pending' && (
                             <td className="p-2 text-right">
@@ -430,32 +488,34 @@ export const TradingActivity = ({
                                 "font-mono",
                                 pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
                               )}>
-                                ${pnl.toFixed(2)}
+                                {pnl.toFixed(2)} USD
                               </div>
                             </td>
                           )}
-                          <td className="p-2 text-right">
-                            {(trade.status === 'pending' || trade.status === 'open') && (
-                              <Button
-                                variant="ghost"
-                                size="sm" 
-                                onClick={() => handleCloseTrade(trade)}
-                                className={cn(
-                                  "h-7 px-2",
-                                  trade.status === 'pending' 
-                                    ? "text-red-500 hover:text-red-600 hover:bg-red-50"
-                                    : "text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                                )}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </td>
+                          {activeTab !== 'closed' && (
+                            <td className="p-2 text-right">
+                              {(trade.status === 'pending' || trade.status === 'open') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm" 
+                                  onClick={() => handleCloseTrade(trade)}
+                                  className={cn(
+                                    "h-7 px-2",
+                                    trade.status === 'pending' 
+                                      ? "text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      : "text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                  )}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </td>
+                          )}
                         </tr>
 
                         {/* Expanded details row */}
                         {hasMultipleTrades && isExpanded && (
-                          <tr className="bg-accent/30">
+                          <tr className="bg-accent/30" key={`expanded-${trade.mergeKey || trade.id}`}>
                             <td colSpan={11} className="p-1">
                               <table className="w-full text-sm">
                                 <thead className="text-xs text-muted-foreground">
@@ -492,13 +552,13 @@ export const TradingActivity = ({
                                           </div>
                                         </td>
                                         <td className="p-1 text-right">{subTrade.lots}</td>
-                                        <td className="p-1 text-right">${subTrade.openPrice.toFixed(decimals)}</td>
-                                        <td className="p-1 text-right">${currentPrice.toFixed(decimals)}</td>
-                                        <td className="p-1 text-right">${subTrade.margin_amount?.toFixed(2)}</td>
+                                        <td className="p-1 text-right">{subTrade.openPrice.toFixed(decimals)} USD</td>
+                                        <td className="p-1 text-right">{currentPrice.toFixed(decimals)} USD</td>
+                                        <td className="p-1 text-right">{subTrade.margin_amount?.toFixed(2)} USD</td>
                                         <td className={cn(
                                           "p-1 text-right font-mono",
                                           subPnl > 0 ? "text-green-500" : "text-red-500"
-                                        )}>${subPnl.toFixed(2)}</td>
+                                        )}>{subPnl.toFixed(2)} USD</td>
                                         <td className="p-1 text-right">
                                           <Button
                                             variant="ghost"
@@ -565,12 +625,12 @@ export const TradingActivity = ({
         <div className="flex items-center justify-between w-full gap-8">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Balance:</span>
-            <div className="font-mono text-sm">${(userBalance || 0).toFixed(2)}</div>
+            <div className="font-mono text-sm">{(userBalance || 0).toFixed(2)} USD</div>
           </div>
           
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Used Margin:</span>
-            <div className="font-mono text-sm">${totalMarginUsed.toFixed(2)}</div>
+            <div className="font-mono text-sm">{totalMarginUsed.toFixed(2)} USD</div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -579,7 +639,7 @@ export const TradingActivity = ({
               "font-mono text-sm",
               freeMargin < 0 ? "text-red-500" : "text-green-500"
             )}>
-              ${freeMargin.toFixed(2)}
+              {freeMargin.toFixed(2)} USD
             </div>
           </div>
 
