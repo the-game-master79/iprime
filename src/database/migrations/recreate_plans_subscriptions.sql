@@ -114,27 +114,27 @@ CREATE TRIGGER on_plan_status_change
     FOR EACH ROW
     EXECUTE FUNCTION handle_plan_status_change();
 
--- Recreate indexes
-CREATE INDEX idx_plans_subscriptions_user ON plans_subscriptions(user_id);
-CREATE INDEX idx_plans_subscriptions_status ON plans_subscriptions(status);
-CREATE INDEX idx_plans_subscriptions_created ON plans_subscriptions(created_at DESC);
+-- Add validation trigger function
+CREATE OR REPLACE FUNCTION validate_plan_amount()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Check if amount is within plan's range
+  IF NOT EXISTS (
+    SELECT 1 FROM plans 
+    WHERE id = NEW.plan_id 
+    AND NEW.amount >= min_investment 
+    AND NEW.amount <= max_investment
+  ) THEN
+    RAISE EXCEPTION 'Amount must be within plan''s investment range';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Enable RLS
-ALTER TABLE plans_subscriptions ENABLE ROW LEVEL SECURITY;
-
--- Recreate RLS policies
-CREATE POLICY "Anyone can view all deposits"
-ON plans_subscriptions FOR SELECT TO public
-USING (true);
-
-CREATE POLICY "Anyone can update deposits"
-ON plans_subscriptions FOR UPDATE TO public
-USING (true)
-WITH CHECK (true);
-
-CREATE POLICY "Users can insert their own deposits"
-ON plans_subscriptions FOR INSERT TO authenticated
-WITH CHECK (auth.uid() = user_id);
+-- Create trigger to validate amount
+CREATE TRIGGER check_plan_amount
+  BEFORE INSERT OR UPDATE ON plans_subscriptions
+  FOR EACH ROW
 
 CREATE POLICY "Users can view their own deposits"
 ON plans_subscriptions FOR SELECT TO authenticated

@@ -73,22 +73,42 @@ export const calculatePriceDifferenceInPips = (
 };
 
 // Update PnL calculation to use pip-based calculation
-export const calculatePnL = (trade: Trade, currentPrice: number, tradingPairs?: TradingPair[]): number => {
+export const calculatePnL = (trade: Trade, currentPrice: number, trades?: Trade[], calculateTotal: boolean = false): number => {
   if (!currentPrice || !trade.openPrice) return 0;
 
+  // Check if trade is part of a hedged position
+  const hedgedTrade = trades?.find(t => 
+    t.id !== trade.id &&
+    t.pair === trade.pair &&
+    t.type !== trade.type &&
+    t.lots === trade.lots &&
+    t.status === 'open'
+  );
+
+  // Always calculate live PnL for display
+  const tradePnL = calculateTradeOnlyPnL(trade, currentPrice);
+
+  // If hedged and calculating total, combine both sides PnL
+  if (hedgedTrade && calculateTotal) {
+    const hedgedPnL = calculateTradeOnlyPnL(hedgedTrade, currentPrice);
+    return tradePnL + hedgedPnL;
+  }
+
+  // Return live PnL regardless of hedged status
+  return tradePnL;
+};
+
+// Helper function to calculate individual trade PnL
+const calculateTradeOnlyPnL = (trade: Trade, currentPrice: number): number => {
   const priceDiff = trade.type === 'buy' 
     ? currentPrice - trade.openPrice 
     : trade.openPrice - currentPrice;
     
-  // Calculate PnL based on pair type using standard lot sizes
   if (trade.pair.includes('BINANCE:')) {
-    // For crypto pairs, use lots directly
     return priceDiff * trade.lots;
   } else if (trade.pair === 'FX:XAU/USD') {
-    // For gold, each lot is 100 oz
     return priceDiff * trade.lots * 100;
   } else {
-    // For forex pairs, use standard lot size (100,000)
     return priceDiff * trade.lots * 100000;
   }
 };

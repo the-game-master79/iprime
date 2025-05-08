@@ -663,96 +663,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="space-y-8">
-              {/* Image Carousel - Moved to top */}
-              {promotions.length > 0 && (
-                <Carousel
-                  opts={{
-                    align: "start",
-                    loop: promotions.length > 3,
-                  }}
-                  className="w-full"
-                >
-                  <CarouselContent className="-ml-2 md:-ml-4">
-                    {promotions.map((promo) => (
-                      <CarouselItem key={promo.id} className="pl-2 md:pl-4 md:basis-1/3 lg:basis-1/3">
-                        <Link to={promo.link}>
-                          <div className="overflow-hidden rounded-xl">
-                            <div className="transition-all duration-300 hover:opacity-90 hover:scale-[0.98]">
-                              <div className="aspect-[2/1] relative">
-                                <img 
-                                  src={promo.image_url} 
-                                  alt={promo.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  {promotions.length > 3 && (
-                    <>
-                      <CarouselPrevious className="hidden md:flex -left-12 shadow-md hover:bg-primary hover:text-white">
-                        <CaretLeft className="h-5 w-5" weight="regular" />
-                      </CarouselPrevious>
-                      <CarouselNext className="hidden md:flex -right-12 shadow-md hover:bg-primary hover:text-white">
-                        <CaretRight className="h-5 w-5" weight="regular" />
-                      </CarouselNext>
-                    </>
-                  )}
-                </Carousel>
-              )}
-
-              {/* Referral and Logo Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Referral Card */}
-                <div className="bg-[#141414] rounded-2xl p-2">
-                  <div className="flex items-center gap-4 w-full">
-                    <div className="relative flex-1">
-                      <Input
-                        readOnly
-                        value={referralCode}
-                        className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
-                      />
-                      <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={handleCopyLink}
-                        className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                      >
-                        <Copy className="h-5 w-5 text-white" weight="regular" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="outline"
-                        onClick={handleShowQrCode}
-                        className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                      >
-                        <QrCode className="h-5 w-5 text-white" weight="regular" />
-                      </Button>
-                      <div 
-                        className={cn(
-                          "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
-                          directCount >= 2 ? "bg-[#20BF55]" : 
-                          directCount === 1 ? "bg-[#FFA500]" : 
-                          "bg-[#FF005C]"
-                        )}
-                        onClick={handleDirectsClick}
-                      >
-                        <span className="text-sm font-medium text-white">{directCount}/2</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+            <div className="space-y-4"> {/* Changed from space-y-8 to space-y-4 */}
+              {/* Trading Card and Promotions */}
+              <div className="flex gap-4">
                 {/* Trading Card */}
                 <div 
-                  className="bg-[#141414] rounded-2xl p-2 overflow-hidden relative cursor-pointer"
+                  className="flex-1 bg-[#141414] rounded-2xl p-2 overflow-hidden relative cursor-pointer"
                   onClick={() => navigate('/trade')}
                 >
                   <img 
@@ -760,7 +676,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     alt="Arrow CT"
                     className="absolute inset-0 w-full h-full object-cover rounded-xl"
                   />
-                  <div className="relative z-10 h-full flex items-center justify-between px-4">
+                  <div className="relative z-10 h-full flex items-center justify-between px-0">
                     <img 
                       src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
                       alt="CloudTrade"
@@ -769,50 +685,68 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     <Button 
                       className="bg-white text-black hover:bg-white/90"
                     >
-                      Trade Now
+                      Trade
                     </Button>
                   </div>
                 </div>
+
+                {/* Promotions Button */}
+                <Button 
+                  variant="secondary" // Changed variant
+                  onClick={() => navigate('/promotions')} // Now correctly navigates to /promotions 
+                  className="bg-[#1E1E1E] text-white border-0 hover:bg-[#252525] h-auto" // Updated styles
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <span>Promotions</span>
+                    {promotions.length > 0 && (
+                      <span className="text-xs text-blue-400">{promotions.length} Active</span>
+                    )}
+                  </div>
+                </Button>
               </div>
 
-              {/* QR Code Modal */}
-              {showQrCode && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowQrCode(false)}>
-                  <div className="bg-[#141414] p-4 rounded-xl w-full max-w-sm space-y-4" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-medium text-white">Share Your Referral Code</h3>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setShowQrCode(false)}
-                        className="hover:bg-white/10"
-                      >
-                        <XCircle className="h-5 w-5 text-white" weight="regular" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex justify-center bg-white p-3 rounded-lg">
-                      <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48" />
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={referralCode}
-                        className="font-mono text-sm bg-[#1E1E1E] border-0"
-                      />
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        onClick={handleCopyLink}
-                        className="bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                      >
-                        <Copy className="h-5 w-5 text-white" weight="regular" />
-                      </Button>
+              {/* Referral Card - Moved below Trading Card */}
+              <div className="bg-[#141414] rounded-2xl p-2">
+                <div className="flex items-center gap-4 w-full">
+                  <div className="relative flex-1">
+                    <Input
+                      readOnly
+                      value={referralCode}
+                      className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
+                    />
+                    <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      size="icon" 
+                      variant="outline"
+                      onClick={handleCopyLink}
+                      className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                    >
+                      <Copy className="h-5 w-5 text-white" weight="regular" />
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="outline"
+                      onClick={handleShowQrCode}
+                      className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                    >
+                      <QrCode className="h-5 w-5 text-white" weight="regular" />
+                    </Button>
+                    <div 
+                      className={cn(
+                        "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
+                        directCount >= 2 ? "bg-[#20BF55]" : 
+                        directCount === 1 ? "bg-[#FFA500]" : 
+                        "bg-[#FF005C]"
+                      )}
+                      onClick={handleDirectsClick}
+                    >
+                      <span className="text-sm font-medium text-white">{directCount}/2</span>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Balance Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -824,7 +758,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
                 <AmountCard
                   variant="compute"
-                  title="AI Computes"
+                  title="AI trading"
                   amount={totalInvested}
                   activePlans={activePlans.count}
                 />

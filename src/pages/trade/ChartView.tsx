@@ -15,6 +15,18 @@ import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/util
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ForexCryptoSheet } from "@/components/shared/ForexCryptoSheet";
+import { cn } from "@/lib/utils";
+
+// Add helper function after imports
+const getRiskLevel = (leverage: number): { label: string; color: string } => {
+  if (leverage <= 20) {
+    return { label: 'Low Risk', color: 'text-green-500' };
+  } else if (leverage <= 100) {
+    return { label: 'Medium Risk', color: 'text-yellow-500' };
+  } else {
+    return { label: 'High Risk', color: 'text-red-500' };
+  }
+};
 
 interface PriceData {
   price: string;
@@ -106,6 +118,8 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [pairInfo, setPairInfo] = useState<TradingPairInfo | null>(null);
   const [pipValue, setPipValue] = useState("0.00");
   const [showForexCryptoSheet, setShowForexCryptoSheet] = useState(false);
+  const [defaultLeverage, setDefaultLeverage] = useState(leverage);
+  const [selectedLeverage, setSelectedLeverage] = useState(leverage.toString());
 
   useEffect(() => {
     if (!pair) {
@@ -158,7 +172,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [showSLInput, setShowSLInput] = useState(false);
   const [showTPInput, setShowTPInput] = useState(false);
   const [showLeverageDialog, setShowLeverageDialog] = useState(false);
-  const [selectedLeverage, setSelectedLeverage] = useState(leverage.toString());
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
@@ -436,34 +449,32 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
       return;
     }
 
+    // Remove any non-numeric characters except decimal point
+    const sanitizedValue = value.replace(/[^\d.]/g, '');
+    
+    // Prevent multiple decimal points
+    if ((sanitizedValue.match(/\./g) || []).length > 1) return;
+    
+    // Allow decimal input up to 2 places
+    const [whole, decimal] = sanitizedValue.split('.');
+    if (decimal && decimal.length > 2) return;
+
     // Validate numeric input
-    const numValue = parseFloat(value);
+    const numValue = parseFloat(sanitizedValue);
     if (isNaN(numValue)) return;
 
-    // Get margin utilization from open trades
-    const existingMargin = trades
-      .filter(t => t.status === 'open' || t.status === 'pending')
-      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
-
-    // Calculate margin for new position
-    const price = parseFloat(pairPrices[defaultPair]?.price || '0');
-    const leverageValue = parseFloat(selectedLeverage);
-    const newPositionMargin = calculateRequiredMargin(
-      price,
-      numValue,
-      leverageValue,
-      defaultPair.includes('BINANCE:'),
-      defaultPair
-    );
-
-    // Check if total margin would exceed balance
-    if (existingMargin + newPositionMargin > userBalance) {
-      // Set to maximum affordable lots
-      setLots(getMaxAffordableLots.toFixed(2));
+    // If value exceeds max lots, set to max lots
+    if (numValue > effectiveMaxLots) {
+      setLots(effectiveMaxLots.toFixed(2));
       return;
     }
 
-    setLots(value);
+    // Set the value, preserving decimal places during typing
+    if (sanitizedValue.includes('.')) {
+      setLots(sanitizedValue);
+    } else {
+      setLots(numValue.toString());
+    }
   };
 
   // Update the getMaxAffordableLots calculation
@@ -892,6 +903,71 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   function cn(...classes: (string | undefined | null | false)[]): string {
     return classes.filter(Boolean).join(' ');
   }
+
+  // Add effect to fetch default leverage
+  useEffect(() => {
+    const fetchDefaultLeverage = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('default_leverage')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching default leverage:', error);
+        return;
+      }
+
+      if (data?.default_leverage) {
+        setDefaultLeverage(data.default_leverage);
+        setSelectedLeverage(data.default_leverage.toString());
+      }
+    };
+
+    fetchDefaultLeverage();
+  }, []);
+
+  // Add function to update leverage in profile
+  const updateProfileLeverage = async (newLeverage: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          default_leverage: newLeverage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setDefaultLeverage(newLeverage);
+      toast({
+        title: "Success",
+        description: "Leverage preference saved"
+      });
+    } catch (error) {
+      console.error('Error updating leverage:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save leverage preference"
+      });
+    }
+  };
+
+  // Update Dialog close handler
+  const handleLeverageDialogClose = async () => {
+    const newLeverage = parseInt(selectedLeverage);
+    await updateProfileLeverage(newLeverage);
+    setShowLeverageDialog(false);
+  };
+
   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Balance Card */}
@@ -1018,18 +1094,18 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                   
                   {/* Trade Info Panel */}
                   <div className="flex gap-2">
-                    <Badge variant="outline" className="flex-1 text-center">
+                    <Badge variant="outline" className="flex-1 text-center border-[#525252]">
                       Margin: ${marginRequired}
                     </Badge>
-                    <Badge variant="outline" className="flex-1 text-center">
+                    <Badge variant="outline" className="flex-1 text-center border-[#525252]">
                       Max Lots: {effectiveMaxLots.toFixed(2)}
                     </Badge>
-                    <Badge variant="outline" className="flex-1 text-center">
-                      Pip Value: ${pipValue}
+                    <Badge variant="outline" className="flex-1 text-center border-[#525252]">
+                      Leverage: {defaultLeverage}x
                     </Badge>
                   </div>
 
-                  {/* Lots Input with Leverage Button */}
+                  {/* Lots Input with touch-friendly increment/decrement buttons */}
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                       <Input
@@ -1037,29 +1113,41 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                         value={lots}
                         onChange={handleLotsChange}
                         placeholder="Enter size"
-                        className="w-full text-right pr-16 font-mono"
+                        className="w-full text-right pr-[120px] font-mono"
                         min={0}
                         max={effectiveMaxLots}
                         step={0.01}
                       />
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-sm text-muted-foreground">
-                        lots
+                      <div className="absolute right-0 top-0 h-full flex items-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentValue = parseFloat(lots) || 0;
+                            const newValue = Math.max(0, currentValue - 0.01);
+                            setLots(newValue.toFixed(2));
+                          }}
+                          className="h-full px-3 min-w-[40px] hover:bg-accent rounded-none"
+                        >
+                          -
+                        </Button>
+                        <div className="px-2 text-sm text-muted-foreground">
+                          lots
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentValue = parseFloat(lots) || 0;
+                            const newValue = Math.min(effectiveMaxLots, currentValue + 0.01);
+                            setLots(newValue.toFixed(2));
+                          }}
+                          className="h-full px-3 min-w-[40px] hover:bg-accent rounded-none"
+                        >
+                          +
+                        </Button>
                       </div>
                     </div>
-                    <Button 
-                      variant="secondary" 
-                      className={cn(
-                        "h-10 px-4 rounded-lg",
-                        parseInt(selectedLeverage) <= 20
-                          ? "text-green-500"
-                          : parseInt(selectedLeverage) <= 100
-                            ? "text-yellow-500"
-                            : "text-red-500"
-                      )}
-                      onClick={() => setShowLeverageDialog(true)}
-                    >
-                      {selectedLeverage}x
-                    </Button>
                   </div>
 
                   {/* Trade Buttons */}
@@ -1096,97 +1184,6 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
           </div>
         </div>
       </div>
-
-      {/* Add leverage dialog box */}
-      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
-        <DialogContent className="p-0 overflow-hidden rounded-lg"> {/* Added margin */}
-          <DialogHeader className="px-6 py-4 border-b border-[#525252]">
-            <DialogTitle className="text-xl">Leverage Information</DialogTitle>
-            <DialogDescription className="text-sm">
-              Choose your preferred leverage level (Max: {pairInfo?.max_leverage}x). Higher leverage means higher risk.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-6 space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Current Selection</label>
-              <div className={cn(
-                "border border-[#525252] rounded-lg p-4 text-center",
-                parseInt(selectedLeverage) <= 20 
-                  ? "bg-green-500/5 border-green-500/10" 
-                  : parseInt(selectedLeverage) <= 100
-                    ? "bg-yellow-500/5 border-yellow-500/10"
-                    : "bg-red-500/5 border-red-500/10"
-              )}>
-                <span className={cn(
-                  "text-3xl font-bold",
-                  parseInt(selectedLeverage) <= 20 
-                    ? "text-green-500" 
-                    : parseInt(selectedLeverage) <= 100
-                      ? "text-yellow-500"
-                      : "text-red-500"
-                )}>{selectedLeverage}x</span>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {pairInfo?.leverage_options && (
-                <>
-                  {['low', 'medium', 'high'].map((riskLevel) => {
-                    const options = pairInfo.leverage_options.filter(value => 
-                      riskLevel === 'low' ? value <= 20 :
-                      riskLevel === 'medium' ? value > 20 && value <= 100 :
-                      value > 100
-                    );
-                    return options.length > 0 ? (
-                      <div key={riskLevel} className="space-y-2">
-                        <div className={cn(
-                          "font-medium",
-                          riskLevel === 'low' ? "text-green-500" :
-                          riskLevel === 'medium' ? "text-yellow-500" : 
-                          "text-red-500"
-                        )}>
-                          {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} Risk
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          {options.map((value) => (
-                            <Button
-                              key={value}
-                              variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                              onClick={() => setSelectedLeverage(value.toString())}
-                              className={cn(
-                                "h-9 font-mono transition-all",
-                                selectedLeverage === value.toString()
-                                  ? `bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/90 border-0`
-                                  : `hover:border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/50 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/5 border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/20`
-                              )}
-                            >
-                              {value}x
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null;
-                  })}
-                </>
-              )}
-            </div>
-          </div>
-          <div className="p-4 bg-gradient-to-t from-muted/10 border-t border-[#525252]">
-            <Button 
-              onClick={() => setShowLeverageDialog(false)}
-              className={cn(
-                "w-full",
-                parseInt(selectedLeverage) <= 20
-                  ? "bg-green-500 hover:bg-green-500/90"
-                  : parseInt(selectedLeverage) <= 100
-                    ? "bg-yellow-500 hover:bg-yellow-500/90"
-                    : "bg-red-500 hover:bg-red-500/90"
-              )}
-            >
-              Confirm Leverage
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

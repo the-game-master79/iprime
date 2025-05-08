@@ -317,26 +317,26 @@ const Affiliate = () => {
       <div className="container max-w-[1000px] mx-auto px-4 mb-6 mt-6">
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
           <BalanceCard 
-            label="Total Referrals"
+            label="All affiliates"
             amount={teamData.length}
             variant="referrals"
             valueClassName="font-mono"
           />
 
           <BalanceCard 
-            label="Commission Earned"
+            label="Income"
             amount={totalCommissions}
             variant="commission"
           />
 
           <BalanceCard 
-            label="Business Volume"
+            label="Biz Volume"
             amount={totalBusiness}
             variant="business"
           />
 
           <BalanceCard 
-            label="Direct Referrals"
+            label="Directs"
             amount={userDirectCount}
             variant="direct"
           />
@@ -468,7 +468,7 @@ const Affiliate = () => {
           </div>
 
           {/* Main Content Area */}
-          <div className="space-y-4 sm:space-y-6 w-full">
+          <div className="space-y-4 sm:space-y-6 w-full pb-10">
             {/* Network Structure */}
             <Card className="bg-card">
               <CardHeader className="p-4 sm:p-6">

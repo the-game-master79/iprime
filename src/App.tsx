@@ -1,8 +1,8 @@
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AdminAuthProvider, RequireAdminAuth } from "@/contexts/AdminAuthContext";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { AuthProvider } from '@/contexts/AuthContext';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/auth/Login";
@@ -18,7 +18,6 @@ import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
-import { ErrorBoundary } from 'react-error-boundary';
 
 // Lazy load routes
 const Platform = lazy(() => import("./pages/dashboard/Platform"));
@@ -27,7 +26,6 @@ const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
 const Payments = lazy(() => import("./pages/payments/Payments"));
 const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
 const Profile = lazy(() => import("./pages/profile/Profile"));
-const MyRank = lazy(() => import("@/pages/dashboard/MyRank"));
 const SupportPage = lazy(() => import("./pages/support/SupportPage"));
 const Trade = lazy(() => import("./pages/trade/Trade"));
 
@@ -50,6 +48,7 @@ const SupportManagePage = lazy(() => import("@/pages/admin/support/SupportManage
 const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
 const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
 const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage"));
+const Promotions = lazy(() => import("@/pages/promotions/Promotions")); // Add this line
 const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates"));
 const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage")); // Add this line
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
@@ -119,8 +118,8 @@ const App = () => {
             <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
             <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
             <Route path="/withdrawals" element={<AuthGuard requireAuth><Withdrawals /></AuthGuard>} />
-            <Route path="/rank" element={<AuthGuard requireAuth><MyRank /></AuthGuard>} />
             <Route path="/deposit" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
+            <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
 
             {/* Trade Routes */}
             <Route path="/trade/chart/:pair" element={
@@ -182,15 +181,14 @@ const App = () => {
                   <Route path="pairs" element={<AdminPairs />} />
                   <Route path="trades" element={<TradesPage />} /> {/* Add this line */}
                   <Route path="live-rates" element={<LiveRatesPage />} /> {/* Add this line */}
+                  <Route path="/performance" element={<Performance />} />
                 </Routes>
               }
             />
 
             {/* Change Performance route from PrivateRoute to AuthGuard */}
             <Route path="/performance" element={
-              <AuthGuard requireAuth>
                 <Performance />
-              </AuthGuard>
             } />
             <Route path="/design" element={<DesignSystem />} /> {/* Add route */}
             <Route path="*" element={<NotFound />} />

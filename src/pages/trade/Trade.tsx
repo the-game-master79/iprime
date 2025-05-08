@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Navigate, useLocation } from "react-router-dom";
+import { useParams, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { cn, getForexMarketStatus } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
@@ -21,6 +21,7 @@ const Trade = () => {
   const { isMobile } = useBreakpoints();
   const { pair } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Base states
   const [selectedPair, setSelectedPair] = useState(pair ? decodeURIComponent(pair) : '');
@@ -169,11 +170,13 @@ const Trade = () => {
         type: trade.type,
         status: trade.status,
         openPrice: trade.open_price,
+        closePrice: trade.close_price,
         lots: trade.lots,
         leverage: trade.leverage,
         orderType: trade.order_type,
         limitPrice: trade.limit_price || null,
         openTime: new Date(trade.created_at).getTime(),
+        closedAt: trade.closed_at,
         pnl: trade.pnl || 0,
         margin_amount: trade.margin_amount
       }));
@@ -330,7 +333,13 @@ const Trade = () => {
       // Update local state
       setTrades(prev => 
         prev.map(t => t.id === tradeId 
-          ? { ...t, status: 'closed', closePrice, pnl } 
+          ? { 
+              ...t, 
+              status: 'closed', 
+              closePrice: closePrice,
+              closedAt: new Date().toISOString(),
+              pnl 
+            } 
           : t
         )
       );
@@ -421,6 +430,19 @@ const Trade = () => {
     }
   };
 
+  // Handle pair selection
+  const handlePairSelect = (pair: string) => {
+    setSelectedPair(pair); // Only update state
+  };
+
+  // Update route handling to use pair param if available
+  useEffect(() => {
+    if (pair) {
+      const decodedPair = decodeURIComponent(pair);
+      setSelectedPair(decodedPair);
+    }
+  }, [pair]);
+
   if (isMobile && location.pathname === '/trade') {
     return <Navigate to="/trade/select" replace />;
   }
@@ -432,9 +454,9 @@ const Trade = () => {
       userBalance={userBalance}
       depositDialogOpen={depositDialogOpen}
       setDepositDialogOpen={setDepositDialogOpen}
-      trades={trades}
-      currentPrices={pairPrices}
-      onCloseTrade={handleCloseTrade}
+      selectedPair={selectedPair}
+      onPairSelect={handlePairSelect}
+      tradingPairs={tradingPairs}
     >
       <MarginWatchDog
         trades={trades}

@@ -380,7 +380,7 @@ const Plans = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Topbar title="Buy Computes" />
+      <Topbar title="Buy AI Computes" />
       
       <div className="container mx-auto max-w-[1000px] py-6 px-4">
         {/* Balance cards section */}

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MagnifyingGlass, ChartLine, Globe, X } from "@phosphor-icons/react";
+import { MagnifyingGlass, ChartLine, Globe, X, ArrowUp, ArrowDown } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { isForexTradingTime } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -16,10 +16,24 @@ import { cryptoDecimals, forexDecimals } from "@/config/decimals";
 import { NavigationFooter } from "@/components/shared/NavigationFooter";
 import { motion, AnimatePresence } from "framer-motion";
 import { TradesSheet } from "@/components/shared/TradesSheet";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { calculateRequiredMargin } from "@/utils/trading";
+import { 
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const SelectPairs = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Add storage key constant
+  const QUICK_TRADE_STORAGE_KEY = 'quick-trade-enabled';
+  
   // Add new states
   const [userBalance, setUserBalance] = useState(0);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -32,6 +46,24 @@ const SelectPairs = () => {
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [quickTradeEnabled, setQuickTradeEnabled] = useState(false);
+  const [quickTradeDialog, setQuickTradeDialog] = useState<{
+    isOpen: boolean;
+    pair: string;
+    action: 'buy' | 'sell';
+    lots: number;
+  }>({
+    isOpen: false,
+    pair: '',
+    action: 'buy',
+    lots: 0.01,
+  });
+  const [expandedPair, setExpandedPair] = useState<{
+    symbol: string;
+    action: 'buy' | 'sell';
+    lots: number;
+  } | null>(null);
+  const [defaultLeverage, setDefaultLeverage] = useState<number>(1);
 
   // Add fetchInitialPrices implementation
   const fetchInitialPrices = async () => {
@@ -159,6 +191,9 @@ const SelectPairs = () => {
   }, [tradingPairs, activeTab, searchQuery, pairPrices, priceAnimations]);
 
   const handlePairSelect = (pair: string) => {
+    // Don't navigate if quick trade is enabled
+    if (quickTradeEnabled) return;
+    
     // Format the pair correctly for the URL
     const encodedPair = encodeURIComponent(pair);
     navigate(`/trade/chart/${encodedPair}`);
@@ -285,13 +320,15 @@ const SelectPairs = () => {
 
       const { data } = await supabase
         .from('profiles')
-        .select('withdrawal_wallet, multiplier_bonus')
+        .select('withdrawal_wallet, multiplier_bonus, default_leverage')
         .eq('id', user.id)
         .single();
 
       if (data) {
         setUserProfile(data);
         setUserBalance(data.withdrawal_wallet + (data.multiplier_bonus || 0));
+        // Set default leverage from profile
+        setDefaultLeverage(data.default_leverage || 1);
       }
     };
 
@@ -327,6 +364,153 @@ const SelectPairs = () => {
       
       return acc;
     }, {} as Record<string, { trades: Trade[], totalPnL: number }>);
+  };
+
+  // Removed any WebSocket reconnection logic from tab change handler
+
+  // Add margin calculation
+  // Removed duplicate declaration of calculateQuickTradeMargin
+
+  // Add function to handle pair expansion
+  const handleExpandPair = (symbol: string, action: 'buy' | 'sell', e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (expandedPair?.symbol === symbol && expandedPair?.action === action) {
+      setExpandedPair(null);
+    } else {
+      const pair = tradingPairs.find(p => p.symbol === symbol);
+      if (pair) {
+        setExpandedPair({
+          symbol,
+          action,
+          lots: 0.01
+        });
+      }
+    }
+  };
+
+  // Update the quick trade handler to match ChartView implementation
+  const handleQuickTrade = async (pair: string, action: 'buy' | 'sell', lots: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const price = action === 'buy' 
+        ? parseFloat(pairPrices[pair]?.ask || '0')
+        : parseFloat(pairPrices[pair]?.bid || '0');
+
+      const selectedPair = tradingPairs.find(p => p.symbol === pair);
+      if (!selectedPair) throw new Error('Invalid pair');
+
+      // Use default leverage but cap it at pair's max_leverage
+      const effectiveLeverage = Math.min(defaultLeverage, selectedPair.max_leverage);
+
+      // Calculate margin amount
+      const marginAmount = calculateRequiredMargin(
+        price,
+        lots,
+        effectiveLeverage,
+        pair.includes('BINANCE:'),
+        pair
+      );
+
+      // Validate margin against balance
+      if (marginAmount > userBalance) {
+        throw new Error(`Insufficient balance. Required margin: $${marginAmount.toFixed(2)}`);
+      }
+
+      // Insert trade directly with order_type
+      const { data: trade, error } = await supabase
+        .from('trades')
+        .insert([{
+          user_id: user.id,
+          pair: pair,
+          type: action,
+          status: 'open',
+          open_price: price,
+          lots: lots,
+          leverage: effectiveLeverage,
+          margin_amount: marginAmount,
+          order_type: 'market' // Add this field
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update local trades state
+      setTrades(prev => [{
+        id: trade.id,
+        pair: trade.pair,
+        type: trade.type,
+        status: trade.status,
+        openPrice: trade.open_price,
+        lots: trade.lots,
+        leverage: trade.leverage,
+        margin_amount: trade.margin_amount,
+        orderType: 'market',
+        openTime: new Date(trade.created_at).getTime()
+      }, ...prev]);
+
+      // Fetch updated balance
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('withdrawal_wallet')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setUserBalance(profile.withdrawal_wallet);
+      }
+
+      toast({
+        title: "Success",
+        description: `${action.toUpperCase()} order executed at $${price}`
+      });
+
+      setExpandedPair(null);
+      
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message
+      });
+    }
+  };
+
+  // Update the margin calculation
+  const calculateQuickTradeMargin = (pair: string, lots: number) => {
+    const selectedPair = tradingPairs.find(p => p.symbol === pair);
+    if (!selectedPair) return 0;
+
+    const price = expandedPair?.action === 'buy' 
+      ? parseFloat(pairPrices[pair]?.ask || '0')
+      : parseFloat(pairPrices[pair]?.bid || '0');
+
+    // Use user's default leverage, but cap it at pair's max_leverage
+    const effectiveLeverage = Math.min(defaultLeverage, selectedPair.max_leverage);
+
+    return calculateRequiredMargin(
+      price,
+      lots,
+      effectiveLeverage,
+      pair.includes('BINANCE:'),
+      pair
+    );
+  };
+
+  // Add effect to load quick trade state from localStorage
+  useEffect(() => {
+    const savedState = localStorage.getItem(QUICK_TRADE_STORAGE_KEY);
+    if (savedState !== null) {
+      setQuickTradeEnabled(savedState === 'true');
+    }
+  }, []);
+
+  // Update the toggle handler
+  const handleQuickTradeToggle = (enabled: boolean) => {
+    setQuickTradeEnabled(enabled);
+    localStorage.setItem(QUICK_TRADE_STORAGE_KEY, enabled.toString());
   };
 
   return (
@@ -443,7 +627,24 @@ const SelectPairs = () => {
                 </Button>
               </div>
 
-              <ScrollArea className="h-[calc(100vh-280px)] mt-4 -mx-4 px-4">
+              <div className="flex items-center justify-between mt-4 px-1">
+                <div className="flex items-center gap-3">
+                  <label 
+                    htmlFor="quick-trade"
+                    className="text-sm font-medium cursor-pointer select-none"
+                  >
+                    Quick Trade
+                  </label>
+                  <Switch
+                    id="quick-trade"
+                    checked={quickTradeEnabled}
+                    onCheckedChange={handleQuickTradeToggle} // Update this line
+                    className="data-[state=checked]:bg-green-500"
+                  />
+                </div>
+              </div>
+
+              <ScrollArea className="h-[calc(100vh-320px)] mt-4 -mx-4 px-4">
                 <div className="grid gap-3 pb-4">
                   {filteredPairs.map((pair) => {
                     const priceData = pairPrices[pair.symbol] || { bid: '0.00000', change: '0.00' };
@@ -453,15 +654,15 @@ const SelectPairs = () => {
                     const activeTrades = getActiveTrades(pair.symbol);
                     
                     return (
-                      <button
+                      <div
                         key={pair.symbol}
-                        disabled={isDisabled}
                         onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
                         className={cn(
                           "w-full text-left bg-card hover:bg-accent rounded-lg border border-[#525252] p-3",
                           "transition-all duration-200 active:scale-[0.98]",
                           "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-                          isDisabled && "opacity-50 cursor-not-allowed"
+                          isDisabled && "opacity-50 cursor-not-allowed",
+                          !isDisabled && "cursor-pointer"
                         )}
                       >
                         <div className="flex flex-col gap-2">
@@ -489,16 +690,104 @@ const SelectPairs = () => {
                               )}>
                                 {parseFloat(priceData.bid).toFixed(getDecimalPlaces(pair.symbol))}
                               </span>
-                              <span className={cn(
-                                "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                                parseFloat(priceData.change) < 0 
-                                  ? "bg-red-500/10 text-red-500" 
-                                  : "bg-green-500/10 text-green-500"
-                              )}>
-                                {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-                              </span>
+                              {quickTradeEnabled ? (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={(e) => handleExpandPair(pair.symbol, 'buy', e)}
+                                  >
+                                    {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'buy' 
+                                      ? 'Cancel' 
+                                      : 'Buy'}
+                                  </Button>
+                                  <Button
+                                    size="sm" 
+                                    className="h-7 px-3 bg-red-600 hover:bg-red-700 text-white"
+                                    onClick={(e) => handleExpandPair(pair.symbol, 'sell', e)}
+                                  >
+                                    {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'sell' 
+                                      ? 'Cancel' 
+                                      : 'Sell'}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className={cn(
+                                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                                  parseFloat(priceData.change) < 0 
+                                    ? "bg-red-500/10 text-red-500" 
+                                    : "bg-green-500/10 text-green-500"
+                                )}>
+                                  {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
+                                </span>
+                              )}
                             </div>
                           </div>
+
+                          {/* Add expandable quick trade section */}
+                          {expandedPair?.symbol === pair.symbol && (
+                            <div className="mt-3 pt-3 border-t border-[#525252] space-y-4">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center text-sm">
+                                  <label className="font-medium">
+                                    Lots: {expandedPair.lots.toFixed(2)}
+                                  </label>
+                                  <span className="text-muted-foreground">
+                                    Max: {pair.max_lots.toFixed(2)}
+                                  </span>
+                                </div>
+                                <Slider
+                                  value={[expandedPair.lots]}
+                                  min={pair.min_lots}
+                                  max={pair.max_lots}
+                                  step={pair.lot_step}
+                                  onValueChange={([value]) => 
+                                    setExpandedPair(prev => prev ? { ...prev, lots: value } : null)
+                                  }
+                                  className="w-full"
+                                />
+                              </div>
+
+                              <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-muted-foreground">Leverage:</span>
+                                  <span className={cn(
+                                    "font-medium",
+                                    defaultLeverage > 100 ? "text-red-500" :
+                                    defaultLeverage > 20 ? "text-yellow-500" : 
+                                    "text-green-500"
+                                  )}>
+                                    {Math.min(defaultLeverage, pair.max_leverage)}x
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-muted-foreground">Required Margin:</span>
+                                  <span className="font-medium">
+                                    ${calculateQuickTradeMargin(pair.symbol, expandedPair.lots).toFixed(2)}
+                                  </span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className={cn(
+                                    expandedPair.action === 'buy' 
+                                      ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                                      : "bg-red-600 hover:bg-red-700 text-white",
+                                    "w-full mt-2"
+                                  )}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuickTrade(
+                                      pair.symbol,
+                                      expandedPair.action,
+                                      expandedPair.lots
+                                    );
+                                  }}
+                                >
+                                  Confirm {expandedPair.action === 'buy' ? 'Buy' : 'Sell'}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
                           {activeTrades.length > 0 && (
                             <div className="-mx-3 -mb-3 border-[#525252]">
@@ -527,7 +816,7 @@ const SelectPairs = () => {
                             </div>
                           )}
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -544,6 +833,65 @@ const SelectPairs = () => {
           calculatePnL={(trade, currentPrice) => calculatePnL(trade, currentPrice)}
           pairPrices={pairPrices}
         />
+
+        <Dialog
+          open={quickTradeDialog.isOpen}
+          onOpenChange={(open) => setQuickTradeDialog(prev => ({ ...prev, isOpen: open }))}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                Quick {quickTradeDialog.action === 'buy' ? 'Buy' : 'Sell'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Lots: {quickTradeDialog.lots.toFixed(2)}
+                </label>
+                <Slider
+                  value={[quickTradeDialog.lots]}
+                  min={0.01}
+                  max={1.00}
+                  step={0.01}
+                  onValueChange={([value]) => 
+                    setQuickTradeDialog(prev => ({ ...prev, lots: value }))
+                  }
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Required Margin:</span>
+                <span className="font-medium">
+                  ${calculateQuickTradeMargin(
+                    quickTradeDialog.pair,
+                    quickTradeDialog.lots
+                  ).toFixed(2)}
+                </span>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setQuickTradeDialog(prev => ({ ...prev, isOpen: false }))}
+              >
+                Cancel
+              </Button>
+              <Button
+                className={quickTradeDialog.action === 'buy' 
+                  ? "bg-blue-600 hover:bg-blue-700" 
+                  : "bg-red-600 hover:bg-red-700"}
+                onClick={() => handleQuickTrade(
+                  quickTradeDialog.pair,
+                  quickTradeDialog.action,
+                  quickTradeDialog.lots
+                )}
+              >
+                Confirm {quickTradeDialog.action === 'buy' ? 'Buy' : 'Sell'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <NavigationFooter />
       </div>

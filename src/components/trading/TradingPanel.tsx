@@ -4,16 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
+import { Badge } from "@/components/ui/badge"; // Add this import
 import { TradingPair, PriceData, TradeParams, Trade } from "@/types/trading"; // Add this import
 import { 
   calculateRequiredMargin, 
   isJPYPair, 
   getStandardLotSize,
-  calculatePipValue // Add this import
+  calculatePipValue, // Add this import
+  calculatePriceDifferenceInPips // Add this import
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
-import { createClient } from '@supabase/supabase-js'; // Import Supabase client
-import { getDecimalPlaces } from "@/config/decimals"; // Add this import
+import { supabase } from "@/lib/supabase"; // Add this import at the top
 
 interface SubscriptionPlan {
   id: string;
@@ -415,14 +416,6 @@ export const TradingPanel = ({
     return type === 'buy' ? staticAskPrice : staticBidPrice;
   }
 
-  // Initialize Supabase client
-  const supabase = useMemo(() => {
-    return createClient(
-      import.meta.env.VITE_SUPABASE_URL || '',
-      import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-    );
-  }, []);
-
   // Add subscription to trade execution notifications
   useEffect(() => {
     const channel = supabase.channel('trade-executions')
@@ -503,6 +496,21 @@ export const TradingPanel = ({
       return () => clearTimeout(timer);
     }
   }, [selectedPair, pairPrices[selectedPair]?.bid, pairPrices[selectedPair]?.ask]);
+
+  // Add pip difference calculation
+  const pipDifference = useMemo(() => {
+    const ask = parseFloat(staticAskPrice);
+    const bid = parseFloat(staticBidPrice);
+    if (!ask || !bid) return 0;
+    
+    return calculatePriceDifferenceInPips(
+      'buy',
+      ask,
+      bid,
+      selectedPair,
+      tradingPairs
+    );
+  }, [staticAskPrice, staticBidPrice, selectedPair, tradingPairs]);
 
   return (
     <div className="w-[350px] border-l border-[#525252] bg-card p-4">
@@ -594,9 +602,9 @@ export const TradingPanel = ({
             </div>
           </div>
 
-          {/* Trade buttons section - Updated colors */}
+          {/* Trade buttons section - Updated with pip difference badge */}
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 relative">
               <Button
                 className={cn(
                   "h-16 flex-col space-y-1",
@@ -615,6 +623,16 @@ export const TradingPanel = ({
                   {getDisplayPrice('sell')}
                 </div>
               </Button>
+
+              {/* Updated pip difference badge */}
+              <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/3 z-10">
+                <Badge 
+                  variant="secondary" 
+                  className="bg-background rounded-sm px-3 py-0.5 text-[10px] font-medium shadow-sm"
+                >
+                  {pipDifference.toFixed(1)} pips
+                </Badge>
+              </div>
 
               <Button
                 className={cn(

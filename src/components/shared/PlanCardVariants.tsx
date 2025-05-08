@@ -13,7 +13,7 @@ interface ActivePlanVariantProps {
 
 export function AvailablePlanVariant({ plans, loading, onInvest }: AvailablePlanVariantProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
+    <div className="grid grid-cols-1 gap-3 md:gap-6">
       {plans.map((plan) => (
         <PlanCard
           key={plan.id}
@@ -32,7 +32,7 @@ export function AvailablePlanVariant({ plans, loading, onInvest }: AvailablePlan
 
 export function ActivePlanVariant({ plans, onCancel }: ActivePlanVariantProps) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
+    <div className="grid grid-cols-1 gap-3 md:gap-6">
       {plans.map((plan) => {
         const progress = Math.min(
           ((plan.days_credited || 0) / plan.duration_days) * 100,

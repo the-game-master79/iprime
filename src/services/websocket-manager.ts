@@ -74,6 +74,7 @@ export class WebSocketManager {
     import.meta.env.VITE_TRADERMADE_API_KEY_3 || ''
   ].filter(Boolean);
   private currentApiKeyIndex = 0;
+  private isConnecting = false;
 
   private constructor() {
     this.tradermadeApiKey = this.apiKeys[0] || '';
@@ -151,110 +152,211 @@ export class WebSocketManager {
   }
 
   private async connectToAll() {
-    if (this.connectionState.crypto.status === 'connecting' || this.connectionState.forex.status === 'connecting') {
+    if (this.isConnecting || 
+        this.connectionState.crypto.status === 'connecting' || 
+        this.connectionState.forex.status === 'connecting') {
       return;
     }
 
-    const cryptoPairs = Array.from(this.activePairs).filter(pair =>
-      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
-    );
-    const forexPairs = Array.from(this.activePairs).filter(pair =>
-      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
-    );
+    this.isConnecting = true;
+    try {
+      const cryptoPairs = Array.from(this.activePairs).filter(pair =>
+        this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
+      );
+      const forexPairs = Array.from(this.activePairs).filter(pair =>
+        this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
+      );
 
-    if (cryptoPairs.length > 0 && (!this.cryptoWs || this.cryptoWs.readyState > WebSocket.OPEN)) {
-      this.connectCrypto(cryptoPairs);
-    }
+      const shouldReconnectCrypto = cryptoPairs.length > 0 && 
+        (!this.cryptoWs || this.cryptoWs.readyState !== WebSocket.OPEN);
+      
+      const shouldReconnectForex = forexPairs.length > 0 && 
+        (!this.forexWs || this.forexWs.readyState !== WebSocket.OPEN) && 
+        isForexTradingTime();
 
-    if (forexPairs.length > 0 && (!this.forexWs || this.forexWs.readyState > WebSocket.OPEN) && isForexTradingTime()) {
-      await this.connectForex(forexPairs);
+      if (shouldReconnectCrypto) {
+        await this.connectCrypto(cryptoPairs);
+      }
+
+      if (shouldReconnectForex) {
+        await this.connectForex(forexPairs);
+      }
+    } finally {
+      this.isConnecting = false;
     }
   }
 
-  private connectCrypto(pairs: string[]) {
-    if (this.cryptoWs) this.cryptoWs.close();
-
-    this.setConnectionState('crypto', { status: 'connecting' });
-    this.cryptoWs = new WebSocket(BINANCE_WS_URL);
-
-    const symbols = pairs.map(p => p.toLowerCase().replace('binance:', ''));
-
-    this.cryptoWs.onopen = () => {
-      this.sendMessage(this.cryptoWs, {
-        method: "SUBSCRIBE",
-        params: symbols.map(s => `${s}@ticker`),
-        id: 1
-      });
-      this.setConnectionState('crypto', { status: 'connected' });
-    };
-
-    this.cryptoWs.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.e === '24hrTicker') {
-        this.updatePrice(`BINANCE:${data.s}`, {
-          price: data.c,
-          bid: data.b,
-          ask: data.a,
-          change: data.P
-        });
+  private async connectCrypto(pairs: string[]) {
+    try {
+      if (this.cryptoWs) {
+        const oldWs = this.cryptoWs;
+        this.cryptoWs = null;
+        oldWs.onopen = null;
+        oldWs.onclose = null;
+        oldWs.onerror = null;
+        oldWs.onmessage = null;
+        if (oldWs.readyState === WebSocket.OPEN) {
+          oldWs.close();
+        }
       }
-    };
 
-    this.setupReconnection(this.cryptoWs, 'crypto');
+      this.setConnectionState('crypto', { status: 'connecting' });
+      this.cryptoWs = new WebSocket(BINANCE_WS_URL);
+
+      await new Promise<void>((resolve, reject) => {
+        if (!this.cryptoWs) return reject(new Error('No WebSocket instance'));
+
+        const timeoutId = setTimeout(() => {
+          this.setConnectionState('crypto', { 
+            status: 'error', 
+            lastError: 'connection timeout' 
+          });
+          reject(new Error('Connection timeout'));
+        }, CONNECTION_TIMEOUT);
+
+        this.cryptoWs.onopen = () => {
+          clearTimeout(timeoutId);
+          const symbols = pairs.map(p => p.toLowerCase().replace('binance:', ''));
+          
+          // Send subscription immediately on connection
+          this.sendMessage(this.cryptoWs, {
+            method: "SUBSCRIBE",
+            params: symbols.map(s => `${s}@ticker`),
+            id: 1
+          });
+
+          this.setupReconnection(this.cryptoWs, 'crypto');
+          this.setConnectionState('crypto', { status: 'connected' });
+          resolve();
+        };
+
+        this.cryptoWs.onerror = (err) => {
+          clearTimeout(timeoutId);
+          this.setConnectionState('crypto', { 
+            status: 'error', 
+            lastError: err.type 
+          });
+          reject(err);
+        };
+
+        // Set up message handler right away
+        this.cryptoWs.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.e === '24hrTicker') {
+              this.updatePrice(`BINANCE:${data.s}`, {
+                price: data.c,
+                bid: data.b,
+                ask: data.a,
+                change: data.P
+              });
+            }
+          } catch (error) {
+            console.warn('Error processing crypto message:', error);
+          }
+        };
+      });
+
+    } catch (error) {
+      this.setConnectionState('crypto', { 
+        status: 'error', 
+        lastError: error.message 
+      });
+      throw error;
+    }
   }
 
   private async connectForex(pairs: string[]) {
-    if (this.forexWs) this.forexWs.close();
-
-    this.setConnectionState('forex', { status: 'connecting' });
-
-    const apiKey = this.getCurrentApiKey();
-    if (!apiKey) {
-      this.setConnectionState('forex', { status: 'error', lastError: 'No API key' });
-      return;
-    }
-
-    this.forexWs = new WebSocket(TRADERMADE_WS_URL);
-    await this.connectWithTimeout(this.forexWs, 'forex');
-
-    this.forexWs.onmessage = async (event) => {
-      if (event.data.includes('User Key Used')) {
-        this.rotateApiKey();
-        await this.connectForex(pairs);
-        return;
+    try {
+      if (this.forexWs) {
+        const oldWs = this.forexWs;
+        this.forexWs = null;
+        oldWs.onopen = null;
+        oldWs.onclose = null;
+        oldWs.onerror = null;
+        oldWs.onmessage = null;
+        if (oldWs.readyState === WebSocket.OPEN) {
+          oldWs.close();
+        }
       }
 
-      if (typeof event.data === 'string' && !event.data.startsWith('{')) return;
+      this.setConnectionState('forex', { status: 'connecting' });
+      const apiKey = this.getCurrentApiKey();
+      if (!apiKey) throw new Error('No API key available');
 
-      const data = JSON.parse(event.data);
-      if (data.symbol && data.bid && data.ask) {
-        const symbol = `FX:${data.symbol.slice(0, 3)}/${data.symbol.slice(3)}`;
-        this.updatePrice(symbol, {
-          price: data.bid,
-          bid: data.bid,
-          ask: data.ask,
-          change: '0.00'
-        });
-      }
-    };
+      this.forexWs = new WebSocket(TRADERMADE_WS_URL);
 
-    this.sendMessage(this.forexWs, { userKey: apiKey, _type: "init" });
+      await new Promise<void>((resolve, reject) => {
+        if (!this.forexWs) return reject(new Error('No WebSocket instance'));
 
-    const symbols = pairs.map(p => p.replace('FX:', '').replace('/', ''));
-    for (let i = 0; i < symbols.length; i += 10) {
-      const batch = symbols.slice(i, i + 10);
-      await new Promise(resolve => setTimeout(() => {
-        this.sendMessage(this.forexWs, {
-          userKey: apiKey,
-          symbol: batch.join(','),
-          _type: "subscribe"
-        });
-        resolve(true);
-      }, 100));
+        const timeoutId = setTimeout(() => {
+          this.setConnectionState('forex', { 
+            status: 'error', 
+            lastError: 'connection timeout' 
+          });
+          reject(new Error('Connection timeout'));
+        }, CONNECTION_TIMEOUT);
+
+        this.forexWs.onopen = () => {
+          clearTimeout(timeoutId);
+          const symbols = pairs.map(p => p.replace('FX:', '').replace('/', ''));
+          
+          // Send init and subscribe in one message
+          this.sendMessage(this.forexWs, {
+            userKey: apiKey,
+            symbol: symbols.join(','),
+            _type: "subscribe"
+          });
+
+          this.setupHeartbeat();
+          this.setupReconnection(this.forexWs, 'forex');
+          this.setConnectionState('forex', { status: 'connected' });
+          resolve();
+        };
+
+        this.forexWs.onerror = (err) => {
+          clearTimeout(timeoutId);
+          this.setConnectionState('forex', { 
+            status: 'error', 
+            lastError: err.type 
+          });
+          reject(err);
+        };
+
+        // Set up message handler right away
+        this.forexWs.onmessage = async (event) => {
+          try {
+            if (event.data.includes('User Key Used')) {
+              this.rotateApiKey();
+              await this.connectForex(pairs);
+              return;
+            }
+
+            if (typeof event.data === 'string' && !event.data.startsWith('{')) return;
+
+            const data = JSON.parse(event.data);
+            if (data.symbol && data.bid && data.ask) {
+              const symbol = `FX:${data.symbol.slice(0, 3)}/${data.symbol.slice(3)}`;
+              this.updatePrice(symbol, {
+                price: data.bid,
+                bid: data.bid,
+                ask: data.ask,
+                change: '0.00'
+              });
+            }
+          } catch (error) {
+            console.warn('Error processing forex message:', error);
+          }
+        };
+      });
+
+    } catch (error) {
+      this.setConnectionState('forex', { 
+        status: 'error', 
+        lastError: error.message 
+      });
+      throw error;
     }
-
-    this.setupHeartbeat();
-    this.setConnectionState('forex', { status: 'connected' });
   }
 
   private setupHeartbeat() {
@@ -298,19 +400,29 @@ export class WebSocketManager {
 
   private async connectWithTimeout(ws: WebSocket, type: 'crypto' | 'forex'): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.setConnectionState(type, { status: 'error', lastError: 'timeout' });
-        reject(new Error('Timeout'));
+      let timeoutId: NodeJS.Timeout;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        ws.onopen = null;
+        ws.onerror = null;
+      };
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        this.setConnectionState(type, { status: 'error', lastError: 'connection timeout' });
+        reject(new Error('Connection timeout'));
       }, CONNECTION_TIMEOUT);
 
       ws.onopen = () => {
-        clearTimeout(timeout);
+        cleanup();
         resolve();
       };
 
       ws.onerror = (err) => {
-        clearTimeout(timeout);
-        reject(err);
+        cleanup();
+        this.setConnectionState(type, { status: 'error', lastError: err.type });
+        reject(new Error(`WebSocket ${type} connection error: ${err.type}`));
       };
     });
   }
@@ -349,34 +461,71 @@ export class WebSocketManager {
   }
 
   unwatchPairs(pairs: string[]) {
-    pairs.forEach(pair => this.activePairs.delete(pair));
-    if (this.activePairs.size === 0) {
+    const remainingPairs = new Set(this.activePairs);
+    pairs.forEach(pair => remainingPairs.delete(pair));
+
+    if (remainingPairs.size === 0) {
+      // Only disconnect if we have no remaining pairs
       this.disconnect();
     } else {
-      this.connectToAll();
+      // Update active pairs and reconnect with remaining pairs
+      this.activePairs = remainingPairs;
+      this.connectToAll().catch(console.error);
     }
   }
 
   disconnect() {
-    if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
-    this.isReconnecting = false;
+    this.isConnecting = false;
 
-    if (this.cryptoWs) {
-      this.cryptoWs.close();
-      this.cryptoWs = null;
+    // Clear all timeouts and intervals first
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    if (this.apiKeyRetryTimeout) {
+      clearTimeout(this.apiKeyRetryTimeout);
+      this.apiKeyRetryTimeout = null;
     }
 
-    if (this.forexWs) {
-      this.forexWs.close();
-      this.forexWs = null;
-    }
+    // Helper function to safely close a WebSocket
+    const safeCloseWebSocket = (ws: WebSocket | null) => {
+      if (!ws) return;
+      
+      try {
+        const socket = ws;
+        // Remove all listeners first
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.onmessage = null;
+        socket.onopen = null;
+        
+        if (socket.readyState === WebSocket.OPEN || 
+            socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
+      } catch (err) {
+        console.warn('Error closing websocket:', err);
+      }
+    };
 
-    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+    // Close connections
+    safeCloseWebSocket(this.cryptoWs);
+    safeCloseWebSocket(this.forexWs);
+    
+    // Clear references
+    this.cryptoWs = null;
+    this.forexWs = null;
 
+    // Reset state
     this.activePairs.clear();
     this.lastPrices = {};
     this.reconnectAttempts = { crypto: 0, forex: 0 };
-
+    
+    // Update connection states
     this.setConnectionState('crypto', { status: 'disconnected' });
     this.setConnectionState('forex', { status: 'disconnected' });
   }

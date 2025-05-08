@@ -19,6 +19,7 @@ import {
   AlertDialogAction
 } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
+import { X } from "lucide-react"; 
 
 interface PriceData {
   price: string;
@@ -107,25 +108,52 @@ export function TradesSheet({
       return sum + calculatePnL(trade, currentPrice);
     }, 0);
 
-  // Check if a position is hedged
+  // Update isHedgedPosition to check for matching lots and opposite type
   const isHedgedPosition = (trade: Trade) => {
-    return openTrades.some(t =>
+    const hedgedTrade = openTrades.find(t => 
+      t.id !== trade.id &&
+      t.pair === trade.pair &&
+      t.type !== trade.type && 
+      t.lots === trade.lots &&
+      t.status === 'open'
+    );
+    return !!hedgedTrade;
+  };
+
+  // Add function to get combined hedged PnL
+  const getHedgedPnL = (trade: Trade, currentPrice: number) => {
+    const hedgedTrade = openTrades.find(t => 
       t.id !== trade.id &&
       t.pair === trade.pair &&
       t.type !== trade.type &&
-      t.lots === trade.lots
+      t.lots === trade.lots &&
+      t.status === 'open'
     );
+
+    if (!hedgedTrade) return calculatePnL(trade, currentPrice);
+    
+    // For hedged positions, return the locked-in PnL
+    const buyTrade = trade.type === 'buy' ? trade : hedgedTrade;
+    const sellTrade = trade.type === 'sell' ? trade : hedgedTrade;
+    
+    return calculatePnL(buyTrade, sellTrade.openPrice);
   };
 
-  // Handle closing all trades
+  // Update handleCloseAllTrades function
   const handleCloseAllTrades = async () => {
+    if (!onCloseTrade) return;
+    
     setIsLoading(true);
     let failed = 0;
+    let completed = 0;
 
     try {
-      for (const trade of openTrades.filter(t => t.status === 'open')) {
+      const tradesToClose = openTrades.filter(t => t.status === 'open');
+      
+      for (const trade of tradesToClose) {
         try {
-          await onCloseTrade?.(trade.id);
+          await onCloseTrade(trade.id);
+          completed++;
         } catch {
           failed++;
         }
@@ -134,18 +162,81 @@ export function TradesSheet({
       if (failed === 0) {
         toast({
           title: "Success",
-          description: "All trades closed successfully"
+          description: `Successfully closed ${completed} trades`
         });
+        // Navigate back to trade/select after all trades are closed
+        navigate('/trade/select');
       } else {
         toast({
           variant: "destructive",
           title: "Warning",
-          description: `Failed to close ${failed} trades`
+          description: `Failed to close ${failed} trades. Completed: ${completed}`
         });
       }
+    } catch (error) {
+      console.error('Error closing trades:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to close trades"
+      });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Update handleCloseHedgedTrades function
+  const handleCloseHedgedTrades = async () => {
+    if (!onCloseTrade) return;
+    
+    setIsLoading(true);
+    let failed = 0;
+    let completed = 0;
+
+    try {
+      const hedgedTrades = openTrades.filter(t => t.status === 'open' && isHedgedPosition(t));
+      
+      for (const trade of hedgedTrades) {
+        try {
+          await onCloseTrade(trade.id);
+          completed++;
+        } catch {
+          failed++;
+        }
+      }
+
+      if (failed === 0) {
+        toast({
+          title: "Success", 
+          description: `Successfully closed ${completed} hedged positions`
+        });
+        // Navigate back to trade/select if all hedged positions are closed
+        if (completed === hedgedTrades.length) {
+          navigate('/trade/select');
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Warning",
+          description: `Failed to close ${failed} positions. Completed: ${completed}`
+        });
+      }
+    } catch (error) {
+      console.error('Error closing hedged trades:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to close hedged positions"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add function to check if all positions are hedged
+  const allPositionsAreHedged = () => {
+    const openPositions = openTrades.filter(t => t.status === 'open');
+    return openPositions.length > 0 && openPositions.every(isHedgedPosition);
   };
 
   // Modified WebSocket subscription effect
@@ -230,17 +321,9 @@ export function TradesSheet({
 
       await onCloseTrade(tradeToClose);
       
-      // First close the sheet
-      onOpenChange(false);
-      
       // Clear trade state
       setTradeToClose(null);
       setIsClosing(false);
-
-      // Add small delay before navigation
-      setTimeout(() => {
-        navigate(`/trade/chart/${encodeURIComponent(trade.pair)}`);
-      }, 100);
 
       toast({
         title: "Success",
@@ -272,9 +355,8 @@ export function TradesSheet({
           side="bottom" 
           className="h-[80vh] p-0 flex flex-col overflow-hidden border-t-0 rounded-t-xl"
         >
-          <div className="py-4 px-4 border-b border-[#525252] flex justify-between items-center">
-            <DialogTitle>Active Trades</DialogTitle>
-            <div className="flex items-center gap-4">
+          <div className="py-4 px-6 border-b border-[#525252] flex items-center">
+            <div className="flex items-center gap-6">
               <div className={cn(
                 "text-sm font-mono font-medium",
                 totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
@@ -282,14 +364,26 @@ export function TradesSheet({
                 ${totalPnL.toFixed(2)}
               </div>
               {openTrades.some(t => t.status === 'open') && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCloseAllTrades}
-                  className="text-xs text-red-500 hover:text-red-600"
-                >
-                  Close All
-                </Button>
+                <div className="flex items-center gap-2">
+                  {allPositionsAreHedged() && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCloseHedgedTrades}
+                      className="text-xs text-blue-500 hover:text-blue-600 min-w-[100px]"
+                    >
+                      Close Hedged
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"  
+                    size="sm"
+                    onClick={handleCloseAllTrades}
+                    className="text-xs text-red-500 hover:text-red-600 min-w-[80px]"
+                  >
+                    Close All
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -344,6 +438,11 @@ export function TradesSheet({
                           <div className="space-y-0.5">
                             <div className="text-sm font-medium flex items-center gap-2">
                               {group.pair.split(':')[1]}
+                              {isHedgedPosition(group) && (
+                                <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-md">
+                                  Hedged
+                                </span>
+                              )}
                               {group.originalTrades.length > 1 && (
                                 <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded-md">
                                   x{group.originalTrades.length}
@@ -362,9 +461,11 @@ export function TradesSheet({
                         </div>
                         <div className={cn(
                           "text-xs font-medium px-2 py-1 rounded-md",
+                          isHedgedPosition(group) ? "bg-blue-500/10 text-blue-500" :
                           pnl > 0 ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
                         )}>
-                          ${pnl.toFixed(2)}
+                          ${isHedgedPosition(group) ? getHedgedPnL(group, currentPrice).toFixed(2) : pnl.toFixed(2)}
+                          {isHedgedPosition(group) && " (Locked)"}
                         </div>
                       </div>
 
@@ -377,18 +478,31 @@ export function TradesSheet({
                             onClick={() => toggleGroupExpansion(groupKey)}
                             className="text-xs w-full"
                           >
-                            {isExpanded ? "Hide Details" : "View Details"}
+                            {isExpanded ? "Hide all trades" : "View all trades"}
                           </Button>
                           {isExpanded && (
                             <div className="mt-2 space-y-1">
                               {group.originalTrades.map(trade => (
                                 <div 
                                   key={trade.id} 
-                                  className="flex justify-between text-xs p-2 bg-muted rounded-md"
+                                  className="flex items-center justify-between text-xs p-2 bg-muted rounded-md"
                                 >
                                   <span>{trade.id.slice(0, 8)}</span>
                                   <span>{trade.lots} Lots</span>
-                                  <span>${calculatePnL(trade, currentPrice).toFixed(2)}</span>
+                                  <div className="flex items-center gap-3">
+                                    <span>${calculatePnL(trade, currentPrice).toFixed(2)}</span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCloseTrade(trade.id);
+                                      }}
+                                      className="h-6 w-6 p-0 hover:bg-red-500/10 text-red-500 hover:text-red-600"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </div>
                               ))}
                             </div>

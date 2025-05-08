@@ -26,12 +26,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
-        // Clear any stale session data first
-        const existingSession = await supabase.auth.getSession();
-        if (!existingSession.data.session) {
-          localStorage.clear();
-          sessionStorage.clear();
-        }
+        // Get initial session without clearing
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
 
         // Set up auth state change listener
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -40,6 +36,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setUser(null);
               localStorage.clear();
               sessionStorage.clear();
+              // Only navigate if we're not already on the login page
+              if (!location.pathname.includes('/auth/')) {
+                navigate('/auth/login', { replace: true });
+              }
             } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               setUser(session?.user ?? null);
             }
@@ -47,10 +47,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         });
 
-        // Initial session check
-        const { data: { session } } = await supabase.auth.getSession();
+        // Set initial session state
         if (mounted) {
-          setUser(session?.user ?? null);
+          setUser(initialSession?.user ?? null);
           setLoading(false);
         }
 
@@ -71,7 +70,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]); // Add location.pathname to dependencies
 
   const logout = async () => {
     try {

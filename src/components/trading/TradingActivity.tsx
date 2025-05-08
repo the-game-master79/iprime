@@ -6,10 +6,33 @@ import { Button } from "@/components/ui/button";
 import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
-import { Trade, PriceData, TradingPair } from "@/types/trading";
+import { PriceData, TradingPair } from "@/types/trading"; // Remove Trade from here
 import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+
+interface Trade {
+  id: string;
+  pair: string;
+  type: 'buy' | 'sell';
+  status: 'open' | 'pending' | 'closed';
+  openPrice: number;
+  closePrice?: number;
+  close_price?: number;
+  lots: number;
+  leverage: number;
+  pnl?: number;
+  margin_amount?: number;
+  orderType?: 'market' | 'limit';
+  limitPrice?: number | null;
+  openTime: number;
+  closedTime?: string;
+  close_time?: string;
+  closed_at?: string;
+  created_at?: string;
+  originalTrades?: Trade[];
+  mergeKey?: string;
+}
 
 interface TradingActivityProps {
   trades: Trade[];
@@ -32,6 +55,7 @@ export const TradingActivity = ({
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
 
   const toggleRowExpansion = (key: string) => {
     const newExpanded = new Set(expandedRows);
@@ -89,7 +113,15 @@ export const TradingActivity = ({
       (t.status === 'open' && t.orderType === 'limit')
     );
 
-    const closedTrades = trades.filter(t => t.status === 'closed');
+    const closedTrades = trades.filter(t => t.status === 'closed')
+      .map(trade => ({
+        ...trade,
+        currentPrice: trade.close_price || trade.closePrice || 0,
+        closePrice: trade.close_price || trade.closePrice || 0,
+        openTime: trade.openTime || trade.created_at,
+        closeTime: trade.closed_at || trade.closedTime || trade.close_time,
+        pnl: trade.pnl || 0
+      }));
 
     return {
       open: mergeTrades(openTrades).map(t => ({
@@ -103,18 +135,18 @@ export const TradingActivity = ({
 
   const { totalPnL } = useMemo(() => {
     return filteredTrades.open.reduce((acc, trade) => {
-      const currentPrice = parseFloat(currentPrices[trade.pair]?.price || '0');
-      const pnl = calculatePnL(trade, currentPrice);
+      const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+      const pnl = calculatePnL(trade, currentPrice, trades, true); // Always pass trades for hedged check
       return { totalPnL: acc.totalPnL + pnl };
     }, { totalPnL: 0 });
-  }, [filteredTrades.open, currentPrices]);
+  }, [filteredTrades.open, currentPrices, trades]);
 
   const { totalMarginUsed, marginLevel, adjustedBalance } = useMemo(() => {
     const totalPnL = trades
       .filter(t => t.status === 'open')
       .reduce((acc, trade) => {
         const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
-        return acc + calculatePnL(trade, currentPrice);
+        return acc + calculatePnL(trade, currentPrice, trades, true); // Add trades and true for total calculation
       }, 0);
 
     const marginUsed = trades
@@ -163,28 +195,27 @@ export const TradingActivity = ({
   // Add pagination helpers
   const paginatedTrades = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    // Map trades to include current prices before pagination
-    const tradesWithPrices = displayedTrades.map(trade => {
-      const currentPrice = trade.status === 'open' 
-        ? parseFloat(currentPrices[trade.pair]?.bid || trade.openPrice.toString())
-        : trade.closePrice || trade.openPrice;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    
+    // Get the appropriate trades array based on active tab
+    const tradesForCurrentTab = filteredTrades[activeTab];
+    if (!tradesForCurrentTab) return [];
+
+    return tradesForCurrentTab.slice(startIndex, endIndex).map(trade => {
+      const currentPrice = activeTab === 'closed'
+        ? trade.close_price || trade.closePrice || 0
+        : parseFloat(currentPrices[trade.pair]?.bid || trade.openPrice.toString());
       
-      const pnl = trade.status === 'closed'
-        ? trade.pnl || 0
-        : trade.status === 'open'
-          ? calculatePnL(trade, currentPrice)
-          : 0;
-  
       return {
         ...trade,
         currentPrice,
-        pnl
+        pnl: activeTab === 'closed' ? trade.pnl : calculatePnL(trade, currentPrice, trades)
       };
     });
-    return tradesWithPrices.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [displayedTrades, currentPage, currentPrices]);
+  }, [activeTab, currentPage, filteredTrades, currentPrices, trades]);
 
-  const totalPages = Math.ceil(displayedTrades.length / ITEMS_PER_PAGE);
+  // Update total pages calculation
+  const totalPages = Math.ceil((filteredTrades[activeTab]?.length || 0) / ITEMS_PER_PAGE);
 
   // Reset page when tab changes
   useEffect(() => {
@@ -239,19 +270,29 @@ export const TradingActivity = ({
     }
   };
 
-  // Update isHedgedPosition to check all trades in pair
+  // Add time window constant for hedged trades (e.g. 5 minutes)
+  const HEDGE_TIME_WINDOW = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+  // Update isHedgedPosition to handle closed trades and time window
   const isHedgedPosition = (trade: Trade) => {
-    if (trade.status !== 'open') return false;
+    if (!trade) return false;
     
-    // For non-expanded trades, check against all trades
     const oppositeType = trade.type === 'buy' ? 'sell' : 'buy';
+    const timeStart = new Date(trade.openTime).getTime() - HEDGE_TIME_WINDOW;
+    const timeEnd = new Date(trade.openTime).getTime() + HEDGE_TIME_WINDOW;
+
     return trades
-      .filter(t => t.status === 'open' && t.pair === trade.pair)
-      .some(t => 
+      .filter(t => 
         t.id !== trade.id && 
-        t.type === oppositeType && 
-        t.lots === trade.lots
-      );
+        t.pair === trade.pair &&
+        t.type === oppositeType &&
+        t.lots === trade.lots &&
+        t.status === trade.status
+      )
+      .some(t => {
+        const tradeTime = new Date(t.openTime).getTime();
+        return tradeTime >= timeStart && tradeTime <= timeEnd;
+      });
   };
 
   // Only return null after all hooks
@@ -305,6 +346,28 @@ export const TradingActivity = ({
       return `@ $${trade.limitPrice.toFixed(decimals)}`;
     }
     return ''; // Return empty string since we'll show type in badge
+  };
+
+  const handleRowClick = (trade: Trade, isClosedTrade: boolean) => {
+    if (isClosedTrade) {
+      setSelectedTrade(trade);
+    } else if (trade.originalTrades?.length > 1) {
+      toggleRowExpansion(trade.mergeKey || trade.id);
+    }
+  };
+
+  // Add formatLots helper
+  const formatLots = (lots: number) => lots.toString();
+
+  // Add formatPrice helper
+  const formatPrice = (price: number, symbol: string) => {
+    const decimals = getDecimalPlaces(symbol);
+    return price.toFixed(decimals);
+  };
+
+  // Add formatPairDisplay helper
+  const formatPairDisplay = (pair: string) => {
+    return pair.split(':')[1];
   };
 
   return (
@@ -371,6 +434,7 @@ export const TradingActivity = ({
                     <th className="text-right p-2">Margin Used</th>
                     <th className="text-left p-2">Position ID</th>
                     <th className="text-left p-2">Open Time</th>
+                    {activeTab === 'closed' && <th className="text-left p-2">Close Time</th>}
                     {activeTab !== 'pending' && <th className="text-right p-2">P&L</th>}
                     {activeTab !== 'closed' && <th className="text-right p-2">Action</th>}
                   </tr>
@@ -382,7 +446,7 @@ export const TradingActivity = ({
                     const pnl = trade.status === 'closed' 
                       ? trade.pnl || 0
                       : trade.status === 'open'
-                        ? calculatePnL(trade, currentPrice)
+                        ? calculatePnL(trade, currentPrice, trades, false) // Pass false for individual display
                         : 0;
 
                     const pairSymbol = trade.pair.split(':')[1];
@@ -409,9 +473,9 @@ export const TradingActivity = ({
                         <tr 
                           className={cn(
                             "border-b border-[#525252] hover:bg-accent/50",
-                            hasMultipleTrades && "cursor-pointer"
+                            (hasMultipleTrades || activeTab === 'closed') && "cursor-pointer"
                           )}
-                          onClick={() => hasMultipleTrades && toggleRowExpansion(trade.mergeKey || trade.id)}
+                          onClick={() => handleRowClick(trade, activeTab === 'closed')}
                         >
                           <td className="p-2">
                             <div className="flex items-center gap-2">
@@ -457,10 +521,10 @@ export const TradingActivity = ({
                           <td className="p-2 text-right font-mono">{trade.openPrice.toFixed(decimals)}</td>
                           <td className="p-2 text-right font-mono">
                             {trade.status === 'closed' 
-                              ? (trade.closePrice || 0).toFixed(decimals)
+                              ? (trade.close_price || trade.closePrice || 0).toFixed(decimals)
                               : trade.status === 'pending' 
                                 ? '-' 
-                                : trade.currentPrice.toFixed(decimals)}
+                                : currentPrice.toFixed(decimals)}
                           </td>
                           <td className="p-2 text-right font-mono">
                             {trade.margin_amount?.toFixed(2) || '0.00'} USD
@@ -481,7 +545,30 @@ export const TradingActivity = ({
                               </Button>
                             </div>
                           </td>
-                          <td className="p-2">{openTime}</td>
+                          <td className="p-2">
+                            {activeTab === 'closed' && trade.closeTime ? (
+                              new Date(trade.closeTime).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                second: '2-digit', 
+                                hour12: true
+                              })
+                            ) : openTime}
+                          </td>
+                          {activeTab === 'closed' && (
+                            <td className="p-2">
+                              {trade.closed_at && new Date(trade.closed_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: true
+                              })}
+                            </td>
+                          )}
                           {activeTab !== 'pending' && (
                             <td className="p-2 text-right">
                               <div className={cn(
@@ -531,7 +618,7 @@ export const TradingActivity = ({
                                 </thead>
                                 <tbody>
                                   {trade.originalTrades.map(subTrade => {
-                                    const subPnl = calculatePnL(subTrade, currentPrice);
+                                    const subPnl = calculatePnL(subTrade, currentPrice, trades); // Pass trades array
                                     const isSubTradeHedged = trade.originalTrades.some(t => 
                                       t.id !== subTrade.id &&
                                       t.pair === subTrade.pair && 
@@ -553,7 +640,12 @@ export const TradingActivity = ({
                                         </td>
                                         <td className="p-1 text-right">{subTrade.lots}</td>
                                         <td className="p-1 text-right">{subTrade.openPrice.toFixed(decimals)} USD</td>
-                                        <td className="p-1 text-right">{currentPrice.toFixed(decimals)} USD</td>
+                                        <td className="p-1 text-right">
+                                          {subTrade.status === 'closed'
+                                            ? (subTrade.close_price || subTrade.closePrice || 0).toFixed(decimals)
+                                            : currentPrice.toFixed(decimals)
+                                          } USD
+                                        </td>
                                         <td className="p-1 text-right">{subTrade.margin_amount?.toFixed(2)} USD</td>
                                         <td className={cn(
                                           "p-1 text-right font-mono",

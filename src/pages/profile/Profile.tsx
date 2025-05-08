@@ -37,6 +37,13 @@ const isValidPostalCode = (code: string) => /^[A-Za-z0-9\s-]+$/.test(code);
 // Add phone validation helper
 const isValidPhone = (phone: string) => /^\d+$/.test(phone);
 
+// Add helper function at the top with other helpers
+const getLeverageRiskLevel = (leverage: number) => {
+  if (leverage <= 20) return { label: 'Low Risk', color: 'text-green-500' };
+  if (leverage <= 100) return { label: 'Medium Risk', color: 'text-yellow-500' };
+  return { label: 'High Risk', color: 'text-red-500' };
+};
+
 const Profile = () => {
   const [searchParams] = useSearchParams(); // Add this line
   const { toast } = useToast();
@@ -103,6 +110,11 @@ const Profile = () => {
 
   // Add new state for tracking if details are set
   const [basicDetailsSet, setBasicDetailsSet] = useState(false);
+
+  // Add new state for leverage
+  const [defaultLeverage, setDefaultLeverage] = useState<number>(100);
+  const [availableLeverageOptions, setAvailableLeverageOptions] = useState<number[]>([]);
+  const [isUpdatingLeverage, setIsUpdatingLeverage] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -339,6 +351,74 @@ const Profile = () => {
     }
   };
 
+  // Add fetchLeverageOptions after other fetch functions
+  const fetchLeverageOptions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('default_leverage')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.default_leverage) {
+        setDefaultLeverage(profile.default_leverage);
+      }
+
+      // Fetch available leverage options from trading_pairs
+      const { data: leverageData } = await supabase
+        .from('trading_pairs')
+        .select('leverage_options')
+        .not('leverage_options', 'is', null);
+
+      if (leverageData) {
+        // Combine all leverage options and remove duplicates
+        const allOptions = Array.from(new Set(
+          leverageData.flatMap(d => d.leverage_options)
+        )).sort((a, b) => a - b);
+        setAvailableLeverageOptions(allOptions);
+      }
+    } catch (error) {
+      console.error('Error fetching leverage options:', error);
+    }
+  };
+
+  // Add handleLeverageUpdate function
+  const handleLeverageUpdate = async (newLeverage: number) => {
+    setIsUpdatingLeverage(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          default_leverage: newLeverage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setDefaultLeverage(newLeverage);
+      toast({
+        title: "Success",
+        description: "Default leverage updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating leverage:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update leverage",
+      });
+    } finally {
+      setIsUpdatingLeverage(false);
+    }
+  };
+
   // Add validation handlers
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -409,6 +489,7 @@ const Profile = () => {
 
   useEffect(() => {
     fetchProfile();
+    fetchLeverageOptions();
   }, []);
 
   const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
@@ -814,6 +895,52 @@ const Profile = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Add after referral section */}
+                  <div className="space-y-2 pt-4 border-t border-secondary">
+                    <h3 className="font-medium">Trading Leverage</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Set your default leverage for new positions
+                    </p>
+                    <div className="space-y-2 max-w-[400px]">
+                      <Select
+                        value={defaultLeverage.toString()}
+                        onValueChange={(value) => handleLeverageUpdate(parseInt(value))}
+                        disabled={isUpdatingLeverage}
+                      >
+                        <SelectTrigger>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{defaultLeverage}x</span>
+                            <span className={`text-xs ${getLeverageRiskLevel(defaultLeverage).color}`}>
+                              {getLeverageRiskLevel(defaultLeverage).label}
+                            </span>
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLeverageOptions.map((leverage) => (
+                            <SelectItem key={leverage} value={leverage.toString()}>
+                              <div className="flex items-center justify-between w-full gap-8">
+                                <span className="font-medium">{leverage}x</span>
+                                <span className={`text-xs ${getLeverageRiskLevel(leverage).color}`}>
+                                  {getLeverageRiskLevel(leverage).label}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm text-muted-foreground">
+                          Current Leverage: <span className={`font-medium ${getLeverageRiskLevel(defaultLeverage).color}`}>{defaultLeverage}x</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <ShieldAlert className="h-3 w-3" />
+                          Higher leverage increases both potential profits and risks
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </TabsContent>
 

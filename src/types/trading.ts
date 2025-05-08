@@ -32,16 +32,18 @@ export interface Trade {
   type: 'buy' | 'sell';
   status: 'open' | 'pending' | 'closed';
   openPrice: number;
-  closePrice?: number;  // Add this field
+  closePrice?: number;
   lots: number;
-  currentPrice?: number;
-  pnl?: number;
   leverage: number;
-  orderType: 'market' | 'limit';
-  limitPrice: number | null;
+  orderType?: 'market' | 'limit';
+  limitPrice?: number | null;
   openTime: number;
+  closedAt?: string;
+  pnl?: number;
   margin_amount?: number;
   pip_value?: number;
+  originalTrades?: Trade[];
+  mergeKey?: string;
 }
 
 export interface TradeParams {

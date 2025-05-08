@@ -6,6 +6,25 @@ const BREAKPOINTS = {
   desktop: 1280
 } as const;
 
+// Add or verify the export of useMediaQuery
+export function useMediaQuery(query: string): boolean {
+  // Implementation of the hook
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const mediaQueryList = window.matchMedia(query);
+    const listener = () => setMatches(mediaQueryList.matches);
+
+    listener();
+    mediaQueryList.addEventListener('change', listener);
+
+    return () => mediaQueryList.removeEventListener('change', listener);
+  }, [query]);
+
+  return matches;
+}
+
+
 export const useBreakpoints = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
