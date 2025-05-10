@@ -26,7 +26,6 @@ const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
 const Payments = lazy(() => import("./pages/payments/Payments"));
 const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
 const Profile = lazy(() => import("./pages/profile/Profile"));
-const SupportPage = lazy(() => import("./pages/support/SupportPage"));
 const Trade = lazy(() => import("./pages/trade/Trade"));
 
 // Add new lazy imports
@@ -151,11 +150,6 @@ const App = () => {
             <Route path="/profile" element={
               <AuthGuard requireAuth>
                 <Profile />
-              </AuthGuard>
-            } />
-            <Route path="/support" element={
-              <AuthGuard requireAuth>
-                <SupportPage />
               </AuthGuard>
             } />
             
