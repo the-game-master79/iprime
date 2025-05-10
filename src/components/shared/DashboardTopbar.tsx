@@ -33,6 +33,7 @@ export const DashboardTopbar = () => {
       const { data, error } = await supabase
         .from('notices')
         .select('*')
+        .or(`user_id.eq.${user.id},user_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

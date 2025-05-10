@@ -665,7 +665,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               <div className="flex gap-4">
                 <div className="flex-1 bg-[#141414] rounded-2xl p-2">
                     <div className="flex flex-col gap-2">
-                    <h3 className="px-2 pt-2 text-white/50">Invite friends and start earning</h3>
+                    <h3 className="px-2 pt-2 text-white">Invite friends and start earning</h3>
                     <div className="flex items-center gap-4 w-full">
                       <div className="relative flex-1">
                         <Input
@@ -800,8 +800,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         className="h-12 gap-2" 
                         onClick={() => navigate('/plans')}
                       >
-                        <Wallet className="h-5 w-5" />
-                        View Plans
+                        <img 
+                          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
+                          alt="AI Trading"
+                          className="h-5 w-5"
+                        />
+                        Trading
                       </Button>
                     </div>
                   </div>
@@ -819,8 +823,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <h3 className="text-3xl font-medium">
                           {businessStats.currentRank || 'New Member'}
                         </h3>
-                        <p className="text-sm text-white/50">
-                          ${businessStats.totalVolume.toLocaleString()} Business Volume
+                        <p className="text-sm">
+                          {businessStats.totalVolume < 0 ? (
+                            <span className="text-[#FFA500]">Pending</span>
+                          ) : (
+                            <span className="text-white/50">${businessStats.totalVolume.toLocaleString()} Business Volume</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -860,8 +868,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     className="space-y-3 w-full"
                   >
                     {transactions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No transactions found
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Target 
+                          className="h-16 w-16 mb-4 text-white/20"
+                          weight="thin"
+                        />
+                        <p className="text-base">No transactions found</p>
+                        <p className="text-sm text-white/50 mt-1">Your transaction history will appear here</p>
                       </div>
                     ) : (
                       <div className="space-y-4">

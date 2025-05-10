@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Info } from "lucide-react";
+import { DollarSign, Info, Bot, Coins } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Removed ShellLayout
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -10,12 +10,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { format } from "date-fns";
 
 import { AvailablePlanVariant, ActivePlanVariant } from "@/components/shared/PlanCardVariants";
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger 
-} from "@/components/ui/accordion";
 
 interface Plan {
   id: string;
@@ -380,8 +374,11 @@ const Plans = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Topbar title="Buy AI Computes" />
-      
+      <Topbar 
+        title="Trading" 
+        variant="ai" 
+        plansCount={subscribedPlans.length}
+      />
       <div className="container mx-auto max-w-[1000px] py-6 px-4">
         {/* Balance cards section */}
         <div className="grid gap-4 md:grid-cols-2 mb-8">
@@ -397,23 +394,44 @@ const Plans = () => {
           />
         </div>
 
-        <Accordion type="single" collapsible defaultValue="info" className="mb-8">
-          <AccordionItem value="info" className="bg-card/30 border border-primary/20 rounded-lg overflow-hidden">
-            <AccordionTrigger className="px-4 hover:no-underline [&[data-state=open]>div>div]:rotate-180">
-              <div className="flex items-center gap-2">
-                <Info className="h-5 w-5 text-primary" />
-                <span className="font-medium text-primary">Start earning with Computes</span>
+        {/* Steps section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+            <div className="flex justify-center mb-6">
+              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
               </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <div className="text-muted-foreground space-y-2">
-                <p>• A compute will start trading in your account automatically.</p>
-                <p>• You can use your existing balance to subscribe to any compute available.</p>
-                <p>• You can close a Compute anytime, and get your refunds. (Deductions Apply)</p>
+            </div>
+            <h3 className="font-medium text-lg mb-3 text-white/90">What is Compute?</h3>
+            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
+              AI-powered trading bot that executes trades automatically based on market analysis
+            </p>
+          </div>
+
+          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+            <div className="flex justify-center mb-6">
+              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                <DollarSign className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </div>
+            <h3 className="font-medium text-lg mb-3 text-white/90">Subscribe to Compute</h3>
+            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
+              Choose a compute plan that matches your investment goals and activate it
+            </p>
+          </div>
+
+          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+            <div className="flex justify-center mb-6">
+              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+              </div>
+            </div>
+            <h3 className="font-medium text-lg mb-3 text-white/90">Earn Daily</h3>
+            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
+              Get daily returns from your compute's trading activities automatically
+            </p>
+          </div>
+        </div>
 
         <Tabs defaultValue="available" className="space-y-8">
           <div className="flex items-center justify-between">
@@ -442,9 +460,9 @@ const Plans = () => {
             {subscribedPlans.length === 0 ? (
               <div className="text-center py-12">
                 <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                <h3 className="mt-4 text-lg font-medium">No Active Investments</h3>
+                <h3 className="mt-4 text-lg font-medium">No Active Computes</h3>
                 <p className="mt-2 text-muted-foreground">
-                  You haven't subscribed to any investment plans yet.
+                  You haven't subscribed to any computes yet.
                 </p>
                 <Button
                   variant="outline"
