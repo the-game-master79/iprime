@@ -6,6 +6,10 @@
   :root {
     --background: 240 10% 3.9%; /* Dark background */
     --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --card-muted: 240 4% 16%;
+    --card-accent: 240 4% 16%;
     --card: 0 0% 8%; /* #141414 */
     --card-foreground: 0 0% 100%; /* Pure white */
     --popover: 0 0% 8%; /* Match card */
@@ -43,11 +47,11 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
+    @apply bg-card/95 backdrop-blur-md border-border/10 shadow-sm;
   }
   
   .dark .glass-card {
-    @apply bg-black/30 border-white/10;
+    @apply bg-card/60 border-border/10;
   }
   
   .scrollbar-hidden {

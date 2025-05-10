@@ -65,12 +65,15 @@ const AdminLogin = () => {
             </div>
 
             <div className="relative w-full max-w-md p-4 min-h-[400px]">
-              <div className="mx-auto flex w-full flex-col justify-center space-y-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg p-8 rounded-xl shadow-[0_2px_8px_2px_rgba(0,0,0,0.08)]">
+              <div className="mx-auto flex w-full flex-col justify-center space-y-4 bg-background/90 backdrop-blur-lg p-8 rounded-xl shadow-[0_2px_8px_2px_rgba(0,0,0,0.08)]">
                 <div className="flex flex-col items-center space-y-4">
-                  <Shield className="h-12 w-12 text-primary" />
-                  <h1 className="text-2xl font-bold">Admin Panel</h1>
+                  <img 
+                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cflogo.svg"
+                    alt="CloudForex Logo"
+                    className="w-16 h-16"
+                  />
                   <p className="text-sm text-muted-foreground text-center">
-                    Secure access to the administrative control panel
+                    Please sign in to continue
                   </p>
                 </div>
 

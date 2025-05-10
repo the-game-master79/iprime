@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronDown, Copy } from "lucide-react";
+import { Search, ChevronDown, Copy, Trash2 } from "lucide-react";
 import { StatCard } from "@/components/ui-components";
 import {
   DropdownMenu,
@@ -40,6 +40,7 @@ interface UserSummary {
   total_pnl: number;
   default_leverage: number;
   last_trade_date: string | null;
+  withdrawal_wallet: number;
 }
 
 interface Trade {
@@ -91,6 +92,9 @@ const TradesPage = () => {
   const [userTradeTab, setUserTradeTab] = useState<'all' | 'open' | 'closed' | 'pending'>('all');
   const [viewTab, setViewTab] = useState<'all' | 'users'>('all');
   const [userSummaries, setUserSummaries] = useState<UserSummary[]>([]);
+  const [dialogSortField, setDialogSortField] = useState<string>("");
+  const [dialogSortDirection, setDialogSortDirection] = useState<"asc" | "desc">("asc");
+  const [userSearchTerm, setUserSearchTerm] = useState("");
 
   useEffect(() => {
     fetchTrades();
@@ -130,7 +134,10 @@ const TradesPage = () => {
     try {
       const { data, error } = await supabase
         .from('trades')
-        .select('*')
+        .select(`
+          *,
+          profiles:user_id (first_name, last_name, email)
+        `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
@@ -170,6 +177,7 @@ const TradesPage = () => {
           last_name,
           email,
           default_leverage,
+          withdrawal_wallet,
           trades:trades(
             id,
             pnl,
@@ -187,6 +195,7 @@ const TradesPage = () => {
         trades_count: user.trades?.length || 0,
         total_pnl: user.trades?.reduce((sum, t) => sum + (t.pnl || 0), 0) || 0,
         default_leverage: user.default_leverage || 100,
+        withdrawal_wallet: user.withdrawal_wallet || 0,
         last_trade_date: user.trades?.length ? 
           new Date(Math.max(...user.trades.map(t => new Date(t.created_at).getTime()))).toISOString() 
           : null
@@ -212,6 +221,38 @@ const TradesPage = () => {
       email: trade.profiles.email,
     });
     fetchUserTrades(trade.user_id);
+  };
+
+  const handleDeleteTrade = async (tradeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('trades')
+        .delete()
+        .eq('id', tradeId)
+        .single();
+
+      if (error) throw error;
+
+      // Update both local states
+      setUserTrades(prevTrades => prevTrades.filter(t => t.id !== tradeId));
+      setTrades(prevTrades => prevTrades.filter(t => t.id !== tradeId));
+      
+      // Recalculate user summaries if in users view
+      if (viewTab === 'users') {
+        fetchUserSummaries();
+      }
+
+      toast({
+        description: "Trade deleted successfully",
+      });
+    } catch (error: any) {
+      console.error('Error deleting trade:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete trade",
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredTrades = trades.filter(trade => 
@@ -273,6 +314,21 @@ const TradesPage = () => {
     return trade.status === userTradeTab;
   });
 
+  const sortedUserTrades = filteredUserTrades.sort((a, b) => {
+    const direction = dialogSortDirection === "asc" ? 1 : -1;
+    
+    switch (dialogSortField) {
+      case "lots":
+        return direction * (a.lots - b.lots);
+      case "type":
+        return direction * a.type.localeCompare(b.type);
+      case "pnl":
+        return direction * ((a.pnl || 0) - (b.pnl || 0));
+      default:
+        return direction * (new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+  });
+
   const calculateStats = (trades: Trade[]) => {
     const totalTrades = trades.length;
     const totalVolume = trades.reduce((sum, t) => sum + t.lots, 0);
@@ -287,6 +343,38 @@ const TradesPage = () => {
       winRate,
     };
   };
+
+  const formatPair = (pair: string) => {
+    return pair
+      .replace('BINANCE:', '')
+      .replace('FX:', '')
+      .replace('/', '');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const handleDialogSort = (field: string) => {
+    if (dialogSortField === field) {
+      setDialogSortDirection(dialogSortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setDialogSortField(field);
+      setDialogSortDirection("asc");
+    }
+  };
+
+  const filteredUserSummaries = userSummaries.filter(user =>
+    user.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+  );
 
   return (
     <AdminLayout>
@@ -473,55 +561,66 @@ const TradesPage = () => {
               </div>
             </>
           ) : (
-            // User trades view
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Trader</TableHead>
-                    <TableHead>Trades Count</TableHead>
-                    <TableHead>P&L</TableHead>
-                    <TableHead>Default Leverage</TableHead>
-                    <TableHead>Last Trade</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userSummaries.map((user) => (
-                    <TableRow key={user.id} className="cursor-pointer hover:bg-accent/50" onClick={() => handleUserClick({ 
-                      user_id: user.id, 
-                      profiles: { 
-                        first_name: user.first_name, 
-                        last_name: user.last_name, 
-                        email: user.email 
-                      } 
-                    } as Trade)}>
-                      <TableCell>
-                        <span className="font-mono text-xs">{user.id}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{user.first_name} {user.last_name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                      </TableCell>
-                      <TableCell>{user.trades_count}</TableCell>
-                      <TableCell className={user.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                        ${user.total_pnl.toFixed(2)}
-                      </TableCell>
-                      <TableCell>{user.default_leverage}x</TableCell>
-                      <TableCell>
-                        {user.last_trade_date ? new Date(user.last_trade_date).toLocaleString() : '-'}
-                      </TableCell>
+            <div className="space-y-4">
+              <div className="relative w-full sm:w-[300px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by email..."
+                  className="pl-8"
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Trader</TableHead>
+                      <TableHead>Balance</TableHead>
+                      <TableHead>Trades Count</TableHead>
+                      <TableHead>P&L</TableHead>
+                      <TableHead>Default Leverage</TableHead>
+                      <TableHead>Last Trade</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUserSummaries.map((user) => (
+                      <TableRow key={user.id} className="cursor-pointer hover:bg-accent/50" onClick={() => handleUserClick({ 
+                        user_id: user.id, 
+                        profiles: { 
+                          first_name: user.first_name, 
+                          last_name: user.last_name, 
+                          email: user.email 
+                        } 
+                      } as Trade)}>
+                        <TableCell><span className="font-mono text-xs">{user.id}</span></TableCell>
+                        <TableCell>
+                          <div className="font-medium">{user.first_name} {user.last_name}</div>
+                          <div className="text-sm text-muted-foreground">{user.email}</div>
+                        </TableCell>
+                        <TableCell className="font-medium">${user.withdrawal_wallet.toFixed(2)}</TableCell>
+                        <TableCell>{user.trades_count}</TableCell>
+                        <TableCell className={user.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                          ${user.total_pnl.toFixed(2)}
+                        </TableCell>
+                        <TableCell>{user.default_leverage}x</TableCell>
+                        <TableCell>
+                          {user.last_trade_date ? formatDate(user.last_trade_date) : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle>Trading History - {selectedUser?.name}</DialogTitle>
           </DialogHeader>
@@ -563,40 +662,72 @@ const TradesPage = () => {
           </Tabs>
 
           <ScrollArea className="max-h-[400px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Pair</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Volume</TableHead>
-                  <TableHead>Open Price</TableHead>
-                  <TableHead>Close Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>P&L</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUserTrades.map((trade) => (
-                  <TableRow key={trade.id}>
-                    <TableCell>{new Date(trade.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{trade.pair}</TableCell>
-                    <TableCell>
-                      <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
-                        {trade.type.toUpperCase()}
-                      </span>
-                    </TableCell>
-                    <TableCell>{trade.lots}</TableCell>
-                    <TableCell>${trade.open_price}</TableCell>
-                    <TableCell>${trade.close_price || '-'}</TableCell>
-                    <TableCell>{trade.status.toUpperCase()}</TableCell>
-                    <TableCell className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                      ${trade.pnl?.toFixed(2) || '0.00'}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[180px]">Date</TableHead>
+                    <TableHead className="min-w-[100px]">Pair</TableHead>
+                    <TableHead 
+                      className="min-w-[80px] cursor-pointer hover:text-primary"
+                      onClick={() => handleDialogSort("type")}
+                    >
+                      Type {dialogSortField === "type" && (dialogSortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead 
+                      className="min-w-[80px] cursor-pointer hover:text-primary"
+                      onClick={() => handleDialogSort("lots")}
+                    >
+                      Volume {dialogSortField === "lots" && (dialogSortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    <TableHead className="min-w-[100px]">Open Price</TableHead>
+                    <TableHead className="min-w-[100px]">Close Price</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
+                    <TableHead 
+                      className="min-w-[100px] cursor-pointer hover:text-primary"
+                      onClick={() => handleDialogSort("pnl")}
+                    >
+                      P&L {dialogSortField === "pnl" && (dialogSortDirection === "asc" ? "↑" : "↓")}
+                    </TableHead>
+                    {userTradeTab === 'closed' && (
+                      <TableHead className="w-[50px]">Actions</TableHead>
+                    )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedUserTrades.map((trade) => (
+                    <TableRow key={trade.id}>
+                      <TableCell>{formatDate(trade.created_at)}</TableCell>
+                      <TableCell>{formatPair(trade.pair)}</TableCell>
+                      <TableCell>
+                        <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                          {trade.type.toUpperCase()}
+                        </span>
+                      </TableCell>
+                      <TableCell>{trade.lots}</TableCell>
+                      <TableCell>${trade.open_price}</TableCell>
+                      <TableCell>${trade.close_price || '-'}</TableCell>
+                      <TableCell>{trade.status.toUpperCase()}</TableCell>
+                      <TableCell className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                        ${trade.pnl?.toFixed(2) || '0.00'}
+                      </TableCell>
+                      {userTradeTab === 'closed' && (
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                            onClick={() => handleDeleteTrade(trade.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
