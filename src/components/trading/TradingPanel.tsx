@@ -48,17 +48,14 @@ export const TradingPanel = ({
   onSubscribe,
   trades = []
 }: TradingPanelProps) => {
-  // Add loading state
   const [isExecutingTrade, setIsExecutingTrade] = useState(false);
-  
-  // Add new state variables for static prices
   const [staticBidPrice, setStaticBidPrice] = useState('0');
   const [staticAskPrice, setStaticAskPrice] = useState('0');
-  const navigate = useNavigate(); // Add this hook
+  const navigate = useNavigate();
   const [lots, setLots] = useState('0.01');
-  const [showLeverageDialog, setShowLeverageDialog] = useState(false);
   const [selectedLeverage, setSelectedLeverage] = useState(defaultLeverage.toString());
   const [pairInfo, setPairInfo] = useState<TradingPair | null>(null);
+  // Remove showLeverageDialog state
 
   // Add crypto decimal limits mapping
   const cryptoLotDecimals: Record<string, number> = {
@@ -124,16 +121,6 @@ export const TradingPanel = ({
   const getMaxLeverageForPair = (pair: TradingPair) => {
     if (!pair.leverage_options?.length) return 1;
     return Math.max(...pair.leverage_options);
-  };
-
-  // Add helper to categorize leverage options
-  const getLeverageCategories = (options: number[]) => {
-    if (!options?.length) return { low: [], medium: [], high: [] };
-    return {
-      low: options.filter(v => v <= 20),
-      medium: options.filter(v => v > 20 && v <= 100),
-      high: options.filter(v => v > 100)
-    };
   };
 
   // Add helper to get max leverage from options
@@ -364,25 +351,6 @@ export const TradingPanel = ({
     
     if (newValue >= pair.min_lots) {
       setLots(newValue.toFixed(2));
-    }
-  };
-
-  const handleConfirmLeverage = async () => {
-    try {
-      if (onSaveLeverage) {
-        await onSaveLeverage(parseInt(selectedLeverage));
-      }
-      setShowLeverageDialog(false);
-      toast({
-        title: "Success",
-        description: "Leverage preference saved",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save leverage preference",
-      });
     }
   };
 
@@ -661,10 +629,7 @@ export const TradingPanel = ({
                     <span>Margin:</span>
                     <span className="font-mono font-bold">${marginRequired}</span>
                   </div>
-                  <div 
-                    className="flex justify-between items-center rounded cursor-pointer transition-colors"
-                    onClick={() => setShowLeverageDialog(true)}
-                  >
+                  <div className="flex justify-between">
                     <span>Leverage:</span>
                     <span className="font-mono">
                       {pairInfo?.leverage_options ? `${selectedLeverage}x` : '1x'}
@@ -692,98 +657,6 @@ export const TradingPanel = ({
               </div>
             </div>
           </div>
-
-          {/* Update leverage dialog section */}
-          <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
-            <DialogContent className="p-0 overflow-hidden">
-              <DialogHeader className="px-6 py-4 border-b">
-                <DialogTitle className="text-xl">Leverage Information</DialogTitle>
-                <DialogDescription className="text-sm">
-                  Choose your preferred leverage level (Max: {getMaxLeverageFromOptions(pairInfo?.leverage_options)}x). 
-                  Higher leverage means higher risk.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="p-6 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Current Selection</label>
-                  <div className={cn(
-                    "border rounded-lg p-4 text-center",
-                    parseInt(selectedLeverage) <= 20 
-                      ? "bg-green-500/5 border-green-500/10" 
-                      : parseInt(selectedLeverage) <= 100
-                        ? "bg-yellow-500/5 border-yellow-500/10"
-                        : "bg-red-500/5 border-red-500/10"
-                  )}>
-                    <span className={cn(
-                      "text-3xl font-bold",
-                      parseInt(selectedLeverage) <= 20 
-                        ? "text-green-500" 
-                        : parseInt(selectedLeverage) <= 100
-                          ? "text-yellow-500"
-                          : "text-red-500"
-                    )}>{selectedLeverage}x</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  {pairInfo?.leverage_options && (
-                    <>
-                      {getVisibleRiskCategories(pairInfo.leverage_options.map(Number)).map((riskLevel) => {
-                        const options = getLeverageCategories(pairInfo.leverage_options.map(Number))[riskLevel as keyof ReturnType<typeof getLeverageCategories>];
-                        return options.length > 0 ? (
-                          <div key={riskLevel} className="space-y-2">
-                            <div className={cn(
-                              "font-medium",
-                              riskLevel === 'low' ? "text-green-500" :
-                              riskLevel === 'medium' ? "text-yellow-500" : 
-                              "text-red-500"
-                            )}>
-                              {riskLevel.charAt(0).toUpperCase() + riskLevel.slice(1)} Risk
-                            </div>
-                            <div className="grid grid-cols-2 gap-1">
-                              {options.map((value) => (
-                                <Button
-                                  key={value}
-                                  variant={selectedLeverage === value.toString() ? "default" : "outline"}
-                                  onClick={() => setSelectedLeverage(value.toString())}
-                                  className={cn(
-                                    "h-9 font-mono transition-all",
-                                    selectedLeverage === value.toString()
-                                      ? `bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/90 border-0`
-                                      : `hover:border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/50 hover:bg-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/5 border-${riskLevel === 'low' ? 'green' : riskLevel === 'medium' ? 'yellow' : 'red'}-500/20`
-                                  )}
-                                >
-                                  {value}x
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : null;
-                      })}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Only show confirm button */}
-              <div className="p-4 bg-gradient-to-t from-muted/10 border-t">
-                <Button 
-                  onClick={handleConfirmLeverage}
-                  className={cn(
-                    "w-full",
-                    parseInt(selectedLeverage) <= 20
-                      ? "bg-green-500 hover:bg-green-500/90"
-                      : parseInt(selectedLeverage) <= 100
-                        ? "bg-yellow-500 hover:bg-yellow-500/90"
-                        : "bg-red-500 hover:bg-red-500/90"
-                  )}
-                >
-                  Confirm Leverage
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Replace AI Trading button with image button */}

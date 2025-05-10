@@ -261,119 +261,27 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   useEffect(() => {
     if (!isPageVisible) return;
 
-    let connections: { [key: string]: WebSocket } = {};
-    let heartbeats: { [key: string]: NodeJS.Timeout } = {};
-    setIsPriceLoaded(false); // Reset on new connection
-
-    // Get all unique pairs from open trades and current chart
-    const getAllPairs = () => {
-      const pairs = new Set<string>();
-      pairs.add(defaultPair);
-      trades.forEach(trade => {
-        if (trade.status === 'open' || trade.status === 'pending') {
-          pairs.add(trade.pair);
-        }
-      });
-      return Array.from(pairs);
-    };
-
-    const connectWebSocket = (pair: string) => {
-      if (connections[pair]?.readyState === WebSocket.OPEN) {
-        connections[pair].close();
-        if (heartbeats[pair]) clearInterval(heartbeats[pair]);
-      }
-
-      if (pair.includes('BINANCE:')) {
-        const ws = new WebSocket('wss://stream.binance.com:9443/ws');
-        const symbol = pair.replace('BINANCE:', '').toLowerCase();
-        
-        ws.onopen = () => {
-          ws.send(JSON.stringify({
-            method: "SUBSCRIBE",
-            params: [`${symbol}@ticker`],
-            id: 1
-          }));
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.e === '24hrTicker') {
-              setPairPrices(prev => ({
-                ...prev,
-                [pair]: {
-                  price: data.c,
-                  bid: data.b,
-                  ask: data.a,
-                  change: data.P
-                }
-              }));
-              setIsPriceLoaded(true);
-            }
-          } catch (error) {
-            console.error('Error handling crypto message:', error);
-          }
-        };
-
-        connections[pair] = ws;
-      } else if (pair.includes('FX:')) {
-        const ws = new WebSocket('wss://marketdata.tradermade.com/feedadv');
-        const symbol = pair.replace('FX:', '').replace('/', '');
-
-        ws.onopen = () => {
-          ws.send(JSON.stringify({
-            userKey: tradermadeApiKey,
-            symbol: symbol,
-            _type: "subscribe"
-          }));
-
-          heartbeats[pair] = setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ heartbeat: "1" }));
-            }
-          }, 30000);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            if (!event.data.startsWith('{')) return;
-            const data = JSON.parse(event.data);
-            if (data.symbol && data.bid && data.ask) {
-              setPairPrices(prev => ({
-                ...prev,
-                [`FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`]: {
-                  price: data.mid || data.bid,
-                  bid: data.bid,
-                  ask: data.ask,
-                  change: prev[`FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`]?.change || '0.00'
-                }
-              }));
-              setIsPriceLoaded(true);
-            }
-          } catch (error) {
-            console.error('Error handling forex message:', error);
-          }
-        };
-
-        connections[pair] = ws;
-      }
-    };
-
-    // Connect to all required pairs
-    getAllPairs().forEach(pair => {
-      connectWebSocket(pair);
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: data
+      }));
+      setIsPriceLoaded(true);
     });
 
-    // Cleanup function
+    // Watch required pairs
+    const pairs = Array.from(new Set([defaultPair, ...trades
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .map(t => t.pair)
+    ]));
+
+    wsManager.watchPairs(pairs);
+
     return () => {
-      Object.values(connections).forEach(ws => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close();
-        }
-      });
-      Object.values(heartbeats).forEach(clearInterval);
+      unsubscribe();
+      wsManager.unwatchPairs(pairs);
     };
-  }, [trades, defaultPair, isPageVisible]); // Added trades to dependencies
+  }, [trades, defaultPair, isPageVisible]);
 
   useEffect(() => {
     const total = trades

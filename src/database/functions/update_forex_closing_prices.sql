@@ -14,6 +14,7 @@ DECLARE
     api_response JSONB;
     api_key CONSTANT TEXT := 'Ch_i_UKqAhR3g2cq1wHi';
     v_old_price DECIMAL;
+    v_rows_updated INTEGER;
 BEGIN
     -- Create temp table to store results
     CREATE TEMP TABLE update_results (
@@ -26,33 +27,53 @@ BEGIN
     -- Loop through active forex pairs
     FOR pair IN 
         SELECT t.symbol, 
-               REPLACE(REPLACE(t.short_name, 'FX:', ''), '/', '') as clean_symbol
+               REPLACE(REPLACE(t.short_name, 'FX:', ''), '/', '') as clean_symbol,
+               t.last_price
         FROM trading_pairs t
         WHERE t.type = 'forex' AND t.is_active = true 
     LOOP
         BEGIN
             -- Store old price
-            SELECT last_price INTO v_old_price
-            FROM trading_pairs
-            WHERE symbol = pair.symbol;
+            v_old_price := pair.last_price;
+            
+            RAISE NOTICE 'Processing pair %: Current price = %', pair.symbol, v_old_price;
 
-            -- Make API call to TradeMade REST endpoint
+            -- Make API call with explicit timeout
             SELECT content::jsonb INTO api_response
-            FROM http_get('https://marketdata.tradermade.com/api/v1/live?' || 
-                         'currency=' || pair.clean_symbol ||
-                         '&api_key=' || api_key);
+            FROM http_get(
+                'https://marketdata.tradermade.com/api/v1/live?' || 
+                'currency=' || pair.clean_symbol ||
+                '&api_key=' || api_key,
+                timeout := 10
+            );
+
+            -- Validate API response structure
+            IF api_response IS NULL THEN
+                RAISE EXCEPTION 'Empty API response received';
+            END IF;
 
             -- Debug log the raw response
             RAISE NOTICE 'API Response for %: %', pair.symbol, api_response;
 
-            -- Update only last_price and last_price_update if API call successful
-            IF api_response->>'bid' IS NOT NULL THEN
+            -- Validate price data
+            IF api_response->>'bid' IS NULL OR NOT (api_response->>'bid' ~ '^\d*\.?\d+$') THEN
+                RAISE EXCEPTION 'Invalid or missing bid price in response';
+            END IF;
+
+            -- Update within a sub-transaction
+            BEGIN
                 UPDATE trading_pairs 
                 SET last_price = (api_response->>'bid')::DECIMAL,
-                    last_price_update = NOW()
-                WHERE symbol = pair.symbol;
+                    last_price_update = NOW(),
+                    updated_at = NOW()
+                WHERE symbol = pair.symbol
+                RETURNING 1 INTO v_rows_updated;
 
-                -- Log the update in results table
+                IF v_rows_updated IS NULL OR v_rows_updated = 0 THEN
+                    RAISE EXCEPTION 'Update failed - no rows updated';
+                END IF;
+
+                -- Log successful update in results table
                 INSERT INTO update_results (symbol, old_price, new_price, status)
                 VALUES (
                     pair.symbol,
@@ -62,30 +83,33 @@ BEGIN
                 );
                 
                 -- Log successful update
-                RAISE NOTICE 'Updated % price from % to %', 
+                RAISE NOTICE 'Successfully updated % price from % to %', 
                     pair.symbol,
                     v_old_price,
                     (api_response->>'bid')::DECIMAL;
-            ELSE
-                -- Log failed update
-                INSERT INTO update_results (symbol, old_price, new_price, status)
-                VALUES (pair.symbol, v_old_price, NULL, 'No bid price received');
-                RAISE WARNING 'No bid price received for %', pair.symbol;
-            END IF;
+            EXCEPTION WHEN OTHERS THEN
+                RAISE NOTICE 'Database update failed for %: %', pair.symbol, SQLERRM;
+                RAISE;
+            END;
 
         EXCEPTION WHEN OTHERS THEN
-            -- Log error in results
+            -- Log error in results with detailed message
             INSERT INTO update_results (symbol, old_price, new_price, status)
             VALUES (pair.symbol, v_old_price, NULL, 'Error: ' || SQLERRM);
-            RAISE WARNING 'Error updating %: %', pair.symbol, SQLERRM;
+            
+            RAISE WARNING 'Error processing % (%): %', pair.symbol, pair.clean_symbol, SQLERRM;
         END;
 
         -- Add delay between requests
-        PERFORM pg_sleep(0.5);
+        PERFORM pg_sleep(1);
     END LOOP;
 
     -- Return results
-    RETURN QUERY SELECT * FROM update_results ORDER BY symbol;
+    RETURN QUERY 
+    SELECT * FROM update_results 
+    ORDER BY 
+        CASE WHEN update_results.status = 'Success' THEN 0 ELSE 1 END,
+        update_results.symbol;
 END;
 $$ LANGUAGE plpgsql;
 

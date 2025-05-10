@@ -33,7 +33,7 @@ export const TradeSidebar = ({
   onToggleCollapse
 }: TradeSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("forex"); // Default to "forex"
+  const [activeTab, setActiveTab] = useState("forex");
   const [priceAnimations, setPriceAnimations] = useState<{[key: string]: 'up' | 'down'}>({});
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
 
@@ -81,6 +81,13 @@ export const TradeSidebar = ({
 
   // Add market status check
   const isForexClosed = !isForexTradingTime();
+
+  // Add effect to handle forex market closure
+  useEffect(() => {
+    if (isForexClosed && activeTab === 'forex') {
+      setActiveTab('crypto');
+    }
+  }, [isForexClosed, activeTab]);
 
   // Prevent switching to forex tab when market is closed
   const handleTabChange = (value: string) => {

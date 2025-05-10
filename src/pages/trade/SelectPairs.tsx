@@ -65,48 +65,13 @@ const SelectPairs = () => {
   } | null>(null);
   const [defaultLeverage, setDefaultLeverage] = useState<number>(1);
 
-  // Add fetchInitialPrices implementation
-  const fetchInitialPrices = async () => {
-    try {
-      const { data: livePrices, error } = await supabase
-        .from('live_prices')
-        .select('*');
-
-      if (error) throw error;
-
-      // Update prices state with fetched data
-      const formattedPrices = livePrices.reduce((acc, price) => ({
-        ...acc,
-        [price.symbol]: {
-          price: price.bid_price,
-          bid: price.bid_price,
-          ask: price.ask_price,
-          change: '0.00'
-        }
-      }), {});
-
-      setPairPrices(prev => ({
-        ...prev,
-        ...formattedPrices
-      }));
-
-      // Reconnect WebSocket after fetching initial prices
-      if (tradingPairs.length > 0) {
-        wsManager.watchPairs(tradingPairs.map(p => p.symbol), ConnectionMode.FULL);
-      }
-    } catch (error) {
-      console.error('Error fetching initial prices:', error);
-    }
-  };
-
   // Fetch trading pairs only once on mount and keep websocket connection alive
   useEffect(() => {
     const fetchTradingPairs = async () => {
       const { data, error } = await supabase
         .from('trading_pairs')
         .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+        .order('display_order', { ascending: true }); // Remove is_active filter to get all pairs
 
       if (error) {
         console.error('Error fetching trading pairs:', error);
@@ -116,7 +81,10 @@ const SelectPairs = () => {
 
       // Watch all pairs immediately with FULL mode
       if (data.length > 0) {
+        // Get all symbols regardless of type
         const allPairs = data.map(pair => pair.symbol);
+        
+        // Subscribe to all pairs at once
         wsManager.watchPairs(allPairs, ConnectionMode.FULL);
       }
     };
@@ -125,16 +93,18 @@ const SelectPairs = () => {
     
     // Cleanup function
     return () => {
-      wsManager.disconnect(); // Use disconnect instead of unwatchPairs to ensure clean shutdown
+      wsManager.disconnect();
     };
   }, []); // Empty dependency array to run only once
 
   // Single WebSocket subscription for all price updates
   useEffect(() => {
     const unsubscribe = wsManager.subscribe((symbol, data) => {
+      if (!data?.bid) return; // Ignore invalid price updates
+      
       setPairPrices(prev => {
         const prevPrice = parseFloat(prev[symbol]?.bid || '0');
-        const newPrice = parseFloat(data.bid || '0');
+        const newPrice = parseFloat(data.bid);
         
         if (prevPrice !== newPrice) {
           setPriceAnimations(prev => ({
@@ -512,6 +482,62 @@ const SelectPairs = () => {
     setQuickTradeEnabled(enabled);
     localStorage.setItem(QUICK_TRADE_STORAGE_KEY, enabled.toString());
   };
+
+  // Add this effect to handle initial price loading and websocket connection
+  useEffect(() => {
+    const loadPricesAndConnect = async () => {
+      try {
+        // Connect WebSocket immediately for all trading pairs
+        if (tradingPairs.length > 0) {
+          wsManager.watchPairs(
+            tradingPairs.map(p => p.symbol),
+            ConnectionMode.FULL
+          );
+        }
+      } catch (error) {
+        console.error('Error connecting to price feed:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to connect to price feed"
+        });
+      }
+    };
+
+    loadPricesAndConnect();
+  }, [tradingPairs]); // Depend on tradingPairs
+
+  // Update the WebSocket subscription effect to initialize prices
+  useEffect(() => {
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      setPairPrices(prev => {
+        const prevPrice = parseFloat(prev[symbol]?.bid || '0');
+        const newPrice = parseFloat(data.bid);
+        
+        // Only update if we have valid new price data
+        if (!isNaN(newPrice) && newPrice > 0) {
+          // Set price animation
+          if (prevPrice !== newPrice) {
+            setPriceAnimations(prev => ({
+              ...prev,
+              [symbol]: newPrice > prevPrice ? 'up' : 'down'
+            }));
+          }
+
+          return {
+            ...prev,
+            [symbol]: data
+          };
+        }
+        
+        return prev;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">

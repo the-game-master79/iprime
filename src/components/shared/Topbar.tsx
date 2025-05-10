@@ -1,4 +1,4 @@
-import { ChevronLeft, Wallet, UserCircle } from "lucide-react";
+import { CaretLeft, Wallet as WalletIcon, User } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -64,18 +64,28 @@ export const Topbar = ({
           <Button 
             variant="ghost" 
             size="sm"
-            className="flex items-center gap-2 ml-4 text-white hover:bg-[#3D3D3D]"
+            className="flex items-center gap-2 text-white hover:bg-[#3D3D3D]"
             onClick={backButtonAction || (() => window.history.back())}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <CaretLeft className="h-4 w-4" />
           </Button>
         )}
+        <div 
+          className="cursor-pointer"
+          onClick={() => navigate('/platform')}
+        >
+          <img 
+            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+            alt="CloudForex" 
+            className="h-8 w-auto"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
         {!hideBalance && (
           <div onClick={handleBalanceClick} className="flex items-center gap-2 rounded-full bg-[#3D3D3D] px-4 py-1.5 shadow-sm transition-colors hover:bg-[#3D3D3D]/80">
-            <Wallet className="h-4 w-4 text-white" />
+            <WalletIcon className="h-4 w-4 text-white" weight="fill" />
             <span className="text-sm font-medium text-white">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
           </div>
         )}
@@ -86,7 +96,7 @@ export const Topbar = ({
           className="rounded-lg bg-[#3D3D3D] hover:bg-[#3D3D3D]/80"
           onClick={() => navigate('/profile')}
         >
-          <UserCircle className="h-5 w-5 text-white" />
+          <User className="h-5 w-5 text-white" weight="fill" />
         </Button>
       </div>
     </>

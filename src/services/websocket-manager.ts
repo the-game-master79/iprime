@@ -5,14 +5,18 @@ import { supabase } from "@/lib/supabase";
 const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws';
 const TRADERMADE_WS_URL = 'wss://marketdata.tradermade.com/feedadv';
 const HEARTBEAT_INTERVAL = 30000;
-const CONNECTION_TIMEOUT = 10000;
+const CONNECTION_TIMEOUT = 30000; // Increase timeout to 30 seconds
 const API_KEY_ROTATION_DELAY = 60000;
+const MAX_CONNECTION_RETRIES = 3;
+const RETRY_DELAY = 2000;
 
 interface PriceData {
   price: string;
   bid: string;
   ask: string;
   change: string;
+  timestamp?: string;
+  mid?: string;
 }
 
 type PriceCallback = (symbol: string, data: PriceData) => void;
@@ -75,6 +79,9 @@ export class WebSocketManager {
   ].filter(Boolean);
   private currentApiKeyIndex = 0;
   private isConnecting = false;
+  private forexPairsQueue: Set<string> = new Set();
+  private forexSubscriptionTimeout: NodeJS.Timeout | null = null;
+  private isForexConnecting: boolean = false;
 
   private constructor() {
     this.tradermadeApiKey = this.apiKeys[0] || '';
@@ -187,87 +194,110 @@ export class WebSocketManager {
   }
 
   private async connectCrypto(pairs: string[]) {
-    try {
-      if (this.cryptoWs) {
-        const oldWs = this.cryptoWs;
-        this.cryptoWs = null;
-        oldWs.onopen = null;
-        oldWs.onclose = null;
-        oldWs.onerror = null;
-        oldWs.onmessage = null;
-        if (oldWs.readyState === WebSocket.OPEN) {
-          oldWs.close();
-        }
-      }
-
-      this.setConnectionState('crypto', { status: 'connecting' });
-      this.cryptoWs = new WebSocket(BINANCE_WS_URL);
-
-      await new Promise<void>((resolve, reject) => {
-        if (!this.cryptoWs) return reject(new Error('No WebSocket instance'));
-
-        const timeoutId = setTimeout(() => {
-          this.setConnectionState('crypto', { 
-            status: 'error', 
-            lastError: 'connection timeout' 
-          });
-          reject(new Error('Connection timeout'));
-        }, CONNECTION_TIMEOUT);
-
-        this.cryptoWs.onopen = () => {
-          clearTimeout(timeoutId);
-          const symbols = pairs.map(p => p.toLowerCase().replace('binance:', ''));
-          
-          // Send subscription immediately on connection
-          this.sendMessage(this.cryptoWs, {
-            method: "SUBSCRIBE",
-            params: symbols.map(s => `${s}@ticker`),
-            id: 1
-          });
-
-          this.setupReconnection(this.cryptoWs, 'crypto');
-          this.setConnectionState('crypto', { status: 'connected' });
-          resolve();
-        };
-
-        this.cryptoWs.onerror = (err) => {
-          clearTimeout(timeoutId);
-          this.setConnectionState('crypto', { 
-            status: 'error', 
-            lastError: err.type 
-          });
-          reject(err);
-        };
-
-        // Set up message handler right away
-        this.cryptoWs.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.e === '24hrTicker') {
-              this.updatePrice(`BINANCE:${data.s}`, {
-                price: data.c,
-                bid: data.b,
-                ask: data.a,
-                change: data.P
-              });
-            }
-          } catch (error) {
-            console.warn('Error processing crypto message:', error);
+    let retries = 0;
+    
+    const tryConnect = async (): Promise<void> => {
+      try {
+        if (this.cryptoWs) {
+          const oldWs = this.cryptoWs;
+          this.cryptoWs = null;
+          oldWs.onopen = null;
+          oldWs.onclose = null;
+          oldWs.onerror = null;
+          oldWs.onmessage = null;
+          if (oldWs.readyState === WebSocket.OPEN) {
+            oldWs.close();
           }
-        };
-      });
+        }
 
-    } catch (error) {
-      this.setConnectionState('crypto', { 
-        status: 'error', 
-        lastError: error.message 
-      });
-      throw error;
-    }
+        this.setConnectionState('crypto', { status: 'connecting' });
+        this.cryptoWs = new WebSocket(BINANCE_WS_URL);
+
+        return new Promise<void>((resolve, reject) => {
+          if (!this.cryptoWs) return reject(new Error('No WebSocket instance'));
+
+          let isResolved = false;
+          const timeoutId = setTimeout(() => {
+            if (!isResolved) {
+              isResolved = true;
+              this.setConnectionState('crypto', { 
+                status: 'error', 
+                lastError: 'connection timeout' 
+              });
+              if (this.cryptoWs) {
+                this.cryptoWs.close();
+                this.cryptoWs = null;
+              }
+              reject(new Error('Connection timeout'));
+            }
+          }, CONNECTION_TIMEOUT);
+
+          this.cryptoWs.onopen = () => {
+            if (isResolved) return;
+            isResolved = true;
+            clearTimeout(timeoutId);
+            
+            const symbols = pairs.map(p => p.toLowerCase().replace('binance:', ''));
+            this.sendMessage(this.cryptoWs, {
+              method: "SUBSCRIBE",
+              params: symbols.map(s => `${s}@ticker`),
+              id: 1
+            });
+
+            this.setupReconnection(this.cryptoWs, 'crypto');
+            this.setConnectionState('crypto', { status: 'connected' });
+            resolve();
+          };
+
+          this.cryptoWs.onerror = (err) => {
+            if (isResolved) return;
+            isResolved = true;
+            clearTimeout(timeoutId);
+            this.setConnectionState('crypto', { 
+              status: 'error', 
+              lastError: err.type 
+            });
+            reject(err);
+          };
+
+          this.cryptoWs.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.e === '24hrTicker') {
+                this.updatePrice(`BINANCE:${data.s}`, {
+                  price: data.c,
+                  bid: data.b,
+                  ask: data.a,
+                  change: data.P
+                });
+              }
+            } catch (error) {
+              console.warn('Error processing crypto message:', error);
+            }
+          };
+        });
+      } catch (error) {
+        if (retries < MAX_CONNECTION_RETRIES) {
+          retries++;
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          return tryConnect();
+        }
+        throw error;
+      }
+    };
+
+    return tryConnect();
   }
 
   private async connectForex(pairs: string[]) {
+    if (this.isForexConnecting) {
+      // Add pairs to queue and wait for current connection
+      pairs.forEach(pair => this.forexPairsQueue.add(pair));
+      return;
+    }
+
     try {
+      this.isForexConnecting = true;
       if (this.forexWs) {
         const oldWs = this.forexWs;
         this.forexWs = null;
@@ -279,6 +309,9 @@ export class WebSocketManager {
           oldWs.close();
         }
       }
+
+      // Add new pairs to queue
+      pairs.forEach(pair => this.forexPairsQueue.add(pair));
 
       this.setConnectionState('forex', { status: 'connecting' });
       const apiKey = this.getCurrentApiKey();
@@ -299,64 +332,75 @@ export class WebSocketManager {
 
         this.forexWs.onopen = () => {
           clearTimeout(timeoutId);
-          const symbols = pairs.map(p => p.replace('FX:', '').replace('/', ''));
-          
-          // Send init and subscribe in one message
-          this.sendMessage(this.forexWs, {
-            userKey: apiKey,
-            symbol: symbols.join(','),
-            _type: "subscribe"
-          });
-
+          this.processForexQueue();
           this.setupHeartbeat();
           this.setupReconnection(this.forexWs, 'forex');
           this.setConnectionState('forex', { status: 'connected' });
           resolve();
         };
 
-        this.forexWs.onerror = (err) => {
-          clearTimeout(timeoutId);
-          this.setConnectionState('forex', { 
-            status: 'error', 
-            lastError: err.type 
-          });
-          reject(err);
-        };
-
-        // Set up message handler right away
-        this.forexWs.onmessage = async (event) => {
-          try {
-            if (event.data.includes('User Key Used')) {
-              this.rotateApiKey();
-              await this.connectForex(pairs);
-              return;
-            }
-
-            if (typeof event.data === 'string' && !event.data.startsWith('{')) return;
-
-            const data = JSON.parse(event.data);
-            if (data.symbol && data.bid && data.ask) {
-              const symbol = `FX:${data.symbol.slice(0, 3)}/${data.symbol.slice(3)}`;
-              this.updatePrice(symbol, {
-                price: data.bid,
-                bid: data.bid,
-                ask: data.ask,
-                change: '0.00'
-              });
-            }
-          } catch (error) {
-            console.warn('Error processing forex message:', error);
-          }
-        };
+        this.setupForexMessageHandler();
       });
 
     } catch (error) {
-      this.setConnectionState('forex', { 
-        status: 'error', 
-        lastError: error.message 
-      });
+      this.isForexConnecting = false;
       throw error;
     }
+  }
+
+  private processForexQueue = () => {
+    if (this.forexSubscriptionTimeout) {
+      clearTimeout(this.forexSubscriptionTimeout);
+    }
+
+    this.forexSubscriptionTimeout = setTimeout(() => {
+      const queuedPairs = Array.from(this.forexPairsQueue);
+      if (queuedPairs.length > 0 && this.forexWs?.readyState === WebSocket.OPEN) {
+        const symbols = queuedPairs.map(p => p.replace('FX:', '').replace('/', ''));
+        
+        this.sendMessage(this.forexWs, {
+          userKey: this.getCurrentApiKey(),
+          symbol: symbols.join(','),
+          _type: "subscribe"
+        });
+
+        this.forexPairsQueue.clear();
+      }
+      this.isForexConnecting = false;
+    }, 100); // Small delay to batch subscriptions
+  };
+
+  private setupForexMessageHandler() {
+    if (!this.forexWs) return;
+
+    this.forexWs.onmessage = async (event) => {
+      try {
+        const message = event.data.toString();
+        
+        if (message.includes('User Key Used')) {
+          this.rotateApiKey();
+          await this.connectForex(Array.from(this.forexPairsQueue));
+          return;
+        }
+
+        if (!message.startsWith('{')) return;
+        
+        const data = JSON.parse(message);
+        if (data.symbol && data.bid && data.ask) {
+          const symbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
+          this.updatePrice(symbol, {
+            price: data.mid || ((Number(data.bid) + Number(data.ask)) / 2).toString(),
+            bid: data.bid.toString(),
+            ask: data.ask.toString(),
+            change: '0.00',
+            timestamp: data.ts,
+            mid: data.mid?.toString()
+          });
+        }
+      } catch (error) {
+        console.error('Error handling forex message:', error);
+      }
+    };
   }
 
   private setupHeartbeat() {
@@ -528,6 +572,117 @@ export class WebSocketManager {
     // Update connection states
     this.setConnectionState('crypto', { status: 'disconnected' });
     this.setConnectionState('forex', { status: 'disconnected' });
+  }
+
+  private async subscribeToCryptoPairs(pairs: string[]) {
+    if (!this.binanceWs || this.binanceWs.readyState !== WebSocket.OPEN) {
+      throw new Error('Binance WebSocket not ready');
+    }
+
+    const symbols = pairs.map(p => p.toLowerCase().replace('binance:', ''));
+    
+    // Subscribe to both ticker and bookTicker for more accurate data
+    this.sendMessage(this.binanceWs, {
+      method: "SUBSCRIBE",
+      params: [
+        ...symbols.map(s => `${s}@ticker`),
+        ...symbols.map(s => `${s}@bookTicker`)
+      ],
+      id: Date.now()
+    });
+
+    this.binanceWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        let priceUpdate;
+
+        if (data.e === '24hrTicker') {
+          // Handle ticker data
+          priceUpdate = {
+            symbol: `BINANCE:${data.s}`,
+            price: data.c,
+            bid: data.b,
+            ask: data.a,
+            change: data.P
+          };
+        } else if (data.e === 'bookTicker') {
+          // Handle real-time book ticker data
+          priceUpdate = {
+            symbol: `BINANCE:${data.s}`,
+            price: data.b, // Use bid as reference price
+            bid: data.b,
+            ask: data.a,
+            change: this.lastPrices[`BINANCE:${data.s}`]?.change || '0.00'
+          };
+        }
+
+        if (priceUpdate) {
+          this.updatePrice(priceUpdate.symbol, priceUpdate);
+        }
+      } catch (error) {
+        console.warn('Error processing crypto message:', error);
+      }
+    };
+  }
+
+  private async subscribeToForexPairs(pairs: string[]) {
+    if (!this.tradermadeWs || this.tradermadeWs.readyState !== WebSocket.OPEN) {
+      throw new Error('TradeMade WebSocket not ready');
+    }
+
+    const symbols = pairs.map(p => p.replace('FX:', '').replace('/', ''));
+    
+    // Send subscription message with proper formatting
+    this.sendMessage(this.tradermadeWs, {
+      userKey: this.getCurrentApiKey(),
+      symbol: symbols.join(','),
+      _type: "subscribe"
+    });
+
+    this.tradermadeWs.onmessage = async (event) => {
+      try {
+        const message = event.data.toString();
+        
+        // Handle connection confirmation
+        if (message.includes('"connected":"connected"')) {
+          console.log('TradeMade WebSocket connected successfully');
+          return;
+        }
+
+        // Handle API key rotation message
+        if (message.includes('User Key Used')) {
+          console.log('TradeMade API key rotation needed');
+          await this.rotateApiKeyAndReconnect(pairs);
+          return;
+        }
+
+        if (!message.startsWith('{')) return;
+        
+        const data = JSON.parse(message);
+        if (data.symbol && data.bid && data.ask) {
+          const symbol = `FX:${data.symbol.slice(0,3)}/${data.symbol.slice(3)}`;
+          const priceUpdate = {
+            symbol,
+            price: data.mid || data.bid,
+            bid: data.bid,
+            ask: data.ask,
+            change: '0.00'
+          };
+          
+          this.updatePrice(symbol, priceUpdate);
+        }
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) {
+          console.error('Error handling forex message:', error);
+        }
+      }
+    };
+  }
+
+  private async rotateApiKeyAndReconnect(pairs: string[]) {
+    this.rotateApiKey();
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay
+    await this.connectForex(pairs);
   }
 }
 

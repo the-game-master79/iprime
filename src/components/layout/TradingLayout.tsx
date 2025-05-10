@@ -5,6 +5,7 @@ import { DepositDialog } from "@/components/dialogs/DepositDialog";
 import { PlusCircle, ChevronLeftCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
+import { isForexTradingTime } from "@/lib/utils"; // Fix import
 
 const RECENT_PAIRS_KEY = 'recentTradingPairs';
 
@@ -89,8 +90,33 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
     }
   }, [userBalance, prevBalance]);
 
+  // Add helper function to check if pair is forex
+  const isForexPair = (pair: string) => {
+    return pair.startsWith('FX:');
+  };
+
+  // Update check to use isForexTradingTime
+  useEffect(() => {
+    if (!isForexTradingTime()) {
+      setRecentPairs(prev => {
+        const filtered = prev.filter(pair => !isForexPair(pair));
+        localStorage.setItem(RECENT_PAIRS_KEY, JSON.stringify(filtered));
+        
+        // If current pair is forex, switch to first available non-forex pair
+        if (isForexPair(selectedPair) && filtered.length > 0) {
+          onPairSelect(filtered[0]);
+        }
+        
+        return filtered;
+      });
+    }
+  }, [selectedPair, onPairSelect]);
+
   // Simplified tab click handler - only updates selected pair without navigation
   const handleTabClick = (pair: string) => {
+    if (isForexPair(pair) && !isForexTradingTime()) {
+      return; // Prevent selecting forex pairs when market is closed
+    }
     onPairSelect(pair); // This will trigger chart update in parent component
   };
 
@@ -122,7 +148,9 @@ export const TradingLayout: React.FC<TradingLayoutProps> = ({
           {/* Trading pair tabs */}
           <div className="flex-1 overflow-x-auto scrollbar-none">
             <div className="flex gap-1 px-2">
-              {recentPairs.map(pair => {
+              {recentPairs
+                .filter(pair => !isForexTradingTime() || !isForexPair(pair))
+                .map(pair => {
                 const pairInfo = tradingPairs.find(p => p.symbol === pair);
                 if (!pairInfo) return null;
                 

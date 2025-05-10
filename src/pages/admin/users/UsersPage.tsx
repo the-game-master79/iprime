@@ -240,6 +240,20 @@ const UsersPage = () => {
     return 0;
   });
 
+  // Update totalPages calculation based on filtered results
+  const totalPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Apply pagination after filtering and sorting
+  const paginatedUsers = sortedUsers.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -250,12 +264,6 @@ const UsersPage = () => {
   };
 
   // Pagination logic
-  const totalPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE);
-  const paginatedUsers = sortedUsers.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -306,24 +314,47 @@ const UsersPage = () => {
 
     try {
       const newBalanceNum = parseFloat(newBalance);
-      // Update user wallet balance first
-      const { error: balanceError } = await supabase
+      
+      // Update user wallet balance in profiles table
+      const { data, error: balanceError } = await supabase
         .from('profiles')
-        .update({ withdrawal_wallet: newBalanceNum })
-        .eq('id', selectedUser.id);
+        .update({ 
+          withdrawal_wallet: newBalanceNum,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedUser.id)
+        .select()
+        .single();
 
       if (balanceError) throw balanceError;
-      await fetchUsers();
+
+      // Update local state with the returned data
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === selectedUser.id 
+            ? { ...user, withdrawal_wallet: newBalanceNum }
+            : user
+        )
+      );
+
+      // Also update selectedUserProfile if it exists and matches the current user
+      if (selectedUserProfile && selectedUserProfile.id === selectedUser.id) {
+        setSelectedUserProfile(prev => prev ? {
+          ...prev,
+          withdrawal_wallet: newBalanceNum
+        } : null);
+      }
+
       setIsBalanceDialogOpen(false);
       toast({
         title: "Balance Updated",
-        description: `Withdrawal wallet balance has been updated successfully`,
+        description: `Withdrawal wallet balance has been updated to $${newBalanceNum.toFixed(2)}`,
       });
     } catch (error) {
       console.error('Error updating balance:', error);
       toast({
         title: "Error",
-        description: "Failed to update balance",
+        description: "Failed to update balance. Please try again.",
         variant: "destructive",
       });
     }

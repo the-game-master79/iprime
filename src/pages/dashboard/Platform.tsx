@@ -2,32 +2,29 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
-import { DashboardTopbar } from "@/components/shared/DashboardTopbar"; // Add this import
+import { DashboardTopbar } from "@/components/shared/DashboardTopbar";
 
 // UI Components
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TransactionTable } from "@/components/tables/TransactionTable"; // Add this import
-import { RankTable } from "@/components/dashboard/RankTable"; // Add this import
-import { AmountCard } from "@/components/shared/AmountCard";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
+import { TransactionTable } from "@/components/tables/TransactionTable";
+import { RankTable } from "@/components/dashboard/RankTable";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // Icons
 import { 
   Copy,
   QrCode,
-  CaretLeft,
-  CaretRight,
   ShareNetwork,
   XCircle,
+  Wallet,
+  ArrowDown,
+  ArrowUp,
+  ChartLine,
+  Trophy,
+  Target,
+  Users
 } from "@phosphor-icons/react";
 
 // Utilities
@@ -663,38 +660,59 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
-            <div className="space-y-4"> {/* Changed from space-y-8 to space-y-4 */}
-              {/* Trading Card and Promotions */}
+            <div className="space-y-4">
+              {/* Referral Card with Promotions Button */}
               <div className="flex gap-4">
-                {/* Trading Card */}
-                <div 
-                  className="flex-1 bg-[#141414] rounded-2xl p-2 overflow-hidden relative cursor-pointer"
-                  onClick={() => navigate('/trade')}
-                >
-                  <img 
-                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//arrowct.png"
-                    alt="Arrow CT"
-                    className="absolute inset-0 w-full h-full object-cover rounded-xl"
-                  />
-                  <div className="relative z-10 h-full flex items-center justify-between px-0">
-                    <img 
-                      src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
-                      alt="CloudTrade"
-                      className="h-8 w-auto"
-                    />
-                    <Button 
-                      className="bg-white text-black hover:bg-white/90"
-                    >
-                      Trade
-                    </Button>
+                <div className="flex-1 bg-[#141414] rounded-2xl p-2">
+                    <div className="flex flex-col gap-2">
+                    <h3 className="px-2 pt-2 text-white/50">Invite friends and start earning</h3>
+                    <div className="flex items-center gap-4 w-full">
+                      <div className="relative flex-1">
+                        <Input
+                          readOnly
+                          value={referralCode}
+                          className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
+                        />
+                        <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="icon" 
+                          variant="outline"
+                          onClick={handleCopyLink}
+                          className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                        >
+                          <Copy className="h-5 w-5 text-white" weight="regular" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="outline"
+                          onClick={handleShowQrCode}
+                          className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                        >
+                          <QrCode className="h-5 w-5 text-white" weight="regular" />
+                        </Button>
+                        <div 
+                          className={cn(
+                            "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
+                            directCount >= 2 ? "bg-[#20BF55]" : 
+                            directCount === 1 ? "bg-[#FFA500]" : 
+                            "bg-[#FF005C]"
+                          )}
+                          onClick={handleDirectsClick}
+                        >
+                          <span className="text-sm font-medium text-white">{directCount}/2</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Promotions Button */}
                 <Button 
-                  variant="secondary" // Changed variant
-                  onClick={() => navigate('/promotions')} // Now correctly navigates to /promotions 
-                  className="bg-[#1E1E1E] text-white border-0 hover:bg-[#252525] h-auto" // Updated styles
+                  variant="secondary"
+                  onClick={() => navigate('/promotions')}
+                  className="bg-[#1E1E1E] text-white border-0 hover:bg-[#252525] h-auto min-w-[120px]"
                 >
                   <div className="flex flex-col items-center gap-1">
                     <span>Promotions</span>
@@ -705,72 +723,129 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 </Button>
               </div>
 
-              {/* Referral Card - Moved below Trading Card */}
-              <div className="bg-[#141414] rounded-2xl p-2">
-                <div className="flex items-center gap-4 w-full">
-                  <div className="relative flex-1">
-                    <Input
-                      readOnly
-                      value={referralCode}
-                      className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
-                    />
-                    <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      size="icon" 
-                      variant="outline"
-                      onClick={handleCopyLink}
-                      className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                    >
-                      <Copy className="h-5 w-5 text-white" weight="regular" />
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="outline"
-                      onClick={handleShowQrCode}
-                      className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                    >
-                      <QrCode className="h-5 w-5 text-white" weight="regular" />
-                    </Button>
-                    <div 
-                      className={cn(
-                        "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
-                        directCount >= 2 ? "bg-[#20BF55]" : 
-                        directCount === 1 ? "bg-[#FFA500]" : 
-                        "bg-[#FF005C]"
-                      )}
-                      onClick={handleDirectsClick}
-                    >
-                      <span className="text-sm font-medium text-white">{directCount}/2</span>
+              {/* Balance Container */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Combined Balance Card */}
+                <div className="md:col-span-2 bg-[#141414] rounded-2xl p-6">
+                  <div className="flex flex-col gap-6">
+                    {/* Balances Section */}
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {/* Available Balance */}
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Wallet className="h-5 w-5 text-white/50" />
+                          <span className="text-sm text-white/50">Available Balance</span>
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-3xl font-medium">
+                            ${withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </h3>
+                          {userProfile?.multiplier_bonus > 0 && (
+                            <p className="text-sm text-white/50">
+                              Including bonus: ${(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* AI Trading Balance */}
+                      <div className="flex-1">
+                        <div className="rounded-lg bg-secondary p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <img 
+                                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
+                                alt="AI Trading"
+                                className="h-5 w-5"
+                              />
+                              <span className="text-sm text-white/50">Trading</span>
+                            </div>
+                            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
+                              {activePlans.count} {activePlans.count === 1 ? 'Plan' : 'Plans'}
+                            </span>
+                          </div>
+                          <h3 className="text-3xl font-medium">
+                            ${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </h3>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Row - 2x2 grid on mobile */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Button 
+                        className="h-12 gap-2 bg-[#FFA500] text-white hover:bg-[#FFA500]/80" 
+                        onClick={() => navigate('/trade')}
+                      >
+                        <ChartLine className="h-5 w-5" />
+                        Trade
+                      </Button>
+                      <Button 
+                        className="h-12 gap-2" 
+                        onClick={() => navigate('/deposit')}
+                      >
+                        <ArrowDown className="h-5 w-5" />
+                        Add Funds
+                      </Button>
+                      <Button 
+                        variant="secondary"
+                        className="h-12 gap-2" 
+                        onClick={() => navigate('/withdrawals')}
+                      >
+                        <ArrowUp className="h-5 w-5" />
+                        Withdraw
+                      </Button>
+                      <Button 
+                        variant="secondary"
+                        className="h-12 gap-2" 
+                        onClick={() => navigate('/plans')}
+                      >
+                        <Wallet className="h-5 w-5" />
+                        View Plans
+                      </Button>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Balance Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <AmountCard
-                  title="Available to invest"
-                  amount={withdrawalBalance}
-                  subtitle={(userProfile?.multiplier_bonus || 0).toString()}
-                />
-
-                <AmountCard
-                  variant="compute"
-                  title="AI trading"
-                  amount={totalInvested}
-                  activePlans={activePlans.count}
-                />
-
-                <AmountCard
-                  variant="rank"
-                  title="Current Rank"
-                  amount={0}
-                  currentRank={businessStats.currentRank || 'New Member'}
-                  nextRank={businessStats.nextRank?.title}
-                  progress={businessStats.progress}
-                />
+                {/* Affiliate Rank Card */}
+                <div className="bg-[#141414] rounded-2xl p-6">
+                  <div className="h-full flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-white/50" />
+                        <span className="text-sm text-white/50">Affiliate Status</span>
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-3xl font-medium">
+                          {businessStats.currentRank || 'New Member'}
+                        </h3>
+                        <p className="text-sm text-white/50">
+                          ${businessStats.totalVolume.toLocaleString()} Business Volume
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Progress to Next Rank - Moved to bottom */}
+                    {businessStats.nextRank && (
+                      <div className="space-y-2 mt-auto pt-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-white/50">Next: {businessStats.nextRank.title}</span>
+                          <span>
+                            ${(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} more
+                          </span>
+                        </div>
+                        <div className="h-2 bg-[#1E1E1E] rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ 
+                              width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Tabs Section */}
@@ -868,9 +943,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               
               <p className="text-center text-base">
                 {directCount >= 2 ? (
-                  "Congratulations! You have achieved the required direct referrals. You can now earn commissions and bonuses."
+                  <>
+                    Congratulations! You have achieved the required direct referrals. You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
+                  </>
                 ) : (
-                  `You need ${2 - directCount} more direct referral${2 - directCount > 1 ? 's' : ''} to start earning commissions and bonuses.`
+                  <>
+                    You need {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''} to start earning <span className={cn(
+                      "font-bold",
+                      directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
+                    )}>commissions and bonuses</span>.
+                  </>
                 )}
               </p>
             </AlertDialogDescription>
