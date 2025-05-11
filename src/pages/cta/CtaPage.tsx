@@ -26,7 +26,7 @@ export const CtaPage = () => {
               New features available.{' '}
               <Link to="/features" className="font-semibold text-primary">
                 <span className="absolute inset-0" aria-hidden="true" />
-                Read more <span aria-hidden="true">&rarr;</span>
+                Explore New Trading Features <span aria-hidden="true">&rarr;</span>
               </Link>
             </div>
           </div>
@@ -41,12 +41,12 @@ export const CtaPage = () => {
                   className="px-8 gap-2 bg-secondary hover:bg-secondary/90 text-white relative overflow-hidden group"
                 >
                   <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
-                  Get Started
+                  Create Trading Account
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
               <Link to="/contact" className="text-sm font-semibold leading-6 text-foreground">
-                Enquire for Institutional Trading <span aria-hidden="true">→</span>
+                Contact Institutional Trading Team <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>

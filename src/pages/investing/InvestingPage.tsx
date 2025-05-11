@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Cpu, HardDrive, DatabaseZap, BarChart2, Send, MoveRight, Timer, Percent, ArrowRight } from "lucide-react";
+import { Cpu, HardDrive, DatabaseZap, BarChart2, Send, MoveRight, Timer, Percent, ArrowRight, ShieldCheck, Lock, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SEO } from "@/components/shared/SEO";
 
@@ -74,17 +74,102 @@ const InvestingPage = () => {
               icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />,
               text: "Investment Plans"
             }}
-            title="Grow Your Wealth"
-            description="Choose from our range of investment plans designed for optimal returns."
+            title="Smart Investment Solutions for Your Future"
+            description="Discover our professionally managed investment plans offering consistent returns through algorithmic trading and advanced market analysis."
             action={{
-              text: "View Plans",
+              text: "Start Investing",
               href: "/auth/login"
             }}
           />
 
+          {/* Investment Overview Section */}
+          <section className="py-16 bg-accent/5">
+            <div className="container max-w-[1200px] mx-auto px-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div className="space-y-6">
+                  <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Why Invest with CloudForex?</h2>
+                  <p className="text-muted-foreground">
+                    Our investment plans combine sophisticated trading algorithms with expert market analysis to generate 
+                    consistent returns. We leverage advanced technology and years of market expertise to manage your 
+                    investments effectively.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Flexible Duration</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Choose investment periods that suit your financial goals</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Percent className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Competitive Returns</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Earn attractive returns through our optimized trading strategies</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <DatabaseZap className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Auto-Trading</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Let our AI-powered systems handle the trading for you</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <BarChart2 className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Performance Tracking</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Monitor your investment performance in real-time</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                  <h3 className="text-xl font-semibold mb-4">Investment Process</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-primary font-medium">1</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-1">Choose Your Plan</h4>
+                        <p className="text-sm text-muted-foreground">Select an investment plan that matches your goals and budget</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-primary font-medium">2</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-1">Fund Your Account</h4>
+                        <p className="text-sm text-muted-foreground">Deposit funds securely using your preferred payment method</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-primary font-medium">3</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium mb-1">Start Earning</h4>
+                        <p className="text-sm text-muted-foreground">Our systems begin trading and generating returns for you</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Investment Plans */}
           <section className="py-16">
             <div className="container max-w-[1200px] mx-auto px-4">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-4">Choose Your Investment Plan</h2>
+                <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  We offer carefully structured investment plans to suit different investment goals and risk appetites. 
+                  Each plan is powered by our advanced trading algorithms and managed by experienced professionals.
+                </p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loading ? (
                   // Loading skeletons
@@ -169,7 +254,7 @@ const InvestingPage = () => {
                               setShowBenefits(true);
                             }}
                           >
-                            View Plan Benefits
+                            See Full Investment Benefits
                             <ArrowRight className="ml-2 h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </div>
@@ -181,6 +266,41 @@ const InvestingPage = () => {
             </div>
           </section>
         </main>
+
+        {/* Safety and Security Section */}
+        <section className="py-16 bg-accent/5">
+          <div className="container max-w-[1200px] mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-4">Your Investment Security</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                We prioritize the security of your investments through robust risk management and transparent operations.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <ShieldCheck className="h-8 w-8 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Risk Management</h3>
+                <p className="text-sm text-muted-foreground">
+                  Our sophisticated risk management systems monitor and adjust trading positions in real-time to protect your investment.
+                </p>
+              </div>
+              <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <Lock className="h-8 w-8 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Secure Platform</h3>
+                <p className="text-sm text-muted-foreground">
+                  Bank-grade security measures protect your funds and personal information, with regular security audits.
+                </p>
+              </div>
+              <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <Eye className="h-8 w-8 text-primary mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Full Transparency</h3>
+                <p className="text-sm text-muted-foreground">
+                  Track your investment performance and returns in real-time through our detailed reporting dashboard.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <Footer />
 

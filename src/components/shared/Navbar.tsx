@@ -53,7 +53,7 @@ export const Navbar = () => {
           <div className="flex items-center gap-4">
             <Link to={user ? "/platform" : "/auth/login"}>
               <Button variant="default" className="rounded-xl px-6 gap-2">
-                {user ? "Go to App" : "Get Started"}
+                {user ? "Access Platform" : "Open Account"}
                 <ArrowCircleRight weight="bold" className="h-5 w-5" />
               </Button>
             </Link>
