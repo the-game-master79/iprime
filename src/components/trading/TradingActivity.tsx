@@ -10,7 +10,6 @@ import { PriceData, TradingPair } from "@/types/trading";
 import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Trade {
   id: string;
@@ -52,6 +51,11 @@ interface MarginInfo {
 
 const ITEMS_PER_PAGE = 10;
 
+// Helper function to format numbers with 2 decimal places and USD symbol
+const formatNumber = (value: number) => {
+  return `$${value.toFixed(2)}`;
+};
+
 export const TradingActivity = ({ 
   trades, 
   onCloseTrade,
@@ -64,7 +68,6 @@ export const TradingActivity = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
-  const { convertAmount } = useCurrency();
 
   const toggleRowExpansion = (key: string) => {
     const newExpanded = new Set(expandedRows);
@@ -411,7 +414,7 @@ export const TradingActivity = ({
                   "text-sm font-mono font-medium",
                   totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
                 )}>
-                  {convertAmount(totalPnL)}
+                  {formatNumber(totalPnL)}
                 </div>
                 {filteredTrades.open.length > 0 && (
                   <Button
@@ -538,7 +541,7 @@ export const TradingActivity = ({
                                 : currentPrice.toFixed(decimals)}
                           </td>
                           <td className="p-2 text-right font-mono">
-                            {convertAmount(trade.margin_amount || 0)}
+                            {formatNumber(trade.margin_amount || 0)}
                           </td>
                           <td className="p-2 font-mono">
                             <div className="flex items-center gap-2">
@@ -586,7 +589,7 @@ export const TradingActivity = ({
                                 "font-mono",
                                 pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
                               )}>
-                                {convertAmount(pnl)}
+                                {formatNumber(pnl)}
                               </div>
                             </td>
                           )}
@@ -657,11 +660,11 @@ export const TradingActivity = ({
                                             : currentPrice.toFixed(decimals)
                                           } USD
                                         </td>
-                                        <td className="p-1 text-right">{convertAmount(subTrade.margin_amount || 0)}</td>
+                                        <td className="p-1 text-right">{formatNumber(subTrade.margin_amount || 0)}</td>
                                         <td className={cn(
                                           "p-1 text-right font-mono",
                                           subPnl > 0 ? "text-green-500" : "text-red-500"
-                                        )}>{convertAmount(subPnl)}</td>
+                                        )}>{formatNumber(subPnl)}</td>
                                         <td className="p-1 text-right">
                                           <Button
                                             variant="ghost"
@@ -728,12 +731,12 @@ export const TradingActivity = ({
         <div className="flex items-center justify-between w-full gap-8">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Balance:</span>
-            <div className="font-mono text-sm">{convertAmount(userBalance)}</div>
+            <div className="font-mono text-sm">{formatNumber(userBalance)}</div>
           </div>
           
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Used Margin:</span>
-            <div className="font-mono text-sm">{convertAmount(marginInfo.totalMarginUsed)}</div>
+            <div className="font-mono text-sm">{formatNumber(marginInfo.totalMarginUsed)}</div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -742,7 +745,7 @@ export const TradingActivity = ({
               "font-mono text-sm",
               marginInfo.freeMargin < 0 ? "text-red-500" : "text-green-500"
             )}>
-              {convertAmount(marginInfo.freeMargin)}
+              {formatNumber(marginInfo.freeMargin)}
             </div>
           </div>
 
