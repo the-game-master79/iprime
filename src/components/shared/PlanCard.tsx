@@ -16,8 +16,38 @@ interface PlanCardProps {
   daysRemaining?: number;
   subscriptionDate?: string;
   onInvest?: () => void;
+  onCancel?: () => void;
   benefits?: string[];
 }
+
+const getBadgeStyle = (planName: string) => {
+  switch (planName.toLowerCase()) {
+    case 'basic plan': 
+      return {
+        background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.1))',
+        border: '1px solid rgba(59, 130, 246, 0.2)',
+        icon: 'bg-blue-500/20'
+      };
+    case 'pro plan': 
+      return {
+        background: 'linear-gradient(45deg, rgba(34, 197, 94, 0.1), rgba(21, 128, 61, 0.1))',
+        border: '1px solid rgba(34, 197, 94, 0.2)',
+        icon: 'bg-green-500/20'
+      };
+    case 'premium plan': 
+      return {
+        background: 'linear-gradient(45deg, rgba(168, 85, 247, 0.1), rgba(126, 34, 206, 0.1))',
+        border: '1px solid rgba(168, 85, 247, 0.2)',
+        icon: 'bg-purple-500/20'
+      };
+    default: 
+      return {
+        background: 'linear-gradient(45deg, rgba(75, 85, 99, 0.1), rgba(55, 65, 81, 0.1))',
+        border: '1px solid rgba(75, 85, 99, 0.2)',
+        icon: 'bg-gray-500/20'
+      };
+  }
+};
 
 export function PlanCard({
   variant = 'available',
@@ -30,88 +60,277 @@ export function PlanCard({
   daysRemaining,
   subscriptionDate,
   onInvest,
+  onCancel,
   benefits = []
 }: PlanCardProps) {
-  const getBadgeColor = () => {
-    switch (name.toLowerCase()) {
-      case 'basic plan': return 'bg-blue-900/20';
-      case 'pro plan': return 'bg-green-900/20';
-      case 'premium plan': return 'bg-purple-900/20';
-      default: return 'bg-gray-900/20';
-    }
-  };
+  const style = getBadgeStyle(name);
 
   return (
-    <Card className="p-6 bg-card/30 border-border/40">
-      <div className="space-y-4">
-        <div className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <Badge variant="outline" className={getBadgeColor()}>{name}</Badge>
-              <h2 className="text-2xl font-bold">
-                {amount.toLocaleString()} USD <span className="text-lg text-muted-foreground">({percentage}%)</span>
-              </h2>
-            </div>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              {variant === 'available' ? (
-                <>
-                  <Lock className="h-3 w-3" /> {duration} days
-                </>
-              ) : (
-                <>
-                  <Clock className="h-3 w-3" /> Subscribed: {subscriptionDate}
-                </>
-              )}
+    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg">
+      <div className="absolute inset-0" style={{ background: style.background }} />
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-primary/5 via-primary/2 to-transparent" />
+      
+      <div className="relative p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Badge 
+              variant="outline" 
+              style={{ borderColor: style.border }}
+              className="px-4 py-1 text-sm font-medium backdrop-blur-sm"
+            >
+              {name}
             </Badge>
+            <div className="space-y-1">              
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-3xl font-bold tracking-tight">
+                  {Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} USD
+                </h2>
+                <span className="text-lg text-primary font-medium">
+                  {Number(percentage * duration).toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5" />
+                  <span>{duration} days lock-in</span>
+                </div>
+                <span>•</span>
+                <span>
+                  ROI: ${((amount * percentage / 100 * duration)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
           </div>
 
-          {variant === 'available' && (
-            <div className="flex flex-row gap-2 w-full md:w-[300px] md:ml-auto">
-              <Button 
-                size="sm"
-                onClick={onInvest}
-                className="flex-1"
-              >
-                Select <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex-1"
+          <div className={`p-3 rounded-xl ${style.icon} transition-transform group-hover:scale-110`}>
+            {variant === 'available' ? (
+              <Lock className="h-5 w-5 text-primary" />
+            ) : (
+              <Clock className="h-5 w-5 text-primary" />
+            )}
+          </div>
+        </div>
+
+        {/* Benefits Preview */}
+        {variant === 'available' && benefits.length > 0 && (
+          <div className="space-y-2 py-2">
+            <ul className="space-y-2">
+              {benefits.slice(0, 3).map((benefit, index) => (
+                <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground group-hover:text-muted-foreground/80">
+                  <div className="h-1 w-1 rounded-full bg-primary" />
+                  {benefit}
+                </li>
+              ))}
+              {benefits.length > 3 && (
+                <li className="text-sm text-muted-foreground/70 pl-3">
+                  +{benefits.length - 3} more benefits...
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {/* Progress for Active Plans */}
+        {variant === 'active' && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium">{progress?.toFixed(2)}%</span>
+              </div>
+              <Progress 
+                value={progress} 
+                className="h-2 [&>div]:bg-primary"
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-primary">               
+                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                <span className="font-medium">+${Number(earnings || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} earned</span>
+              </div>
+              <span className="text-muted-foreground">{daysRemaining} days remaining</span>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        {variant === 'available' ? (
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={onInvest}
+              className="flex-1 bg-primary hover:bg-primary/90"
+            >
+              Invest Now <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                >
+                  Details
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-xl flex items-center gap-2">
+                    <div className={`p-2 rounded-lg ${style.icon}`}>
+                      <Lock className="h-4 w-4 text-primary" />
+                    </div>
+                    {name}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-6 pt-2">
+                      <div className="space-y-2">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Investment Amount</span>
+                          <span className="text-lg font-medium">${amount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Daily Return</span>
+                          <span className="text-lg font-medium text-primary">{percentage}%</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Duration</span>
+                          <span className="text-lg font-medium">{duration} days</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="font-medium">Benefits & Features</h4>
+                        <ul className="space-y-2">
+                          {benefits.map((benefit, index) => (
+                            <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2" />
+                              <span>{benefit}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-primary/20 hover:border-primary/40">
+                    Close
+                  </AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">              
+          <AlertDialog>
+              <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white"
                   >
-                    More info
+                    Cancel Plan
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>{name} Details</AlertDialogTitle>
-                    <AlertDialogDescription className="space-y-4">
-                      <p>Investment details and benefits overview.</p>
-                      <ul className="list-disc pl-4 space-y-2">
-                        {benefits.map((benefit, index) => (
-                          <li key={index}>{benefit}</li>
-                        ))}
-                      </ul>
+                    <AlertDialogTitle>Cancel Investment Plan</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-4 pt-2">
+                        <p className="text-sm text-muted-foreground">Please review the cancellation details below:</p>
+                        
+                        <div className="space-y-3 rounded-lg border bg-card/50 p-4">
+                          <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">Investment Amount</span>
+                            <span className="font-medium">${amount.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-green-500">
+                            <span className="text-sm">Total Returns</span>
+                            <span className="font-medium">+${earnings?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-destructive">
+                            <span className="text-sm">Pre-closure Fee (10%)</span>
+                            <span className="font-medium">-${(amount * 0.10).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-destructive">
+                            <span className="text-sm">Admin Fee (5%)</span>
+                            <span className="font-medium">-${(amount * 0.05).toLocaleString()}</span>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <div className="flex justify-between font-medium">
+                              <span>Net Refund Amount</span>
+                              <span>${(amount - (amount * 0.15)).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Close</AlertDialogCancel>
+                    <AlertDialogCancel className="border-primary/20 hover:border-primary/40">Back</AlertDialogCancel>
+                    <Button variant="destructive" onClick={onCancel}>Confirm Cancellation</Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            </div>
-          )}
-        </div>
+              <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                >
+                  Details
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-xl flex items-center gap-2">
+                    <div className={`p-2 rounded-lg ${style.icon}`}>
+                      <Clock className="h-4 w-4 text-primary" />
+                    </div>
+                    {name}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-6 pt-2">
+                      <div className="space-y-3">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Subscription Date</span>
+                          <span className="text-base font-medium">{subscriptionDate}</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Investment Amount</span>
+                          <span className="text-lg font-medium">${amount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Daily Return</span>
+                          <span className="text-lg font-medium text-primary">{percentage}%</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">Total Earned</span>
+                          <span className="text-lg font-medium text-green-500">+${earnings?.toFixed(2)}</span>
+                        </div>
+                      </div>
 
-        {variant === 'active' && (
-          <div className="space-y-2">
-            <Progress value={progress} className="h-2 rounded-full [&>div]:rounded-full" />
-            <div className="flex justify-between text-xs mt-2">
-              <span className="text-green-500 font-medium">+{earnings?.toFixed(2)} USD earned</span>
-              <span className="text-muted-foreground">{daysRemaining} days remain</span>
-            </div>
+                      <div className="space-y-2 bg-card/50 rounded-lg p-4 border border-primary/10">              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Progress</span>
+                <span className="font-medium">{progress?.toFixed(2)}%</span>
+              </div>
+              <Progress 
+                value={progress} 
+                className="h-2 [&>div]:bg-primary"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                          <span>Day {duration - daysRemaining}</span>
+                          <span>Day {duration}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-primary/20 hover:border-primary/40">
+                    Close
+                  </AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </div>

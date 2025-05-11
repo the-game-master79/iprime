@@ -321,6 +321,19 @@ const Plans = () => {
   };
 
   const handleCancelSubscription = async (plan: PlanWithSubscription) => {
+    // Calculate fees and refund amount
+    const { forexFee, adminFee, refundAmount } = calculateRefundAmount(plan.amount);
+    
+    // Show confirmation dialog with fee breakdown
+    if (!window.confirm(
+      `Are you sure you want to cancel this plan?\n\n` +
+      `Investment Amount: $${plan.investment.toFixed(2)}\n` +
+      `Forex Fee (10%): -$${forexFee.toFixed(2)}\n` +
+      `Admin Fee (5%): -$${adminFee.toFixed(2)}\n` +
+      `Refund Amount: $${refundAmount.toFixed(2)}\n\n` +
+      `Click OK to proceed with cancellation.`
+    )) return;
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;

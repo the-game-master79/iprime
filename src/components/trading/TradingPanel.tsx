@@ -15,6 +15,23 @@ import {
 } from "@/utils/trading";
 import { useNavigate } from "react-router-dom"; // Add this import at the top
 import { supabase } from "@/lib/supabase"; // Add this import at the top
+import { AlertTriangle, DollarSign, TrendingUp } from "lucide-react";
+
+// Helper functions for leverage categories
+interface LeverageCategories {
+  low: number[];
+  medium: number[];
+  high: number[];
+}
+
+const getLeverageCategories = (leverageOptions: number[]): LeverageCategories => {
+  const sortedOptions = [...leverageOptions].sort((a, b) => a - b);
+  return {
+    low: sortedOptions.filter(l => l <= 100),
+    medium: sortedOptions.filter(l => l > 100 && l <= 500),
+    high: sortedOptions.filter(l => l > 500)
+  };
+};
 
 interface SubscriptionPlan {
   id: string;
@@ -37,6 +54,34 @@ interface TradingPanelProps {
   trades?: Trade[]; // Make trades prop optional
 }
 
+interface RiskLevelInfo {
+  label: string;
+  color: string;
+  Icon: any;
+  description: string;
+}
+
+const RISK_LEVEL_INFO: Record<'low' | 'medium' | 'high', RiskLevelInfo> = {
+  low: {
+    label: 'Conservative',
+    color: 'text-green-500',
+    Icon: DollarSign,
+    description: 'Lower risk, suitable for beginners'
+  },
+  medium: {
+    label: 'Moderate',
+    color: 'text-yellow-500',
+    Icon: TrendingUp,
+    description: 'Balanced risk-reward ratio'
+  },
+  high: {
+    label: 'Aggressive',
+    color: 'text-red-500',
+    Icon: AlertTriangle,
+    description: 'High risk, for experienced traders'
+  }
+};
+
 export const TradingPanel = ({
   selectedPair,
   pairPrices,
@@ -55,7 +100,15 @@ export const TradingPanel = ({
   const [lots, setLots] = useState('0.01');
   const [selectedLeverage, setSelectedLeverage] = useState(defaultLeverage.toString());
   const [pairInfo, setPairInfo] = useState<TradingPair | null>(null);
-  // Remove showLeverageDialog state
+  const [actualLeverage, setActualLeverage] = useState(defaultLeverage);
+  const [showLeverageDialog, setShowLeverageDialog] = useState(false);
+  const [newLeverage, setNewLeverage] = useState(defaultLeverage.toString());
+
+  // Effect to handle defaultLeverage changes
+  useEffect(() => {
+    setSelectedLeverage(defaultLeverage.toString());
+    setActualLeverage(defaultLeverage);
+  }, [defaultLeverage]);
 
   // Add crypto decimal limits mapping
   const cryptoLotDecimals: Record<string, number> = {
@@ -128,17 +181,75 @@ export const TradingPanel = ({
     return options.length ? Math.max(...options) : 1;
   };
 
-  // Update leverage dialog section to show max leverage
+  // Add effect to manage leverage based on pair limits
   useEffect(() => {
     const pair = tradingPairs.find(p => p.symbol === selectedPair);
-    if (pair) {
+    if (pair && pair.leverage_options?.length > 0) {
       setPairInfo(pair);
-      // Parse leverage options from the array
-      const leverageOptions = pair.leverage_options?.map(Number) || [];
-      const defaultLeverageValue = leverageOptions.find(l => l >= defaultLeverage) || leverageOptions[0];
-      setSelectedLeverage(defaultLeverageValue?.toString() || "1");
+      // Get the leverage options and sort them
+      const leverageOptions = [...pair.leverage_options].sort((a, b) => a - b);
+      const selectedValue = parseInt(selectedLeverage);
+      
+      // Find the closest available leverage option that's less than or equal to selected value
+      // If none found, use the highest available option
+      const effectiveLeverage = leverageOptions
+        .filter(l => l <= selectedValue)
+        .sort((a, b) => b - a)[0] || leverageOptions[leverageOptions.length - 1];
+      
+      if (effectiveLeverage !== selectedValue) {
+        // Update both selected and actual leverage
+        setSelectedLeverage(effectiveLeverage.toString());
+        setActualLeverage(effectiveLeverage);
+        
+        // Show a message about the adjustment
+        toast({
+          description: `Leverage adjusted to ${effectiveLeverage}x (available for ${pair.short_name || pair.symbol})`,
+        });
+        
+        // If a save leverage handler is provided and the leverage needs to change
+        if (onSaveLeverage) {
+          onSaveLeverage(effectiveLeverage).catch(error => {
+            console.error('Error saving leverage:', error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Failed to update leverage preference"
+            });
+          });
+        }
+      } else {
+        setActualLeverage(selectedValue);
+      }
     }
-  }, [selectedPair, tradingPairs, defaultLeverage]);
+  }, [selectedPair, tradingPairs, selectedLeverage]);
+
+  // Initialize leverage state on component mount and pair changes
+  useEffect(() => {
+    const pair = tradingPairs.find(p => p.symbol === selectedPair);
+    if (!pair || !pair.leverage_options?.length) return;
+
+    setPairInfo(pair);
+    const userLeverage = parseInt(selectedLeverage);
+    const maxPairLeverage = Math.max(...pair.leverage_options);
+
+    // If current leverage is beyond pair's maximum, cap it
+    if (userLeverage > maxPairLeverage) {
+      setActualLeverage(maxPairLeverage);
+      setSelectedLeverage(maxPairLeverage.toString());
+      
+      // Only show toast if leverage was actually changed
+      if (userLeverage !== maxPairLeverage) {
+        toast({
+          description: `${pair.short_name || pair.symbol}: Leverage adjusted from ${userLeverage}x to ${maxPairLeverage}x (maximum allowed)`,
+          duration: 4000
+        });
+      }
+    } else {
+      // Keep user's selected leverage since it's within pair limits
+      setActualLeverage(userLeverage);
+      setSelectedLeverage(userLeverage.toString());
+    }
+  }, [selectedPair, tradingPairs]);
 
   const isGoldPair = (pair: string): boolean => {
     return pair === 'FX:XAU/USD';
@@ -154,11 +265,11 @@ export const TradingPanel = ({
     if (selectedPair === 'FX:XAU/USD') {
       // Gold margin calculation: (lots * 100 * price) / leverage
       // 100 represents troy ounces per lot for gold
-      return ((lotSize * 100 * price) / leverageValue).toFixed(2);
+      return ((lotSize * 100 * price) / actualLeverage).toFixed(2);
     }
     
-    return calculateRequiredMargin(price, lotSize, leverageValue, isCrypto, selectedPair).toFixed(2);
-  }, [lots, pairPrices, selectedLeverage, selectedPair]);
+    return calculateRequiredMargin(price, lotSize, actualLeverage, isCrypto, selectedPair).toFixed(2);
+  }, [lots, pairPrices, selectedLeverage, selectedPair, actualLeverage]);
 
   // Update tradingInfo calculation to use calculatePipValue function
   const tradingInfo = useMemo(() => {
@@ -480,6 +591,42 @@ export const TradingPanel = ({
     );
   }, [staticAskPrice, staticBidPrice, selectedPair, tradingPairs]);
 
+  const handleLeverageSelect = async (leverage: number) => {
+    const pair = tradingPairs.find(p => p.symbol === selectedPair);
+    if (!pair) return;
+
+    const maxPairLeverage = Math.max(...(pair.leverage_options || []));
+    const effectiveLeverage = Math.min(leverage, maxPairLeverage);
+
+    // Update states
+    setNewLeverage(effectiveLeverage.toString());
+    setSelectedLeverage(effectiveLeverage.toString());
+    setActualLeverage(effectiveLeverage);
+
+    // Show toast if leverage was capped
+    if (leverage !== effectiveLeverage) {
+      toast({
+        description: `${pair.short_name || pair.symbol} has a maximum leverage of ${maxPairLeverage}x. Your selected leverage (${leverage}x) has been adjusted accordingly.`,
+        duration: 4000
+      });
+    }
+
+    // Save preference if handler provided
+    if (onSaveLeverage) {
+      try {
+        await onSaveLeverage(effectiveLeverage);
+      } catch (error) {
+        console.error('Error saving leverage:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update leverage preference"
+        });
+      }
+    }
+    setShowLeverageDialog(false);
+  };
+
   return (
     <div className="w-[350px] border-l border-[#525252] bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
@@ -631,9 +778,16 @@ export const TradingPanel = ({
                   </div>
                   <div className="flex justify-between">
                     <span>Leverage:</span>
-                    <span className="font-mono">
-                      {pairInfo?.leverage_options ? `${selectedLeverage}x` : '1x'}
-                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto p-0 font-mono hover:bg-transparent"
+                      onClick={() => setShowLeverageDialog(true)}
+                    >
+                      {actualLeverage !== parseInt(selectedLeverage)
+                        ? `${actualLeverage}x (max for ${pairInfo?.short_name})`
+                        : `${actualLeverage}x`}
+                    </Button>
                   </div>
                   <div className="flex justify-between">
                     <span>Pip Value:</span>
@@ -674,6 +828,52 @@ export const TradingPanel = ({
           </Button>
         </div>
       </div>
+
+      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Leverage</DialogTitle>
+            <DialogDescription>
+              Choose your preferred leverage level. Higher leverage increases both potential profits and risks.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {pairInfo && getVisibleRiskCategories(pairInfo.leverage_options || []).map(category => {
+              const options = getLeverageCategories(pairInfo.leverage_options || [])[category];
+              const { label, color, Icon, description } = RISK_LEVEL_INFO[category];
+
+              return (
+                <div key={category} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Icon className={cn("h-4 w-4", color)} />
+                    <span className={cn("font-medium", color)}>{label}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{description}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {options.map(leverage => (
+                      <Button
+                        key={leverage}
+                        variant={parseInt(selectedLeverage) === leverage ? "secondary" : "outline"}
+                        onClick={() => handleLeverageSelect(leverage)}
+                        className="flex-1"
+                      >
+                        {leverage}x
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">
+              Selected leverage will be saved as your default for future trades.
+            </p>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

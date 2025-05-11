@@ -13,9 +13,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
 import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ForexCryptoSheet } from "@/components/shared/ForexCryptoSheet";
 import { cn } from "@/lib/utils";
+import { DollarSign, TrendingUp, Zap } from "lucide-react";
 
 // Add helper function after imports
 const getRiskLevel = (leverage: number): { label: string; color: string } => {
@@ -120,6 +121,57 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [showForexCryptoSheet, setShowForexCryptoSheet] = useState(false);
   const [defaultLeverage, setDefaultLeverage] = useState(leverage);
   const [selectedLeverage, setSelectedLeverage] = useState(leverage.toString());
+
+  // Helper functions for leverage categories
+  interface LeverageCategories {
+    low: number[];
+    medium: number[];
+    high: number[];
+  }
+
+  const getLeverageCategories = (leverageOptions: number[]): LeverageCategories => {
+    const sortedOptions = [...leverageOptions].sort((a, b) => a - b);
+    return {
+      low: sortedOptions.filter(l => l <= 20),
+      medium: sortedOptions.filter(l => l > 20 && l <= 100),
+      high: sortedOptions.filter(l => l > 100)
+    };
+  };
+
+  interface RiskLevelInfo {
+    label: string;
+    color: string;
+    Icon: any;
+    description: string;
+  }
+
+  const RISK_LEVEL_INFO: Record<'low' | 'medium' | 'high', RiskLevelInfo> = {
+    low: {
+      label: 'Conservative',
+      color: 'text-green-500',
+      Icon: DollarSign,
+      description: 'Lower risk, suitable for beginners'
+    },
+    medium: {
+      label: 'Moderate',
+      color: 'text-yellow-500',
+      Icon: TrendingUp,
+      description: 'Balanced risk-reward ratio'
+    },
+    high: {
+      label: 'Aggressive',
+      color: 'text-red-500',
+      Icon: Zap,
+      description: 'Higher risk, for experienced traders'
+    }
+  };
+
+  const getVisibleRiskCategories = (leverageOptions: number[]): Array<'low' | 'medium' | 'high'> => {
+    const categories = getLeverageCategories(leverageOptions);
+    return Object.entries(categories)
+      .filter(([_, options]) => options.length > 0)
+      .map(([category]) => category as 'low' | 'medium' | 'high');
+  };
 
   useEffect(() => {
     if (!pair) {
@@ -876,8 +928,72 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     setShowLeverageDialog(false);
   };
 
+  // Add handler for leverage selection
+  const handleLeverageSelect = (leverage: number) => {
+    const maxAllowedLeverage = Math.max(...(pairInfo?.leverage_options || []));
+    const effectiveLeverage = Math.min(leverage, maxAllowedLeverage);
+
+    // Update leverage state
+    setSelectedLeverage(effectiveLeverage.toString());
+    
+    // Show toast if leverage was capped
+    if (leverage !== effectiveLeverage) {
+      toast({
+        description: `${pairInfo?.name || defaultPair} has a maximum leverage of ${maxAllowedLeverage}x. Your selected leverage (${leverage}x) has been adjusted accordingly.`,
+        duration: 4000
+      });
+    }
+  };
+
   return (
     <div className="h-screen bg-background flex flex-col">
+      {/* Leverage Selection Dialog */}
+      <Dialog open={showLeverageDialog} onOpenChange={setShowLeverageDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Leverage</DialogTitle>
+            <DialogDescription>
+              Choose your preferred leverage level. Higher leverage increases both potential profits and risks.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {pairInfo && getVisibleRiskCategories(pairInfo.leverage_options || []).map(category => {
+              const options = getLeverageCategories(pairInfo.leverage_options || [])[category];
+              const { label, color, Icon, description } = RISK_LEVEL_INFO[category];
+
+              return (
+                <div key={category} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Icon className={cn("h-4 w-4", color)} />
+                    <span className={cn("font-medium", color)}>{label}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{description}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {options.map(leverage => (
+                      <Button
+                        key={leverage}
+                        variant={parseInt(selectedLeverage) === leverage ? "secondary" : "outline"}
+                        onClick={() => handleLeverageSelect(leverage)}
+                        className="flex-1"
+                      >
+                        {leverage}x
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground">
+              Selected leverage will be saved as your default for future trades.
+            </p>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Balance Card */}
       <div className="px-4 pt-4">
         <div className="bg-[#141414] rounded-xl border border-[#525252]">
@@ -981,9 +1097,7 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
         open={showTradesSheet}
         onOpenChange={setShowTradesSheet}
         trades={trades}
-        pairPrices={pairPrices}
         onCloseTrade={handleCloseTrade}
-        calculatePnL={calculatePnL}
       />
 
       <div className="container mx-auto px-4 flex-1">
@@ -1008,9 +1122,21 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                     <Badge variant="outline" className="flex-1 text-center border-[#525252]">
                       Max Lots: {effectiveMaxLots.toFixed(2)}
                     </Badge>
-                    <Badge variant="outline" className="flex-1 text-center border-[#525252]">
-                      Leverage: {defaultLeverage}x
-                    </Badge>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowLeverageDialog(true)}
+                      className="p-0 h-auto flex-1"
+                    >
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "w-full text-center border-[#525252]",
+                          getRiskLevel(parseInt(selectedLeverage)).color
+                        )}
+                      >
+                        Leverage: {selectedLeverage}x
+                      </Badge>
+                    </Button>
                   </div>
 
                   {/* Lots Input with touch-friendly increment/decrement buttons */}

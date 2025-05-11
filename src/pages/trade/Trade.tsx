@@ -213,6 +213,15 @@ const Trade = () => {
         }
       }
 
+      // Get the current trading pair info
+      const currentPair = tradingPairs.find(p => p.symbol === selectedPair);
+      if (!currentPair) {
+        throw new Error('Trading pair not found');
+      }
+
+      // Ensure leverage doesn't exceed pair's max leverage
+      const effectiveLeverage = Math.min(params.leverage, currentPair.max_leverage);
+
       const currentPrice = params.type === 'buy'
         ? parseFloat(pairPrices[selectedPair]?.ask || '0')
         : parseFloat(pairPrices[selectedPair]?.bid || '0');
@@ -225,7 +234,7 @@ const Trade = () => {
       const marginAmount = calculateRequiredMargin(
         effectivePrice,
         params.lots,
-        params.leverage,
+        effectiveLeverage, // Use the capped leverage
         selectedPair.includes('BINANCE:'),
         selectedPair
       );
@@ -247,9 +256,9 @@ const Trade = () => {
           pair: selectedPair,
           type: params.type,
           status: params.orderType === 'limit' ? 'pending' : 'open',
-          open_price: effectivePrice, // Set open_price to limit price for limit orders
+          open_price: effectivePrice,
           lots: params.lots,
-          leverage: params.leverage,
+          leverage: effectiveLeverage, // Use the capped leverage
           order_type: params.orderType,
           limit_price: params.limitPrice,
           margin_amount: marginAmount
@@ -267,7 +276,7 @@ const Trade = () => {
         status: params.orderType === 'limit' ? 'pending' : 'open',
         openPrice: params.orderType === 'limit' ? params.limitPrice! : currentPrice,
         lots: params.lots,
-        leverage: params.leverage,
+        leverage: effectiveLeverage, // Use the capped leverage
         orderType: params.orderType,
         limitPrice: params.limitPrice,
         openTime: Date.now(),
@@ -414,9 +423,10 @@ const Trade = () => {
       // Update local state after successful save
       setDefaultLeverage(leverage);
 
+      const pair = tradingPairs.find(p => p.symbol === selectedPair);
       toast({
-        title: "Success",
-        description: "Leverage preference saved"
+        title: "Leverage Updated",
+        description: `Default leverage of ${leverage}x has been saved${pair ? ` (Maximum for ${pair.short_name || selectedPair}: ${pair.leverage_options ? Math.max(...pair.leverage_options) : leverage}x)` : ''}`
       });
 
     } catch (error) {

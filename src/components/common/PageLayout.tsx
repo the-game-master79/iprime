@@ -18,7 +18,9 @@ export function PageLayout({
 }: PageLayoutProps) {
   return (
     <div className={cn("container space-y-6 p-6 pb-16", className)}>
-      <PageHeader title={title} description={description} action={action} />
+      <div className="flex justify-between items-center">
+        <PageHeader title={title} description={description} action={action} />
+      </div>
       <div className="space-y-6">
         {children}
       </div>

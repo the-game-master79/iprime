@@ -10,6 +10,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { lazy, Suspense } from "react";
 import DepositPage from "@/pages/deposit/DepositPage";
 import SelectPairs from "./pages/trade/SelectPairs";
+
 import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { ChartView } from "@/pages/trade/ChartView";
 import { useCacheFlush } from '@/hooks/use-cache-flush';
@@ -77,7 +78,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
         <AuthProvider>
           <AdminAuthProvider>
             <TooltipProvider>
-              {children}
+                {children}
             </TooltipProvider>
           </AdminAuthProvider>
         </AuthProvider>

@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { X } from "@phosphor-icons/react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/components/ui/use-toast";
-import { PriceData, TradingPair } from "@/types/trading"; // Remove Trade from here
+import { PriceData, TradingPair } from "@/types/trading";
 import { calculatePnL } from "@/utils/trading";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface Trade {
   id: string;
@@ -38,8 +39,15 @@ interface TradingActivityProps {
   trades: Trade[];
   onCloseTrade: (tradeId: string) => void;
   userBalance: number;
-  currentPrices: Record<string, PriceData>; // Add this prop
-  tradingPairs: TradingPair[]; // Add this prop
+  currentPrices: Record<string, PriceData>;
+  tradingPairs: TradingPair[];
+}
+
+interface MarginInfo {
+  totalMarginUsed: number;
+  marginLevel: number;
+  adjustedBalance: number;
+  freeMargin: number;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -48,14 +56,15 @@ export const TradingActivity = ({
   trades, 
   onCloseTrade,
   userBalance = 0,
-  currentPrices, // Add this prop
-  tradingPairs, // Add this prop
+  currentPrices,
+  tradingPairs,
 }: TradingActivityProps) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Change this line to default to true
+  const [isExpanded, setIsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState<'open' | 'pending' | 'closed'>('open');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const { convertAmount } = useCurrency();
 
   const toggleRowExpansion = (key: string) => {
     const newExpanded = new Set(expandedRows);
@@ -141,7 +150,7 @@ export const TradingActivity = ({
     }, { totalPnL: 0 });
   }, [filteredTrades.open, currentPrices, trades]);
 
-  const { totalMarginUsed, marginLevel, adjustedBalance } = useMemo(() => {
+  const marginInfo: MarginInfo = useMemo(() => {
     const totalPnL = trades
       .filter(t => t.status === 'open')
       .reduce((acc, trade) => {
@@ -157,11 +166,13 @@ export const TradingActivity = ({
 
     const adjustedBal = userBalance + totalPnL;
     const level = marginUsed > 0 ? ((adjustedBal / marginUsed) * 100) : 100;
+    const freeMarg = adjustedBal - marginUsed;
 
     return {
       totalMarginUsed: marginUsed,
       marginLevel: level,
-      adjustedBalance: adjustedBal
+      adjustedBalance: adjustedBal,
+      freeMargin: freeMarg,
     };
   }, [trades, userBalance, currentPrices]);
 
@@ -189,7 +200,7 @@ export const TradingActivity = ({
     };
   }, []);
 
-  const freeMargin = adjustedBalance - totalMarginUsed;
+  const freeMargin = marginInfo.adjustedBalance - marginInfo.totalMarginUsed;
   const displayedTrades = filteredTrades[activeTab];
 
   // Add pagination helpers
@@ -400,7 +411,7 @@ export const TradingActivity = ({
                   "text-sm font-mono font-medium",
                   totalPnL > 0 ? "text-green-500" : totalPnL < 0 ? "text-red-500" : ""
                 )}>
-                  {totalPnL.toFixed(2)} USD
+                  {convertAmount(totalPnL)}
                 </div>
                 {filteredTrades.open.length > 0 && (
                   <Button
@@ -527,7 +538,7 @@ export const TradingActivity = ({
                                 : currentPrice.toFixed(decimals)}
                           </td>
                           <td className="p-2 text-right font-mono">
-                            {trade.margin_amount?.toFixed(2) || '0.00'} USD
+                            {convertAmount(trade.margin_amount || 0)}
                           </td>
                           <td className="p-2 font-mono">
                             <div className="flex items-center gap-2">
@@ -575,7 +586,7 @@ export const TradingActivity = ({
                                 "font-mono",
                                 pnl > 0 ? "text-green-500" : pnl < 0 ? "text-red-500" : ""
                               )}>
-                                {pnl.toFixed(2)} USD
+                                {convertAmount(pnl)}
                               </div>
                             </td>
                           )}
@@ -646,11 +657,11 @@ export const TradingActivity = ({
                                             : currentPrice.toFixed(decimals)
                                           } USD
                                         </td>
-                                        <td className="p-1 text-right">{subTrade.margin_amount?.toFixed(2)} USD</td>
+                                        <td className="p-1 text-right">{convertAmount(subTrade.margin_amount || 0)}</td>
                                         <td className={cn(
                                           "p-1 text-right font-mono",
                                           subPnl > 0 ? "text-green-500" : "text-red-500"
-                                        )}>{subPnl.toFixed(2)} USD</td>
+                                        )}>{convertAmount(subPnl)}</td>
                                         <td className="p-1 text-right">
                                           <Button
                                             variant="ghost"
@@ -717,21 +728,21 @@ export const TradingActivity = ({
         <div className="flex items-center justify-between w-full gap-8">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Balance:</span>
-            <div className="font-mono text-sm">{(userBalance || 0).toFixed(2)} USD</div>
+            <div className="font-mono text-sm">{convertAmount(userBalance)}</div>
           </div>
           
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Used Margin:</span>
-            <div className="font-mono text-sm">{totalMarginUsed.toFixed(2)} USD</div>
+            <div className="font-mono text-sm">{convertAmount(marginInfo.totalMarginUsed)}</div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Free Margin:</span>
             <div className={cn(
               "font-mono text-sm",
-              freeMargin < 0 ? "text-red-500" : "text-green-500"
+              marginInfo.freeMargin < 0 ? "text-red-500" : "text-green-500"
             )}>
-              {freeMargin.toFixed(2)} USD
+              {convertAmount(marginInfo.freeMargin)}
             </div>
           </div>
 
@@ -739,9 +750,9 @@ export const TradingActivity = ({
             <span className="text-xs text-muted-foreground">Margin Level:</span>
             <div className={cn(
               "font-mono text-sm",
-              marginLevel < 100 ? "text-red-500" : "text-green-500"
+              marginInfo.marginLevel < 100 ? "text-red-500" : "text-green-500"
             )}>
-              {marginLevel.toFixed(2)}%
+              {marginInfo.marginLevel.toFixed(2)}%
             </div>
           </div>
         </div>

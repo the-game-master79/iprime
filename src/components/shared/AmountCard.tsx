@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-
 interface AmountCardProps {
   title: string;
   amount: number;
@@ -42,10 +41,7 @@ export function AmountCard({
                 <span className="text-sm text-muted-foreground">{title}</span>
               </div>
               <span className="text-2xl font-semibold mt-1">
-                {amount.toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })} USD
+                {convertAmount(amount)}
               </span>
               {activePlans !== undefined && (
                 <span className="text-xs text-muted-foreground mt-1">
@@ -101,17 +97,11 @@ export function AmountCard({
               </div>
               <div className="space-y-1">
                 <span className="text-2xl font-semibold block">
-                  {amount.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })} USD
+                  {convertAmount(amount)}
                 </span>
                 {subtitle && (
                   <span className="text-xs text-muted-foreground">
-                    Bonus: ${parseFloat(subtitle).toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
+                    Bonus: {convertAmount(parseFloat(subtitle))}
                   </span>
                 )}
               </div>

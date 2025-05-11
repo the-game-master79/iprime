@@ -1,9 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import terser from '@rollup/plugin-terser';
+import viteCompression from 'vite-plugin-compression';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteCompression({
+      algorithm: 'gzip',
+      ext: '.gz',
+      threshold: 10240, // Only compress files > 10KB
+      deleteOriginFile: false,
+    }),
+  ],
   root: './',
   base: './',
   server: {
@@ -17,7 +27,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false, // Disable sourcemaps in production for better performance
+    minify: 'terser', // Use terser for better minification
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+      },
+      format: {
+        comments: false, // Remove comments
+      },
+    },
     // Improve chunk loading
     rollupOptions: {
       output: {
@@ -25,13 +45,33 @@ export default defineConfig({
           'admin': [
             './src/pages/admin/AdminLayout.tsx',
             './src/pages/admin/Dashboard.tsx',
-            // Add other admin-related files
+          ],
+          'vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+          ],
+          'ui': [
+            './src/components/ui/dialog.tsx',
+            './src/components/ui/button.tsx',
+            './src/components/ui/input.tsx'
           ],
         },
+        // Optimize chunk size
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
     },
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
+  },
+  css: {
+    // CSS optimization
+    devSourcemap: true,
+    modules: {
+      scopeBehaviour: 'local',
+    },
   },
   resolve: {
     alias: {

@@ -240,6 +240,34 @@ export default {
     			'grid-move': {
     				'0%': { transform: 'translateY(0)' },
     				'100%': { transform: 'translateY(24px)' }
+    			},
+    			'price-up': {
+    				'0%': {
+    					transform: 'translateY(0)',
+    					opacity: '1'
+    				},
+    				'50%': {
+    					transform: 'translateY(-4px)',
+    					opacity: '0.6'
+    				},
+    				'100%': {
+    					transform: 'translateY(0)',
+    					opacity: '1'
+    				}
+    			},
+    			'price-down': {
+    				'0%': {
+    					transform: 'translateY(0)',
+    					opacity: '1'
+    				},
+    				'50%': {
+    					transform: 'translateY(4px)',
+    					opacity: '0.6'
+    				},
+    				'100%': {
+    					transform: 'translateY(0)',
+    					opacity: '1'
+    				}
     			}
     		},
     		animation: {
@@ -267,7 +295,9 @@ export default {
     			'orbit-normal': 'orbit 12s linear infinite',
     			'orbit-fast': 'orbit 8s linear infinite',
     			shimmer: 'shimmer 2s linear infinite',
-    			'grid-move': 'grid-move 20s linear infinite'
+    			'grid-move': 'grid-move 20s linear infinite',
+    			'price-up': 'price-up 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+    			'price-down': 'price-down 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
     		},
     		fontFamily: {
     			sans: [
