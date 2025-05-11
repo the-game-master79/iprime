@@ -94,14 +94,17 @@ const Login = () => {
 
         if (profileError) throw profileError;
         toast.success("Registration successful! Welcome to CloudForex");
+        navigate('/platform');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: { user }, error } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         });
 
         if (error) throw error;
+        if (!user) throw new Error('No user returned from login');
         toast.success("Login successful!");
+        navigate('/platform');
       }
     } catch (error) {
       toast.error(`Error: ${(error as Error).message}`);

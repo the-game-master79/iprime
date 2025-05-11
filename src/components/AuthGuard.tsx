@@ -27,7 +27,7 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
         replace: true 
       });
     } else if (user && authPage) {
-      // Navigate to platform instead of dashboard
+      // Navigate to platform by default, unless there's a specific return path
       const returnPath = location.state?.from || '/platform';
       navigate(returnPath, { replace: true });
     }
