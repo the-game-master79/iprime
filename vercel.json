@@ -15,5 +15,12 @@
         }
       ]
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "NODE_VERSION": "18",
+      "NPM_VERSION": "9",
+      "NPM_CONFIG_FORCE": "true"
+    }
+  }
 }
