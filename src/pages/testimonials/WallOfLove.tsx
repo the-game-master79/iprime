@@ -1,6 +1,5 @@
 import { PageTransition } from "@/components/ui-components";
 import { Navbar } from "@/components/shared/Navbar";
-import { Footer } from "@/components/shared/Footer";
 import { SEO } from "@/components/shared/SEO";
 import { Fire } from "@phosphor-icons/react";
 

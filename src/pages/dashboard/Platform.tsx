@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransactionTable } from "@/components/tables/TransactionTable";
 import { RankTable } from "@/components/dashboard/RankTable";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Icons
 import { 
@@ -665,9 +666,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               <div className="flex gap-4">
                 <div className="flex-1 bg-[#141414] rounded-2xl p-2">
                     <div className="flex flex-col gap-2">
-                    <h3 className="px-2 pt-2 text-white">Invite friends and start earning</h3>
                     <div className="flex items-center gap-4 w-full">
-                      <div className="relative flex-1">
+                      <div className="relative flex-1 hidden md:block">
                         <Input
                           readOnly
                           value={referralCode}
@@ -675,7 +675,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         />
                         <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-1 md:flex-none">
                         <Button 
                           size="icon" 
                           variant="outline"
@@ -928,6 +928,50 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
           )}
         </div>
       </main>
+
+      {/* QR Code Dialog */}
+      <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
+        <DialogContent className="bg-[#141414] border-0">
+          <DialogHeader>
+            <DialogTitle>Share Referral Code</DialogTitle>
+            <DialogDescription>
+              Scan this QR code to share your referral link
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center p-4 space-y-4">
+            {qrCodeUrl && (
+              <div className="bg-white p-4 rounded-lg">
+                <img src={qrCodeUrl} alt="Referral QR Code" className="w-64 h-64" />
+              </div>
+            )}
+            <div className="w-full">
+              <div className="relative">
+                <Input
+                  readOnly
+                  value={referralLink}
+                  className="pr-24 bg-[#1E1E1E] border-0"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="absolute right-1 top-1 h-7"
+                >
+                  Copy Link
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full" 
+              variant="secondary"
+              onClick={() => setShowQrCode(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
         <AlertDialogContent className="bg-[#141414] border-0">
