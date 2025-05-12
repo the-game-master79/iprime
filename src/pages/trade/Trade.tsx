@@ -565,6 +565,14 @@ const Trade = () => {
               onSaveLeverage={handleSaveLeverage}
               defaultLeverage={defaultLeverage}
             />
+            
+            {/* Add MarginWatchDog */}
+            <MarginWatchDog
+              trades={trades}
+              currentPrices={pairPrices}
+              userBalance={userBalance}
+              onCloseTrade={handleCloseTrade}
+            />
           </div>
         </div>
       )}

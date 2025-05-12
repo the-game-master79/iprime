@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { KycFormData, DocumentType } from '@/types/kyc';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { format, subYears } from "date-fns"; // Add this import
 import { countries as countryList } from "@/data/countries"; // Rename import to avoid conflict
 import { Topbar } from "@/components/shared/Topbar";
@@ -51,6 +53,9 @@ const Profile = () => {
     back: null
   });
 
+  const [selectedCountry, setSelectedCountry] = useState<{name: string, code: string, phone: string} | null>(null);
+
+  // Rest of the state declarations
   const [userData, setUserData] = useState({
     firstName: "",
     lastName: "",
@@ -91,9 +96,10 @@ const Profile = () => {
   const [kycData, setKycData] = useState<any>(null);
 
   // Add new state for location dropdowns
-  const [selectedCountry, setSelectedCountry] = useState("");
+  const [countryInfo, setCountryInfo] = useState<{name: string, code: string, phone: string} | null>(null);
   const [cityError, setCityError] = useState("");
   const [postalError, setPostalError] = useState("");
+  const [phonePrefix, setPhonePrefix] = useState("");
 
   // Add validation states
   const [nameError, setNameError] = useState("");
@@ -401,26 +407,68 @@ const Profile = () => {
 
   // Add phone validation handler
   const handlePhoneChange = (value: string) => {
-    if (!isValidPhone(value)) {
+    // Remove any non-digit characters 
+    const cleanValue = value.replace(/[^\d]/g, '');
+    
+    if (!cleanValue) {
+      setPhoneError("Phone number is required");
+      setUserData(prev => ({...prev, phone: cleanValue}));
+      return;
+    }
+
+    if (!/^\d+$/.test(cleanValue)) {
       setPhoneError("Only numbers are allowed");
+    } else if (cleanValue.length > 40) {
+      setPhoneError("Phone number cannot exceed 40 digits");
     } else {
       setPhoneError("");
     }
-    setUserData(prev => ({...prev, phone: value}));
+
+    // Store the number with the country code
+    setUserData(prev => ({...prev, phone: cleanValue.slice(0, 40)}));
   };
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
+  // Effect to set initial country info and phone prefix
+  useEffect(() => {
+    if (userData.country) {
+      const country = countryList[0].find(c => c.name === userData.country);
+      if (country) {
+        setCountryInfo(country);
+        setPhonePrefix(country.phone);
+      }
+    }
+  }, [userData.country]);    const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate required fields before submission
-    if (!userData.phone || !userData.address || !userData.city || !userData.country) {
+    if (!userData.country) {
+      toast({
+        title: "Error",
+        description: "Please select your country",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!userData.phone || !userData.address || !userData.city) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate phone number format
+    const fullPhoneNumber = `${phonePrefix}${userData.phone}`;
+    if (!isValidPhone(userData.phone)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid phone number",
         variant: "destructive",
       });
       return;
@@ -433,7 +481,7 @@ const Profile = () => {
       if (!user) throw new Error('No user found');
 
       const updates = {
-        phone: userData.phone,
+        phone: `${phonePrefix}${userData.phone}`,
         address: userData.address,
         city: userData.city,
         country: userData.country,
@@ -639,102 +687,160 @@ const Profile = () => {
 
                   {/* Rest of the personal info form */}
                   <form onSubmit={handlePersonalInfoUpdate} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="relative">
-                        {basicDetailsSet ? (
-                          <div className="p-4 bg-muted/50 rounded-lg">
-                            <p className="text-sm text-muted-foreground">Phone Number</p>
-                            <p className="font-medium">+{userData.phone}</p>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3">
-                              <span className="text-muted-foreground">+</span>
+                    {basicDetailsSet ? (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="p-4 bg-muted rounded-lg">
+                          <p className="text-sm text-muted-foreground">Country</p>
+                          <p className="font-medium">{userData.country}</p>
+                        </div>
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground">Phone Number</p>
+                          <p className="font-medium">+{userData.phone}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <label htmlFor="country" className="text-sm text-muted-foreground">
+                            Country
+                          </label>
+                          <Select
+                            value={userData.country}
+                            onValueChange={(value) => {
+                              const country = countryList[0].find(c => c.name === value);
+                              if (country) {
+                                setCountryInfo(country);
+                                setPhonePrefix(country.phone);
+                                setUserData(prev => ({
+                                  ...prev,
+                                  country: value,
+                                  phone: prev.phone.replace(/^[0-9]+/, '')
+                                }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your country">
+                                {userData.country && countryList[0].find(c => c.name === userData.country) && (
+                                  <div className="flex items-center gap-2">
+                                    <img
+                                      src={`https://flagcdn.com/w20/${countryList[0].find(c => c.name === userData.country)?.code.toLowerCase()}.png`}
+                                      alt={`${userData.country} flag`}
+                                      className="h-4 w-auto object-contain"
+                                    />
+                                    <span>{userData.country}</span>
+                                  </div>
+                                )}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent position="popper" align="start" side="bottom" sideOffset={5} className="w-[400px]">
+                              <ScrollArea className="h-[200px]">
+                                <SelectGroup>
+                                  {countryList[0].map((country) => (
+                                    <SelectItem
+                                      key={`personal-${country.code}`}
+                                      value={country.name}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <div className="flex items-center gap-2 flex-1">
+                                        <img
+                                          src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                                          alt={`${country.name} flag`}
+                                          className="h-4 w-auto object-contain"
+                                        />
+                                        <span className="font-medium">{country.name}</span>
+                                        <span className="text-muted-foreground text-sm ml-auto">+{country.phone}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </ScrollArea>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <label htmlFor="phone" className="text-sm text-muted-foreground">
+                            Phone Number
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center">
+                              <div className="w-[72px] flex justify-center border-r border-input">
+                                <span className="text-muted-foreground text-sm font-medium">+{phonePrefix}</span>
+                              </div>
                             </div>
                             <Input 
                               id="phone" 
                               name="phone"
                               value={userData.phone}
-                              onChange={(e) => handlePhoneChange(e.target.value)}
-                              className={`pl-7 ${phoneError ? "border-red-500" : ""}`}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^\d]/g, '');
+                                if (value.length <= 40) {
+                                  // Store only the number without prefix
+                                  setUserData(prev => ({...prev, phone: value}));
+                                  // Handle validation
+                                  if (!value) {
+                                    setPhoneError("Phone number is required");
+                                  } else if (!/^\d+$/.test(value)) {
+                                    setPhoneError("Only numbers are allowed");
+                                  } else {
+                                    setPhoneError("");
+                                  }
+                                }
+                              }}
+                              className={`pl-[72px] ${phoneError ? "border-red-500" : ""} ${!phonePrefix ? "opacity-50 cursor-not-allowed" : ""}`}
                               placeholder="Phone Number"
                               type="tel"
+                              disabled={!phonePrefix}
                             />
+                            {!phonePrefix && (
+                              <p className="text-xs text-muted-foreground mt-1">Please select a country first</p>
+                            )}
                             {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
-                          </>
-                        )}
-                      </div>
-                      {basicDetailsSet ? (
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-sm text-muted-foreground">Address</p>
-                          <p className="font-medium">{userData.address}</p>
+                          </div>
                         </div>
-                      ) : (
-                        <Input 
-                          id="address" 
-                          name="address"
-                          value={userData.address}
-                          onChange={(e) => setUserData(prev => ({...prev, address: e.target.value}))}
-                          placeholder="Address"
-                        />
-                      )}
-                    </div>
+                      </div>
+                    )}
 
+                    {/* City and Address section */}
                     <div className="grid gap-4 sm:grid-cols-2">
                       {basicDetailsSet ? (
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-sm text-muted-foreground">City</p>
-                          <p className="font-medium">{userData.city}</p>
-                        </div>
+                        <>
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground">City</p>
+                            <p className="font-medium">{userData.city}</p>
+                          </div>
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground">Address</p>
+                            <p className="font-medium">{userData.address}</p>
+                          </div>
+                        </>
                       ) : (
-                        <Input 
-                          id="city" 
-                          name="city"
-                          value={userData.city}
-                          onChange={(e) => setUserData(prev => ({...prev, city: e.target.value}))}
-                          placeholder="City"
-                        />
-                      )}
-                      {basicDetailsSet ? (
-                        <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-sm text-muted-foreground">Country</p>
-                          <p className="font-medium">{userData.country}</p>
-                        </div>
-                      ) : (
-                        <Select
-                          value={userData.country}
-                          onValueChange={(value) => setUserData(prev => ({...prev, country: value}))}
-                          disabled={basicDetailsSet}
-                        >
-                          <SelectTrigger className={basicDetailsSet ? "bg-muted" : ""}>
-                            <SelectValue placeholder="Select your country">
-                              {userData.country && countryList[0].find(c => c.name === userData.country) && (
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={`https://flagcdn.com/w20/${countryList[0].find(c => c.name === userData.country)?.code.toLowerCase()}.png`}
-                                    alt={`${userData.country} flag`}
-                                    className="h-4 w-auto object-contain"
-                                  />
-                                  <span>{userData.country}</span>
-                                </div>
-                              )}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {countryList[0].map((country) => (
-                              <SelectItem key={`personal-${country.code}`} value={country.name}>
-                                <div className="flex items-center gap-2">
-                                  <img
-                                    src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
-                                    alt={`${country.name} flag`}
-                                    className="h-4 w-auto object-contain"
-                                  />
-                                  <span>{country.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <>
+                          <div className="space-y-2">
+                            <label htmlFor="city" className="text-sm text-muted-foreground">
+                              City
+                            </label>
+                            <Input 
+                              id="city" 
+                              name="city"
+                              value={userData.city}
+                              onChange={(e) => setUserData(prev => ({...prev, city: e.target.value}))}
+                              placeholder="City"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="address" className="text-sm text-muted-foreground">
+                              Address
+                            </label>
+                            <Input 
+                              id="address" 
+                              name="address"
+                              value={userData.address}
+                              onChange={(e) => setUserData(prev => ({...prev, address: e.target.value}))}
+                              placeholder="Address"
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -846,16 +952,23 @@ const Profile = () => {
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
+                              <label htmlFor="full_name" className="text-sm text-muted-foreground">
+                                Full Name (as per the document)
+                              </label>
                               <Input
                                 id="full_name"
                                 value={kycFormData.full_name}
                                 onChange={handleNameChange}
                                 className={nameError ? "border-red-500" : ""}
-                                placeholder="Full Name (as per the document)"
+                                placeholder="Enter your full name"
+                                aria-label="Full Name"
                               />
                               {nameError && <p className="text-xs text-red-500">{nameError}</p>}
                             </div>
                             <div className="space-y-2">
+                              <label htmlFor="date_of_birth" className="text-sm text-muted-foreground">
+                                Date of Birth
+                              </label>
                               <Input
                                 id="date_of_birth"
                                 type="date"
@@ -870,53 +983,87 @@ const Profile = () => {
                           </div>
 
                           <div className="space-y-2">
+                            <label htmlFor="address" className="text-sm text-muted-foreground">
+                              Residential Address
+                            </label>
                             <Input
                               id="address"
                               value={kycFormData.address}
                               onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
-                              placeholder="Your residential address"
+                              placeholder="Enter your residential address"
                               className="w-full"
+                              aria-label="Residential Address"
                             />
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
+                              <label htmlFor="country" className="text-sm text-muted-foreground">
+                                Country
+                              </label>
                               <Select
                                 value={kycFormData.country}
                                 onValueChange={(value) => setKycFormData(prev => ({...prev, country: value}))}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Your country" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {countryList[0].map((country) => (
-                                    <SelectItem key={`kyc-${country.code}`} value={country.name}>
+                                  <SelectValue placeholder="Your country">
+                                    {kycFormData.country && countryList[0].find(c => c.name === kycFormData.country) && (
                                       <div className="flex items-center gap-2">
                                         <img
-                                          src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
-                                          alt={`${country.name} flag`}
+                                          src={`https://flagcdn.com/w20/${countryList[0].find(c => c.name === kycFormData.country)?.code.toLowerCase()}.png`}
+                                          alt={`${kycFormData.country} flag`}
                                           className="h-4 w-auto object-contain"
                                         />
-                                        <span>{country.name}</span>
+                                        <span>{kycFormData.country}</span>
                                       </div>
-                                    </SelectItem>
-                                  ))}
+                                    )}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent position="popper" align="start" side="bottom" sideOffset={5} className="w-[400px]">
+                                  <ScrollArea className="h-[200px]">
+                                    <SelectGroup>
+                                      {countryList[0].map((country) => (
+                                        <SelectItem
+                                          key={`kyc-${country.code}`}
+                                          value={country.name}
+                                          className="flex items-center gap-2"
+                                        >
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <img
+                                              src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                                              alt={`${country.name} flag`}
+                                              className="h-4 w-auto object-contain"
+                                            />
+                                            <span className="font-medium">{country.name}</span>
+                                            <span className="text-muted-foreground text-sm ml-auto">+{country.phone}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  </ScrollArea>
                                 </SelectContent>
                               </Select>
                             </div>
 
                             <div className="space-y-2">
+                              <label htmlFor="state" className="text-sm text-muted-foreground">
+                                State/Province
+                              </label>
                               <Input
                                 id="state"
                                 value={kycFormData.state}
                                 onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
-                                placeholder="Your state or province"
+                                placeholder="Enter your state or province"
+                                aria-label="State or Province"
                               />
                             </div>
                           </div>
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
+                              <label htmlFor="city" className="text-sm text-muted-foreground">
+                                City
+                              </label>
                               <Input
                                 id="city"
                                 value={kycFormData.city}
@@ -927,12 +1074,16 @@ const Profile = () => {
                               {cityError && <p className="text-xs text-red-500">{cityError}</p>}
                             </div>
                             <div className="space-y-2">
+                              <label htmlFor="postal_code" className="text-sm text-muted-foreground">
+                                Postal Code
+                              </label>
                               <Input
                                 id="postal_code"
                                 value={kycFormData.postal_code}
                                 onChange={(e) => handlePostalChange(e.target.value)}
-                                placeholder="Your postal code"
+                                placeholder="Enter your postal code"
                                 className={postalError ? "border-red-500" : ""}
+                                aria-label="Postal Code"
                               />
                               {postalError && <p className="text-xs text-red-500">{postalError}</p>}
                             </div>
@@ -968,16 +1119,23 @@ const Profile = () => {
                             </div>
 
                             <div className="space-y-2">
+                              <label htmlFor="document_number" className="text-sm text-muted-foreground">
+                                Document Number
+                              </label>
                               <Input
                                 id="document_number"
                                 value={kycFormData.document_number}
                                 onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
-                                placeholder="Your document number"
+                                placeholder="Enter your document number"
+                                aria-label="Document Number"
                               />
                             </div>
                           </div>
 
                           <div className="space-y-2">
+                            <label htmlFor="occupation" className="text-sm text-muted-foreground">
+                              Occupation
+                            </label>
                             <Input
                               id="occupation"
                               value={kycFormData.occupation}

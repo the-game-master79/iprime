@@ -171,8 +171,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setWithdrawalBalance(totalBalance);
 
       if (profileData.data?.referral_code) {
+        const fullUrl = `${window.location.origin}/auth/login?ref=${profileData.data.referral_code}`;
         setReferralCode(profileData.data.referral_code);
-        setReferralLink(`${window.location.origin}/auth/login?ref=${profileData.data.referral_code}`);
+        setReferralLink(fullUrl);
       }
 
       // Calculate total invested amount from approved subscriptions
@@ -663,64 +664,84 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
           ) : (
             <div className="space-y-4">
               {/* Referral Card with Promotions Button */}
-              <div className="flex gap-4">
-                <div className="flex-1 bg-[#141414] rounded-2xl p-2">
-                    <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-4 w-full">
-                      <div className="relative flex-1 hidden md:block">
+              <div className="space-y-4">
+                {/* Referral Link Container */}
+                <div className="bg-gradient-to-br from-[#141414] to-[#1E1E1E] rounded-2xl p-4 border border-white/5">
+                  <div className="flex flex-col gap-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShareNetwork className="h-5 w-5 text-primary" weight="fill" />
+                        <span className="text-sm font-medium text-white/80">Your Referral Link</span>
+                      </div>
+                      <div 
+                        className={cn(
+                          "px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5",
+                          directCount >= 2 ? "bg-[#20BF55]/10 text-[#20BF55]" : 
+                          directCount === 1 ? "bg-[#FFA500]/10 text-[#FFA500]" : 
+                          "bg-[#FF005C]/10 text-[#FF005C]"
+                        )}
+                        onClick={handleDirectsClick}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          directCount >= 2 ? "bg-[#20BF55]" : 
+                          directCount === 1 ? "bg-[#FFA500]" : 
+                          "bg-[#FF005C]"
+                        )} />
+                        <span>{directCount}/2 Directs</span>
+                      </div>
+                    </div>
+
+                    {/* Referral Link Input */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
                         <Input
                           readOnly
-                          value={referralCode}
-                          className="pr-4 pl-10 font-mono text-sm bg-[#1E1E1E] border-0 h-12"
+                          value={referralLink}
+                          className="w-full pr-[120px] pl-4 font-mono text-sm bg-black/20 border-white/5 h-12 focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
                         />
-                        <ShareNetwork className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
-                      </div>
-                      <div className="flex items-center gap-2 flex-1 md:flex-none">
-                        <Button 
-                          size="icon" 
-                          variant="outline"
-                          onClick={handleCopyLink}
-                          className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                        >
-                          <Copy className="h-5 w-5 text-white" weight="regular" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="outline"
-                          onClick={handleShowQrCode}
-                          className="h-12 w-12 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
-                        >
-                          <QrCode className="h-5 w-5 text-white" weight="regular" />
-                        </Button>
-                        <div 
-                          className={cn(
-                            "h-12 w-12 flex items-center justify-center rounded-lg border-0 cursor-pointer hover:opacity-90",
-                            directCount >= 2 ? "bg-[#20BF55]" : 
-                            directCount === 1 ? "bg-[#FFA500]" : 
-                            "bg-[#FF005C]"
-                          )}
-                          onClick={handleDirectsClick}
-                        >
-                          <span className="text-sm font-medium text-white">{directCount}/2</span>
+                        <div className="absolute right-1 top-1 h-10 flex items-center gap-1">
+                          <Button 
+                            size="icon" 
+                            variant="ghost"
+                            onClick={handleCopyLink}
+                            className="h-8 w-8 rounded-lg hover:bg-white/5"
+                          >
+                            <Copy className="h-4 w-4 text-white/70" weight="regular" />
+                          </Button>
+                          <Button 
+                            size="icon" 
+                            variant="ghost"
+                            onClick={handleShowQrCode}
+                            className="h-8 w-8 rounded-lg hover:bg-white/5"
+                          >
+                            <QrCode className="h-4 w-4 text-white/70" weight="regular" />
+                          </Button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Promotions Button */}
-                <Button 
-                  variant="secondary"
-                  onClick={() => navigate('/promotions')}
-                  className="bg-[#1E1E1E] text-white border-0 hover:bg-[#252525] h-auto min-w-[120px]"
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <span>Promotions</span>
-                    {promotions.length > 0 && (
-                      <span className="text-xs text-blue-400">{promotions.length} Active</span>
-                    )}
-                  </div>
-                </Button>
+                {/* Promotions Card */}
+                <div className="w-full p-4 bg-[#1E1E1E] rounded-2xl">
+                  <Button 
+                    variant="ghost"
+                    onClick={() => navigate('/promotions')}
+                    className="w-full h-auto py-2 px-4 hover:bg-white/5"
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-base">View Active Promotions</span>
+                      {promotions.length > 0 && (
+                        <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
+                          {promotions.length} Active
+                        </span>
+                      )}
+                    </div>
+                  </Button>
+                </div>
               </div>
 
               {/* Balance Container */}
@@ -971,9 +992,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
+      </Dialog>          <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
         <AlertDialogContent className="bg-[#141414] border-0">
           <div className="absolute right-4 top-4">
             <Button
@@ -986,32 +1005,33 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
           </div>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl mb-6">Direct Referral Status</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-6">
-              <div className="flex items-center justify-center">
-                <span className={cn(
-                  "text-7xl font-bold",
-                  directCount >= 2 ? "text-[#20BF55]" : 
-                  directCount === 1 ? "text-[#FFA500]" : 
-                  "text-[#FF005C]"
-                )}>
-                  {directCount}/2
-                </span>
+            <AlertDialogDescription>
+              <div className="space-y-6">
+                <div className="flex items-center justify-center">
+                  <span className={cn(
+                    "text-7xl font-bold",
+                    directCount >= 2 ? "text-[#20BF55]" : 
+                    directCount === 1 ? "text-[#FFA500]" : 
+                    "text-[#FF005C]"
+                  )}>
+                    {directCount}/2
+                  </span>
+                </div>
+                <div className="text-center">
+                  {directCount >= 2 ? (
+                    <>
+                      Congratulations! You have achieved the required direct referrals. You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
+                    </>
+                  ) : (
+                    <>
+                      You need {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''} to start earning <span className={cn(
+                        "font-bold",
+                        directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
+                      )}>commissions and bonuses</span>.
+                    </>
+                  )}
+                </div>
               </div>
-              
-              <p className="text-center text-base">
-                {directCount >= 2 ? (
-                  <>
-                    Congratulations! You have achieved the required direct referrals. You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
-                  </>
-                ) : (
-                  <>
-                    You need {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''} to start earning <span className={cn(
-                      "font-bold",
-                      directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
-                    )}>commissions and bonuses</span>.
-                  </>
-                )}
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
         </AlertDialogContent>

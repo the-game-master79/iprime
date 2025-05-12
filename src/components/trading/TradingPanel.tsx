@@ -100,9 +100,17 @@ export const TradingPanel = ({
   const [lots, setLots] = useState('0.01');
   const [selectedLeverage, setSelectedLeverage] = useState(defaultLeverage.toString());
   const [pairInfo, setPairInfo] = useState<TradingPair | null>(null);
+
+  // Add effect to check if prices are loaded
+  useEffect(() => {
+    const priceData = pairPrices[selectedPair];
+    const hasPrice = priceData && priceData.bid && priceData.ask;
+    setIsPriceLoaded(!!hasPrice);
+  }, [selectedPair, pairPrices]);
   const [actualLeverage, setActualLeverage] = useState(defaultLeverage);
   const [showLeverageDialog, setShowLeverageDialog] = useState(false);
   const [newLeverage, setNewLeverage] = useState(defaultLeverage.toString());
+  const [isPriceLoaded, setIsPriceLoaded] = useState(false);
 
   // Effect to handle defaultLeverage changes
   useEffect(() => {
@@ -148,7 +156,7 @@ export const TradingPanel = ({
       .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
   }, [trades]);
 
-  // Update getMaxAffordableLots to properly consider existing margin utilization
+  // Update getMaxAffordableLots to properly consider existing margin utilization and round to 2 decimals
   const getMaxAffordableLots = (): number => {
     const price = parseFloat(pairPrices[selectedPair]?.price || '0');
     const leverageValue = parseFloat(selectedLeverage);
@@ -161,13 +169,17 @@ export const TradingPanel = ({
     const availableBalance = Math.max(0, userBalance - existingMargin);
 
     // Calculate max lots based on remaining available balance and pair type
+    let maxLots;
     if (isCrypto) {
-      return (availableBalance * leverageValue) / price;
+      maxLots = (availableBalance * leverageValue) / price;
     } else if (selectedPair === 'FX:XAU/USD') {
-      return (availableBalance * leverageValue) / (price * 100);
+      maxLots = (availableBalance * leverageValue) / (price * 100);
     } else {
-      return (availableBalance * leverageValue) / (price * getStandardLotSize(selectedPair));
+      maxLots = (availableBalance * leverageValue) / (price * getStandardLotSize(selectedPair));
     }
+
+    // Round to 2 decimal places to avoid floating point precision issues
+    return Math.floor(maxLots * 100) / 100;
   };
 
   // Add helper to get max leverage for pair
@@ -358,6 +370,15 @@ export const TradingPanel = ({
   const handleTrade = async (type: 'buy' | 'sell') => {
     if (isExecutingTrade) return; // Prevent multiple clicks
 
+    if (!isPriceLoaded) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please wait for price data to load before placing a trade",
+      });
+      return;
+    }
+
     const error = validateTrade();
     if (error) {
       toast({
@@ -389,12 +410,14 @@ export const TradingPanel = ({
     }
   };
 
-  // Update handleSetMaxLots function to enforce 2 decimals
+  // Update handleSetMaxLots function to enforce 2 decimals and handle floating point precision
   const handleSetMaxLots = () => {
     const maxAffordableLots = getMaxAffordableLots();
     const maxPairLots = pairInfo?.max_lots || 0;
     const effectiveMaxLots = Math.min(maxAffordableLots, maxPairLots);
-    setLots(effectiveMaxLots.toFixed(2)); // Always use 2 decimals for max
+    // Round to 2 decimal places to avoid floating point precision issues
+    const roundedLots = Math.floor(effectiveMaxLots * 100) / 100;
+    setLots(roundedLots.toFixed(2)); // Always use 2 decimals for max
   };
 
   // Update handleLotsChange to enforce 2 decimal limit
@@ -627,6 +650,13 @@ export const TradingPanel = ({
     setShowLeverageDialog(false);
   };
 
+  // Add effect to check if prices are loaded
+  useEffect(() => {
+    const priceData = pairPrices[selectedPair];
+    const hasPrice = priceData && priceData.bid && priceData.ask;
+    setIsPriceLoaded(!!hasPrice);
+  }, [selectedPair, pairPrices]);
+
   return (
     <div className="w-[350px] border-l border-[#525252] bg-card p-4">
       <div className="flex flex-col h-full justify-between space-y-4">
@@ -726,13 +756,13 @@ export const TradingPanel = ({
                   "bg-red-500 hover:bg-red-600 border-0",
                   "text-white font-medium",
                   "!items-start !justify-start",
-                  isExecutingTrade && "opacity-50 cursor-not-allowed"
+                  (isExecutingTrade || !isPriceLoaded) && "opacity-50 cursor-not-allowed"
                 )}
                 onClick={() => handleTrade('sell')}
-                disabled={isExecutingTrade}
+                disabled={isExecutingTrade || !isPriceLoaded}
               >
                 <div className="text-xs font-normal text-left pl-2">
-                  {isExecutingTrade ? 'Executing...' : 'Sell at'}
+                  {isExecutingTrade ? 'Executing...' : !isPriceLoaded ? 'Loading...' : 'Sell at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-left pl-2">
                   {getDisplayPrice('sell')}
@@ -755,13 +785,13 @@ export const TradingPanel = ({
                   "bg-blue-500 hover:bg-blue-600 border-0",
                   "text-white font-medium",
                   "!items-start !justify-start",
-                  isExecutingTrade && "opacity-50 cursor-not-allowed"
+                  (isExecutingTrade || !isPriceLoaded) && "opacity-50 cursor-not-allowed"
                 )}
                 onClick={() => handleTrade('buy')}
-                disabled={isExecutingTrade}
+                disabled={isExecutingTrade || !isPriceLoaded}
               >
                 <div className="text-xs font-normal text-right pr-2">
-                  {isExecutingTrade ? 'Executing...' : 'Buy at'}
+                  {isExecutingTrade ? 'Executing...' : !isPriceLoaded ? 'Loading...' : 'Buy at'}
                 </div>
                 <div className="text-lg font-mono font-semibold text-right pr-2">
                   {getDisplayPrice('buy')}
@@ -813,18 +843,20 @@ export const TradingPanel = ({
           </div>
         </div>
 
-        {/* Replace AI Trading button with image button */}
+        {/* AI Trading button with text and image */}
         <div className="pt-4 border-t border-[#525252]">
-          {/* Removed DemoTrade component */}
           <Button
-            className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+            className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
             onClick={() => navigate('/plans')}
           >
-            <img 
-              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-computes.svg"
-              alt="Subscribe to AI Computes"
-              className="w-full h-full object-fit-cover rounded-md"
-            />
+            <div className="flex items-center justify-center gap-3">
+              <img 
+                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
+                alt="AI"
+                className="h-6 w-6"
+              />
+              <span className="text-lg font-semibold">Trading</span>
+            </div>
           </Button>
         </div>
       </div>

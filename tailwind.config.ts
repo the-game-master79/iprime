@@ -298,10 +298,14 @@ export default {
     			'grid-move': 'grid-move 20s linear infinite',
     			'price-up': 'price-up 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
     			'price-down': 'price-down 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
-    		},
-    		fontFamily: {
+    		},        fontFamily: {
     			sans: [
     				'Aeonik',
+    				'system-ui',
+    				'-apple-system',
+    				'BlinkMacSystemFont',
+    				'Segoe UI',
+    				'Roboto',
     				'sans-serif'
     			]
     		},
