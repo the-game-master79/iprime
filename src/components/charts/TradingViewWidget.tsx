@@ -4,9 +4,10 @@ import { useBreakpoints } from "@/hooks/use-breakpoints";
 interface TradingViewWidgetProps {
   symbol: string;
   theme?: "light" | "dark";
+  variant?: "full" | "minimal";  // Add variant prop
 }
 
-function TradingViewWidget({ symbol, theme = "dark" }: TradingViewWidgetProps) {
+function TradingViewWidget({ symbol, theme = "dark", variant = "full" }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
   const { isMobile } = useBreakpoints();
 
@@ -35,7 +36,9 @@ function TradingViewWidget({ symbol, theme = "dark" }: TradingViewWidgetProps) {
       script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
       script.type = "text/javascript";
       script.async = true;
-      script.innerHTML = JSON.stringify({
+
+      // Configure based on variant
+      const config = {
         "autosize": true,
         "symbol": symbol,
         "interval": "1",
@@ -44,22 +47,74 @@ function TradingViewWidget({ symbol, theme = "dark" }: TradingViewWidgetProps) {
         "style": "1",
         "locale": "en",
         "enable_publishing": false,
-        "hide_top_toolbar": isMobile,
-        "hide_symbol": isMobile,
-        "hide_legend": isMobile,
-        "save_image": false,
         "calendar": false,
-        "hide_volume": false,
-        "support_host": "https://www.tradingview.com",
         "container_id": "tradingview_chart",
-        "hide_side_toolbar": isMobile,
-        "withdateranges": false,
-        "details": false,
-        "hotlist": false,
-        "width": "100%",
-        "height": "100%"
-      });
+        ...(variant === "minimal" ? {
+          // Minimal variant settings
+          "hide_top_toolbar": true,
+          "hide_legend": true,
+          "hide_side_toolbar": true,
+          "hide_volume": true,
+          "hide_symbol": true,
+          "allow_symbol_change": false,
+          "save_image": false,
+          "details": false,
+          "hotlist": false,
+          "show_popup_button": false,
+          "withdateranges": false,
+          "toolbar_bg": "#000000",
+          "disabled_features": [
+            "use_localstorage_for_settings",
+            "volume_force_overlay",
+            "create_volume_indicator_by_default",
+            "header_compare",
+            "header_symbol_search",
+            "header_fullscreen_button",
+            "header_settings",
+            "header_chart_type",
+            "header_resolutions",
+            "drawing_tools",
+            "timeframes_toolbar",
+            "legend_widget",
+            "main_series_scale_menu",
+            "scales_context_menu",
+            "show_chart_property_page",
+            "symbol_search_hot_key",
+            "context_menus",
+            "left_toolbar",
+            "control_bar",
+            "edit_buttons_in_legend",
+            "border_around_the_chart"
+          ],
+          "overrides": {
+            "mainSeriesProperties.showPriceLine": false,
+            "paneProperties.background": "#000000",
+            "paneProperties.vertGridProperties.color": "#1e1e1e",
+            "paneProperties.horzGridProperties.color": "#1e1e1e",
+            "scalesProperties.textColor": "#AAA"
+          }
+        } : {
+          // Updated full variant settings
+          "hide_top_toolbar": false,
+          "hide_legend": false,
+          "hide_side_toolbar": false,
+          "hide_volume": false,
+          "details": false, // Changed to false
+          "allow_symbol_change": false,
+          "save_image": true,
+          "show_popup_button": true,
+          "withdateranges": true,
+          "disabled_features": [
+            "use_localstorage_for_settings",
+            "header_symbol_search",
+            "symbol_info",
+            "header_compare",
+            "header_settings"
+          ]
+        })
+      };
 
+      script.innerHTML = JSON.stringify(config);
       container.current.appendChild(script);
     };
 
@@ -72,7 +127,7 @@ function TradingViewWidget({ symbol, theme = "dark" }: TradingViewWidgetProps) {
         container.current.innerHTML = '';
       }
     };
-  }, [theme, isMobile, symbol]);
+  }, [theme, isMobile, symbol, variant]); // Add variant to dependencies
 
   return (
     <div className="tradingview-widget-container flex flex-col h-full w-full relative bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" ref={container}>

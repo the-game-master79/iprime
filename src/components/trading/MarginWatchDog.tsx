@@ -59,15 +59,6 @@ export const MarginWatchDog = ({ trades, currentPrices, userBalance, onCloseTrad
       // Calculate margin level (adjusted balance / margin used)
       const marginLevel = adjustedBalance / totalMargin;
 
-      console.log('MarginWatchDog Status:', {
-        openTrades: openTrades.length,
-        totalPnL: totalPnL.toFixed(2),
-        equityLevel: (equityLevel * 100).toFixed(2) + '%',
-        marginLevel: (marginLevel * 100).toFixed(2) + '%',
-        adjustedBalance: adjustedBalance.toFixed(2),
-        totalMargin: totalMargin.toFixed(2),
-      });
-
       // Handle low equity level (5% of initial balance)
       if (equityLevel <= LOW_EQUITY_THRESHOLD) {
         // Sort trades by PnL (close most unprofitable first)

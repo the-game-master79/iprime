@@ -26,13 +26,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import TradingViewWidget from "@/components/charts/TradingViewWidget";
+import { useScreenTracker } from '@/contexts/ScreenTracker';
+import { ScreenConflictOverlay } from '@/components/overlays/ScreenConflictOverlay';
 
 const SelectPairs = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  
-  // Add storage key constant
-  const QUICK_TRADE_STORAGE_KEY = 'quick-trade-enabled';
+  const { setActiveScreen, hasConflict } = useScreenTracker();
   
   // Add new states
   const [userBalance, setUserBalance] = useState(0);
@@ -46,7 +47,6 @@ const SelectPairs = () => {
   const [showTradesSheet, setShowTradesSheet] = useState(false);
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [showSearch, setShowSearch] = useState(false);
-  const [quickTradeEnabled, setQuickTradeEnabled] = useState(false);
   const [quickTradeDialog, setQuickTradeDialog] = useState<{
     isOpen: boolean;
     pair: string;
@@ -159,15 +159,6 @@ const SelectPairs = () => {
         priceAnimation: priceAnimations[pair.symbol]
       }));
   }, [tradingPairs, activeTab, searchQuery, pairPrices, priceAnimations]);
-
-  const handlePairSelect = (pair: string) => {
-    // Don't navigate if quick trade is enabled
-    if (quickTradeEnabled) return;
-    
-    // Format the pair correctly for the URL
-    const encodedPair = encodeURIComponent(pair);
-    navigate(`/trade/chart/${encodedPair}`);
-  };
 
   // Update visibility change handler
   useEffect(() => {
@@ -469,20 +460,6 @@ const SelectPairs = () => {
     );
   };
 
-  // Add effect to load quick trade state from localStorage
-  useEffect(() => {
-    const savedState = localStorage.getItem(QUICK_TRADE_STORAGE_KEY);
-    if (savedState !== null) {
-      setQuickTradeEnabled(savedState === 'true');
-    }
-  }, []);
-
-  // Update the toggle handler
-  const handleQuickTradeToggle = (enabled: boolean) => {
-    setQuickTradeEnabled(enabled);
-    localStorage.setItem(QUICK_TRADE_STORAGE_KEY, enabled.toString());
-  };
-
   // Add this effect to handle initial price loading and websocket connection
   useEffect(() => {
     const loadPricesAndConnect = async () => {
@@ -568,6 +545,44 @@ const SelectPairs = () => {
     // Return the minimum between affordable lots and pair's max lots
     return Math.min(maxAffordableLots, selectedPair.max_lots);
   };
+
+  // Update the UI click handler to do nothing
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Prevent any navigation
+    e.preventDefault();
+  };
+
+  // Add helper to format symbol for TradingView
+  const formatTradingViewSymbol = (symbol: string): string => {
+    if (symbol.startsWith('BINANCE:')) {
+      return symbol; // Binance symbols are already correctly formatted
+    }
+    if (symbol.startsWith('FX:')) {
+      // Convert FX:EUR/USD to FX:EURUSD
+      return symbol.replace('/', '');
+    }
+    return symbol;
+  };
+
+  // Update screen tracking effect
+  useEffect(() => {
+    // Set active screen immediately
+    setActiveScreen('selectPairs');
+    
+    // Cleanup function to clear active screen
+    return () => {
+      setActiveScreen(null);
+    };
+  }, [setActiveScreen]);
+
+  // Move the conflict check to the top of the component
+  if (hasConflict) {
+    return (
+      <div className="min-h-screen">
+        <ScreenConflictOverlay />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">
@@ -683,23 +698,6 @@ const SelectPairs = () => {
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between mt-4 px-1">
-                <div className="flex items-center gap-3">
-                  <label 
-                    htmlFor="quick-trade"
-                    className="text-sm font-medium cursor-pointer select-none"
-                  >
-                    Quick Trade
-                  </label>
-                  <Switch
-                    id="quick-trade"
-                    checked={quickTradeEnabled}
-                    onCheckedChange={handleQuickTradeToggle} // Update this line
-                    className="data-[state=checked]:bg-green-500"
-                  />
-                </div>
-              </div>
-
               <ScrollArea className="h-[calc(100vh-320px)] mt-4 -mx-4 px-4">
                 <div className="grid gap-3 pb-4">
                   {filteredPairs.map((pair) => {
@@ -712,7 +710,7 @@ const SelectPairs = () => {
                     return (
                       <div
                         key={pair.symbol}
-                        onClick={() => !isDisabled && handlePairSelect(pair.symbol)}
+                        onClick={handleContainerClick}
                         className={cn(
                           "w-full text-left bg-card hover:bg-accent rounded-lg border border-[#525252] p-3",
                           "transition-all duration-200 active:scale-[0.98]",
@@ -746,43 +744,39 @@ const SelectPairs = () => {
                               )}>
                                 {parseFloat(priceData.bid).toFixed(getDecimalPlaces(pair.symbol))}
                               </span>
-                              {quickTradeEnabled ? (
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    size="sm"
-                                    className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white"
-                                    onClick={(e) => handleExpandPair(pair.symbol, 'buy', e)}
-                                  >
-                                    {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'buy' 
-                                      ? 'Cancel' 
-                                      : 'Buy'}
-                                  </Button>
-                                  <Button
-                                    size="sm" 
-                                    className="h-7 px-3 bg-red-600 hover:bg-red-700 text-white"
-                                    onClick={(e) => handleExpandPair(pair.symbol, 'sell', e)}
-                                  >
-                                    {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'sell' 
-                                      ? 'Cancel' 
-                                      : 'Sell'}
-                                  </Button>
-                                </div>
-                              ) : (
-                                <span className={cn(
-                                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                                  parseFloat(priceData.change) < 0 
-                                    ? "bg-red-500/10 text-red-500" 
-                                    : "bg-green-500/10 text-green-500"
-                                )}>
-                                  {parseFloat(priceData.change) > 0 ? '+' : ''}{priceData.change}%
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={(e) => handleExpandPair(pair.symbol, 'buy', e)}
+                                >
+                                  {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'buy' 
+                                    ? 'Cancel' 
+                                    : 'Buy'}
+                                </Button>
+                                <Button
+                                  size="sm" 
+                                  className="h-7 px-3 bg-red-600 hover:bg-red-700 text-white"
+                                  onClick={(e) => handleExpandPair(pair.symbol, 'sell', e)}
+                                >
+                                  {expandedPair?.symbol === pair.symbol && expandedPair?.action === 'sell' 
+                                    ? 'Cancel' 
+                                    : 'Sell'}
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
                           {/* Add expandable quick trade section */}
                           {expandedPair?.symbol === pair.symbol && (
                             <div className="mt-3 pt-3 border-t border-[#525252] space-y-4">
+                              <div className="h-[300px] -mx-3 mb-4">
+                                <TradingViewWidget 
+                                  symbol={formatTradingViewSymbol(pair.symbol)}
+                                  theme="dark"
+                                  variant="minimal"  // Add this line
+                                />
+                              </div>
                               <div className="space-y-2">
                                 {(() => {
                                   const maxLeverage = pair.max_leverage;

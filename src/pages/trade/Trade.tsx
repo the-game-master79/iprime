@@ -16,8 +16,10 @@ import type { Trade, TradingPair, PriceData, TradeParams } from "@/types/trading
 import { formatTradingViewSymbol, calculatePnL, calculateRequiredMargin } from "@/utils/trading";
 import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 import { MarginWatchDog } from "@/components/trading/MarginWatchDog";
+import { useScreenTracker } from '@/contexts/ScreenTracker';
 
 const Trade = () => {
+  const { setActiveScreen, hasConflict } = useScreenTracker();
   const { isMobile } = useBreakpoints();
   const { pair } = useParams();
   const location = useLocation();
@@ -452,6 +454,16 @@ const Trade = () => {
       setSelectedPair(decodedPair);
     }
   }, [pair]);
+
+  // Add effect to register screen
+  useEffect(() => {
+    setActiveScreen('trade');
+    return () => setActiveScreen('selectPairs');
+  }, [setActiveScreen]);
+
+  if (hasConflict) {
+    return <ScreenConflictOverlay />;
+  }
 
   if (isMobile && location.pathname === '/trade') {
     return <Navigate to="/trade/select" replace />;
