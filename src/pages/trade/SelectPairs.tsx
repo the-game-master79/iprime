@@ -587,8 +587,9 @@ const SelectPairs = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-[#525252]">
-        {/* Balance Card */}
-        <div className="px-4 pt-4">
+        {/* Balance and Stats Cards Grid */}
+        <div className="px-4 pt-4 pb-3 grid grid-cols-2 gap-3">
+          {/* Balance Card */}
           <div className="bg-[#141414] rounded-xl border border-[#525252]">
             <div className="p-4">
               <div className="flex flex-col gap-4">
@@ -602,39 +603,36 @@ const SelectPairs = () => {
                 {/* Balance */}
                 <div className="flex flex-col">
                   <span className="text-2xl font-semibold text-white">
-                    ${userBalance.toLocaleString()}
+                    {userBalance.toLocaleString()} USD
                   </span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Stats Card */}
-        <div className="px-4 py-3">
+          {/* Stats Card */}
           <div 
             className="relative overflow-hidden bg-card rounded-xl border border-[#525252] shadow-sm transition-all 
                      hover:shadow-md active:scale-[0.99] cursor-pointer"
             onClick={() => setShowTradesSheet(true)}
           >
-            <div className="p-4 flex items-center justify-between">
-              <Badge variant="outline">
+            <div className="p-4 flex flex-col gap-4">
+              <Badge variant="outline" className="rounded-sm bg-[#282828] text-primary w-fit">
                 Positions ({trades.filter(t => t.status === 'open').length})
               </Badge>
-              <Badge 
-                variant={totalPnL === 0 ? "outline" : totalPnL > 0 ? "success" : "destructive"}
-                className={cn(
-                  "font-mono",
-                  totalPnL === 0 && "text-muted-foreground bg-muted"
-                )}
-              >
+              <div className={cn(
+                "text-2xl font-semibold",
+                totalPnL === 0 && "text-foreground",
+                totalPnL > 0 && "text-green-500",
+                totalPnL < 0 && "text-red-500"
+              )}>
                 {totalPnL === 0 ? 
-                  '$0.00' : 
+                  '0.00' : 
                   totalPnL > 0 ? 
-                    `Profit +$${totalPnL.toFixed(2)}` : 
-                    `Loss -$${Math.abs(totalPnL).toFixed(2)}`
+                    `+${totalPnL.toFixed(2)}` : 
+                    `-${Math.abs(totalPnL).toFixed(2)}`
                 }
-              </Badge>
+              </div>
             </div>
           </div>
         </div>
@@ -769,12 +767,12 @@ const SelectPairs = () => {
 
                           {/* Add expandable quick trade section */}
                           {expandedPair?.symbol === pair.symbol && (
-                            <div className="mt-3 pt-3 border-t border-[#525252] space-y-4">
-                              <div className="h-[300px] -mx-3 mb-4">
+                            <div className="mt-3 space-y-4">
+                              <div className="h-[300px] p-3 rounded-xl bg-[#141414]">
                                 <TradingViewWidget 
                                   symbol={formatTradingViewSymbol(pair.symbol)}
                                   theme="dark"
-                                  variant="minimal"  // Add this line
+                                  variant="minimal"
                                 />
                               </div>
                               <div className="space-y-2">

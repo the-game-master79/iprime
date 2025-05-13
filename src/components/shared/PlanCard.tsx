@@ -254,8 +254,14 @@ export function PlanCard({
                           <span className="text-lg font-medium">${amount.toLocaleString()}</span>
                         </div>
                         <div className="flex items-baseline justify-between">
-                          <span className="text-sm text-muted-foreground">Daily Return</span>
-                          <span className="text-lg font-medium text-primary">{percentage}%</span>
+                          <span className="text-sm text-muted-foreground">Total ROI</span>
+                          <span className="text-lg font-medium text-primary">{Number(percentage * duration).toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">ROI in USD</span>
+                          <span className="text-lg font-medium text-primary">
+                            ${((amount * percentage * duration) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                         <div className="flex items-baseline justify-between">
                           <span className="text-sm text-muted-foreground">Duration</span>
@@ -323,8 +329,14 @@ export function PlanCard({
                           <span className="text-lg font-medium">${amount.toLocaleString()}</span>
                         </div>
                         <div className="flex items-baseline justify-between">
-                          <span className="text-sm text-muted-foreground">Daily Return</span>
-                          <span className="text-lg font-medium text-primary">{percentage}%</span>
+                          <span className="text-sm text-muted-foreground">Total ROI</span>
+                          <span className="text-lg font-medium text-primary">{Number(percentage * duration).toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-sm text-muted-foreground">ROI in USD</span>
+                          <span className="text-lg font-medium text-primary">
+                            ${((amount * percentage * duration) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
                         </div>
                         <div className="flex items-baseline justify-between">
                           <span className="text-sm text-muted-foreground">Total Earned</span>
