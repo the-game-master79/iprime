@@ -5,8 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Trade } from "@/types/trade";
 import { getDecimalPlaces } from "@/config/decimals"; // Add this import
-import { wsManager } from '@/services/websocket-manager';
-import { DialogTitle } from "@/components/ui/dialog";
+import { wsManager, ConnectionMode } from '@/services/websocket-manager';
 import { toast } from "@/hooks/use-toast";
 import { 
   AlertDialog,
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react"; 
+import { MarginWatchDog } from "@/components/trading/MarginWatchDog";
 
 interface PriceData {
   price: string;
@@ -68,12 +68,23 @@ const groupTradesByPairAndType = (trades: Trade[]) => {
         pnl: 0,
       };
     }
+    // Ensure numerical values are properly handled
+    const tradeLots = Number(trade.lots) || 0;
+    const tradePnl = Number(trade.pnl) || 0;
+    
     acc[key].originalTrades.push(trade);
-    acc[key].lots += trade.lots;
-    acc[key].pnl += trade.pnl || 0;
+    acc[key].lots = Number((acc[key].lots + tradeLots).toFixed(2));
+    acc[key].pnl = Number((acc[key].pnl + tradePnl).toFixed(2));
     return acc;
   }, {} as Record<string, Trade & { originalTrades: Trade[] }>);
   return Object.values(grouped);
+};
+
+// Add safety checks for numerical calculations in calculatePnL usage
+const calculateSafePnL = (trade: Trade, currentPrice: number): number => {
+  if (!trade || !currentPrice || !calculatePnL) return 0;
+  const pnl = calculatePnL(trade, currentPrice);
+  return isNaN(pnl) ? 0 : Number(pnl.toFixed(2));
 };
 
 interface TradesSheetProps {
@@ -82,6 +93,7 @@ interface TradesSheetProps {
   trades: Trade[];
   onCloseTrade?: (tradeId: string) => Promise<void>;
   calculatePnL: (trade: Trade, currentPrice: number) => number;
+  userBalance: number; // Add this prop
 }
 
 export function TradesSheet({
@@ -89,7 +101,8 @@ export function TradesSheet({
   onOpenChange,
   trades: openTrades,
   onCloseTrade,
-  calculatePnL
+  calculatePnL,
+  userBalance  // Add this prop
 }: TradesSheetProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'open' | 'pending'>('open');
@@ -104,12 +117,15 @@ export function TradesSheet({
   const totalPnL = openTrades
     .filter(t => t.status === 'open')
     .reduce((sum, trade) => {
+      if (!calculatePnL || !localPrices[trade.pair]) return sum;
       const currentPrice = parseFloat(localPrices[trade.pair]?.bid || '0');
+      if (!currentPrice) return sum;
       return sum + calculatePnL(trade, currentPrice);
     }, 0);
 
   // Update isHedgedPosition to check for matching lots and opposite type
   const isHedgedPosition = (trade: Trade) => {
+    if (!trade || !openTrades) return false;
     const hedgedTrade = openTrades.find(t => 
       t.id !== trade.id &&
       t.pair === trade.pair &&
@@ -122,6 +138,7 @@ export function TradesSheet({
 
   // Add function to get combined hedged PnL
   const getHedgedPnL = (trade: Trade, currentPrice: number) => {
+    if (!calculatePnL || !trade || !currentPrice) return 0;
     const hedgedTrade = openTrades.find(t => 
       t.id !== trade.id &&
       t.pair === trade.pair &&
@@ -255,6 +272,8 @@ export function TradesSheet({
       });
 
       const unsubscribe = wsManager.subscribe((symbol, data) => {
+        if (!data?.bid) return; // Ignore invalid price updates
+        
         setLocalPrices(prev => ({
           ...prev,
           [symbol]: data
@@ -265,7 +284,9 @@ export function TradesSheet({
         }));
       });
 
-      wsManager.watchPairs(uniquePairs);
+      // Use MINIMAL mode for trades sheet
+      wsManager.watchPairs(uniquePairs, ConnectionMode.MINIMAL);
+
       return () => {
         unsubscribe();
         wsManager.unwatchPairs(uniquePairs);
@@ -350,6 +371,16 @@ export function TradesSheet({
 
   return (
     <>
+      {/* Add MarginWatchDog before Sheet component */}
+      {onCloseTrade && (
+        <MarginWatchDog
+          trades={openTrades}
+          currentPrices={localPrices}
+          userBalance={userBalance}
+          onCloseTrade={onCloseTrade}
+        />
+      )}
+
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent 
           side="bottom" 

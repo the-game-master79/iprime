@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Lock, ArrowRight } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useEffect, useState } from "react";
+import { TradingPair } from "@/types/trading";
+import { supabase } from "@/lib/supabase";
 
 interface PlanCardProps {
   variant?: 'available' | 'active';
@@ -49,6 +52,61 @@ const getBadgeStyle = (planName: string) => {
   }
 };
 
+const CACHE_KEY = 'trading-pairs-cache';
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+
+const getRandomPairs = (pairs: TradingPair[], count: number) => {
+  const shuffled = [...pairs].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+};
+
+const useTradingPairs = () => {
+  const [pairs, setPairs] = useState<TradingPair[]>([]);
+
+  useEffect(() => {
+    const fetchPairs = async () => {
+      // Check cache first
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION) {
+          setPairs(
+            data.map((pair: any) => ({
+              ...pair,
+              min_leverage: pair.min_leverage || 0,
+              max_leverage: pair.max_leverage || 0,
+              leverage_options: pair.leverage_options || [],
+              min_lots: pair.min_lots || 0,
+              max_lots: pair.max_lots || 0,
+              other_property: pair.other_property || null, // Add other missing properties with defaults
+            }))
+          );
+          return;
+        }
+      }
+
+      // Fetch fresh data if cache is invalid
+      const { data, error } = await supabase
+        .from('trading_pairs')
+        .select('id, symbol, name, type, is_active, image_url, short_name')
+        .eq('is_active', true);
+
+      if (!error && data) {
+        setPairs(data);
+        // Update cache
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          data,
+          timestamp: Date.now()
+        }));
+      }
+    };
+
+    fetchPairs();
+  }, []);
+
+  return pairs;
+};
+
 export function PlanCard({
   variant = 'available',
   name,
@@ -64,6 +122,14 @@ export function PlanCard({
   benefits = []
 }: PlanCardProps) {
   const style = getBadgeStyle(name);
+  const tradingPairs = useTradingPairs();
+  const [randomPairs, setRandomPairs] = useState<TradingPair[]>([]);
+
+  useEffect(() => {
+    if (tradingPairs.length > 0) {
+      setRandomPairs(getRandomPairs(tradingPairs, 3));
+    }
+  }, [tradingPairs]);
 
   return (
     <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg">
@@ -97,7 +163,7 @@ export function PlanCard({
                 </div>
                 <span>•</span>
                 <span>
-                  ROI: ${((amount * percentage / 100 * duration)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  ROI: ${((amount * percentage / 100 * duration)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
@@ -180,7 +246,7 @@ export function PlanCard({
                     </div>
                     {name}
                   </AlertDialogTitle>
-                  <AlertDialogDescription asChild>
+                  <AlertDialogDescription>
                     <div className="space-y-6 pt-2">
                       <div className="space-y-2">
                         <div className="flex items-baseline justify-between">
@@ -221,56 +287,14 @@ export function PlanCard({
           </div>
         ) : (
           <div className="flex items-center gap-3">              
-          <AlertDialog>
-              <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white"
-                  >
-                    Cancel Plan
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Cancel Investment Plan</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="space-y-4 pt-2">
-                        <p className="text-sm text-muted-foreground">Please review the cancellation details below:</p>
-                        
-                        <div className="space-y-3 rounded-lg border bg-card/50 p-4">
-                          <div className="flex justify-between">
-                            <span className="text-sm text-muted-foreground">Investment Amount</span>
-                            <span className="font-medium">${amount.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-green-500">
-                            <span className="text-sm">Total Returns</span>
-                            <span className="font-medium">+${earnings?.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-destructive">
-                            <span className="text-sm">Pre-closure Fee (10%)</span>
-                            <span className="font-medium">-${(amount * 0.10).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-destructive">
-                            <span className="text-sm">Admin Fee (5%)</span>
-                            <span className="font-medium">-${(amount * 0.05).toLocaleString()}</span>
-                          </div>
-                          <div className="pt-2 border-t">
-                            <div className="flex justify-between font-medium">
-                              <span>Net Refund Amount</span>
-                              <span>${(amount - (amount * 0.15)).toLocaleString()}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="border-primary/20 hover:border-primary/40">Back</AlertDialogCancel>
-                    <Button variant="destructive" onClick={onCancel}>Confirm Cancellation</Button>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              <AlertDialog>
+            <Button
+              variant="destructive"
+              className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white"
+              onClick={onCancel}
+            >
+              Cancel Plan
+            </Button>
+            <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
                   variant="outline" 
@@ -287,7 +311,7 @@ export function PlanCard({
                     </div>
                     {name}
                   </AlertDialogTitle>
-                  <AlertDialogDescription asChild>
+                  <AlertDialogDescription>
                     <div className="space-y-6 pt-2">
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between">
@@ -321,6 +345,35 @@ export function PlanCard({
                           <span>Day {duration}</span>
                         </div>
                       </div>
+
+                      {variant === 'active' && (
+                        <div className="space-y-4">
+                          <h4 className="font-medium">Trading Pairs</h4>
+                          <div className="grid grid-cols-3 gap-3">
+                            {randomPairs.map((pair) => (
+                              <div 
+                                key={pair.id} 
+                                className="flex items-center gap-2 p-2 rounded-lg bg-card/50 border border-primary/10"
+                              >
+                                <img
+                                  src={pair.image_url}
+                                  alt={pair.name}
+                                  className="h-8 w-8 rounded-full"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/generic.png';
+                                  }}
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-left">{pair.short_name}</span>
+                                  <span className="text-xs text-muted-foreground text-left">
+                                    {pair.type}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>

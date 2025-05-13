@@ -11,8 +11,7 @@ import { useLimitOrders } from '@/hooks/use-limit-orders';
 import { AlertCircle, ChevronLeftCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { wsManager } from '@/services/websocket-manager';
-import { calculatePnL, calculateRequiredMargin, calculatePipValue } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { calculatePnL, calculateRequiredMargin } from "@/utils/trading"; // Remove getPipValue as it's internal to calculatePipValue
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ForexCryptoSheet } from "@/components/shared/ForexCryptoSheet";
 import { cn } from "@/lib/utils";
@@ -236,6 +235,9 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
   const [limitPrice, setLimitPrice] = useState('');
   const [isPriceLoaded, setIsPriceLoaded] = useState(false);
 
+  // Add loading indicator state
+  const [isConnecting, setIsConnecting] = useState(true);
+
   useEffect(() => {
     const fetchUserBalance = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -310,30 +312,57 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     };
   }, []);
 
+  // Move WebSocket initialization to a separate effect that runs earlier
   useEffect(() => {
-    if (!isPageVisible) return;
+    if (!defaultPair) return;
 
+    setIsConnecting(true);
+    setIsPriceLoaded(false); // Reset price loaded state when changing pairs
+    
+    // Initialize WebSocket connection immediately
     const unsubscribe = wsManager.subscribe((symbol, data) => {
       setPairPrices(prev => ({
         ...prev,
         [symbol]: data
       }));
       setIsPriceLoaded(true);
+      setIsConnecting(false);
     });
 
-    // Watch required pairs
-    const pairs = Array.from(new Set([defaultPair, ...trades
-      .filter(t => t.status === 'open' || t.status === 'pending')
-      .map(t => t.pair)
-    ]));
-
-    wsManager.watchPairs(pairs);
+    // Watch the current pair immediately
+    wsManager.watchPairs([defaultPair]);
 
     return () => {
       unsubscribe();
-      wsManager.unwatchPairs(pairs);
+      wsManager.unwatchPairs([defaultPair]);
     };
-  }, [trades, defaultPair, isPageVisible]);
+  }, [defaultPair]); // Only depend on defaultPair
+
+  // Separate effect for active trades price updates
+  useEffect(() => {
+    if (!trades.length) return;
+
+    const activeTradePairs = trades
+      .filter(t => t.status === 'open' || t.status === 'pending')
+      .map(t => t.pair)
+      .filter(pair => pair !== defaultPair); // Exclude current pair as it's already watched
+
+    if (!activeTradePairs.length) return;
+
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      setPairPrices(prev => ({
+        ...prev,
+        [symbol]: data
+      }));
+    });
+
+    wsManager.watchPairs(activeTradePairs);
+
+    return () => {
+      unsubscribe();
+      wsManager.unwatchPairs(activeTradePairs);
+    };
+  }, [trades, defaultPair]);
 
   useEffect(() => {
     const total = trades
@@ -472,6 +501,14 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
     const maxByPair = pairInfo?.max_lots || 0;
     return Math.min(maxByBalance, maxByPair);
   }, [getMaxAffordableLots, pairInfo]);
+
+  // Add handleSetMaxLots function after effectiveMaxLots calculation
+  const handleSetMaxLots = () => {
+    const maxLots = Math.min(getMaxAffordableLots, pairInfo?.max_lots || 0);
+    // Round to 2 decimal places
+    const roundedMaxLots = Math.floor(maxLots * 100) / 100;
+    setLots(roundedMaxLots.toFixed(2));
+  };
 
   const handleTradeClick = (type: 'buy' | 'sell') => {
     if (showPanel && type === tradeType) {
@@ -1119,7 +1156,11 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                     <Badge variant="outline" className="flex-1 text-center border-[#525252]">
                       Margin: ${marginRequired}
                     </Badge>
-                    <Badge variant="outline" className="flex-1 text-center border-[#525252]">
+                    <Badge 
+                      variant="outline" 
+                      className="flex-1 text-center border-[#525252] cursor-pointer hover:bg-accent/50"
+                      onClick={handleSetMaxLots}
+                    >
                       Max Lots: {effectiveMaxLots.toFixed(2)}
                     </Badge>
                     <Button
@@ -1190,24 +1231,26 @@ export const ChartView = ({ openTrades = 0, totalPnL: initialTotalPnL = 0, lever
                       variant="outline"
                       className="flex-1 h-12 shadow-sm text-white border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700"
                       onClick={() => handleTrade('sell')}
-                      disabled={!isPriceLoaded}
+                      disabled={!isPriceLoaded || isConnecting}
                     >
                       <div className="flex flex-col">
                         <span>Sell</span>
                         <span className="text-xs font-mono">
-                          {!isPriceLoaded ? 'Loading...' : `$${formatPrice(pairPrices[defaultPair]?.bid)}`}
+                          {isConnecting ? 'Connecting...' : !isPriceLoaded ? 'Loading...' : 
+                          formatPrice(pairPrices[defaultPair]?.bid)}
                         </span>
                       </div>
                     </Button>
                     <Button 
                       className="flex-1 h-12 shadow-sm bg-blue-500 hover:bg-blue-600 text-white"
                       onClick={() => handleTrade('buy')}
-                      disabled={!isPriceLoaded}
+                      disabled={!isPriceLoaded || isConnecting}
                     >
                       <div className="flex flex-col">
                         <span>Buy</span>
                         <span className="text-xs font-mono">
-                          {!isPriceLoaded ? 'Loading...' : `$${formatPrice(pairPrices[defaultPair]?.ask)}`}
+                          {isConnecting ? 'Connecting...' : !isPriceLoaded ? 'Loading...' : 
+                          formatPrice(pairPrices[defaultPair]?.ask)}
                         </span>
                       </div>
                     </Button>

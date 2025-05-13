@@ -76,41 +76,53 @@ export const calculatePriceDifferenceInPips = (
 export const calculatePnL = (trade: Trade, currentPrice: number, trades?: Trade[], calculateTotal: boolean = false): number => {
   if (!currentPrice || !trade.openPrice) return 0;
 
-  // Check if trade is part of a hedged position
-  const hedgedTrade = trades?.find(t => 
-    t.id !== trade.id &&
-    t.pair === trade.pair &&
-    t.type !== trade.type &&
-    t.lots === trade.lots &&
-    t.status === 'open'
-  );
-
-  // Always calculate live PnL for display
-  const tradePnL = calculateTradeOnlyPnL(trade, currentPrice);
-
-  // If hedged and calculating total, combine both sides PnL
-  if (hedgedTrade && calculateTotal) {
-    const hedgedPnL = calculateTradeOnlyPnL(hedgedTrade, currentPrice);
-    return tradePnL + hedgedPnL;
-  }
-
-  // Return live PnL regardless of hedged status
-  return tradePnL;
-};
-
-// Helper function to calculate individual trade PnL
-const calculateTradeOnlyPnL = (trade: Trade, currentPrice: number): number => {
+  // Calculate price difference
   const priceDiff = trade.type === 'buy' 
     ? currentPrice - trade.openPrice 
     : trade.openPrice - currentPrice;
-    
+
+  // Calculate base PnL based on instrument type
+  let basePnL = 0;
   if (trade.pair.includes('BINANCE:')) {
-    return priceDiff * trade.lots;
+    // For crypto: price difference * lots (direct value calculation)
+    basePnL = priceDiff * trade.lots;
   } else if (trade.pair === 'FX:XAU/USD') {
-    return priceDiff * trade.lots * 100;
+    // For gold: (price difference * lots * fixed multiplier)
+    basePnL = priceDiff * trade.lots * 100;
   } else {
-    return priceDiff * trade.lots * 100000;
+    // For forex: (price difference * lots * standard lot size)
+    basePnL = priceDiff * trade.lots * 100000;
   }
+
+  // If calculating total and trade is hedged, include both sides
+  if (calculateTotal && trades) {
+    const hedgedTrade = trades.find(t => 
+      t.id !== trade.id &&
+      t.pair === trade.pair &&
+      t.type !== trade.type &&
+      t.lots === trade.lots &&
+      t.status === 'open'
+    );
+
+    if (hedgedTrade) {
+      const hedgedPriceDiff = hedgedTrade.type === 'buy'
+        ? currentPrice - hedgedTrade.openPrice
+        : hedgedTrade.openPrice - currentPrice;
+
+      let hedgedPnL = 0;
+      if (trade.pair.includes('BINANCE:')) {
+        hedgedPnL = hedgedPriceDiff * hedgedTrade.lots;
+      } else if (trade.pair === 'FX:XAU/USD') {
+        hedgedPnL = hedgedPriceDiff * hedgedTrade.lots * 100;
+      } else {
+        hedgedPnL = hedgedPriceDiff * hedgedTrade.lots * 100000;
+      }
+
+      return basePnL + hedgedPnL;
+    }
+  }
+
+  return basePnL;
 };
 
 export const calculateRequiredMargin = (

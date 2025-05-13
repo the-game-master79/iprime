@@ -60,6 +60,8 @@ const Plans = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [planToSubscribe, setPlanToSubscribe] = useState<Plan | null>(null);
   const [totalInvested, setTotalInvested] = useState(0);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [planToCancel, setPlanToCancel] = useState<PlanWithSubscription | null>(null);
 
   // Add this new function
   const calculateTotalInvested = async () => {
@@ -385,6 +387,49 @@ const Plans = () => {
     }
   };
 
+  const handleCancelClick = (plan: PlanWithSubscription) => {
+    setPlanToCancel(plan);
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!planToCancel) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Update subscription status to cancelled
+      const { error: updateError } = await supabase
+        .from('plans_subscriptions')
+        .update({ status: 'cancelled' })
+        .eq('id', planToCancel.subscription_id);
+
+      if (updateError) throw updateError;
+
+      // Recalculate total invested
+      await calculateTotalInvested();
+      
+      toast({
+        title: "Success",
+        description: "Plan cancelled successfully",
+        variant: "default"
+      });
+
+      setShowCancelDialog(false);
+      setPlanToCancel(null);
+      fetchSubscribedPlans();
+
+    } catch (error) {
+      console.error('Error cancelling subscription:', error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel plan",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Topbar 
@@ -491,7 +536,7 @@ const Plans = () => {
             ) : (
               <ActivePlanVariant 
                 plans={subscribedPlans}
-                onCancel={handleCancelSubscription}
+                onCancel={handleCancelClick}
               />
             )}
           </TabsContent>
@@ -502,23 +547,23 @@ const Plans = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Subscription</AlertDialogTitle>
-            <AlertDialogDescription asChild>
+            <AlertDialogDescription>
               <div className="space-y-4">
-                <p>Please confirm your subscription to {planToSubscribe?.name}</p>
+                <div>Please confirm your subscription to {planToSubscribe?.name}</div>
                 
                 <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Current Balance:</span>
-                    <span className="font-medium">{userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
+                    <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
                   </div>
                   <div className="flex justify-between text-destructive">
                     <span>Investment Amount:</span>
-                    <span>-{planToSubscribe?.investment.toLocaleString()} USD</span>
+                    <span>-${planToSubscribe?.investment.toLocaleString()} USD</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-medium">
                     <span>Remaining Balance:</span>
-                    <span>{((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
+                    <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
                   </div>
                 </div>
               </div>
@@ -526,8 +571,61 @@ const Plans = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubscription}>
-              Confirm Subscription
+            <AlertDialogAction onClick={handleConfirmSubscription}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Plan</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-4">
+                <p>Are you sure you want to cancel this plan? This action cannot be undone.</p>
+                
+                <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Plan Name:</span>
+                    <span className="font-medium">{planToCancel?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Investment Amount:</span>
+                    <span className="font-medium">${planToCancel?.investment.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Earned:</span>
+                    <span className="font-medium text-green-500">
+                      +${(planToCancel?.actual_earnings || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <Separator className="my-2" />
+                  {planToCancel && (
+                    <>
+                      <div className="flex justify-between text-destructive/80">
+                        <span>Pre-closure Fee (10%):</span>
+                        <span>-${(planToCancel.investment * 0.10).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-destructive/80">
+                        <span>Admin Fee (5%):</span>
+                        <span>-${(planToCancel.investment * 0.05).toLocaleString()}</span>
+                      </div>
+                      <Separator className="my-2" />
+                      <div className="flex justify-between font-medium">
+                        <span>Final Refund Amount:</span>
+                        <span>${(planToCancel.investment * 0.85).toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Plan</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90">
+              Cancel Plan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -573,4 +671,3 @@ function toast({ title, description, variant }: { title: string; description: st
     }, 500);
   }, 3000);
 }
-

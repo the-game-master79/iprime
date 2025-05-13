@@ -364,21 +364,21 @@ const SelectPairs = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const selectedPair = tradingPairs.find(p => p.symbol === pair);
+      if (!selectedPair) throw new Error('Invalid pair');
+
+      // Always use maximum leverage for quick trades
+      const maxLeverage = selectedPair.max_leverage;
+
       const price = action === 'buy' 
         ? parseFloat(pairPrices[pair]?.ask || '0')
         : parseFloat(pairPrices[pair]?.bid || '0');
 
-      const selectedPair = tradingPairs.find(p => p.symbol === pair);
-      if (!selectedPair) throw new Error('Invalid pair');
-
-      // Use default leverage but cap it at pair's max_leverage
-      const effectiveLeverage = Math.min(defaultLeverage, selectedPair.max_leverage);
-
-      // Calculate margin amount
+      // Calculate margin amount with max leverage
       const marginAmount = calculateRequiredMargin(
         price,
         lots,
-        effectiveLeverage,
+        maxLeverage,
         pair.includes('BINANCE:'),
         pair
       );
@@ -398,7 +398,7 @@ const SelectPairs = () => {
           status: 'open',
           open_price: price,
           lots: lots,
-          leverage: effectiveLeverage,
+          leverage: maxLeverage,
           margin_amount: marginAmount,
           order_type: 'market' // Add this field
         }])
@@ -538,6 +538,36 @@ const SelectPairs = () => {
       unsubscribe();
     };
   }, []);
+
+  // Add helper to calculate max affordable lots based on user balance
+  const getMaxAffordableLots = (pair: string, leverageValue: number) => {
+    const selectedPair = tradingPairs.find(p => p.symbol === pair);
+    if (!selectedPair) return 0;
+
+    const price = parseFloat(pairPrices[pair]?.ask || '0');
+    if (!price || !leverageValue || !userBalance) return 0;
+
+    // Calculate total margin already used
+    const marginUtilized = trades
+      .filter(t => t.status === 'open')
+      .reduce((total, trade) => total + (trade.margin_amount || 0), 0);
+
+    // Available balance for new positions
+    const availableBalance = userBalance - marginUtilized;
+    if (availableBalance <= 0) return 0;
+
+    // Calculate max affordable lots
+    const maxAffordableLots = availableBalance * leverageValue / (
+      pair.includes('BINANCE:') 
+        ? price 
+        : pair === 'FX:XAU/USD'
+          ? price * 100
+          : price * 100000
+    );
+
+    // Return the minimum between affordable lots and pair's max lots
+    return Math.min(maxAffordableLots, selectedPair.max_lots);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted pb-16">
@@ -754,63 +784,89 @@ const SelectPairs = () => {
                           {expandedPair?.symbol === pair.symbol && (
                             <div className="mt-3 pt-3 border-t border-[#525252] space-y-4">
                               <div className="space-y-2">
-                                <div className="flex justify-between items-center text-sm">
-                                  <label className="font-medium">
-                                    Lots: {expandedPair.lots.toFixed(2)}
-                                  </label>
-                                  <span className="text-muted-foreground">
-                                    Max: {pair.max_lots.toFixed(2)}
-                                  </span>
-                                </div>
-                                <Slider
-                                  value={[expandedPair.lots]}
-                                  min={pair.min_lots}
-                                  max={pair.max_lots}
-                                  step={pair.lot_step}
-                                  onValueChange={([value]) => 
-                                    setExpandedPair(prev => prev ? { ...prev, lots: value } : null)
-                                  }
-                                  className="w-full"
-                                />
-                              </div>
-
-                              <div className="flex flex-col gap-2">
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-muted-foreground">Leverage:</span>
-                                  <span className={cn(
-                                    "font-medium",
-                                    defaultLeverage > 100 ? "text-red-500" :
-                                    defaultLeverage > 20 ? "text-yellow-500" : 
-                                    "text-green-500"
-                                  )}>
-                                    {Math.min(defaultLeverage, pair.max_leverage)}x
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-muted-foreground">Required Margin:</span>
-                                  <span className="font-medium">
-                                    ${calculateQuickTradeMargin(pair.symbol, expandedPair.lots).toFixed(2)}
-                                  </span>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className={cn(
-                                    expandedPair.action === 'buy' 
-                                      ? "bg-blue-600 hover:bg-blue-700 text-white" 
-                                      : "bg-red-600 hover:bg-red-700 text-white",
-                                    "w-full mt-2"
-                                  )}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleQuickTrade(
-                                      pair.symbol,
-                                      expandedPair.action,
-                                      expandedPair.lots
-                                    );
-                                  }}
-                                >
-                                  Confirm {expandedPair.action === 'buy' ? 'Buy' : 'Sell'}
-                                </Button>
+                                {(() => {
+                                  const maxLeverage = pair.max_leverage;
+                                  const currentPrice = parseFloat(pairPrices[pair.symbol]?.ask || '0');
+                                  const maxAffordable = getMaxAffordableLots(pair.symbol, maxLeverage);
+                                  const margin = calculateRequiredMargin(
+                                    currentPrice,
+                                    expandedPair.lots,
+                                    maxLeverage,
+                                    pair.symbol.includes('BINANCE:'),
+                                    pair.symbol
+                                  );
+                                  const isMarginAvailable = margin <= userBalance;
+                          
+                                  return (
+                                    <>
+                                      <div className="flex justify-between items-center text-sm">
+                                        <label className="font-medium">
+                                          Lots: {expandedPair.lots.toFixed(2)}
+                                        </label>
+                                        <span className="text-muted-foreground">
+                                          Max: {maxAffordable.toFixed(2)}
+                                        </span>
+                                      </div>
+                                      <Slider
+                                        value={[expandedPair.lots]}
+                                        min={pair.min_lots}
+                                        max={maxAffordable}
+                                        step={pair.lot_step}
+                                        onValueChange={([value]) => 
+                                          setExpandedPair(prev => prev ? { ...prev, lots: value } : null)
+                                        }
+                                        className={cn(
+                                          "w-full",
+                                          !isMarginAvailable && "opacity-50 cursor-not-allowed"
+                                        )}
+                                        disabled={!isMarginAvailable}
+                                      />
+                          
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                          <span className="text-muted-foreground">Leverage:</span>
+                                          <span className="text-red-500 font-medium">
+                                            {maxLeverage}x (Max)
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                          <span className="text-muted-foreground">Required Margin:</span>
+                                          <span className={cn(
+                                            "font-medium",
+                                            !isMarginAvailable && "text-red-500"
+                                          )}>
+                                            ${margin.toFixed(2)}
+                                          </span>
+                                        </div>
+                                        {!isMarginAvailable && (
+                                          <div className="text-xs text-red-500">
+                                            Insufficient balance for selected lots
+                                          </div>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          className={cn(
+                                            expandedPair.action === 'buy' 
+                                              ? "bg-blue-600 hover:bg-blue-700 text-white" 
+                                              : "bg-red-600 hover:bg-red-700 text-white",
+                                            "w-full mt-2"
+                                          )}
+                                          disabled={!isMarginAvailable}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleQuickTrade(
+                                              pair.symbol,
+                                              expandedPair.action,
+                                              expandedPair.lots
+                                            );
+                                          }}
+                                        >
+                                          Confirm {expandedPair.action === 'buy' ? 'Buy' : 'Sell'}
+                                        </Button>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                           )}

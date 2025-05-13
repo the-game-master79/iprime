@@ -29,19 +29,20 @@ export const MarginWatchDog = ({ trades, currentPrices, userBalance, onCloseTrad
       if (now - lastCheck.current < 1000) return;
       lastCheck.current = now;
 
-      // Verify we have prices for all open trades
-      const hasAllPrices = openTrades.every(trade => 
-        currentPrices[trade.pair] && (currentPrices[trade.pair].bid || currentPrices[trade.pair].ask)
-      );
-
-      if (!hasAllPrices) {
-        console.warn('MarginWatchDog: Missing prices for some trades');
-        return;
+      // Verify we have prices for all open trades and get current prices
+      const tradePrices = new Map<string, number>();
+      for (const trade of openTrades) {
+        const price = currentPrices[trade.pair]?.bid;
+        if (!price) {
+          console.warn(`MarginWatchDog: Missing price for ${trade.pair}`);
+          return;
+        }
+        tradePrices.set(trade.id, parseFloat(price));
       }
 
       // Calculate total unrealized PnL
       const totalPnL = openTrades.reduce((acc, trade) => {
-        const currentPrice = parseFloat(currentPrices[trade.pair]?.bid || '0');
+        const currentPrice = tradePrices.get(trade.id) || 0;
         if (currentPrice === 0) return acc;
         return acc + calculatePnL(trade, currentPrice);
       }, 0);
@@ -76,22 +77,29 @@ export const MarginWatchDog = ({ trades, currentPrices, userBalance, onCloseTrad
           return pnlA - pnlB;
         });
 
-        // Close trades until equity improves
+        // Close trades in batches until equity improves
+        const batchSize = 5; // Close up to 5 trades at once
         let currentEquity = equityLevel;
         let remainingTrades = [...sortedTrades];
 
-        for (const trade of sortedTrades) {
+        for (let i = 0; i < sortedTrades.length; i += batchSize) {
           if (currentEquity > LOW_EQUITY_THRESHOLD) break;
           
-          await onCloseTrade(trade.id).catch(error => 
-            console.error('Failed to close trade during low equity:', error)
+          const tradeBatch = sortedTrades.slice(i, i + batchSize);
+          await Promise.all(
+            tradeBatch.map(trade => 
+              onCloseTrade(trade.id).catch(error => 
+                console.error(`Failed to close trade ${trade.id}:`, error)
+              )
+            )
           );
           
-          // Recalculate equity after each trade closure
-          remainingTrades = remainingTrades.filter(t => t.id !== trade.id);
-          const newTotalPnL = remainingTrades.reduce((acc, t) => 
-            acc + calculatePnL(t, parseFloat(currentPrices[t.pair]?.bid || '0')), 0
-          );
+          // Recalculate equity after batch closure
+          remainingTrades = remainingTrades.filter(t => !tradeBatch.some(bt => bt.id === t.id));
+          const newTotalPnL = remainingTrades.reduce((acc, t) => {
+            const price = tradePrices.get(t.id) || 0;
+            return acc + calculatePnL(t, price);
+          }, 0);
           currentEquity = (userBalance + newTotalPnL) / userBalance;
         }
         

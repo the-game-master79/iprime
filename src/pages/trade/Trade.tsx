@@ -326,7 +326,7 @@ const Trade = () => {
         throw new Error('No valid close price available');
       }
 
-      // Calculate PnL
+      // Calculate PnL using consistent method
       const pnl = calculatePnL(trade, closePrice);
 
       // Call close_trade function
@@ -345,7 +345,7 @@ const Trade = () => {
           ? { 
               ...t, 
               status: 'closed', 
-              closePrice: closePrice,
+              closePrice,
               closedAt: new Date().toISOString(),
               pnl 
             } 

@@ -9,6 +9,8 @@ const CONNECTION_TIMEOUT = 30000; // Increase timeout to 30 seconds
 const API_KEY_ROTATION_DELAY = 60000;
 const MAX_CONNECTION_RETRIES = 3;
 const RETRY_DELAY = 2000;
+const HEARTBEAT_CHECK_INTERVAL = 10000; // Check connection every 10 seconds
+const MAX_MISSED_HEARTBEATS = 3; // Consider connection dead after 3 missed heartbeats
 
 interface PriceData {
   price: string;
@@ -82,9 +84,15 @@ export class WebSocketManager {
   private forexPairsQueue: Set<string> = new Set();
   private forexSubscriptionTimeout: NodeJS.Timeout | null = null;
   private isForexConnecting: boolean = false;
+  private lastHeartbeat = { crypto: Date.now(), forex: Date.now() };
+  private missedHeartbeats = { crypto: 0, forex: 0 };
+  private heartbeatCheckInterval: NodeJS.Timeout | null = null;
+  binanceWs: any;
+  tradermadeWs: any;
 
   private constructor() {
     this.tradermadeApiKey = this.apiKeys[0] || '';
+    this.setupHeartbeatCheck();
   }
 
   static getInstance(): WebSocketManager {
@@ -129,33 +137,45 @@ export class WebSocketManager {
       await this.fetchTradingPairs();
     }
 
-    if (mode === ConnectionMode.SINGLE) {
-      this.activePairs.clear();
+    // Prioritize initial connection
+    if (pairs.length === 1 && mode === ConnectionMode.SINGLE) {
+      // Immediately try to connect for single pair
+      const type = pairs[0].includes('BINANCE:') ? 'crypto' : 'forex';
+      if (type === 'crypto') {
+        this.connectCrypto([pairs[0]]);
+      } else if (type === 'forex') {
+        this.connectForex([pairs[0]]);
+      }
+    } else {
+      // Use existing logic for multiple pairs
+      if (mode === ConnectionMode.SINGLE) {
+        this.activePairs.clear();
+      }
+
+      const validPairs = pairs.filter(pair =>
+        this.tradingPairs.some(tp => tp.symbol === pair && tp.is_active)
+      );
+
+      switch (mode) {
+        case ConnectionMode.FULL:
+          validPairs.forEach(pair => this.activePairs.add(pair));
+          break;
+        case ConnectionMode.MINIMAL:
+          validPairs
+            .filter(pair =>
+              this.activeTrades.some(t => t.pair === pair && ['open', 'pending'].includes(t.status))
+            )
+            .forEach(pair => this.activePairs.add(pair));
+          break;
+        case ConnectionMode.SINGLE:
+          if (validPairs.length > 0) {
+            this.activePairs.add(validPairs[0]);
+          }
+          break;
+      }
+
+      await this.connectToAll();
     }
-
-    const validPairs = pairs.filter(pair =>
-      this.tradingPairs.some(tp => tp.symbol === pair && tp.is_active)
-    );
-
-    switch (mode) {
-      case ConnectionMode.FULL:
-        validPairs.forEach(pair => this.activePairs.add(pair));
-        break;
-      case ConnectionMode.MINIMAL:
-        validPairs
-          .filter(pair =>
-            this.activeTrades.some(t => t.pair === pair && ['open', 'pending'].includes(t.status))
-          )
-          .forEach(pair => this.activePairs.add(pair));
-        break;
-      case ConnectionMode.SINGLE:
-        if (validPairs.length > 0) {
-          this.activePairs.add(validPairs[0]);
-        }
-        break;
-    }
-
-    await this.connectToAll();
   }
 
   private async connectToAll() {
@@ -426,11 +446,28 @@ export class WebSocketManager {
         }, delay);
       }
     };
+
+    // Update message handlers to track heartbeats
+    const originalOnMessage = ws.onmessage;
+    ws.onmessage = (event) => {
+      this.lastHeartbeat[type] = Date.now();
+      this.missedHeartbeats[type] = 0;
+      if (originalOnMessage) {
+        originalOnMessage.call(ws, event);
+      }
+    };
   }
 
   private sendMessage(ws: WebSocket | null, message: any) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return false;
     }
   }
 
@@ -534,6 +571,14 @@ export class WebSocketManager {
       clearTimeout(this.apiKeyRetryTimeout);
       this.apiKeyRetryTimeout = null;
     }
+    if (this.heartbeatCheckInterval) {
+      clearInterval(this.heartbeatCheckInterval);
+      this.heartbeatCheckInterval = null;
+    }
+    
+    // Reset heartbeat tracking
+    this.lastHeartbeat = { crypto: Date.now(), forex: Date.now() };
+    this.missedHeartbeats = { crypto: 0, forex: 0 };
 
     // Helper function to safely close a WebSocket
     const safeCloseWebSocket = (ws: WebSocket | null) => {
@@ -683,6 +728,73 @@ export class WebSocketManager {
     this.rotateApiKey();
     await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay
     await this.connectForex(pairs);
+  }
+
+  private setupHeartbeatCheck() {
+    // Clear any existing interval
+    if (this.heartbeatCheckInterval) {
+      clearInterval(this.heartbeatCheckInterval);
+    }
+
+    this.heartbeatCheckInterval = setInterval(() => {
+      this.checkConnections();
+    }, HEARTBEAT_CHECK_INTERVAL);
+  }
+
+  private checkConnections() {
+    const now = Date.now();
+
+    // Check crypto connection
+    if (this.cryptoWs && this.cryptoWs.readyState === WebSocket.OPEN) {
+      if (now - this.lastHeartbeat.crypto > HEARTBEAT_INTERVAL) {
+        this.missedHeartbeats.crypto++;
+        if (this.missedHeartbeats.crypto >= MAX_MISSED_HEARTBEATS) {
+          console.log('Crypto connection appears dead, reconnecting...');
+          this.reconnectCrypto();
+        }
+      }
+    }
+
+    // Check forex connection
+    if (this.forexWs && this.forexWs.readyState === WebSocket.OPEN) {
+      if (now - this.lastHeartbeat.forex > HEARTBEAT_INTERVAL) {
+        this.missedHeartbeats.forex++;
+        if (this.missedHeartbeats.forex >= MAX_MISSED_HEARTBEATS) {
+          console.log('Forex connection appears dead, reconnecting...');
+          this.reconnectForex();
+        }
+      }
+    }
+  }
+
+  private async reconnectCrypto() {
+    const cryptoPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'crypto')
+    );
+    
+    if (cryptoPairs.length > 0) {
+      await this.connectCrypto(cryptoPairs);
+    }
+  }
+
+  private async reconnectForex() {
+    const forexPairs = Array.from(this.activePairs).filter(pair =>
+      this.tradingPairs.some(tp => tp.symbol === pair && tp.type === 'forex')
+    );
+    
+    if (forexPairs.length > 0 && isForexTradingTime()) {
+      await this.connectForex(forexPairs);
+    }
+  }
+
+  // Add fast reconnect for single pair
+  private async reconnectSinglePair(pair: string) {
+    const type = pair.includes('BINANCE:') ? 'crypto' : 'forex';
+    if (type === 'crypto' && this.cryptoWs?.readyState !== WebSocket.OPEN) {
+      await this.connectCrypto([pair]);
+    } else if (type === 'forex' && this.forexWs?.readyState !== WebSocket.OPEN) {
+      await this.connectForex([pair]);
+    }
   }
 }
 
