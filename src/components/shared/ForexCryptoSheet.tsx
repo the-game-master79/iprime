@@ -29,7 +29,7 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
   const [searchQuery, setSearchQuery] = useState("");
   const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [localPrices, setLocalPrices] = useState<Record<string, { bid: string; change: string }>>({});
+  const [localPrices, setLocalPrices] = useState<Record<string, { price: string; timestamp: string }>>({});
   const [priceAnimations, setPriceAnimations] = useState<Record<string, "up" | "down">>({});
   const [activeTab, setActiveTab] = useState<'forex' | 'crypto'>('forex');
 
@@ -55,34 +55,17 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
 
   useEffect(() => {
     const unsubscribe = wsManager.subscribe((symbol, data) => {
-      setLocalPrices((prev) => {
-        const prevPrice = parseFloat(prev[symbol]?.bid || "0");
-        const newPrice = parseFloat(data.bid || "0");
-
-        if (prevPrice !== newPrice) {
-          setPriceAnimations((prevAnimations) => ({
-            ...prevAnimations,
-            [symbol]: newPrice > prevPrice ? "up" : "down",
-          }));
-
-          // Clear animation after a delay
-          setTimeout(() => {
-            setPriceAnimations((prevAnimations) => ({
-              ...prevAnimations,
-              [symbol]: undefined,
-            }));
-          }, 1000);
-        }
-
-        return { ...prev, [symbol]: data };
-      });
+      setLocalPrices((prev) => ({
+        ...prev,
+        [symbol]: {
+          price: parseFloat(data.price || '0').toFixed(5),
+          timestamp: data.timestamp || new Date().toISOString(),
+        },
+      }));
     });
-
-    wsManager.watchPairs(tradingPairs.map((pair) => pair.symbol));
 
     return () => {
       unsubscribe();
-      wsManager.unwatchPairs(tradingPairs.map((pair) => pair.symbol));
     };
   }, [tradingPairs]);
 
@@ -167,7 +150,7 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
                 {filteredPairs
                   .filter((pair) => pair.type === "forex")
                   .map((pair) => {
-                    const priceData = localPrices[pair.symbol] || { bid: "0.00000", change: "0.00" };
+                    const priceData = localPrices[pair.symbol] || { price: "0.00000", timestamp: new Date().toISOString() };
                     const priceAnimation = priceAnimations[pair.symbol];
 
                     return (
@@ -205,17 +188,17 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
                               priceAnimation === "down" && "text-red-500 animate-price-down"
                             )}
                           >
-                            ${parseFloat(priceData.bid).toFixed(5)}
+                            ${parseFloat(priceData.price).toFixed(5)}
                           </div>
                           <Badge
                             variant="outline"
                             className={cn(
                               "text-xs transition-colors ",
-                              parseFloat(priceData.change) >= 0 ? "text-green-500" : "text-red-500"
+                              parseFloat(priceData.price) >= 0 ? "text-green-500" : "text-red-500"
                             )}
                           >
-                            {parseFloat(priceData.change) >= 0 ? "+" : ""}
-                            {priceData.change}%
+                            {parseFloat(priceData.price) >= 0 ? "+" : ""}
+                            {priceData.price}%
                           </Badge>
                         </div>
                       </Button>
@@ -226,7 +209,7 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
                 {filteredPairs
                   .filter((pair) => pair.type === "crypto")
                   .map((pair) => {
-                    const priceData = localPrices[pair.symbol] || { bid: "0.00000", change: "0.00" };
+                    const priceData = localPrices[pair.symbol] || { price: "0.00000", timestamp: new Date().toISOString() };
                     const priceAnimation = priceAnimations[pair.symbol];
 
                     return (
@@ -262,17 +245,17 @@ export const ForexCryptoSheet: React.FC<ForexCryptoSheetProps> = ({ open, onOpen
                               priceAnimation === "down" && "text-red-500 animate-price-down"
                             )}
                           >
-                            ${parseFloat(priceData.bid).toFixed(5)}
+                            ${parseFloat(priceData.price).toFixed(5)}
                           </div>
                           <Badge
                             variant="outline"
                             className={cn(
                               "text-xs transition-colors",
-                              parseFloat(priceData.change) >= 0 ? "text-green-500" : "text-red-500"
+                              parseFloat(priceData.price) >= 0 ? "text-green-500" : "text-red-500"
                             )}
                           >
-                            {parseFloat(priceData.change) >= 0 ? "+" : ""}
-                            {priceData.change}%
+                            {parseFloat(priceData.price) >= 0 ? "+" : ""}
+                            {priceData.price}%
                           </Badge>
                         </div>
                       </Button>

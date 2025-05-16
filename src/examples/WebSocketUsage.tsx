@@ -3,28 +3,16 @@ import { wsManager } from '@/services/websocket-manager';
 
 const YourComponent = () => {
   useEffect(() => {
-    // Subscribe to price updates
-    const unsubscribePrices = wsManager.subscribe((symbol, data) => {
-      // Handle price updates
+    const unsubscribe = wsManager.subscribe((symbol, data) => {
+      console.log(`Price update for ${symbol}:`, data);
     });
 
-    // Subscribe to status changes
-    const unsubscribeStatus = wsManager.onStatusChange((stats) => {
-      // Handle connection status changes
-    });
-
-    // Subscribe to liquidation events
-    const unsubscribeLiquidation = wsManager.onLiquidation((tradeId) => {
-      // Handle liquidation events
-    });
-
-    // Cleanup on unmount
     return () => {
-      unsubscribePrices();
-      unsubscribeStatus();
-      unsubscribeLiquidation();
+      unsubscribe();
     };
   }, []);
 
-  // Rest of component code...
+  return <div>WebSocket Example</div>;
 };
+
+export default YourComponent;

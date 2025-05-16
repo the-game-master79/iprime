@@ -10,9 +10,15 @@ ALTER TABLE trades
   REFERENCES profiles(id) 
   ON DELETE CASCADE;
 
--- Add margin amount column
+
+-- Ensure type is always lowercase and valid ('buy' or 'sell')
 ALTER TABLE trades
-ADD COLUMN IF NOT EXISTS margin_amount DECIMAL DEFAULT 0;
+  DROP CONSTRAINT IF EXISTS trades_type_check;
+
+ALTER TABLE trades
+  ADD CONSTRAINT trades_type_check CHECK (
+    LOWER(type) IN ('buy', 'sell')
+  );
 
 -- Add proper indices
 CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);

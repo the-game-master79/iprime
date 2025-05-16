@@ -9,7 +9,6 @@ import Login from "./pages/auth/Login";
 import { AuthGuard } from '@/components/AuthGuard';
 import { lazy, Suspense } from "react";
 import DepositPage from "@/pages/deposit/DepositPage";
-import SelectPairs from "./pages/trade/SelectPairs";
 
 import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { useCacheFlush } from '@/hooks/use-cache-flush';
@@ -27,7 +26,6 @@ const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
 const Payments = lazy(() => import("./pages/payments/Payments"));
 const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
 const Profile = lazy(() => import("./pages/profile/Profile"));
-const Trade = lazy(() => import("./pages/trade/Trade"));
 
 // Add new lazy imports
 const InvestingPage = lazy(() => import("@/pages/investing/InvestingPage")); 
@@ -49,8 +47,8 @@ const AdminNotices = lazy(() => import("@/pages/admin/notices/NoticesPage"));
 const PromotionsPage = lazy(() => import("@/pages/admin/promotions/PromotionsPage"));
 const PromocodesPage = lazy(() => import("@/pages/admin/promotions/PromocodesPage"));
 const Promotions = lazy(() => import("@/pages/promotions/Promotions")); // Add this line
+const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage")); 
 const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates"));
-const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage")); // Add this line
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
 
@@ -58,6 +56,7 @@ import AdminPairs from "@/pages/admin/pairs/Pairs";
 const Account = lazy(() => import("@/pages/account/Account")); 
 const Performance = lazy(() => import("@/pages/performance/Performance"));
 const DesignSystem = lazy(() => import("@/pages/design-system/DesignSystem")); // Add DesignSystem import
+import TradingStation from "@/pages/tradingstation/TradingStation";
 
 // Create a stable QueryClient instance outside component
 const queryClient = new QueryClient({
@@ -111,6 +110,7 @@ const App = () => {
               <Route path="/legal/terms" element={<TermsOfService />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/auth/login" element={<Login />} />
+              <Route path="/tradingstation" element={<TradingStation />} />
 
               {/* Protected Routes */}
               <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
@@ -123,24 +123,6 @@ const App = () => {
               <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
 
               {/* Trade Routes */}
-              <Route path="/trade/select" element={
-                <AuthGuard requireAuth>
-                  <TradeRouteGuard />
-                  <SelectPairs />
-                </AuthGuard>
-              } />
-              <Route path="/trade/:pair" element={
-                <AuthGuard requireAuth>
-                  <TradeRouteGuard />
-                  <Trade />
-                </AuthGuard>
-              } />
-              <Route path="/trade" element={
-                <AuthGuard requireAuth>
-                  <TradeRouteGuard />
-                  <Trade />
-                </AuthGuard>
-              } />
 
               {/* Strictly protected routes */}
               <Route path="/profile" element={
@@ -169,7 +151,7 @@ const App = () => {
                     <Route path="promotions" element={<PromotionsPage />} />
                     <Route path="promocodes" element={<PromocodesPage />} />
                     <Route path="pairs" element={<AdminPairs />} />
-                    <Route path="trades" element={<TradesPage />} /> {/* Add this line */}
+                    <Route path="trades" element={<TradesPage />} />
                     <Route path="live-rates" element={<LiveRatesPage />} /> {/* Add this line */}
                     <Route path="/performance" element={<Performance />} />
                   </Routes>

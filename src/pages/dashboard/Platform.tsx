@@ -643,8 +643,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   };
 
   const handleTradeClick = () => {
-    // If mobile, go to select page first, otherwise go to main trade view
-    navigate(isMobile ? '/trade/select' : '/trade');
+    // Always navigate directly to the tradingstation route
+    navigate('/tradingstation');
   };
 
   const handleDirectsClick = () => {
@@ -796,7 +796,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <Button 
                         className="h-12 gap-2 bg-[#FFA500] text-white hover:bg-[#FFA500]/80" 
-                        onClick={() => navigate('/trade')}
+                        onClick={() => navigate('/tradingstation')}
                       >
                         <ChartLine className="h-5 w-5" />
                         Trade

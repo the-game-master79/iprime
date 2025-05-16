@@ -1,149 +1,268 @@
-import React, { useEffect, useRef, memo } from 'react';
-import { useBreakpoints } from "@/hooks/use-breakpoints";
+import React, { useEffect, useRef, memo, useState } from 'react';
 
+// Define allowed props for the TradingView widget
 interface TradingViewWidgetProps {
-  symbol: string;
-  theme?: "light" | "dark";
-  variant?: "full" | "minimal";  // Add variant prop
+  symbol?: string;
+  interval?: string;
+  timezone?: string;
+  theme?: 'light' | 'dark';
+  style?: string;
+  locale?: string;
+  hide_legend?: boolean;
+  allow_symbol_change?: boolean;
+  totalPnL?: number; // Add PnL prop
+  onClosePnLDisplay?: () => void; // Add close handler
+  closeAllTrades?: () => void; // Add new prop for closing all trades
 }
 
-function TradingViewWidget({ symbol, theme = "dark", variant = "full" }: TradingViewWidgetProps) {
+// Default props if not provided
+const defaultProps = {
+  symbol: "CMCMARKETS:EURUSD",
+  interval: "1",
+  timezone: "Etc/UTC",
+  theme: "dark" as const,
+  style: "1",
+  locale: "en",
+  hide_legend: true,
+  allow_symbol_change: false,
+};
+
+function TradingViewWidget({
+  symbol,
+  interval,
+  timezone,
+  theme,
+  style,
+  locale,
+  hide_legend,
+  allow_symbol_change,
+  totalPnL,
+  onClosePnLDisplay,
+  closeAllTrades,
+}: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement>(null);
-  const { isMobile } = useBreakpoints();
+  const scriptRef = useRef<HTMLScriptElement | null>(null);
+  const [showPnL, setShowPnL] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isWidgetReady, setIsWidgetReady] = useState(false);
+
+  // Combine default props with provided props
+  const {
+    symbol: defaultSymbol,
+    interval: defaultInterval,
+    timezone: defaultTimezone,
+    theme: defaultTheme,
+    style: defaultStyle,
+    locale: defaultLocale,
+    hide_legend: defaultHideLegend,
+    allow_symbol_change: defaultAllowSymbolChange,
+  } = { ...defaultProps, ...{
+    symbol,
+    interval,
+    timezone,
+    theme,
+    style,
+    locale,
+    hide_legend,
+    allow_symbol_change,
+  }};
+
+  // Clean up function
+  const cleanupWidget = () => {
+    if (scriptRef.current && scriptRef.current.parentNode) {
+      scriptRef.current.parentNode.removeChild(scriptRef.current);
+      scriptRef.current = null;
+    }
+    
+    if (container.current) {
+      while (container.current.firstChild) {
+        container.current.removeChild(container.current.firstChild);
+      }
+    }
+  };
 
   useEffect(() => {
-    const initWidget = () => {
-      if (!container.current) return;
+    // First clean up any existing widget
+    cleanupWidget();
+    setIsWidgetReady(false);
 
-      // Clean up any existing content
-      const existingWidget = container.current.querySelector('script');
-      if (existingWidget) {
-        existingWidget.remove();
-      }
-
-      // Important: Don't clear innerHTML here to prevent container being removed
-      // Create the container div if it doesn't exist
-      let containerDiv = container.current.querySelector('#tradingview_chart');
-      if (!containerDiv) {
-        containerDiv = document.createElement('div');
-        containerDiv.id = 'tradingview_chart';
-        containerDiv.className = 'flex-1 w-full overflow-hidden';
-        containerDiv.style.height = 'calc(100% - 28px)';
-        container.current.appendChild(containerDiv);
-      }
-      
-      const script = document.createElement("script");
-      script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-      script.type = "text/javascript";
-      script.async = true;
-
-      // Configure based on variant
-      const config = {
-        "autosize": true,
-        "symbol": symbol,
-        "interval": "1",
-        "timezone": "Etc/UTC",
-        "theme": theme,
-        "style": "1",
-        "locale": "en",
-        "enable_publishing": false,
-        "calendar": false,
-        "container_id": "tradingview_chart",
-        ...(variant === "minimal" ? {
-          // Minimal variant settings
-          "hide_top_toolbar": true,
-          "hide_legend": true,
-          "hide_side_toolbar": true,
-          "hide_volume": true,
-          "hide_symbol": true,
-          "allow_symbol_change": false,
-          "save_image": false,
-          "details": false,
-          "hotlist": false,
-          "show_popup_button": false,
-          "withdateranges": false,
-          "toolbar_bg": "#000000",
-          "disabled_features": [
-            "use_localstorage_for_settings",
-            "volume_force_overlay",
-            "create_volume_indicator_by_default",
-            "header_compare",
-            "header_symbol_search",
-            "header_fullscreen_button",
-            "header_settings",
-            "header_chart_type",
-            "header_resolutions",
-            "drawing_tools",
-            "timeframes_toolbar",
-            "legend_widget",
-            "main_series_scale_menu",
-            "scales_context_menu",
-            "show_chart_property_page",
-            "symbol_search_hot_key",
-            "context_menus",
-            "left_toolbar",
-            "control_bar",
-            "edit_buttons_in_legend",
-            "border_around_the_chart"
-          ],
-          "overrides": {
-            "mainSeriesProperties.showPriceLine": false,
-            "paneProperties.background": "#000000",
-            "paneProperties.vertGridProperties.color": "#1e1e1e",
-            "paneProperties.horzGridProperties.color": "#1e1e1e",
-            "scalesProperties.textColor": "#AAA"
+    if (container.current) {
+      try {
+        // Create container divs with a more structured approach
+        const widgetContainer = document.createElement("div");
+        widgetContainer.className = "tradingview-widget-container__widget";
+        widgetContainer.style.height = "calc(100% - 32px)";
+        widgetContainer.style.width = "100%";
+        
+        const copyright = document.createElement("div");
+        copyright.className = "tradingview-widget-copyright";
+        copyright.innerHTML = '<a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a>';
+        
+        // Clear container before appending
+        while (container.current.firstChild) {
+          container.current.removeChild(container.current.firstChild);
+        }
+        
+        // Append elements to the DOM first
+        container.current.appendChild(widgetContainer);
+        container.current.appendChild(copyright);
+        
+        // Ensure DOM is updated before loading script
+        setTimeout(() => {
+          if (!container.current || !widgetContainer) {
+            console.error("Container or widget container not available");
+            return;
           }
-        } : {
-          // Updated full variant settings
-          "hide_top_toolbar": false,
-          "hide_legend": false,
-          "hide_side_toolbar": false,
-          "hide_volume": false,
-          "details": false, // Changed to false
-          "allow_symbol_change": false,
-          "save_image": true,
-          "show_popup_button": true,
-          "withdateranges": true,
-          "disabled_features": [
-            "use_localstorage_for_settings",
-            "header_symbol_search",
-            "symbol_info",
-            "header_compare",
-            "header_settings"
-          ]
-        })
-      };
-
-      script.innerHTML = JSON.stringify(config);
-      container.current.appendChild(script);
-    };
-
-    // Initialize after a short delay to ensure DOM is ready
-    const timer = setTimeout(initWidget, 0);
-
-    return () => {
-      clearTimeout(timer);
-      if (container.current) {
-        container.current.innerHTML = '';
+          
+          // Create and add script
+          const script = document.createElement("script");
+          script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+          script.type = "text/javascript";
+          script.async = true;
+          
+          // Set configuration as a string
+          const config = {
+            autosize: true,
+            symbol: defaultSymbol,
+            interval: defaultInterval,
+            timezone: defaultTimezone,
+            theme: defaultTheme,
+            style: defaultStyle,
+            locale: defaultLocale,
+            hide_legend: defaultHideLegend,
+            allow_symbol_change: defaultAllowSymbolChange,
+            save_image: false,
+            support_host: "https://www.tradingview.com"
+          };
+          
+          script.innerHTML = JSON.stringify(config);
+          
+          // Set an onload event to track when the widget is ready
+          script.onload = () => {
+            setIsWidgetReady(true);
+          };
+          
+          // Store reference to script for cleanup
+          scriptRef.current = script;
+          
+          // Add script to the widget container specifically
+          widgetContainer.appendChild(script);
+        }, 100);
+      } catch (error) {
+        console.error("Error initializing TradingView widget:", error);
       }
+    }
+    
+    // Cleanup function
+    return () => {
+      cleanupWidget();
     };
-  }, [theme, isMobile, symbol, variant]); // Add variant to dependencies
+  }, [defaultSymbol, defaultInterval, defaultTimezone, defaultTheme, defaultStyle, defaultLocale, defaultHideLegend, defaultAllowSymbolChange]);
+
+  // Handle PnL display close
+  const handleClose = () => {
+    setShowPnL(false);
+    if (onClosePnLDisplay) {
+      onClosePnLDisplay();
+    }
+  };
+  
+  // New handler to show confirmation dialog instead of directly closing trades
+  const handleCloseAllTrades = () => {
+    setShowConfirmDialog(true);
+  };
+  
+  // Handle confirmation
+  const handleConfirm = () => {
+    setShowConfirmDialog(false);
+    if (closeAllTrades) {
+      // Call closeAllTrades directly without any browser confirmation
+      closeAllTrades();
+    }
+  };
+  
+  // Handle dialog cancellation
+  const handleCancel = () => {
+    setShowConfirmDialog(false);
+  };
 
   return (
-    <div className="tradingview-widget-container flex flex-col h-full w-full relative bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" ref={container}>
-      <div id="tradingview_chart" className="flex-1 w-full overflow-hidden" style={{ height: "calc(100% - 28px)" }} />
-      <div className="tradingview-widget-copyright h-7 px-3 flex items-center justify-end text-xs text-muted-foreground/80 bg-background/50 backdrop-blur-sm">
-        <a 
-          href="https://www.tradingview.com/" 
-          rel="noopener nofollow" 
-          target="_blank"
-          className="hover:text-primary transition-colors duration-200"
+    <div style={{ position: "relative", height: "100%", width: "100%" }}>
+      {/* PnL display rendered outside the TradingView container */}
+      {showPnL && totalPnL !== undefined && (
+        <div 
+          className="absolute top-0 right-0 z-50 flex mt-2 items-center"
+          style={{ pointerEvents: "auto" }}
         >
-          Track all markets on TradingView
-        </a>
+          <span className="font-medium text-xs text-white px-2 py-1">Unrealized P&L:</span>
+          <span 
+            className={`font-bold font-mono text-xs px-2 py-1 ${
+              totalPnL > 0
+                ? "text-green-500"
+                : totalPnL < 0
+                ? "text-red-500"
+                : "text-gray-400"
+            }`}
+          >
+            {totalPnL.toFixed(2)} USD
+          </span>
+          {/* Only show the close button if there are open trades (totalPnL is not zero) */}
+          {totalPnL !== 0 && (
+            <button
+              onClick={handleCloseAllTrades}
+              className="flex items-center justify-center rounded-full hover:bg-red-500/20 hover:text-red-500 transition-colors cursor-pointer w-6 h-6"
+              title="Close All Open Positions"
+              type="button"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12"></path>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
+      
+      {/* Custom confirmation dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-medium mb-4">Close All Positions</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Are you sure you want to close all open positions? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-md text-sm font-medium transition-colors"
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition-colors"
+                type="button"
+              >
+                Close All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Create a proper container structure for TradingView */}
+      <div className="tradingview-widget-container" ref={container} style={{ height: "100%", width: "100%" }}>
+        {/* Widget will be mounted here */}
       </div>
     </div>
   );
+}
+
+// Declare TradingView on Window object
+declare global {
+  interface Window {
+    TradingView: any;
+  }
 }
 
 export default memo(TradingViewWidget);

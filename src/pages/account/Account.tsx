@@ -169,7 +169,6 @@ export default function Account() {
 
   // WebSocket subscription for price updates - modified to be persistent
   useEffect(() => {
-    // Get all unique pairs from trades regardless of status
     const pairs = [...new Set(trades.map(t => t.pair))];
 
     const unsubscribe = wsManager.subscribe((symbol, data) => {
@@ -179,14 +178,8 @@ export default function Account() {
       }));
     });
 
-    if (pairs.length > 0) {
-      // Pass true as second argument to make connections persistent
-      wsManager.watchPairs(pairs);
-    }
-
     return () => {
       unsubscribe();
-      // Don't unwatchPairs here to keep connections alive
     };
   }, [trades]);
 
