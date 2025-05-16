@@ -721,7 +721,7 @@ const TradingStation = () => {
           <td className="px-4 py-2 text-xs">
             {Number(trade.close_price).toFixed(decimals)}
           </td>
-          <td className="px-4 py-2 text-xs">${trade.margin_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+          <td className="px-4 py-2 text-xs">${Number(trade.margin_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
           <td className="px-4 py-2">
             <span
               className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
@@ -746,8 +746,8 @@ const TradingStation = () => {
               hour12: true,
             })}
           </td>
-          <td className={`px-4 py-2 text-xs ${trade.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-            ${trade.pnl.toFixed(2)}
+          <td className={`px-4 py-2 text-xs ${Number(trade.pnl ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
+            ${Number(trade.pnl ?? 0).toFixed(2)}
           </td>
         </tr>
       );
