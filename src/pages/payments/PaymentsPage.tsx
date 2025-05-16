@@ -1,5 +1,4 @@
 import { PageHeader } from "@/components/ui-components";
-import ShellLayout from "@/components/layout/Shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

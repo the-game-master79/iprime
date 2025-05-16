@@ -10,14 +10,12 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { lazy, Suspense } from "react";
 import DepositPage from "@/pages/deposit/DepositPage";
 
-import { TradeRouteGuard } from "@/components/guards/TradeRouteGuard";
 import { useCacheFlush } from '@/hooks/use-cache-flush';
 import Index from "./pages/Index";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
-import { ScreenTrackerProvider } from '@/contexts/ScreenTracker';
 
 // Lazy load routes
 const Platform = lazy(() => import("./pages/dashboard/Platform"));
@@ -51,11 +49,6 @@ const TradesPage = lazy(() => import("@/pages/admin/trades/TradesPage"));
 const LiveRatesPage = lazy(() => import("@/pages/admin/live-rates/LiveRates"));
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 import AdminPairs from "@/pages/admin/pairs/Pairs";
-
-// Add Account import with other lazy imports
-const Account = lazy(() => import("@/pages/account/Account")); 
-const Performance = lazy(() => import("@/pages/performance/Performance"));
-const DesignSystem = lazy(() => import("@/pages/design-system/DesignSystem")); // Add DesignSystem import
 import TradingStation from "@/pages/tradingstation/TradingStation";
 
 // Create a stable QueryClient instance outside component
@@ -92,7 +85,6 @@ const App = () => {
 
   return (
     <HelmetProvider>
-      <ScreenTrackerProvider>
         <Providers>
           <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center">
@@ -114,7 +106,6 @@ const App = () => {
 
               {/* Protected Routes */}
               <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
-              <Route path="/account" element={<AuthGuard requireAuth><Account /></AuthGuard>} />
               <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
               <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
               <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
@@ -153,22 +144,14 @@ const App = () => {
                     <Route path="pairs" element={<AdminPairs />} />
                     <Route path="trades" element={<TradesPage />} />
                     <Route path="live-rates" element={<LiveRatesPage />} /> {/* Add this line */}
-                    <Route path="/performance" element={<Performance />} />
                   </Routes>
                 }
               />
-
-              {/* Change Performance route from PrivateRoute to AuthGuard */}
-              <Route path="/performance" element={
-                  <Performance />
-              } />
-              <Route path="/design" element={<DesignSystem />} /> {/* Add route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
           <Toaster />
         </Providers>
-      </ScreenTrackerProvider>
     </HelmetProvider>
   );
 };

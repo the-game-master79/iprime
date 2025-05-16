@@ -1609,7 +1609,6 @@ const TradingStation = () => {
               activityHeight={activityHeight}
               totalPnL={totalOpenPnL}
               closeAllTrades={closeAllTrades}
-              isMobile={isMobile}
             />
           </div>
 
