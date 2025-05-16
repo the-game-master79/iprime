@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import { useState } from "react";
+import ReactDOM from "react-dom";
 
 // Import the chart component so we can use it in mobile view
 import MiniChart from "@/components/tradingstation/MiniChart"; 
@@ -70,7 +71,9 @@ const TradingPanel = ({
 }: TradingPanelProps) => {
   // Add state to control the custom dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  
+  // Add state for 0% fees dialog
+  const [showFeesDialog, setShowFeesDialog] = useState(false);
+
   // Helper function to get TradingView symbol format
   const getTradingViewSymbol = (pair: PriceData | null): string => {
     if (!pair) return "";
@@ -93,8 +96,8 @@ const TradingPanel = ({
   const renderConfirmDialog = () => {
     if (!showConfirmDialog) return null;
     
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    return ReactDOM.createPortal(
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999]">
         <div className="bg-background rounded-lg shadow-lg max-w-md w-[90vw] overflow-hidden">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-2 text-foreground">Close All Positions</h3>
@@ -118,10 +121,55 @@ const TradingPanel = ({
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   };
-  
+
+  // 0% Fees Dialog
+  const renderFeesDialog = () => {
+    if (!showFeesDialog) return null;
+    return ReactDOM.createPortal(
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999]">
+        <div className="bg-background rounded-lg shadow-lg max-w-md w-[90vw] overflow-hidden border border-border">
+          <div className="p-6 flex flex-col items-center">
+            <h3 className="text-2xl font-bold mb-4 text-green-700">Enjoy True 0% Fees</h3>
+            <div className="grid grid-cols-1 gap-4 w-full">
+              <div className="flex items-center gap-4 bg-green-50 rounded-lg p-4 w-full">
+                <span className="text-5xl font-extrabold text-green-500">0 USD</span>
+                <span className="text-xl font-medium text-green-700">Swap</span>
+              </div>
+              <div className="flex items-center gap-4 bg-green-50 rounded-lg p-4 w-full">
+                <span className="text-5xl font-extrabold text-green-500">0%</span>
+                <span className="text-xl font-medium text-green-700">Fees</span>
+              </div>
+              <div className="flex items-center gap-4 bg-green-50 rounded-lg p-4 w-full">
+                <span className="text-5xl font-extrabold text-green-500">0%</span>
+                <span className="text-xl font-medium text-green-700">Commissions</span>
+              </div>
+              <div className="flex items-center gap-4 bg-green-50 rounded-lg p-4 w-full">
+                <span className="text-5xl font-extrabold text-green-500">0%</span>
+                <span className="text-xl font-medium text-green-700">Holding Fees</span>
+              </div>
+              <div className="flex items-center gap-4 bg-green-50 rounded-lg p-4 w-full">
+                <span className="text-5xl font-extrabold text-green-500">0%</span>
+                <span className="text-xl font-medium text-green-700">Night Swaps</span>
+              </div>
+            </div>
+            <button
+              className="mt-6 px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+              onClick={() => setShowFeesDialog(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div className={`
       ${isMobile 
@@ -129,11 +177,12 @@ const TradingPanel = ({
         : "fixed top-16 right-0 h-[calc(100%-4rem)] w-[350px] bg-muted/10 border-l border-border/50"
       } flex flex-col p-0`}
     >
-      {/* Render our custom dialog */}
+      {/* Render our custom dialogs */}
       {renderConfirmDialog()}
+      {renderFeesDialog()}
       
       {selectedPair ? (
-        <div className="p-4">
+        <div className="p-4 flex flex-col flex-1 h-full">
           {/* Mobile-specific title bar with PnL display and X button */}
           {isMobile && (
             <div className="mb-4 mt-16 pb-2 border-b border-border/50">
@@ -433,10 +482,14 @@ const TradingPanel = ({
 
           {/* Add badge at the bottom - Only on desktop */}
           {!isMobile && (
-            <div className="mt-6">
-              <div className="bg-green-100 text-green-700 text-center py-2 rounded-lg font-medium">
+            <div className="mt-auto flex flex-col">
+              <button
+                className="bg-green-100 text-green-700 text-center py-2 rounded-lg font-medium hover:bg-green-200 transition-colors"
+                onClick={() => setShowFeesDialog(true)}
+                type="button"
+              >
                 0% fees for your Account
-              </div>
+              </button>
             </div>
           )}
         </div>
@@ -453,6 +506,18 @@ const TradingPanel = ({
               </p>
             )}
           </div>
+        </div>
+      )}
+      {/* For mobile, show the badge at the bottom as well */}
+      {isMobile && selectedPair && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[90vw] z-40">
+          <button
+            className="w-full bg-green-100 text-green-700 text-center py-2 rounded-lg font-medium hover:bg-green-200 transition-colors shadow"
+            onClick={() => setShowFeesDialog(true)}
+            type="button"
+          >
+            0% fees for your Account
+          </button>
         </div>
       )}
     </div>

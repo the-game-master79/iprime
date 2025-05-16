@@ -649,11 +649,11 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   return (
     <div
       className={`${fullPage 
-        ? "w-full h-full bg-background" 
+        ? "w-full h-full bg-background flex flex-col" 
         : "fixed bottom-0 left-0 right-0 bg-background text-white flex flex-col items-center justify-center border-t border-gray-700"
       } transition-all duration-300`}
       ref={activityPanelRef}
-      style={fullPage ? {} : {
+      style={fullPage ? { minHeight: "100dvh", paddingBottom: fullPage ? 88 : undefined } : {
         marginLeft: isCollapsed ? "60px" : "460px",
         marginRight: "350px",
         height: activityCollapsed ? 56 : activityHeight + 24,
@@ -666,7 +666,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
     >
       {/* Trading Activity Section */}
       <div 
-        className={`w-full ${fullPage ? "h-full" : "bg-muted/10 border-t border-border/50"} flex flex-col transition-all duration-300 ${
+        className={`w-full ${fullPage ? "h-full flex flex-col" : "bg-muted/10 border-t border-border/50 flex flex-col"} transition-all duration-300 ${
           activityCollapsed && !fullPage ? "overflow-hidden" : "overflow-hidden"
         }`} 
         style={fullPage ? {height: "100%"} : {height: "100%"}}
@@ -826,11 +826,12 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
           <>
             {/* Trading Activity Table */}
             <div
-              className="flex-grow overflow-auto"
+              className={`flex-grow overflow-auto ${fullPage ? "flex flex-col" : ""}`}
               style={{
                 scrollbarColor: "#525252 #18181b",
                 scrollbarWidth: "thin",
-                height: fullPage ? "calc(100vh - 230px)" : undefined
+                height: fullPage ? "auto" : undefined,
+                minHeight: 0,
               }}
             >
               <table className="w-full text-left border-collapse">
@@ -960,9 +961,18 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   ) : activeTradeTab === "open" ? (
                     openTrades && openTrades.length > 0 ?
                       (!fullPage ? (
-                        // Fix here: Call renderOpenTrades as a function if it is one 
-                        typeof renderOpenTrades === 'function' ? renderOpenTrades(openTrades) : renderOpenTrades
+                        // If using expandable grouped trades, make the accumulated group rows scrollable
+                        <tr>
+                          <td colSpan={fullPage ? 5 : 10} className="p-0 border-0">
+                            <div className="max-h-[320px] overflow-y-auto">
+                              {typeof renderOpenTrades === 'function'
+                                ? renderOpenTrades(openTrades)
+                                : renderOpenTrades}
+                            </div>
+                          </td>
+                        </tr>
                       ) : (
+                        // ...existing code for mobile/fullPage
                         <tr>
                           <td colSpan={5} className="p-0 border-0">
                             <div className="flex flex-col gap-2 py-2">
@@ -1259,7 +1269,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       
       {/* Mobile summary stats at bottom of full page view */}
       {fullPage && (
-        <div className="grid grid-cols-2 gap-2 p-4 bg-muted/5 border-t border-border/50 mb-20">
+        <div className="fixed bottom-0 left-0 w-full z-50 grid grid-cols-2 gap-2 p-4 bg-muted/5 border-t border-border/50 mb-12">
           <div className="p-3 rounded-lg bg-muted/20">
             <div className="text-xs text-muted-foreground">Equity</div>
             <div className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>

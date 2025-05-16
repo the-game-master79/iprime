@@ -94,10 +94,6 @@ function TradingViewWidget({
         widgetContainer.style.height = "calc(100% - 32px)";
         widgetContainer.style.width = "100%";
         
-        const copyright = document.createElement("div");
-        copyright.className = "tradingview-widget-copyright";
-        copyright.innerHTML = '<a href="https://www.tradingview.com/" rel="noopener nofollow" target="_blank"><span class="blue-text">Track all markets on TradingView</span></a>';
-        
         // Clear container before appending
         while (container.current.firstChild) {
           container.current.removeChild(container.current.firstChild);
@@ -105,7 +101,6 @@ function TradingViewWidget({
         
         // Append elements to the DOM first
         container.current.appendChild(widgetContainer);
-        container.current.appendChild(copyright);
         
         // Ensure DOM is updated before loading script
         setTimeout(() => {
