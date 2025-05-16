@@ -59,9 +59,6 @@ const TradingStation = () => {
   // Timezone state
   const [userTimezone, setUserTimezone] = useState("Etc/UTC");
   
-  // Add state to track forex market status
-  const [isForexMarketOpen, setIsForexMarketOpen] = useState(false);
-
   // Check screen size on mount and resize
   useEffect(() => {
     const checkScreenSize = () => {
@@ -172,14 +169,19 @@ const TradingStation = () => {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.symbol && data.data?.price) {
+            // Accept price, or fallback to bid, or ask
+            const price =
+              data.data?.price ??
+              data.data?.bid ??
+              data.data?.ask;
+            if (data.symbol && price) {
               setLocalPrices((prev) => {
                 const prevPrice = parseFloat(prev[data.symbol]?.price || "0");
-                const newPrice = parseFloat(data.data.price);
+                const newPrice = parseFloat(price);
                 return {
                   ...prev,
                   [data.symbol]: {
-                    price: data.data.price.toString(),
+                    price: price.toString(),
                     symbol: data.symbol,
                     isPriceUp: newPrice > prevPrice, // Determine if price went up
                   },
@@ -294,102 +296,6 @@ const TradingStation = () => {
     fetchTrades();
   }, []);
 
-  // Check if forex market is open (Sunday 10:00 PM UTC to Friday 9:00 PM UTC)
-  useEffect(() => {
-    const checkForexMarketStatus = () => {
-      const now = new Date();
-      const day = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-      const hours = now.getUTCHours();
-      const minutes = now.getUTCMinutes();
-      
-      // Market is closed from Friday 21:00 (9 PM) to Sunday 22:00 (10 PM)
-      if (day === 5 && (hours > 21 || (hours === 21 && minutes >= 0))) {
-        // Friday after 21:00
-        setIsForexMarketOpen(false);
-      } else if (day === 6) {
-        // All day Saturday
-        setIsForexMarketOpen(false);
-      } else if (day === 0 && (hours < 22 || (hours === 22 && minutes === 0))) {
-        // Sunday before 22:00
-        setIsForexMarketOpen(false);
-      } else {
-        // All other times
-        setIsForexMarketOpen(true);
-      }
-      
-      // Auto switch to crypto tab if forex is closed and forex tab is selected
-      if (!isForexMarketOpen && activeTab === "forex") {
-        setActiveTab("crypto");
-      }
-    };
-    
-    // Check market status on component mount
-    checkForexMarketStatus();
-    
-    // Check market status every minute
-    const intervalId = setInterval(checkForexMarketStatus, 60000);
-    
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [activeTab, isForexMarketOpen]);
-
-  // Helper function to get next market event time
-  const getNextMarketEvent = () => {
-    const now = new Date();
-    const day = now.getUTCDay();
-    const hours = now.getUTCHours();
-    const minutes = now.getUTCMinutes();
-    
-    let nextEventDate = new Date(now);
-    let eventType = "";
-    
-    if (isForexMarketOpen) {
-      // Market is open, next event is market close (Friday 21:00)
-      eventType = "closes";
-      
-      if (day < 5 || (day === 5 && hours < 21)) {
-        // Set to next Friday 21:00
-        nextEventDate.setUTCDate(now.getUTCDate() + ((5 - day) % 7));
-        nextEventDate.setUTCHours(21, 0, 0, 0);
-      } else {
-        // We're already past Friday 21:00, set to next Friday
-        nextEventDate.setUTCDate(now.getUTCDate() + 7);
-        nextEventDate.setUTCHours(21, 0, 0, 0);
-      }
-    } else {
-      // Market is closed, next event is market open (Sunday 22:00)
-      eventType = "opens";
-      
-      if (day < 0) {
-        // Set to next Sunday 22:00
-        nextEventDate.setUTCDate(now.getUTCDate() + ((0 - day) % 7));
-        nextEventDate.setUTCHours(22, 0, 0, 0);
-      } else if (day === 0 && hours < 22) {
-        // It's Sunday but before 22:00
-        nextEventDate.setUTCHours(22, 0, 0, 0);
-      } else {
-        // Set to next Sunday 22:00
-        nextEventDate.setUTCDate(now.getUTCDate() + ((7 - day) % 7));
-        nextEventDate.setUTCHours(22, 0, 0, 0);
-      }
-    }
-    
-    return {
-      type: eventType,
-      date: nextEventDate,
-      formattedTime: nextEventDate.toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'UTC'
-      }) + ' UTC'
-    };
-  };
-
   const filteredPairs = Object.values(localPrices).filter((pair) => {
     const isCrypto = pair.symbol.endsWith("USDT");
     
@@ -398,11 +304,7 @@ const TradingStation = () => {
       return activeTab === "crypto" && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
     }
     
-    // Only show forex pairs when market is open
-    if (!isCrypto && !isForexMarketOpen) {
-      return false; // Hide forex pairs when market is closed
-    }
-    
+    // Always show forex pairs if forex tab is active
     return activeTab === "forex" && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -584,16 +486,6 @@ const TradingStation = () => {
       return;
     }
     
-    // Check if the selected pair is forex and market is closed
-    if (selectedPair && !selectedPair.symbol.endsWith("USDT") && !isForexMarketOpen) {
-      toast({
-        title: "Market Closed",
-        description: "Forex market is currently closed. Trading is available from Sunday 10:00 PM to Friday 9:00 PM UTC.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (selectedPair) {
       console.log(`Buying ${quantity} of ${selectedPair.symbol}`);
       // Add your buy logic here
@@ -603,16 +495,6 @@ const TradingStation = () => {
   const handleSell = () => {
     if (margin > balance) {
       alert("Insufficient balance to open this trade.");
-      return;
-    }
-    
-    // Check if the selected pair is forex and market is closed
-    if (selectedPair && !selectedPair.symbol.endsWith("USDT") && !isForexMarketOpen) {
-      toast({
-        title: "Market Closed",
-        description: "Forex market is currently closed. Trading is available from Sunday 10:00 PM to Friday 9:00 PM UTC.",
-        variant: "destructive",
-      });
       return;
     }
     
@@ -1176,16 +1058,6 @@ const TradingStation = () => {
       return;
     }
     
-    // Check if the selected pair is forex and market is closed
-    if (!selectedPair.symbol.endsWith("USDT") && !isForexMarketOpen) {
-      toast({
-        title: "Market Closed",
-        description: "Forex market is currently closed. Trading is available from Sunday 10:00 PM to Friday 9:00 PM UTC.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (margin > balance) {
       toast({
         title: "Insufficient Balance",
@@ -1518,6 +1390,64 @@ const TradingStation = () => {
         return `FX:${symbol}`;
     }
 
+  // Add forex market status helper
+  function getForexMarketStatus() {
+    const now = new Date();
+    const utcDay = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const utcHour = now.getUTCHours();
+    const utcMinute = now.getUTCMinutes();
+
+    // Forex market opens Sunday 22:00 UTC, closes Friday 21:00 UTC
+    let isOpen = false;
+    let nextEventType = "";
+    let nextEventDate = new Date(now);
+
+    // Calculate if market is open
+    if (
+      (utcDay > 0 && utcDay < 5) || // Monday-Thursday: always open
+      (utcDay === 5 && utcHour < 21) || // Friday before 21:00 UTC: open
+      (utcDay === 0 && (utcHour > 22 || (utcHour === 22 && utcMinute >= 0))) // Sunday after 22:00 UTC: open
+    ) {
+      isOpen = true;
+    }
+
+    if (isOpen) {
+      // Next event is close: Friday 21:00 UTC
+      nextEventType = "closes";
+      // Find next Friday
+      const daysUntilFriday = (5 - utcDay + 7) % 7;
+      nextEventDate.setUTCDate(now.getUTCDate() + daysUntilFriday);
+      nextEventDate.setUTCHours(21, 0, 0, 0);
+      // If today is Friday and after 21:00, move to next week's Friday
+      if (utcDay === 5 && utcHour >= 21) {
+        nextEventDate.setUTCDate(nextEventDate.getUTCDate() + 7);
+      }
+    } else {
+      // Next event is open: Sunday 22:00 UTC
+      nextEventType = "opens";
+      // Find next Sunday
+      const daysUntilSunday = (7 - utcDay) % 7;
+      nextEventDate.setUTCDate(now.getUTCDate() + daysUntilSunday);
+      nextEventDate.setUTCHours(22, 0, 0, 0);
+      // If today is Sunday and before 22:00, it's this Sunday
+      if (utcDay === 0 && utcHour < 22) {
+        nextEventDate.setUTCHours(22, 0, 0, 0);
+      }
+    }
+
+    const formattedTime = nextEventDate.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'UTC'
+    }) + ' UTC';
+
+    return { isOpen, nextEventType, nextEventDate, formattedTime };
+  }
+
   return (
     <div className="relative">
       {/* Animations styles */}
@@ -1647,7 +1577,7 @@ const TradingStation = () => {
         {(!isMobile || (isMobile && showMobileMenu)) && (
           <div className={isMobile ? "fixed inset-0 z-50 pt-[60px] pb-[56px]" : ""}>
             <Sidebar
-              isCollapsed={isMobile ? false : isCollapsed} // Never collapse on mobile
+              isCollapsed={isMobile ? false : isCollapsed}
               toggleCollapse={toggleCollapse}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
@@ -1663,8 +1593,6 @@ const TradingStation = () => {
               isMobile={isMobile}
               closeMobileMenu={() => setShowMobileMenu(false)}
               navigateToTradeTab={() => toggleMobileView("trading")} 
-              isForexMarketOpen={isForexMarketOpen} // Pass market status
-              getNextMarketEvent={getNextMarketEvent} // Pass function to get next market event
             />
           </div>
         )}
@@ -1682,8 +1610,6 @@ const TradingStation = () => {
               totalPnL={totalOpenPnL}
               closeAllTrades={closeAllTrades}
               isMobile={isMobile}
-              isForexMarketOpen={isForexMarketOpen} // Pass market status
-              getNextMarketEvent={getNextMarketEvent} // Pass function to get next market event
             />
           </div>
 
@@ -1711,12 +1637,10 @@ const TradingStation = () => {
               getCryptoImageForSymbol={getCryptoImageForSymbol}
               getForexImageForSymbol={getForexImageForSymbol}
               isMobile={isMobile}
-              timezone={userTimezone} // Pass the timezone
-              totalOpenPnL={totalOpenPnL} // The total PnL is already being passed
-              closeAllTrades={closeAllTrades} // Pass the close all trades function
-              openCount={openCount} // Add this missing prop to fix the issue
-              isForexMarketOpen={isForexMarketOpen} // Pass market status
-              getNextMarketEvent={getNextMarketEvent} // Pass function to get next market event
+              timezone={userTimezone}
+              totalOpenPnL={totalOpenPnL}
+              closeAllTrades={closeAllTrades}
+              openCount={openCount}
             />
           </div>
         </div>
