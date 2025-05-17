@@ -1035,7 +1035,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                         // Add scroll area for open positions in mobile/fullPage mode
                         <tr>
                           <td colSpan={5} className="p-0 border-0">
-                            <div className="max-h-[440px] overflow-y-auto flex flex-col gap-2 py-2">
+                            <div
+                              className="overflow-y-auto flex flex-col gap-2 py-2 pb-32"
+                              style={{
+                                // Ensure the scroll area does not go behind the summary
+                                maxHeight: "calc(100dvh - 220px)", // 220px = approx header + summary height
+                                minHeight: 0,
+                              }}
+                            >
                               {/* Group open trades by pair and type for mobile */}
                               {(() => {
                                 // Group trades by pair and type

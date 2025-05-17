@@ -759,11 +759,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         </div>
                         <div className="space-y-1">
                           <h3 className="text-3xl font-medium">
-                            ${withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                           </h3>
                           {userProfile?.multiplier_bonus > 0 && (
                             <p className="text-sm text-white/50">
-                              Including bonus: ${(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              Including bonus: {(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                             </p>
                           )}
                         </div>
@@ -786,7 +786,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                             </span>
                           </div>
                           <h3 className="text-3xl font-medium">
-                            ${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                           </h3>
                         </div>
                       </div>
@@ -803,7 +803,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                       </Button>
                       <Button 
                         className="h-12 gap-2" 
-                        onClick={() => navigate('/deposit')}
+                        onClick={() => navigate('/cashier')}
                       >
                         <ArrowDown className="h-5 w-5" />
                         Add Funds
@@ -851,7 +851,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                           {businessStats.totalVolume < 0 ? (
                             <span className="text-[#FFA500]">Pending</span>
                           ) : (
-                            <span className="text-white/50">${businessStats.totalVolume.toLocaleString()} Business Volume</span>
+                            <span className="text-white/50">{businessStats.totalVolume.toLocaleString()} USD Business Volume</span>
                           )}
                         </p>
                       </div>
@@ -863,7 +863,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-white/50">Next: {businessStats.nextRank.title}</span>
                           <span>
-                            ${(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} more
+                            {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
                           </span>
                         </div>
                         <div className="h-2 bg-[#1E1E1E] rounded-full overflow-hidden">
