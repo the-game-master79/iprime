@@ -384,8 +384,9 @@ const Affiliate = () => {
                 </div>
 
                 {currentReferrer && (
-                  <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-sm">
-                    <span>Referred by <span className="font-medium">{currentReferrer}</span></span>
+                  <div className="p-3 rounded-lg bg-green-600/20 border border-green-800 text-sm">
+                    <span>Referred by:</span>
+                     <div><span className="font-bold text-lg">{currentReferrer}</span></div>
                   </div>
                 )}
               </CardContent>
@@ -525,7 +526,7 @@ const Affiliate = () => {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="p-0 sm:px-6">
+              <CardContent className="p-6 sm:px-6">
                 {teamData.length === 0 ? (
                   <div className="text-center p-6 border-2 border-dashed rounded-lg mx-4 sm:mx-6 mb-4">
                     <h3 className="font-medium text-muted-foreground">No Team Members Yet</h3>
@@ -534,90 +535,93 @@ const Affiliate = () => {
                     </p>
                   </div>
                 ) : (
-                  <Accordion type="single" collapsible className="w-full divide-y">
-                    {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
-                      <AccordionItem 
-                        value={`level-${level}`} 
-                        key={level} 
-                        className="border-none bg-secondary/50 dark:bg-secondary/10"
-                      >
-                        <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline">
-                          <div>
-                            <p className="font-medium text-sm text-left">Level {level}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {teamData.filter(m => m.level === level).length} members
-                            </p>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 sm:px-6 pb-4">
-                          <div className="space-y-3">
-                            {teamData
-                              .filter(member => member.level === level)
-                              .map(member => (
-                                <div
-                                  key={member.id}
-                                  className={`rounded-lg border p-4 transition-colors ${
-                                    legendType === "investments" ? (
-                                      member.totalSubscriptions > 0
-                                        ? 'bg-green-50/50 border-green-100'  
-                                        : member.status === 'Active'
-                                        ? 'bg-amber-50/50 border-amber-100'
-                                        : 'bg-red-50/50 border-red-100'
-                                    ) : (
-                                      member.directCount >= 2
-                                        ? 'bg-green-50/50 border-green-100'
-                                        : 'bg-amber-50/50 border-amber-100'
-                                    )
-                                  }`}
-                                >
-                                  <div className="flex justify-between items-start gap-4">
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-2">
-                                        <p className="font-medium">{member.name}</p>
-                                        <div className={cn(
-                                          "w-2 h-2 rounded-full",
-                                          legendType === "investments" 
-                                            ? member.totalSubscriptions > 0
-                                              ? "bg-green-500"
-                                              : member.status === 'Active'
-                                                ? "bg-amber-500"
-                                                : "bg-red-500"
-                                            : member.directCount >= 2
-                                              ? "bg-green-500" 
-                                              : "bg-amber-500"
-                                        )} />
+                  // Add gap between accordions
+                  <div className="flex flex-col gap-4">
+                    <Accordion type="single" collapsible className="w-full">
+                      {Array.from(new Set(teamData.map(m => m.level))).sort((a, b) => a - b).map(level => (
+                        <AccordionItem 
+                          value={`level-${level}`} 
+                          key={level} 
+                          className="border-none bg-background dark:bg-secondary/10 rounded-xl mb-2"
+                        >
+                          <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline rounded-t-xl">
+                            <div>
+                              <p className="font-medium text-sm text-left">Level {level}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {teamData.filter(m => m.level === level).length} members
+                              </p>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 sm:px-6 pb-4 rounded-b-xl">
+                            <div className="space-y-3">
+                              {teamData
+                                .filter(member => member.level === level)
+                                .map(member => (
+                                  <div
+                                    key={member.id}
+                                    className={`rounded-lg p-4 transition-colors ${
+                                      legendType === "investments" ? (
+                                        member.totalSubscriptions > 0
+                                          ? 'bg-green-600/10'  
+                                          : member.status === 'Active'
+                                          ? 'bg-amber-600/10'
+                                          : 'bg-red-600/10'
+                                      ) : (
+                                        member.directCount >= 2
+                                          ? 'bg-green-600/10'
+                                          : 'bg-amber-600/10'
+                                      )
+                                    }`}
+                                  >
+                                    <div className="flex justify-between items-start gap-4">
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-medium">{member.name}</p>
+                                          <div className={cn(
+                                            "w-2 h-2 rounded-full",
+                                            legendType === "investments" 
+                                              ? member.totalSubscriptions > 0
+                                                ? "bg-green-500"
+                                                : member.status === 'Active'
+                                                  ? "bg-amber-500"
+                                                  : "bg-red-500"
+                                              : member.directCount >= 2
+                                                ? "bg-green-500" 
+                                                : "bg-amber-500"
+                                          )} />
+                                        </div>
+                                        <Badge 
+                                          variant="outline" 
+                                          className="w-fit text-[10px] h-5 text-muted-foreground"
+                                        >
+                                          {member.referralCode}
+                                        </Badge>
+                                        <p className={cn(
+                                          "text-xs",
+                                          member.directCount === 0 ? "text-red-600" :
+                                          member.directCount === 1 ? "text-amber-600" :
+                                          "text-green-600"
+                                        )}>
+                                          Direct Referrals: {member.directCount}/2
+                                        </p>
                                       </div>
-                                      <Badge 
-                                        variant="outline" 
-                                        className="w-fit text-[10px] h-5 text-muted-foreground"
-                                      >
-                                        {member.referralCode}
-                                      </Badge>
-                                      <p className={cn(
-                                        "text-xs",
-                                        member.directCount === 0 ? "text-red-600" :
-                                        member.directCount === 1 ? "text-amber-600" :
-                                        "text-green-600"
-                                      )}>
-                                        Direct Referrals: {member.directCount}/2
-                                      </p>
-                                    </div>
-                                    <div className="text-right space-y-1">
-                                      <div className="text-sm font-medium">
-                                        Business Volume: ${(member.totalInvested || 0).toLocaleString()}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Plans: {member.totalSubscriptions || 0}
+                                      <div className="text-right space-y-1">
+                                        <div className="text-sm font-medium">
+                                          Business Volume: ${(member.totalInvested || 0).toLocaleString()}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          Plans: {member.totalSubscriptions || 0}
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
+                                ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
                 )}
               </CardContent>
             </Card>

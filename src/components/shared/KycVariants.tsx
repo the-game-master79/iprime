@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Clock, Shield } from "lucide-react";
+import { ShieldCheck, WarningCircle, ClockCountdown, Shield } from "@phosphor-icons/react";
 import { Card } from "@/components/ui/card";
 
 interface KycVariantProps {
@@ -10,86 +10,135 @@ export function KycVariant({ status = 'required', date }: KycVariantProps) {
   switch (status) {
     case 'completed':
       return (
-        <Card className="p-4 rounded-lg border bg-green-50 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-              <Check className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-green-800">Verification Complete</h3>
-              <p className="text-sm text-green-700">
-                Your identity has been verified successfully. You now have full access to all platform features.
-              </p>
-              {date && (
-                <div className="mt-3 text-xs text-green-700 flex items-center gap-1">
-                  <Check className="h-4 w-4" />
-                  Verified on {date.toLocaleDateString()}
-                </div>
-              )}
-            </div>
+        <Card className="p-4 rounded-lg border bg-[#22c55e]/10 border-[#22c55e]/30 dark:bg-green-500/10 dark:border-green-700">
+          <div className="flex flex-col gap-2 items-start">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-600 text-xs font-semibold dark:bg-green-700/40 dark:text-green-200 mb-2">
+              <ShieldCheck size={18} weight="regular" className="mr-1" />
+            </span>
+            <h3 className="font-semibold text-white dark:text-green-200 mb-1">KYC Verified</h3>
+            <p className="text-sm text-white dark:text-green-200 mb-1">
+              Your identity has been <span className="font-semibold">successfully verified</span>. You now have unrestricted access to all platform features, including deposits, withdrawals, and investments.
+            </p>
+            <ul className="text-xs text-white/80 dark:text-green-200/80 list-disc ml-4 mb-2">
+              <li>Withdrawals are now enabled for your account.</li>
+              <li>Enjoy higher transaction limits and faster processing.</li>
+              <li>Account security is enhanced.</li>
+            </ul>
+            {date && (
+              <div className="mt-2 text-xs text-white dark:text-green-200 flex items-center gap-1">
+                <ShieldCheck size={14} weight="regular" />
+                Verified on {date.toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                }).replace(',', '')}
+              </div>
+            )}
           </div>
         </Card>
       );
 
     case 'processing':
       return (
-        <Card className="p-4 rounded-lg border bg-yellow-50 border-yellow-200">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-              <Clock className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-yellow-800">Verification In Progress</h3>
-              <p className="text-sm text-yellow-700">
-                Your documents are being reviewed. This usually takes 1-2 business days.
-              </p>
-              {date && (
-                <div className="mt-3 text-xs text-yellow-700 flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Submitted on {date.toLocaleDateString()}
-                </div>
-              )}
-            </div>
+        <Card className="p-4 rounded-lg border bg-[#fcd34d]/10 border-[#fcd34d] 200 dark:bg-yellow-400/10 dark:border-yellow-700">
+          <div className="flex flex-col gap-2 items-start">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold dark:bg-yellow-700/40 dark:text-yellow-200 mb-2">
+              <ClockCountdown size={18} weight="regular" className="mr-1" />
+            </span>
+            <h3 className="font-semibold text-white dark:text-yellow-200 mb-1">KYC Under Review</h3>
+            <p className="text-sm text-white dark:text-yellow-200 mb-1">
+              Your KYC documents have been <span className="font-semibold">submitted</span> and are currently being reviewed by our compliance team.
+            </p>
+            <ul className="text-xs text-white/70 dark:text-yellow-200/80 list-disc ml-4 mb-2">
+              <li>Review typically takes <span className="font-semibold">1-2 business days</span>.</li>
+              <li>You will be notified by email once the review is complete.</li>
+              <li>Withdrawals and some features remain restricted until approval.</li>
+            </ul>
+            {date && (
+              <div className="mt-2 text-xs text-white dark:text-yellow-200 flex items-center gap-1">
+                <ClockCountdown size={14} weight="regular" />
+                Submitted on {date.toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                }).replace(',', '')}
+              </div>
+            )}
           </div>
         </Card>
       );
 
     case 'rejected':
       return (
-        <Card className="p-4 rounded-lg border bg-red-50 border-red-200">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-red-800">Verification Rejected</h3>
-              <p className="text-sm text-red-700">
-                Your verification was not successful. Please submit new documents following the guidelines below.
-              </p>
-              {date && (
-                <div className="mt-3 text-xs text-red-700 flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  Rejected on {date.toLocaleDateString()}
-                </div>
-              )}
-            </div>
+        <Card className="p-4 rounded-lg border bg-[#ef4444]/10 border-[#ef4444]] border-red-200 dark:bg-red-400/10 dark:border-red-700">
+          <div className="flex flex-col gap-2 items-start">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-100 text-red-800 text-xs font-semibold dark:bg-red-700/40 dark:text-red-200 mb-2">
+              <WarningCircle size={18} weight="regular" className="mr-1" />
+            </span>
+            <h3 className="font-semibold text-white dark:text-red-200 mb-1">KYC Rejected</h3>
+            <p className="text-sm text-white dark:text-red-200 mb-1">
+              Unfortunately, your KYC verification was <span className="font-semibold">not successful</span>. This may be due to unclear documents, mismatched information, or unsupported document types.
+            </p>
+            <ul className="text-xs text-white/80 dark:text-red-200/80 list-disc ml-4 mb-2">
+              <li>You can contact our support to get the rejection reason.</li>
+              <li>Ensure your documents are clear and match your profile details.</li>
+              <li>Accepted documents: Passport, National ID, or Driver’s License.</li>
+              <li>Please note that we don't accept clients from Azerbaijan, North Korea, Turkmenistan, Syria, Iran, Iraq, Afghanistan, Somalia, Yemen.</li>
+            </ul>
+            <span className="text-xs text-white dark:text-red-200">
+              Please resubmit your documents to proceed.
+            </span>
+            {date && (
+              <div className="mt-2 text-xs text-whitedark:text-red-200 flex items-center gap-1">
+                <WarningCircle size={14} weight="regular" />
+                Rejected on {date.toLocaleString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                }).replace(',', '')}
+              </div>
+            )}
           </div>
         </Card>
       );
 
     default:
       return (
-        <Card className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-blue-800">Verification Required</h3>
-              <p className="text-sm text-blue-700">
-                Please complete your KYC verification to unlock all platform features.
-              </p>
-            </div>
+        <Card className="p-4 rounded-lg border bg-[#525252]/20 border-[#525252] dark:bg-[#1e293b]/60 dark:border-blue-700">
+          <div className="flex flex-col gap-2 items-start">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-blue-600 text-xs font-semibold dark:bg-blue-700/40 dark:text-blue-200 mb-2">
+              <Shield size={18} weight="regular" className="mr-1" />
+            </span>
+            <h3 className="font-semibold text-white dark:text-blue-200 mb-1">KYC Verification Required</h3>
+            <p className="text-sm text-white dark:text-white mb-1">
+              To ensure the security of your account and comply with regulations, <span className="font-semibold">KYC verification is required</span> before you can withdraw funds or access all features.
+            </p>
+            <ul className="text-xs text-white/80 dark:text-blue-300 list-disc ml-4 mb-2">
+              <li>Submit a government-issued photo ID and a selfie.</li>
+              <li>Verification is typically completed within 1-2 business days.</li>
+              <li>Your information is encrypted and securely stored.</li>
+            </ul>
+            {typeof window !== "undefined" && window.location.pathname !== "/profile" && (
+              <button
+                className="mt-2 px-4 py-2 rounded-full bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition"
+                onClick={() => window.location.href = '/profile?tab=kyc'}
+                type="button"
+              >
+                Submit Verification
+              </button>
+            )}
           </div>
         </Card>
       );

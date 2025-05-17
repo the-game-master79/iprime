@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransactionTable } from "@/components/tables/TransactionTable";
+import Withdrawals from "../withdrawals/Withdrawals";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -71,7 +72,7 @@ interface DepositHistory {
   description?: string;
 }
 
-export default function DepositPage() {
+export default function CashierPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const selectedPlan = location.state?.plan as Plan | null;
@@ -90,6 +91,8 @@ export default function DepositPage() {
   const [deposits, setDeposits] = useState<DepositHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showPromoDialog, setShowPromoDialog] = useState(false);
+  const [historySortField, setHistorySortField] = useState<'date' | 'amount' | 'status'>('date');
+  const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -521,10 +524,27 @@ export default function DepositPage() {
     });
   };
 
+  const filteredAndSortedDeposits = [...deposits].sort((a, b) => {
+    if (historySortField === 'amount') {
+      return historySortDirection === 'asc'
+        ? a.amount - b.amount
+        : b.amount - a.amount;
+    }
+    if (historySortField === 'status') {
+      return historySortDirection === 'asc'
+        ? (a.status || '').localeCompare(b.status || '')
+        : (b.status || '').localeCompare(a.status || '');
+    }
+    // Default: sort by date
+    return historySortDirection === 'asc'
+      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   return (
     <div className="min-h-screen bg-black">
       <Topbar 
-        title="Add Funds"
+        title="Cashier"
         leftContent={
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft size={20} weight="regular" />
@@ -538,7 +558,7 @@ export default function DepositPage() {
             <div className="flex items-center justify-between w-full">
               <TabsList className="grid grid-cols-2 w-[200px] sm:w-[300px]">
                 <TabsTrigger value="add-funds">Add Funds</TabsTrigger>
-                <TabsTrigger value="deposit-history">History</TabsTrigger>
+                <TabsTrigger value="withdraw">Payouts</TabsTrigger>
               </TabsList>
               
               <Button 
@@ -774,28 +794,95 @@ export default function DepositPage() {
                   </Card>
                 </div>
               </div>
+              {/* Transaction table below the form */}
+              <div className="mt-8">
+                <Card className="border-none bg-black">
+                  <CardContent className="p-2">
+                    {/* Deposit History Header and Filter */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-semibold text-white">Deposit History</h2>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            id="history-filter"
+                            value={historySortField}
+                            onValueChange={setHistorySortField}
+                          >
+                            <SelectTrigger className="w-[120px] bg-[#212121] border-none text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="date">Date</SelectItem>
+                              <SelectItem value="amount">Amount</SelectItem>
+                              <SelectItem value="status">Status</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
+                            className="text-foreground"
+                            title="Toggle sort direction"
+                          >
+                            {historySortDirection === "asc" ? (
+                              <span className="text-foreground">&uarr;</span>
+                            ) : (
+                              <span className="text-foreground">&darr;</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-b border-white/10 mb-2" />
+                    {/* Filtered and sorted table */}
+                    {isLoading ? (
+                      <div className="text-center py-6">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
+                      </div>
+                    ) : filteredAndSortedDeposits.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No deposits found
+                      </div>
+                    ) : (
+                      <TransactionTable 
+                        transactions={filteredAndSortedDeposits}
+                        onCopyId={handleCopyId}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
-            <TabsContent value="deposit-history" className="w-full">
-              <Card className="border-none bg-black">
-                <CardContent className="p-6">
-                  {isLoading ? (
-                    <div className="text-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
-                    </div>
-                  ) : deposits.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No deposits found
-                    </div>
-                  ) : (
-                    <TransactionTable 
-                      transactions={deposits}
-                      onCopyId={handleCopyId}
-                    />
-                  )}
-                </CardContent>
-              </Card>
+            <TabsContent value="withdraw" className="w-full">
+              {/* Render Withdrawals page instead of placeholder */}
+              <Withdrawals />
+              {/* Transaction table below the form */}
+              {/* You may remove the transaction table below if Withdrawals already includes it */}
+              {/* 
+              <div className="mt-8">
+                <Card className="border-none bg-black">
+                  <CardContent className="p-6">
+                    {isLoading ? (
+                      <div className="text-center py-6">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
+                      </div>
+                    ) : deposits.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No deposits found
+                      </div>
+                    ) : (
+                      <TransactionTable 
+                        transactions={deposits}
+                        onCopyId={handleCopyId}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+              */}
             </TabsContent>
           </Tabs>
         </div>

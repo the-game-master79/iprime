@@ -55,7 +55,7 @@ const availableRoutes = [
   { value: "/dashboard", label: "Dashboard" },
   { value: "/plans", label: "Plans" },
   { value: "/affiliate", label: "Affiliates" },
-  { value: "/deposit", label: "Deposit" },
+  { value: "/cashier", label: "Cashier" }, // changed from /deposit to /cashier
   { value: "/trade", label: "Trade" },
 ];
 

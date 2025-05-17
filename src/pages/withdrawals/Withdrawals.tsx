@@ -8,12 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { checkWithdrawalLimit } from "@/lib/rateLimit";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { format } from "date-fns";
-import { Topbar } from "@/components/shared/Topbar";
 import { BalanceCard } from "@/components/shared/BalanceCards";
+import { KycVariant } from "@/components/shared/KycVariants";
+import { TransactionTable } from "@/components/tables/TransactionTable";
 
 interface DepositMethod {
   id: string;
@@ -78,7 +75,8 @@ const Withdraw = () => {
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [userBalance, setUserBalance] = useState(0);
   const [amountError, setAmountError] = useState<string | null>(null);
-  const [kycStatus, setKycStatus] = useState<Profile['kyc_status']>(null);
+  const [kycStatus, setKycStatus] = useState<'pending' | 'processing' | 'completed' | 'rejected' | 'required'>('pending');
+  const [kycDate, setKycDate] = useState<Date | undefined>(undefined);
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'Pending').reduce((sum, w) => sum + w.amount, 0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -86,13 +84,36 @@ const Withdraw = () => {
   const [copied, setCopied] = useState(false);
   const [sortField, setSortField] = useState<'created_at' | 'amount' | 'status'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [historySortField, setHistorySortField] = useState<'date' | 'amount' | 'status'>('date');
+  const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchDepositMethods();
     fetchWithdrawals();
     fetchUserBalance();
     fetchKycStatus();
+    fetchWithdrawalTransactions(); // fetch transactions for payout history table
   }, []);
+
+  // Set default currency when depositMethods are loaded
+  useEffect(() => {
+    // Find the first available crypto method (USDT or USDC)
+    const firstCrypto = depositMethods.find(
+      method =>
+        method.method === 'crypto' &&
+        method.is_active &&
+        (method.crypto_symbol?.toLowerCase() === 'usdt' ||
+         method.crypto_symbol?.toLowerCase() === 'usdc')
+    );
+    if (firstCrypto && !formData.cryptoId) {
+      setFormData(prev => ({
+        ...prev,
+        cryptoId: firstCrypto.id,
+        network: firstCrypto.network || ''
+      }));
+    }
+  }, [depositMethods]); // Only runs when depositMethods change
 
   const fetchDepositMethods = async () => {
     try {
@@ -184,16 +205,56 @@ const Withdraw = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Prefer to get from profiles table (if kyc_status is there)
+      const { data: profile } = await supabase
         .from('profiles')
         .select('kyc_status')
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
-      setKycStatus(data?.kyc_status);
+      // Optionally, get latest KYC record for date
+      const { data: kyc } = await supabase
+        .from('kyc')
+        .select('updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      setKycStatus(profile?.kyc_status || 'pending');
+      setKycDate(kyc?.updated_at ? new Date(kyc.updated_at) : undefined);
     } catch (error) {
       console.error('Error fetching KYC status:', error);
+    }
+  };
+
+  // Fetch withdrawal transactions from the withdrawals table (not transactions)
+  const fetchWithdrawalTransactions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      // Map withdrawals to TransactionTable format
+      const mapped = (data || []).map((w: Withdrawal) => ({
+        id: w.id,
+        amount: w.amount,
+        status: w.status, // 'Pending' | 'Processing' | 'Completed' | 'Failed'
+        created_at: w.created_at,
+        updated_at: w.updated_at,
+        type: 'withdrawal',
+        description: `Withdrawal ${w.crypto_symbol || ''} ${w.network ? `via ${w.network}` : ''}`,
+        wallet_address: w.wallet_address, // Pass wallet address to TransactionTable
+        crypto_symbol: w.crypto_symbol,
+        network: w.network,
+      }));
+      setTransactions(mapped);
+    } catch (error) {
+      // Optionally handle error
     }
   };
 
@@ -479,26 +540,45 @@ const Withdraw = () => {
       : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+  // Filtered and sorted payout history for TransactionTable
+  const filteredAndSortedTransactions = [...transactions]
+    .filter(tx => {
+      // Optionally add search/filter logic here if needed
+      return true;
+    })
+    .sort((a, b) => {
+      if (historySortField === 'amount') {
+        return historySortDirection === 'asc'
+          ? a.amount - b.amount
+          : b.amount - a.amount;
+      }
+      if (historySortField === 'status') {
+        return historySortDirection === 'asc'
+          ? (a.status || '').localeCompare(b.status || '')
+          : (b.status || '').localeCompare(a.status || '');
+      }
+      // Default: sort by date
+      return historySortDirection === 'asc'
+        ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
   return (
     <div className="w-full min-h-screen bg-[#000000]">
-      <Topbar title="Withdraw" />
-      
       <div className="container max-w-[1000px] mx-auto py-6 px-4 md:px-6">
         {/* Balance Cards Grid */}
         <div className="grid gap-4 mb-8">
           <BalanceCard 
-            label="Available to withdraw"
+            label="Available for Payout"
             amount={userBalance}
             variant="default"
           />
-          
           <div className="grid grid-cols-2 gap-4">
             <BalanceCard
               label="Processing"
               amount={pendingWithdrawals}
               variant="processing"
             />
-
             <BalanceCard
               label="Success" 
               amount={withdrawals.filter(w => w.status === 'Completed').reduce((sum, w) => sum + w.amount, 0)}
@@ -507,56 +587,45 @@ const Withdraw = () => {
           </div>
         </div>
 
-        <Tabs defaultValue={activeTab} value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="request" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Request Withdrawal
-            </TabsTrigger>
-            <TabsTrigger 
-              value="history" 
-              className="flex items-center gap-2 relative"
-              disabled={kycStatus !== 'completed'}
-            >
-              <ClockCounterClockwise className="h-4 w-4" />
-              History
-              {withdrawals.some(w => w.status === 'Pending') && (
-                <Badge className="absolute -right-6 -top-2 h-5 w-5 p-0 flex items-center justify-center">
-                  {withdrawals.filter(w => w.status === 'Pending').length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="request" className="m-0 space-y-4">
-            {kycStatus !== 'completed' ? (
-              <KycWarning />
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-normal">Select Currency</Label>
-                    <Select 
-                      value={formData.cryptoId || cryptoOptions[0]?.id} 
-                      onValueChange={(value) => {
-                        const selectedMethod = depositMethods.find(m => m.id === value);
-                        const network = selectedMethod?.network || '';
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          cryptoId: value,
-                          network
-                        }));
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select cryptocurrency" />
-                      </SelectTrigger>
-                      <SelectContent>
+        {/* Use KycVariant for KYC status display */}
+        <div className="max-w-lg mx-auto mb-8">
+          {kycStatus !== 'completed' && (
+            <KycVariant status={kycStatus as any} date={kycDate} />
+          )}
+        </div>
+
+        {/* Layout: Form on left, payout history full width below */}
+        <div className="flex flex-col gap-8">
+          {/* Form */}
+          <div className="w-full max-w-lg mx-auto">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-normal">Select Currency</Label>
+                  <Select 
+                    value={formData.cryptoId || cryptoOptions[0]?.id} 
+                    onValueChange={(value) => {
+                      const selectedMethod = depositMethods.find(m => m.id === value);
+                      const network = selectedMethod?.network || '';
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        cryptoId: value,
+                        network
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select cryptocurrency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Grouped by USDT and USDC */}
+                      <div>
+                        <div className="px-2 py-1 text-xs text-muted-foreground">USDT</div>
                         {depositMethods
                           .filter(method => 
                             method.method === 'crypto' && 
                             method.is_active && 
-                            (method.crypto_symbol?.toLowerCase() === 'usdt' || 
-                             method.crypto_symbol?.toLowerCase() === 'usdc')
+                            method.crypto_symbol?.toLowerCase() === 'usdt'
                           )
                           .map(method => (
                             <SelectItem key={method.id} value={method.id}>
@@ -568,184 +637,117 @@ const Withdraw = () => {
                               </div>
                             </SelectItem>
                           ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="walletAddress" className="text-xs font-normal text-white">Wallet Address</Label>
-                    <Input
-                      id="walletAddress"
-                      placeholder={`Enter ${
-                        selectedCrypto?.name?.toUpperCase() || 'USDT'
-                      } ${formData.network || 'TRC20'} address`}
-                      value={formData.walletAddress}
-                      onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="amount" className="text-xs font-normal text-white">Amount</Label>
-                    <div className="relative">
-                      <Input
-                        id="amount"
-                        type="number"
-                        min="0"
-                        placeholder="Enter amount"
-                        className={`${amountError ? 'border-red-500' : ''}`}
-                        value={formData.amount}
-                        onChange={handleAmountChange}
-                      />
-                      <span className="absolute right-3 top-2.5 text-white">USD</span>
-                    </div>
-                    {amountError && (
-                      <p className="text-sm text-red-500">{amountError}</p>
-                    )}
-                    {formData.amount && !amountError && (
-                      <p className="text-sm text-muted-foreground">
-                        Your balance after withdrawal → {(userBalance - parseFloat(formData.amount)).toLocaleString()} USD
-                      </p>
-                    )}
-                  </div>
+                      </div>
+                      <div>
+                        <div className="px-2 py-1 text-xs text-muted-foreground">USDC</div>
+                        {depositMethods
+                          .filter(method => 
+                            method.method === 'crypto' && 
+                            method.is_active && 
+                            method.crypto_symbol?.toLowerCase() === 'usdc'
+                          )
+                          .map(method => (
+                            <SelectItem key={method.id} value={method.id}>
+                              <div className="flex items-center gap-2">
+                                {method.logo_url && (
+                                  <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
+                                )}
+                                {method.crypto_name} • {method.network}
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </div>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-                  {isSubmitting ? "Processing..." : "Request Withdrawal"}
-                </Button>
-              </form>
-            )}
-          </TabsContent>
-
-          <TabsContent value="history" className="m-0 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="relative w-full sm:w-[300px]">
-                  <MagnifyingGlass className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-2">
+                  <Label htmlFor="walletAddress" className="text-xs font-normal text-white">Wallet Address</Label>
                   <Input
-                    type="search"
-                    placeholder="Search withdrawals..."
-                    className="pl-8 w-full"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    id="walletAddress"
+                    placeholder={`Enter ${
+                      selectedCrypto?.name?.toUpperCase() || 'USDT'
+                    } ${formData.network || 'TRC20'} address`}
+                    value={formData.walletAddress}
+                    onChange={(e) => setFormData(prev => ({ ...prev, walletAddress: e.target.value }))}
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                    </SelectContent>
-                  </Select>
 
-                  <Select value={sortField} onValueChange={(value: typeof sortField) => setSortField(value)}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Sort By" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="created_at">Date</SelectItem>
-                      <SelectItem value="amount">Amount</SelectItem>
-                      <SelectItem value="status">Status</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
-                    className="w-10"
-                  >
-                    <ArrowsDownUp className={`h-4 w-4 transition-transform ${
-                      sortDirection === "desc" ? "rotate-180" : ""
-                    }`} />
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="amount" className="text-xs font-normal text-white">Amount</Label>
+                  <div className="relative">
+                    <Input
+                      id="amount"
+                      type="number"
+                      min="0"
+                      placeholder="Enter amount"
+                      className={`${amountError ? 'border-red-500' : ''}`}
+                      value={formData.amount}
+                      onChange={handleAmountChange}
+                    />
+                    <span className="absolute right-3 top-2.5 text-white">USD</span>
+                  </div>
+                  {amountError && (
+                    <p className="text-sm text-red-500">{amountError}</p>
+                  )}
+                  {formData.amount && !amountError && (
+                    <p className="text-sm text-muted-foreground">
+                      Your balance after withdrawal → {(userBalance - parseFloat(formData.amount)).toLocaleString()} USD
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-gray-800 bg-[#141414]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent border-b border-border/40">
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Date</TableHead>
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Transaction</TableHead>
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Amount</TableHead>
-                      <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/50">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedAndFilteredWithdrawals.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          No withdrawals found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      sortedAndFilteredWithdrawals.map((withdrawal) => (
-                        <TableRow 
-                          key={withdrawal.id}
-                          className="group hover:bg-muted/50 transition-colors"
-                        >
-                          <TableCell className="py-4 align-top">
-                            <div className="text-sm font-medium">
-                              {format(new Date(withdrawal.created_at), 'MMM dd, yyyy')}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {format(new Date(withdrawal.created_at), 'hh:mm a')}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-4 align-top">
-                            <div className="flex flex-col gap-1">
-                              <Badge variant="outline" className="w-fit capitalize text-xs">
-                                Withdrawal
-                              </Badge>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-mono">{withdrawal.id.slice(0, 12)}...</span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleCopyId(withdrawal.id)}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {withdrawal.crypto_name} ({withdrawal.crypto_symbol}) - {withdrawal.network}
-                              </div>
-                            </div>
-                            </TableCell>
-                          <TableCell className="py-4 align-top">
-                            <Badge variant="outline" className="font-mono">
-                              -${withdrawal.amount.toLocaleString()}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-4 align-top">
-                            <Badge 
-                              variant={
-                                withdrawal.status === 'Completed' ? 'success' :
-                                withdrawal.status === 'Pending' ? 'warning' :
-                                withdrawal.status === 'Processing' ? 'secondary' :
-                                'destructive'
-                              } 
-                              className="capitalize"
-                            >
-                              {withdrawal.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+                {isSubmitting ? "Processing..." : "Request Payout"}
+              </Button>
+            </form>
+          </div>
+
+          {/* Payout History Table - full width below the form */}
+          <div className="w-full">
+            {/* Filter and sort controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+              <h2 className="text-xl font-semibold text-white">Payout History</h2>
+              <div className="flex items-center gap-2">
+                <Select
+                  id="payout-history-filter"
+                  value={historySortField}
+                  onValueChange={setHistorySortField}
+                >
+                  <SelectTrigger className="w-[120px] bg-[#212121] border-none text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Date</SelectItem>
+                    <SelectItem value="amount">Amount</SelectItem>
+                    <SelectItem value="status">Status</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
+                  className="text-foreground"
+                  title="Toggle sort direction"
+                >
+                  {historySortDirection === "asc" ? (
+                    <span className="text-foreground">&uarr;</span>
+                  ) : (
+                    <span className="text-foreground">&darr;</span>
+                  )}
+                </Button>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+            <div className="border-b border-white/10 mb-2" />
+            <div className="mt-4">
+              <TransactionTable
+                transactions={filteredAndSortedTransactions}
+                onCopyId={handleCopyId}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

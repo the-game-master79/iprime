@@ -48,7 +48,78 @@ const Sidebar = ({
 }: SidebarProps) => {
   // For mobile, we'll ignore the isCollapsed prop and always show content
   const showContent = isMobile || !isCollapsed;
+
+  // Helper to check if forex market is open and get next open time
+  function getForexMarketStatus() {
+    const now = new Date();
+    const utcDay = now.getUTCDay();
+    const utcHour = now.getUTCHours();
+    const utcMinute = now.getUTCMinutes();
+    let isOpen = false;
+    let nextOpen: Date | null = null;
+
+    if (
+      (utcDay > 0 && utcDay < 5) ||
+      (utcDay === 5 && utcHour < 21) ||
+      (utcDay === 0 && (utcHour > 22 || (utcHour === 22 && utcMinute >= 0)))
+    ) {
+      isOpen = true;
+    } else {
+      // Find next Sunday 22:00 UTC
+      nextOpen = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 22, 0, 0, 0));
+      let daysUntilSunday = (7 - utcDay) % 7;
+      if (utcDay === 0 && utcHour < 22) {
+        // Today is Sunday, before 22:00
+        // nextOpen is today at 22:00
+      } else {
+        // Next Sunday
+        nextOpen.setUTCDate(now.getUTCDate() + daysUntilSunday);
+      }
+      // If today is Sunday and after 22:00, next open is next week's Sunday
+      if (utcDay === 0 && utcHour >= 22) {
+        nextOpen.setUTCDate(nextOpen.getUTCDate() + 7);
+      }
+    }
+    return { isOpen, nextOpen };
+  }
+  const { isOpen: isForexMarketOpen, nextOpen } = getForexMarketStatus();
+
+  // Countdown state for next open
+  const [countdown, setCountdown] = useState<string>("");
+
+  useEffect(() => {
+    if (!isForexMarketOpen && nextOpen) {
+      const interval = setInterval(() => {
+        const now = new Date();
+        const diff = nextOpen.getTime() - now.getTime();
+        if (diff <= 0) {
+          setCountdown("Market is opening...");
+          clearInterval(interval);
+        } else {
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+          setCountdown(
+            `${hours.toString().padStart(2, "0")}:${minutes
+              .toString()
+              .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+          );
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setCountdown("");
+    }
+  }, [isForexMarketOpen, nextOpen]);
   
+  // On mount, if market is closed and forex tab is active, switch to crypto tab
+  useEffect(() => {
+    if (!isForexMarketOpen && activeTab === "forex") {
+      setActiveTab("crypto");
+    }
+    // eslint-disable-next-line
+  }, []);
+
   // Add effect to select first pair when tab changes or when filteredPairs changes
   useEffect(() => {
     // Only auto-select if no pair is currently selected or if tabs were switched
@@ -197,8 +268,23 @@ const Sidebar = ({
             {filteredPairs.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
                 <div className="text-4xl mb-2">🔍</div>
-                <p>No matching pairs found</p>
-                <p className="text-sm">Try adjusting your search term</p>
+                <p>
+                  {activeTab === "forex" && !isForexMarketOpen
+                    ? "Markets are closed today."
+                    : "No matching pairs found"}
+                </p>
+                <p className="text-sm">
+                  {activeTab === "forex" && !isForexMarketOpen
+                    ? <>
+                        Forex market is currently closed.<br />
+                        {countdown && (
+                          <span>
+                            Market opens in <span className="font-semibold">{countdown}</span>
+                          </span>
+                        )}
+                      </>
+                    : "Try adjusting your search term"}
+                </p>
               </div>
             )}
           </div>

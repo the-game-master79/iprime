@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus } from "@phosphor-icons/react";
+import { Plus, House } from "@phosphor-icons/react";
 
 interface NavbarProps {
   balance: number;
@@ -14,11 +14,28 @@ const Navbar = ({ balance, isMobile = false, toggleMobileMenu }: NavbarProps) =>
   return (
     <nav className={`fixed top-0 left-0 w-full h-16 ${isMobile ? 'bg-background' : 'bg-muted/10'} border-b border-border/50 flex items-center px-4 justify-between z-50`}>
       <div className="flex items-center gap-4">
-        <img
-          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
-          alt="CloudTrade Logo"
-          className="h-8"
-        />
+        {/* Home button first */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2"
+          onClick={() => navigate("/platform")}
+          title="Home"
+        >
+          <House size={20} weight="bold" />
+        </Button>
+        {/* Logo: clicking refreshes the page */}
+        <button
+          onClick={() => window.location.reload()}
+          className="focus:outline-none"
+          title="Refresh"
+        >
+          <img
+            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
+            alt="CloudTrade Logo"
+            className="h-8"
+          />
+        </button>
       </div>
       <div className="flex items-center gap-4">
         {isMobile ? (

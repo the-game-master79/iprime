@@ -856,6 +856,24 @@ const TradingStation = () => {
     return closedTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
   }, [closedTrades]);
 
+  // Determine if market is open (for disabling close buttons)
+  const forexMarketStatus = getForexMarketStatus();
+  const isForexMarketOpen = forexMarketStatus.isOpen;
+
+  // Helper to check if a trade is a forex trade (not crypto)
+  function isForexTrade(trade: any) {
+    return !trade.pair.endsWith("USDT") && trade.pair !== "XAUUSD";
+  }
+
+  // Pass a function to ActivityPanel to determine if close should be disabled
+  function isTradeCloseDisabled(trade: any) {
+    if (isForexTrade(trade)) {
+      return !isForexMarketOpen;
+    }
+    return false;
+  }
+
+  // Patch renderTrades to accept a disableClose function and pass disabled prop to Button
   function renderTrades(trades: any[]): React.ReactNode {
     // Group trades by pair and type (buy/sell)
     const grouped: Record<string, { 
@@ -990,6 +1008,12 @@ const TradingStation = () => {
             <span className="px-2 py-1 rounded-full bg-muted/20 text-xs font-semibold hover:bg-muted/30 transition-all">
               {g.totalLots.toFixed(2)}
             </span>
+            {/* Show open positions count if more than 1 */}
+            {g.trades.length > 0 && (
+              <span className="ml-2 px-2 py-1 rounded-full bg-blue-500 text-white text-xs font-semibold">
+                {g.trades.length}
+              </span>
+            )}
           </td>
           <td className="px-4 py-2 text-xs">
             {Number(firstTrade.open_price).toFixed(decimals)}
@@ -1035,6 +1059,12 @@ const TradingStation = () => {
                 size="sm"
                 onClick={() => g.trades.forEach((t) => handleCloseTrade(t))}
                 className="w-full"
+                disabled={isForexTrade(g.trades[0]) && !isForexMarketOpen}
+                title={
+                  isForexTrade(g.trades[0]) && !isForexMarketOpen
+                    ? "Market is closed. You can only close forex trades when the market is open."
+                    : "Close"
+                }
               >
                 Close
               </Button>
@@ -1755,6 +1785,7 @@ const TradingStation = () => {
           </button>
           
           <button
+
             className={`mobile-menu-button ${activeView === "activity" ? "active" : ""}`}
             onClick={() => {
               toggleMobileView("activity");

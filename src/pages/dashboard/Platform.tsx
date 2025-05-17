@@ -808,13 +808,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <ArrowDown className="h-5 w-5" />
                         Add Funds
                       </Button>
-                      <Button 
-                        variant="secondary"
-                        className="h-12 gap-2" 
-                        onClick={() => navigate('/withdrawals')}
+                      {/* Replace Withdraw with Agent button with gradient */}
+                      <Button
+                        className="h-12 gap-2 bg-gradient-to-r from-[#6a11cb] via-[#2575fc] to-[#43e97b] text-white font-semibold border-0 shadow-md hover:from-[#43e97b] hover:to-[#6a11cb] hover:via-[#2575fc]"
+                        style={{
+                          backgroundImage: "linear-gradient(90deg, #6a11cb 0%, #2575fc 50%, #43e97b 100%)"
+                        }}
+                        onClick={() => navigate('/affiliate')}
                       >
-                        <ArrowUp className="h-5 w-5" />
-                        Withdraw
+                        <Users className="h-5 w-5" />
+                        Agent
                       </Button>
                       <Button 
                         variant="secondary"

@@ -17,6 +17,7 @@ interface Transaction {
   status: string;
   created_at: string;
   description?: string;
+  wallet_address?: string; // Add wallet_address as optional
 }
 
 interface TransactionTableProps {
@@ -155,6 +156,21 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
               <h2 className={`text-xl font-semibold ${getAmountColor(transaction.status, isPositive)}`}>
                 {isPositive ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()} USD
               </h2>
+              {/* Wallet Address display and copy */}
+              {transaction.wallet_address && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-white/60 font-mono break-all">{transaction.wallet_address}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onCopyId(transaction.wallet_address!)}
+                    className="h-5 w-5 hover:bg-white/10"
+                    title="Copy wallet address"
+                  >
+                    <Copy className="h-3 w-3 text-white/60" weight="regular" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Right side - ID and Copy button */}

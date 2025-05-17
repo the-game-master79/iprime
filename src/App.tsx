@@ -110,7 +110,7 @@ const App = () => {
               <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
               <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
               <Route path="/withdrawals" element={<AuthGuard requireAuth><Withdrawals /></AuthGuard>} />
-              <Route path="/deposit" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
+              <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
               <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
 
               {/* Trade Routes */}

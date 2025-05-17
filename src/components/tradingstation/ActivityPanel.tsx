@@ -338,9 +338,48 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               </div>
             </td>
             <td className="px-4 py-2">
-              <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold hover:bg-gray-100 transition-all">
-                {g.totalLots.toFixed(2)}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Remove arrow from lots column, keep only the one for pair */}
+                {/* {g.trades.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 p-0 rounded-full hover:bg-muted/30"
+                    onClick={() => toggleGroupExpand(g.key)}
+                    title={isExpanded ? "Collapse" : "Expand"}
+                  >
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </Button>
+                )} */}
+                <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold">
+                  {g.totalLots.toFixed(2)}
+                </span>
+                <span className="ml-2 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                  {g.trades.length} open
+                </span>
+              </div>
+              {/* Remove expanded individual positions for desktop */}
+              {/* {g.trades.length > 1 && isExpanded && (
+                <div className="mt-2 border-t border-border/20">
+                  {g.trades.map((trade, idx) => (
+                    <div key={trade.id} className="flex items-center gap-2 py-1">
+                      <span className="text-xs text-muted-foreground">ID: {trade.id.substring(0, 8)}...</span>
+                      <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold">
+                        {Number(trade.lots).toFixed(2)} lot
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCloseTrade(trade)}
+                        className="w-6 h-6 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                        title="Close Position"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )} */}
             </td>
             <td className="px-4 py-2 text-xs">
               {Number(firstTrade.open_price).toFixed(decimals)}
@@ -391,7 +430,12 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       : "w-8 h-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
                     }
                   `}
-                  title={hasMultiplePositions ? "Close All Positions" : "Close Position"}
+                  title={
+                    isForexTrade(g.trades[0]) && !isForexMarketOpen
+                      ? "Market is closed. You can only close forex trades when the market is open."
+                      : hasMultiplePositions ? "Close All Positions" : "Close Position"
+                  }
+                  disabled={isForexTrade(g.trades[0]) && !isForexMarketOpen}
                 >
                   <X size={16} />
                 </Button>
@@ -455,7 +499,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   </div>
                 </td>
                 <td className="px-4 py-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs hover:bg-gray-100 transition-all">
+                  <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold">
                     {Number(trade.lots).toFixed(2)}
                   </span>
                 </td>
@@ -646,6 +690,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
     }
   }, [freeMargin, marginLevel, openTrades]);
 
+  // Add this state at the top-level of the component, not inside any function or render
+  const [mobileExpandedGroups, setMobileExpandedGroups] = useState<Record<string, boolean>>({});
+  const toggleMobileGroupExpand = (key: string) => {
+    setMobileExpandedGroups(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   return (
     <div
       className={`${fullPage 
@@ -710,29 +763,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               <span className={`ml-1 bg-gray-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{closedCount}</span>
             </Button>
           </div>
-          
-          {/* Expand/Collapse All button - only show in desktop mode */}
-          {hasExpandableTrades && !fullPage && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-2 h-8 text-xs flex items-center gap-1"
-              onClick={() => toggleAllGroups(!anyExpanded)}
-              title={anyExpanded ? "Collapse All" : "Expand All"}
-            >
-              {anyExpanded ? (
-                <>
-                  <ChevronsUp size={14} />
-                  <span className="hidden sm:inline">Collapse All</span>
-                </>
-              ) : (
-                <>
-                  <ChevronsDown size={14} />
-                  <span className="hidden sm:inline">Expand All</span>
-                </>
-              )}
-            </Button>
-          )}
           
           <div className="flex-1" />
           
@@ -800,6 +830,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 size="sm"
                 onClick={() => openTrades.forEach(trade => handleCloseTrade(trade))}
                 className="h-9 px-3 gap-1 text-xs"
+                disabled={
+                  openTrades.some(isForexTrade) && !isForexMarketOpen
+                }
+                title={
+                  openTrades.some(isForexTrade) && !isForexMarketOpen
+                    ? "Market is closed. You can only close forex trades when the market is open."
+                    : "Close All"
+                }
               >
                 <X size={14} />
                 Close All ({openTrades.length})
@@ -832,10 +870,18 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 scrollbarWidth: "thin",
                 height: fullPage ? "auto" : undefined,
                 minHeight: 0,
+                ...(fullPage && activeTradeTab === "closed"
+                  ? { paddingBottom: "112px" } // Add bottom padding so closed trades don't go behind the summary
+                  : {}),
+                ...(fullPage && activeTradeTab === "open"
+                  ? { paddingBottom: 0, marginBottom: 0 }
+                  : {}),
               }}
             >
               <table className="w-full text-left border-collapse">
-                <thead className="top-0 bg-muted/30 sticky">
+                <thead
+                  className={`top-0 bg-muted/30 sticky${fullPage ? " hidden" : ""}`}
+                >
                   {activeTradeTab === "closed" ? (
                     <tr>
                       <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Pair</th>
@@ -877,6 +923,26 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       <tr>
                         <td colSpan={4} className="p-0 border-0">
                           <div className="flex flex-col gap-1 py-2">
+                            {/* Pagination controls for mobile/fullPage mode */}
+                            <div className="flex justify-between items-center px-2 pb-2">
+                              <button
+                                className="px-3 py-1 text-xs bg-muted/30 rounded-lg font-medium hover:bg-muted/40 disabled:opacity-50"
+                                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                                disabled={currentPage === 1}
+                              >
+                                Previous
+                              </button>
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Page {currentPage} of {totalPages}
+                              </span>
+                              <button
+                                className="px-3 py-1 text-xs bg-muted/30 rounded-lg font-medium hover:bg-muted/40 disabled:opacity-50"
+                                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                              >
+                                Next
+                              </button>
+                            </div>
                             {getLimitedClosedTrades().map((trade, idx) => {
                               const openPrice = parseFloat(trade.open_price);
                               const closePrice = parseFloat(trade.close_price || "0");
@@ -961,150 +1027,344 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   ) : activeTradeTab === "open" ? (
                     openTrades && openTrades.length > 0 ?
                       (!fullPage ? (
-                        // If using expandable grouped trades, make the accumulated group rows scrollable
-                        <tr>
-                          <td colSpan={fullPage ? 5 : 10} className="p-0 border-0">
-                            <div className="max-h-[320px] overflow-y-auto">
-                              {typeof renderOpenTrades === 'function'
-                                ? renderOpenTrades(openTrades)
-                                : renderOpenTrades}
-                            </div>
-                          </td>
-                        </tr>
+                        // Only use renderExpandableTrades for desktop open trades table (table look)
+                        <>
+                          {renderExpandableTrades(openTrades)}
+                        </>
                       ) : (
-                        // ...existing code for mobile/fullPage
+                        // Add scroll area for open positions in mobile/fullPage mode
                         <tr>
                           <td colSpan={5} className="p-0 border-0">
-                            <div className="flex flex-col gap-2 py-2">
-                              {openTrades.map((trade, idx) => {
-                                const currentPrice = localPrices[trade.pair]?.price !== undefined
-                                  ? parseFloat(localPrices[trade.pair].price)
-                                  : parseFloat(trade.open_price);
-                                const openPrice = parseFloat(trade.open_price);
-                                
-                                // Calculate PnL (simplified from renderExpandableTrades)
-                                let livePnL = 0;
-                                let pipSize = 0.0001;
-                                let lotSize = 100000;
-                                
-                                if (trade.pair.endsWith("USDT")) {
-                                  pipSize = 1;
-                                  lotSize = 1;
-                                  if (trade.type?.toLowerCase() === "buy") {
-                                    livePnL = currentPrice - openPrice;
-                                  } else {
-                                    livePnL = openPrice - currentPrice;
+                            <div className="max-h-[440px] overflow-y-auto flex flex-col gap-2 py-2">
+                              {/* Group open trades by pair and type for mobile */}
+                              {(() => {
+                                // Group trades by pair and type
+                                const grouped: Record<string, { 
+                                  key: string,
+                                  pair: string,
+                                  type: string,
+                                  trades: any[],
+                                  totalLots: number,
+                                  totalLivePnL: number,
+                                  openPrice: number,
+                                  currentPrice: number,
+                                  decimals: number,
+                                  hedgingTracker?: {
+                                    hedgedBuyLots: number,
+                                    hedgedSellLots: number,
+                                    maxHedgedBuyLots: number,
+                                    maxHedgedSellLots: number
                                   }
-                                } else if (trade.pair === "XAUUSD") {
-                                  pipSize = 0.01;
-                                  lotSize = 100;
-                                  const lots = Number(trade.lots) || 0;
-                                  const pipValue = pipSize * lots * 100;
-                                  if (trade.type?.toLowerCase() === "buy") {
-                                    livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                  } else {
-                                    livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
+                                }> = {};
+                                openTrades.forEach((trade) => {
+                                  const key = `${trade.pair}|${(trade.type || "").toLowerCase()}`;
+                                  if (!grouped[key]) {
+                                    grouped[key] = {
+                                      key,
+                                      pair: trade.pair,
+                                      type: (trade.type || "").toLowerCase(),
+                                      trades: [],
+                                      totalLots: 0,
+                                      totalLivePnL: 0,
+                                      openPrice: 0,
+                                      currentPrice: 0,
+                                      decimals: getPriceDecimals(trade.pair)
+                                    };
                                   }
-                                } else {
-                                  if (trade.pair.endsWith("JPY")) {
-                                    pipSize = 0.01;
-                                  }
-                                  const lots = Number(trade.lots) || 0;
-                                  const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
-                                  if (trade.type?.toLowerCase() === "buy") {
-                                    livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                  } else {
-                                    livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                  }
-                                }
+                                  grouped[key].trades.push(trade);
+                                  grouped[key].totalLots += Number(trade.lots) || 0;
+                                });
 
-                                const decimals = getPriceDecimals(trade.pair);
-                                const formattedPnL = livePnL.toFixed(2);
-                                const isProfitable = livePnL >= 0;
+                                // Calculate total PnL and prices for each group
+                                Object.values(grouped).forEach((g) => {
+                                  let totalPnL = 0;
+                                  let totalLots = 0;
+                                  let openPriceSum = 0;
+                                  let currentPriceSum = 0;
+                                  g.trades.forEach((trade) => {
+                                    const currentPrice = localPrices[trade.pair]?.price !== undefined
+                                      ? parseFloat(localPrices[trade.pair].price)
+                                      : parseFloat(trade.open_price);
+                                    const openPrice = parseFloat(trade.open_price);
+                                    let pipSize = 0.0001;
+                                    let lotSize = 100000;
+                                    let livePnL = 0;
+                                    if (trade.pair.endsWith("USDT")) {
+                                      pipSize = 1;
+                                      lotSize = 1;
+                                      if (trade.type?.toLowerCase() === "buy") {
+                                        livePnL = currentPrice - openPrice;
+                                      } else {
+                                        livePnL = openPrice - currentPrice;
+                                      }
+                                    } else if (trade.pair === "XAUUSD") {
+                                      pipSize = 0.01;
+                                      lotSize = 100;
+                                      const lots = Number(trade.lots) || 0;
+                                      const pipValue = pipSize * lots * 100;
+                                      if (trade.type?.toLowerCase() === "buy") {
+                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
+                                      } else {
+                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
+                                      }
+                                    } else {
+                                      if (trade.pair.endsWith("JPY")) {
+                                        pipSize = 0.01;
+                                      }
+                                      const lots = Number(trade.lots) || 0;
+                                      const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
+                                      if (trade.type?.toLowerCase() === "buy") {
+                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
+                                      } else {
+                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
+                                      }
+                                    }
+                                    totalPnL += livePnL;
+                                    totalLots += Number(trade.lots) || 0;
+                                    openPriceSum += openPrice * (Number(trade.lots) || 0);
+                                    currentPriceSum += currentPrice * (Number(trade.lots) || 0);
+                                  });
+                                  g.totalLivePnL = totalPnL;
+                                  g.totalLots = totalLots;
+                                  g.openPrice = totalLots > 0 ? openPriceSum / totalLots : 0;
+                                  g.currentPrice = totalLots > 0 ? currentPriceSum / totalLots : 0;
+                                });
 
-                                // Check if this trade is part of a hedged pair
-                                const tradeType = trade.type?.toLowerCase();
-                                const isHedged = openTrades.some(t => 
-                                  t.pair === trade.pair && 
-                                  t.type?.toLowerCase() !== tradeType &&
-                                  t.id !== trade.id
-                                );
+                                // --- HEDGING LOGIC FOR MOBILE ---
+                                // Find buy/sell lots per pair
+                                const pairTypes: Record<string, { buyLots: number, sellLots: number, hedgedBuyLots: number, hedgedSellLots: number }> = {};
+                                Object.values(grouped).forEach((g) => {
+                                  if (!pairTypes[g.pair]) pairTypes[g.pair] = { buyLots: 0, sellLots: 0, hedgedBuyLots: 0, hedgedSellLots: 0 };
+                                  if (g.type === "buy") pairTypes[g.pair].buyLots += g.totalLots;
+                                  if (g.type === "sell") pairTypes[g.pair].sellLots += g.totalLots;
+                                });
+                                Object.keys(pairTypes).forEach(pair => {
+                                  const hedgedLots = Math.min(pairTypes[pair].buyLots, pairTypes[pair].sellLots);
+                                  pairTypes[pair].hedgedBuyLots = hedgedLots;
+                                  pairTypes[pair].hedgedSellLots = hedgedLots;
+                                });
 
-                                return (
-                                  <div key={`open-${trade.id || idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
-                                    {/* First row: Icon, Pair name and PnL with close button */}
-                                    <div className="flex justify-between items-center mb-3">
-                                      <div className="flex items-center gap-3">
-                                        <img
-                                          src={
-                                            trade.pair.endsWith("USDT")
-                                              ? getCryptoImageForSymbol(trade.pair)
-                                              : getForexImageForSymbol(trade.pair)
-                                          }
-                                          alt={trade.pair}
-                                          className="h-7 w-7"
-                                        />
-                                        <span className="font-semibold text-base">{formatPairName(trade.pair)}</span>
+                                // Attach hedging tracker to each group
+                                Object.values(grouped).forEach((g) => {
+                                  g.hedgingTracker = {
+                                    hedgedBuyLots: 0,
+                                    hedgedSellLots: 0,
+                                    maxHedgedBuyLots: pairTypes[g.pair]?.hedgedBuyLots || 0,
+                                    maxHedgedSellLots: pairTypes[g.pair]?.hedgedSellLots || 0
+                                  };
+                                });
+
+                                return Object.values(grouped).map((g, idx) => {
+                                  const isProfitable = g.totalLivePnL >= 0;
+                                  const isExpanded = mobileExpandedGroups[g.key] || false;
+                                  // Is this group hedged at all?
+                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
+                                  return (
+                                    <div key={`open-group-${g.key}-${idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
+                                      {/* First row: Icon, Pair name and PnL with close button */}
+                                      <div className="flex justify-between items-center mb-3">
+                                        <div className="flex items-center gap-3">
+                                          <img
+                                            src={
+                                              g.pair.endsWith("USDT")
+                                                ? getCryptoImageForSymbol(g.pair)
+                                                : getForexImageForSymbol(g.pair)
+                                            }
+                                            alt={g.pair}
+                                            className="h-7 w-7"
+                                          />
+                                          <span className="font-semibold text-base">{formatPairName(g.pair)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`font-bold text-base ${isProfitable ? "text-green-500" : "text-red-500"}`}>
+                                            {isProfitable ? "+" : ""}${g.totalLivePnL.toFixed(2)}
+                                          </span>
+                                          {(() => {
+                                            const isForex = isForexTrade(g.trades[0]);
+                                            return (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
+                                                className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                                                disabled={isForex && !isForexMarketOpen}
+                                                title={
+                                                  isForex && !isForexMarketOpen
+                                                    ? "Market is closed. You can only close forex trades when the market is open."
+                                                    : g.trades.length > 1 ? "Close All" : "Close"
+                                                }
+                                              >
+                                                <X size={16} />
+                                              </Button>
+                                            );
+                                          })()}
+                                        </div>
                                       </div>
-                                      
-                                      <div className="flex items-center gap-2">
-                                        <span className={`font-bold text-base ${isProfitable ? "text-green-500" : "text-red-500"}`}>
-                                          {isProfitable ? "+" : ""}${formattedPnL}
-                                        </span>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleCloseTrade(trade)}
-                                          className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                                      {/* Second row: Type badge, lots badge, prices, and expand arrow */}
+                                      <div className="flex flex-wrap gap-2 items-center">
+                                        <span
+                                          className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
+                                            g.type === "buy"
+                                              ? "bg-blue-500/80"
+                                              : "bg-red-500/80"
+                                          }`}
                                         >
-                                          <X size={16} />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Second row: Type badge, lots badge, prices */}
-                                    <div className="flex flex-wrap gap-2 items-center">
-                                      <span
-                                        className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
-                                          trade.type?.toLowerCase() === "buy"
-                                            ? "bg-blue-500/80"
-                                            : "bg-red-500/80"
-                                        }`}
-                                      >
-                                        {trade.type?.toUpperCase() || "UNKNOWN"}
-                                      </span>
-                                      {isHedged && (
-                                        <span className="px-2 py-1 rounded-md border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold">
-                                          H
+                                          {g.type.toUpperCase()}
                                         </span>
+                                        {/* Show Hedged badge for group if hedged */}
+                                        {isHedged && (
+                                          <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold transition-all ml-1 hover:bg-blue-500/20">
+                                            Hedged
+                                          </span>
+                                        )}
+                                        <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-800 text-xs font-medium">
+                                          {g.totalLots.toFixed(2)} lot{g.totalLots !== 1 ? 's' : ''}
+                                        </span>
+                                        <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium flex items-center gap-1">
+                                          O: {Number(g.openPrice).toFixed(g.decimals)}
+                                          {/* Arrow button for expand/collapse if multiple trades */}
+                                          {g.trades.length > 1 && (
+                                            <button
+                                              type="button"
+                                              className="ml-1 rounded-full p-1 hover:bg-muted/20 transition"
+                                              onClick={() => toggleMobileGroupExpand(g.key)}
+                                              aria-label={isExpanded ? "Collapse" : "Expand"}
+                                            >
+                                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            </button>
+                                          )}
+                                        </span>
+                                        <div className="flex-grow"></div>
+                                        <span className="px-2 py-1 rounded-md bg-green-50 text-green-800 text-xs font-medium">
+                                          {Number(g.currentPrice).toFixed(g.decimals)}
+                                        </span>
+                                      </div>
+                                      {/* Expanded individual trades for mobile */}
+                                      {isExpanded && (
+                                        <div className="mt-2 border-t border-border/20 pt-2">
+                                          {g.trades.map((trade, tIdx) => {
+                                            // Calculate individual PnL
+                                            const currentPrice = localPrices[trade.pair]?.price !== undefined
+                                              ? parseFloat(localPrices[trade.pair].price)
+                                              : parseFloat(trade.open_price);
+                                            const openPrice = parseFloat(trade.open_price);
+                                            let pipSize = 0.0001;
+                                            let lotSize = 100000;
+                                            let livePnL = 0;
+                                            if (trade.pair.endsWith("USDT")) {
+                                              pipSize = 1;
+                                              lotSize = 1;
+                                              if (trade.type?.toLowerCase() === "buy") {
+                                                livePnL = currentPrice - openPrice;
+                                              } else {
+                                                livePnL = openPrice - currentPrice;
+                                              }
+                                            } else if (trade.pair === "XAUUSD") {
+                                              pipSize = 0.01;
+                                              lotSize = 100;
+                                              const lots = Number(trade.lots) || 0;
+                                              const pipValue = pipSize * lots * 100;
+                                              if (trade.type?.toLowerCase() === "buy") {
+                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
+                                              } else {
+                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
+                                              }
+                                            } else {
+                                              if (trade.pair.endsWith("JPY")) {
+                                                pipSize = 0.01;
+                                              }
+                                              const lots = Number(trade.lots) || 0;
+                                              const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
+                                              if (trade.type?.toLowerCase() === "buy") {
+                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
+                                              } else {
+                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
+                                              }
+                                            }
+                                            const decimals = getPriceDecimals(trade.pair);
+                                            const isProfitable = livePnL >= 0;
+
+                                            // --- HEDGED BADGE LOGIC FOR MOBILE ---
+                                            let isTradeHedged = false;
+                                            const type = trade.type?.toLowerCase();
+                                            const lots = Number(trade.lots) || 0;
+                                            if (isHedged) {
+                                              if (type === "buy" && g.hedgingTracker!.hedgedBuyLots < g.hedgingTracker!.maxHedgedBuyLots) {
+                                                isTradeHedged = true;
+                                                g.hedgingTracker!.hedgedBuyLots += lots;
+                                                if (g.hedgingTracker!.hedgedBuyLots > g.hedgingTracker!.maxHedgedBuyLots) {
+                                                  g.hedgingTracker!.hedgedBuyLots = g.hedgingTracker!.maxHedgedBuyLots;
+                                                }
+                                              } else if (type === "sell" && g.hedgingTracker!.hedgedSellLots < g.hedgingTracker!.maxHedgedSellLots) {
+                                                isTradeHedged = true;
+                                                g.hedgingTracker!.hedgedSellLots += lots;
+                                                if (g.hedgingTracker!.hedgedSellLots > g.hedgingTracker!.maxHedgedSellLots) {
+                                                  g.hedgingTracker!.hedgedSellLots = g.hedgingTracker!.maxHedgedSellLots;
+                                                }
+                                              }
+                                            }
+
+                                            return (
+                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-3 py-3 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 44 }}>
+                                                <span className="text-xs text-muted-foreground min-w-[90px]">
+                                                  ID: {trade.id.substring(0, 8)}...
+                                                </span>
+                                                <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold min-w-[48px] text-center">
+                                                  {Number(trade.lots).toFixed(2)}
+                                                </span>
+                                                {/* Removed buy/sell badge here */}
+                                                {/* 
+                                                <span
+                                                  className={`px-2 py-1 rounded-full text-white text-xs font-semibold ${
+                                                    trade.type?.toLowerCase() === "buy"
+                                                      ? "bg-blue-500"
+                                                      : "bg-red-500"
+                                                  }`}
+                                                >
+                                                  {trade.type?.toUpperCase() || "UNKNOWN"}
+                                                </span>
+                                                */}
+                                                {/* Show H badge for hedged positions */}
+                                                {isTradeHedged && (
+                                                  <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold ml-1 hover:bg-blue-500/20 min-w-[28px] text-center">
+                                                    H
+                                                  </span>
+                                                )}
+                                                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium min-w-[60px] text-center">
+                                                  {Number(openPrice).toFixed(decimals)}
+                                                </span>
+                                                <span className={`font-mono text-xs ${isProfitable ? "text-green-500" : "text-red-500"} min-w-[60px] text-center`}>
+                                                  ${livePnL.toFixed(2)}
+                                                </span>
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => handleCloseTrade(trade)}
+                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                                                  title="Close Position"
+                                                  style={{ minWidth: 28, minHeight: 28 }}
+                                                >
+                                                  <X size={14} />
+                                                </Button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       )}
-                                      <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-800 text-xs font-medium">
-                                        {Number(trade.lots).toFixed(2)} lot{Number(trade.lots) !== 1 ? 's' : ''}
-                                      </span>
-                                      <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium">
-                                        O: {Number(openPrice).toFixed(decimals)}
-                                      </span>
-                                      <div className="flex-grow"></div>
-                                      <span className="px-2 py-1 rounded-md bg-green-50 text-green-800 text-xs font-medium">
-                                        {Number(currentPrice).toFixed(decimals)}
-                                      </span>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                });
+                              })()}
                             </div>
                           </td>
                         </tr>
                       ))
                     :
-                      // Fix here: Call renderOpenTrades as a function if it is one, otherwise use it directly
-                      typeof renderOpenTrades === 'function' ? null : renderOpenTrades || (
-                        <tr>
-                          <td colSpan={fullPage ? 5 : 10} className="text-center py-8 text-muted-foreground">
-                            No open trades
-                          </td>
-                        </tr>
-                      )
+                      <tr>
+                        <td colSpan={fullPage ? 5 : 10} className="text-center py-8 text-muted-foreground">
+                          No open trades
+                        </td>
+                      </tr>
                   ) : (
                     pendingTrades && pendingTrades.length > 0 ?
                       (!fullPage ? (
@@ -1269,7 +1529,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       
       {/* Mobile summary stats at bottom of full page view */}
       {fullPage && (
-        <div className="fixed bottom-0 left-0 w-full z-50 grid grid-cols-2 gap-2 p-4 bg-muted/5 border-t border-border/50 mb-12">
+        <div className="fixed bottom-0 left-0 w-full z-50 grid grid-cols-2 gap-2 p-4 bg-secondary border-t border-border/50 mb-12">
           <div className="p-3 rounded-lg bg-muted/20">
             <div className="text-xs text-muted-foreground">Equity</div>
             <div className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
@@ -1309,5 +1569,28 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   );
 };
 
+// Helper to check if a trade is a forex trade (not crypto or XAUUSD)
+function isForexTrade(trade: any) {
+  return !trade.pair.endsWith("USDT") && trade.pair !== "XAUUSD";
+}
+
+// Add a prop or logic to determine if forex market is open
+// For simplicity, add a helper here (should be passed as prop in a real app)
+function getForexMarketStatus() {
+  const now = new Date();
+  const utcDay = now.getUTCDay();
+  const utcHour = now.getUTCHours();
+  const utcMinute = now.getUTCMinutes();
+  let isOpen = false;
+   if (
+    (utcDay > 0 && utcDay < 5) ||
+    (utcDay === 5 && utcHour < 21) ||
+    (utcDay === 0 && (utcHour > 22 || (utcHour === 22 && utcMinute >= 0)))
+  ) {
+    isOpen = true;
+  }
+  return isOpen;
+}
+const isForexMarketOpen = getForexMarketStatus();
 
 export default ActivityPanel;

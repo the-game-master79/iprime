@@ -1,6 +1,21 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom"; // Add this import
-import { User, Shield, Upload, Save, CreditCard, Check, AlertTriangle, Clock, ArrowLeft, LogOut, Sun, Moon } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+// Replace Lucide icons with Phosphor regular icons
+import {
+  User as UserIcon,
+  Shield as ShieldIcon,
+  UploadSimple as UploadIcon,
+  FloppyDisk as SaveIcon,
+  IdentificationCard as CreditCardIcon,
+  Check as CheckIcon,
+  WarningCircle as AlertTriangleIcon,
+  Clock as ClockIcon,
+  ArrowLeft as ArrowLeftIcon,
+  SignOut as LogOutIcon,
+  Sun as SunIcon,
+  Moon as MoonIcon,
+  Calendar as CalendarIcon
+} from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase"; // Make sure this import exists
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +23,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { KycFormData, DocumentType } from '@/types/kyc';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { format, subYears } from "date-fns"; // Add this import
 import { countries as countryList } from "@/data/countries"; // Rename import to avoid conflict
@@ -30,11 +44,12 @@ const isValidAge = (dob: string) => {
   return dobDate <= minDate;
 };
 
-// Add this validation helper at the top with other validators
+// Update validation helpers
 const isValidCity = (city: string) => /^[A-Za-z\s-]+$/.test(city);
-
-// Add validation helpers at the top
-const isValidPostalCode = (code: string) => /^[A-Za-z0-9\s-]+$/.test(code);
+const isValidState = (state: string) => /^[A-Za-z\s-]+$/.test(state);
+const isValidOccupation = (occupation: string) => /^[A-Za-z\s-]+$/.test(occupation);
+// Postal code: only numbers, spaces, hyphens allowed (no alphabets)
+const isValidPostalCode = (code: string) => /^[0-9\s-]+$/.test(code);
 
 // Add phone validation helper
 const isValidPhone = (phone: string) => /^\d+$/.test(phone);
@@ -106,6 +121,8 @@ const Profile = () => {
   const [dobError, setDobError] = useState("");
   const [fileError, setFileError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [stateError, setStateError] = useState("");
+  const [occupationError, setOccupationError] = useState("");
 
   // Add new state for tracking if details are set
   const [basicDetailsSet, setBasicDetailsSet] = useState(false);
@@ -398,7 +415,7 @@ const Profile = () => {
   // Add handlers before the return statement
   const handlePostalChange = (value: string) => {
     if (!isValidPostalCode(value)) {
-      setPostalError("Only letters, numbers, spaces and hyphens are allowed");
+      setPostalError("Only numbers, spaces and hyphens are allowed");
     } else {
       setPostalError("");
     }
@@ -426,6 +443,26 @@ const Profile = () => {
 
     // Store the number with the country code
     setUserData(prev => ({...prev, phone: cleanValue.slice(0, 40)}));
+  };
+
+  // Add state validation handler
+  const handleStateChange = (value: string) => {
+    if (!isValidState(value)) {
+      setStateError("Only letters, spaces and hyphens are allowed");
+    } else {
+      setStateError("");
+    }
+    setKycFormData(prev => ({...prev, state: value}));
+  };
+
+  // Add occupation validation handler
+  const handleOccupationChange = (value: string) => {
+    if (!isValidOccupation(value)) {
+      setOccupationError("Only letters, spaces and hyphens are allowed");
+    } else {
+      setOccupationError("");
+    }
+    setKycFormData(prev => ({...prev, occupation: value}));
   };
 
   useEffect(() => {
@@ -852,7 +889,7 @@ const Profile = () => {
                       >
                         {isUpdatingPersonal ? "Processing..." : (
                           <>
-                            <Save className="h-4 w-4 mr-2" />
+                            <SaveIcon className="h-4 w-4 mr-2" weight="regular" />
                             Save Changes
                           </>
                         )}
@@ -867,7 +904,7 @@ const Profile = () => {
                       <div className="p-4 rounded-lg border bg-green-50 border-green-200">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                            <Check className="h-5 w-5 text-green-600" />
+                            <CheckIcon className="h-5 w-5 text-green-600" weight="regular" />
                           </div>
                           <div>
                             <p className="text-sm text-green-800">
@@ -896,19 +933,19 @@ const Profile = () => {
                           />
                           {isValidatingCode && (
                             <p className="text-sm text-muted-foreground">
-                              <Clock className="h-3 w-3 inline mr-1" />
+                              <ClockIcon className="h-3 w-3 inline mr-1" weight="regular" />
                               Validating code...
                             </p>
                           )}
                           {referralCode && !isValidatingCode && referrerName && (
                             <p className="text-sm text-green-600">
-                              <Check className="h-3 w-3 inline mr-1" />
+                              <CheckIcon className="h-3 w-3 inline mr-1" weight="regular" />
                               Referred by: {referrerName}
                             </p>
                           )}
                           {referralCode && !isValidatingCode && !referrerName && (
                             <p className="text-sm text-red-600">
-                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              <AlertTriangleIcon className="h-3 w-3 inline mr-1" weight="regular" />
                               Invalid referral code. Please check and try again.
                             </p>
                           )}
@@ -945,7 +982,7 @@ const Profile = () => {
                         <div className="space-y-4">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <User className="h-4 w-4 text-blue-600" />
+                              <UserIcon className="h-4 w-4 text-blue-600" weight="regular" />
                             </div>
                             <h3 className="text-lg font-medium">Personal Details</h3>
                           </div>
@@ -969,15 +1006,22 @@ const Profile = () => {
                               <label htmlFor="date_of_birth" className="text-sm text-muted-foreground">
                                 Date of Birth
                               </label>
-                              <Input
-                                id="date_of_birth"
-                                type="date"
-                                max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
-                                value={kycFormData.date_of_birth}
-                                onChange={handleDobChange}
-                                className={dobError ? "border-red-500" : ""}
-                                placeholder="Date of Birth"
-                              />
+                              <div className="relative">
+                                <Input
+                                  id="date_of_birth"
+                                  type="date"
+                                  max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
+                                  value={kycFormData.date_of_birth}
+                                  onChange={handleDobChange}
+                                  className={dobError ? "border-red-500 pr-10" : "pr-10"}
+                                  placeholder="Date of Birth"
+                                  style={{ colorScheme: "dark" }}
+                                />
+                                {/* White calendar icon overlay */}
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                  <CalendarIcon color="#fff" size={20} weight="regular" />
+                                </span>
+                              </div>
                               {dobError && <p className="text-xs text-red-500">{dobError}</p>}
                             </div>
                           </div>
@@ -1052,7 +1096,11 @@ const Profile = () => {
                               <Input
                                 id="state"
                                 value={kycFormData.state}
-                                onChange={(e) => setKycFormData(prev => ({...prev, state: e.target.value}))}
+                                onChange={e => {
+                                  // Only allow letters, spaces, hyphens
+                                  const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
+                                  setKycFormData(prev => ({ ...prev, state: value }));
+                                }}
                                 placeholder="Enter your state or province"
                                 aria-label="State or Province"
                               />
@@ -1067,11 +1115,13 @@ const Profile = () => {
                               <Input
                                 id="city"
                                 value={kycFormData.city}
-                                onChange={(e) => handleCityChange(e.target.value)}
+                                onChange={e => {
+                                  // Only allow letters, spaces, hyphens
+                                  const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
+                                  setKycFormData(prev => ({ ...prev, city: value }));
+                                }}
                                 placeholder="Your city name"
-                                className={cityError ? "border-red-500" : ""}
                               />
-                              {cityError && <p className="text-xs text-red-500">{cityError}</p>}
                             </div>
                             <div className="space-y-2">
                               <label htmlFor="postal_code" className="text-sm text-muted-foreground">
@@ -1080,12 +1130,14 @@ const Profile = () => {
                               <Input
                                 id="postal_code"
                                 value={kycFormData.postal_code}
-                                onChange={(e) => handlePostalChange(e.target.value)}
+                                onChange={e => {
+                                  // Only allow numbers, spaces, hyphens
+                                  const value = e.target.value.replace(/[^0-9\s-]/g, "");
+                                  setKycFormData(prev => ({ ...prev, postal_code: value }));
+                                }}
                                 placeholder="Enter your postal code"
-                                className={postalError ? "border-red-500" : ""}
                                 aria-label="Postal Code"
                               />
-                              {postalError && <p className="text-xs text-red-500">{postalError}</p>}
                             </div>
                           </div>
                         </div>
@@ -1094,7 +1146,7 @@ const Profile = () => {
                         <div className="space-y-4 pt-4 border-t border-secondary">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <CreditCard className="h-4 w-4 text-blue-600" />
+                              <CreditCardIcon className="h-4 w-4 text-blue-600" weight="regular" />
                             </div>
                             <h3 className="text-lg font-medium">Document Identification</h3>
                           </div>
@@ -1139,7 +1191,11 @@ const Profile = () => {
                             <Input
                               id="occupation"
                               value={kycFormData.occupation}
-                              onChange={(e) => setKycFormData(prev => ({...prev, occupation: e.target.value}))}
+                              onChange={e => {
+                                // Only allow letters, spaces, hyphens
+                                const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
+                                setKycFormData(prev => ({ ...prev, occupation: value }));
+                              }}
                               placeholder="Your occupation"
                             />
                           </div>
@@ -1149,7 +1205,7 @@ const Profile = () => {
                         <div className="space-y-4 pt-4 border-t border-secondary">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <Upload className="h-4 w-4 text-blue-600" />
+                              <UploadIcon className="h-4 w-4 text-blue-600" weight="regular" />
                             </div>
                             <h3 className="text-lg font-medium">Document Upload</h3>
                           </div>
@@ -1199,7 +1255,7 @@ const Profile = () => {
                           {fileError && <p className="text-xs text-red-500">{fileError}</p>}
                         </div>
                       </div>
-                    )}
+                  )}
                   {/* Update button visibility condition */}
                   {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
                     <div className="mt-8">
@@ -1230,7 +1286,7 @@ const Profile = () => {
           onClick={handleLogout}
           className="flex items-center gap-2"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOutIcon className="h-4 w-4" weight="regular" />
           Logout
         </Button>
       </div>
