@@ -840,7 +840,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         onClick={() => navigate('/plans')}
                       >
                         <img 
-                          src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
+                          key={theme}
+                          src={
+                            theme === "dark"
+                              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-dark.svg"
+                              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-light.svg"
+                          }
                           alt="AI Trading"
                           className="h-5 w-5"
                         />
