@@ -29,8 +29,7 @@ interface SupportTicket {
   updated_at: string;
   resolved_at?: string;
   profiles: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
     phone: string;
   };
 }
@@ -57,8 +56,7 @@ const SupportManagePage = () => {
         .select(`
           *,
           profiles (
-            first_name,
-            last_name,
+            full_name,
             phone
           )
         `)
@@ -176,7 +174,7 @@ const SupportManagePage = () => {
   const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = (
       ticket.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${ticket.profiles?.first_name} ${ticket.profiles?.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+      `${ticket.profiles?.full_name}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const matchesStatus = 
@@ -262,7 +260,7 @@ const SupportManagePage = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium">
-                        {ticket.profiles?.first_name} {ticket.profiles?.last_name}
+                        {ticket.profiles?.full_name}
                       </h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium
                         ${ticket.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -322,7 +320,7 @@ const SupportManagePage = () => {
               <div className="text-sm text-muted-foreground space-y-1">
                 <p><span className="font-medium">Issue Type:</span> {selectedTicket?.issue_type}</p>
                 <p><span className="font-medium">Description:</span> {selectedTicket?.description}</p>
-                <p><span className="font-medium">User:</span> {selectedTicket?.profiles?.first_name} {selectedTicket?.profiles?.last_name}</p>
+                <p><span className="font-medium">User:</span> {selectedTicket?.profiles?.full_name}</p>
               </div>
             </div>
             

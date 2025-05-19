@@ -191,12 +191,12 @@ const Sidebar = ({
               placeholder="Search pairs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 h-10 bg-muted/50 border-muted-foreground/20 hover:border-muted-foreground/30 transition-colors"
+              className="pl-9 pr-4 h-10 placeholder:text-muted-foreground bg-muted/50 border-muted-foreground/20 hover:border-muted-foreground/30 transition-colors"
             />
           </div>
           
           {/* Tab buttons - Make full width on mobile */}
-          <div className="flex gap-4 mb-4 w-full">
+          <div className="flex gap-1 mb-4 w-full bg-muted/20 rounded-xl p-1">
             <Button
               variant={activeTab === "forex" ? "default" : "outline"}
               onClick={() => setActiveTab("forex")}
@@ -224,8 +224,11 @@ const Sidebar = ({
                 className={`
                   flex items-center justify-between p-4 
                   ${isMobile ? "h-16" : "h-16"} 
-                  border border-border/50 rounded-lg hover:bg-accent hover:border-border 
+                  border border-border/50 rounded-lg
                   group transition-all duration-200
+                  ${selectedPair?.symbol === pair.symbol
+                    ? "bg-secondary text-foreground border-primary"
+                    : "hover:bg-secondary/60 hover:text-foreground"}
                 `}
                 onClick={() => handlePairSelection(pair)}
               >
@@ -243,7 +246,7 @@ const Sidebar = ({
                     <span className="font-medium group-hover:text-foreground/90 transition-colors">
                       {formatPairName(pair.symbol)}
                     </span>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">
                       {getFullName(pair.symbol)}
                     </span>
                   </div>

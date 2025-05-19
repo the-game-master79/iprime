@@ -79,28 +79,28 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
     switch (status) {
       case 'Completed':
         return {
-          border: 'border-[#20BF55]',
-          bg: 'bg-[#20BF55]/20',
-          text: 'text-[#20BF55]'
+          border: 'border-success',
+          bg: 'bg-success/20',
+          text: 'text-success'
         };
       case 'pending':
       case 'Pending':
         return {
-          border: 'border-[#FFA500]',
-          bg: 'bg-[#FFA500]/20',
-          text: 'text-[#FFA500]'
+          border: 'border-warning',
+          bg: 'bg-warning/20',
+          text: 'text-warning'
         };
       case 'Failed':
         return {
-          border: 'border-[#FF005C]',
-          bg: 'bg-[#FF005C]/20',
-          text: 'text-[#FF005C]'
+          border: 'border-error',
+          bg: 'bg-error/20',
+          text: 'text-error'
         };
       default:
         return {
-          border: 'border-[#20BF55]',
-          bg: 'bg-[#20BF55]/20',
-          text: 'text-[#20BF55]'
+          border: 'border-success',
+          bg: 'bg-success/20',
+          text: 'text-success'
         };
     }
   };
@@ -112,11 +112,11 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
   const getAmountColor = (status: string, isPositive: boolean) => {
     switch (status) {
       case 'Failed':
-        return 'text-[#FF005C]';
+        return 'text-error';
       case 'Pending':
-        return 'text-[#FFA500]';
+        return 'text-warning';
       default:
-        return isPositive ? 'text-[#20BF55]' : 'text-white';
+        return isPositive ? 'text-success' : 'text-success';
     }
   };
 
@@ -146,13 +146,13 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
     return (
       <div 
         key={transaction.id} 
-        className="bg-[#1E1E1E] p-4 rounded-xl border border-white/5"
+        className="bg-secondary text-foreground p-4 rounded-xl border border-border"
       >
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between">
             {/* Left side - Date and Amount */}
             <div className="space-y-1">
-              <span className="text-sm text-white/60">{formattedDate}</span>
+              <span className="text-sm text-foreground">{formattedDate}</span>
               <h2 className={`text-xl font-semibold ${getAmountColor(transaction.status, isPositive)}`}>
                 {isPositive ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()} USD
               </h2>
@@ -167,7 +167,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
                     className="h-5 w-5 hover:bg-white/10"
                     title="Copy wallet address"
                   >
-                    <Copy className="h-3 w-3 text-white/60" weight="regular" />
+                    <Copy className="h-3 w-3 text-foreground" weight="regular" />
                   </Button>
                 </div>
               )}
@@ -176,14 +176,14 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
             {/* Right side - ID and Copy button */}
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-white/80 font-mono">{truncatedId}</span>
+                <span className="text-sm text-foreground font-mono">{truncatedId}</span>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => onCopyId(transaction.id)}
                   className="h-6 w-6 hover:bg-white/10"
                 >
-                  <Copy className="h-3 w-3 text-white/60" weight="regular" />
+                  <Copy className="h-3 w-3 text-foreground" weight="regular" />
                 </Button>
               </div>
               <Badge 
@@ -220,14 +220,12 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
 
               {/* Rewards Accordion */}
               {rewards.length > 0 && (
-                <Accordion type="single" collapsible className="bg-[#1E1E1E] rounded-xl border border-white/5">
+                <Accordion type="single" collapsible className="bg-secondary text-foreground rounded-xl border border-border">
                   <AccordionItem value={`rewards-${dateKey}`} className="border-0">
-                    <AccordionTrigger className="px-4 py-3 hover:bg-white/5">
+                    <AccordionTrigger className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">
-                          {rewards.length} Reward Transaction{rewards.length > 1 ? 's' : ''}
-                        </span>
-                        <span className="text-sm text-white/60">
+                        <span className="text-sm font-regular text-foreground">{rewards.length} Reward Transaction{rewards.length > 1 ? 's' : ''}</span>
+                        <span className="text-sm text-foreground/40">
                           {format(new Date(dateKey), 'd MMM')}
                         </span>
                       </div>

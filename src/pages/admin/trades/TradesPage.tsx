@@ -56,8 +56,7 @@ interface Trade {
   pnl?: number;
   created_at: string;
   profiles: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
     email: string;
   };
 }
@@ -112,7 +111,7 @@ const TradesPage = () => {
         .from('trades')
         .select(`
           *,
-          profiles:user_id (first_name, last_name, email)
+          profiles:user_id (full_name, email)
         `)
         .order('created_at', { ascending: false });
 
@@ -136,7 +135,7 @@ const TradesPage = () => {
         .from('trades')
         .select(`
           *,
-          profiles:user_id (first_name, last_name, email)
+          profiles:user_id (full_name, email)
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
@@ -217,7 +216,7 @@ const TradesPage = () => {
     
     setSelectedUser({
       id: trade.user_id,
-      name: `${trade.profiles.first_name} ${trade.profiles.last_name}`,
+      name: `${trade.profiles.full_name}`,
       email: trade.profiles.email,
     });
     fetchUserTrades(trade.user_id);
@@ -256,7 +255,7 @@ const TradesPage = () => {
   };
 
   const filteredTrades = trades.filter(trade => 
-    (trade.profiles.first_name + ' ' + trade.profiles.last_name)
+    (trade.profiles.full_name)
       .toLowerCase()
       .includes(searchTerm.toLowerCase()) ||
     trade.profiles.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -293,8 +292,8 @@ const TradesPage = () => {
     
     switch (sortField) {
       case "trader":
-        return direction * (`${a.profiles.first_name} ${a.profiles.last_name}`)
-          .localeCompare(`${b.profiles.first_name} ${b.profiles.last_name}`);
+        return direction * (`${a.profiles.full_name}`)
+          .localeCompare(`${b.profiles.full_name}`);
       case "pair":
         return direction * a.pair.localeCompare(b.pair);
       case "lots":
@@ -529,7 +528,7 @@ const TradesPage = () => {
                               onClick={() => handleUserClick(trade)}
                             >
                               <div className="font-medium">
-                                {trade.profiles.first_name} {trade.profiles.last_name}
+                                {trade.profiles.full_name}
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {trade.profiles.email}
@@ -590,14 +589,13 @@ const TradesPage = () => {
                       <TableRow key={user.id} className="cursor-pointer hover:bg-accent/50" onClick={() => handleUserClick({ 
                         user_id: user.id, 
                         profiles: { 
-                          first_name: user.first_name, 
-                          last_name: user.last_name, 
+                          full_name: user.full_name, 
                           email: user.email 
                         } 
                       } as Trade)}>
                         <TableCell><span className="font-mono text-xs">{user.id}</span></TableCell>
                         <TableCell>
-                          <div className="font-medium">{user.first_name} {user.last_name}</div>
+                          <div className="font-medium">{user.full_name}</div>
                           <div className="text-sm text-muted-foreground">{user.email}</div>
                         </TableCell>
                         <TableCell className="font-medium">${user.withdrawal_wallet.toFixed(2)}</TableCell>

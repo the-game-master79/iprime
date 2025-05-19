@@ -19,8 +19,7 @@ interface Deposit {
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   profiles?: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
     email: string;
   };
 }
@@ -45,8 +44,7 @@ const AdminDepositsPage = () => {
         .select(`
           *,
           profiles:user_id (
-            first_name,
-            last_name,
+            full_name,
             email
           )
         `)
@@ -124,8 +122,7 @@ const AdminDepositsPage = () => {
     deposit.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deposit.crypto_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deposit.crypto_symbol?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    deposit.profiles?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    deposit.profiles?.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    deposit.profiles?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deposit.profiles?.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -220,7 +217,7 @@ const AdminDepositsPage = () => {
                     <TableCell>
                       <div className="space-y-1">
                         <div className="font-medium">
-                          {deposit.profiles?.first_name} {deposit.profiles?.last_name}
+                          {deposit.profiles?.full_name}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {deposit.profiles?.email}

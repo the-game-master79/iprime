@@ -14,8 +14,8 @@ import { useCacheFlush } from '@/hooks/use-cache-flush';
 import Index from "./pages/Index";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
-import Contact from "@/pages/contact/Contact";
 import { HelmetProvider } from 'react-helmet-async';
+import ThemePalettePage from "@/pages/ThemePalettePage";
 
 // Lazy load routes
 const Platform = lazy(() => import("./pages/dashboard/Platform"));
@@ -100,9 +100,9 @@ const App = () => {
               <Route path="/company" element={<CompanyPage />} />
               <Route path="/legal/privacy" element={<PrivacyPolicy />} />
               <Route path="/legal/terms" element={<TermsOfService />} />
-              <Route path="/contact" element={<Contact />} />
               <Route path="/auth/login" element={<Login />} />
               <Route path="/tradingstation" element={<TradingStation />} />
+              <Route path="/theme-palette" element={<ThemePalettePage />} />
 
               {/* Protected Routes */}
               <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />

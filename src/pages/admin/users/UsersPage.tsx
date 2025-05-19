@@ -66,8 +66,7 @@ interface KycDocument {
 
 interface User {
   id: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   email: string;
   status: string;
   date_joined: string;
@@ -189,8 +188,7 @@ const UsersPage = () => {
         .from('profiles')
         .select(`
           id,
-          first_name,
-          last_name,
+          full_name,
           email,
           status,
           date_joined,
@@ -224,8 +222,7 @@ const UsersPage = () => {
 
   const filteredUsers = users.filter(
     (user) =>
-      user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -715,10 +712,10 @@ const UsersPage = () => {
                 KYC Status {sortField === "kyc_status" && (sortDirection === "asc" ? "↑" : "↓")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                setSortField("first_name");
+                setSortField("full_name");
                 setSortDirection(sortDirection === "asc" ? "desc" : "asc");
               }}>
-                Name {sortField === "first_name" && (sortDirection === "asc" ? "↑" : "↓")}
+                Name {sortField === "full_name" && (sortDirection === "asc" ? "↑" : "↓")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
                 setSortField("email");
@@ -758,7 +755,7 @@ const UsersPage = () => {
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell>{`${user.first_name} ${user.last_name}`}</TableCell>
+                  <TableCell>{user.full_name}</TableCell>
                   <TableCell>
                     <button
                       className="text-left hover:underline"
@@ -930,7 +927,7 @@ const UsersPage = () => {
               <div>
                 <label className="text-sm font-medium">User</label>
                 <p className="text-sm text-muted-foreground">
-                  {selectedUser?.first_name} {selectedUser?.last_name}
+                  {selectedUser?.full_name}
                 </p>
               </div>
               <div>
@@ -983,7 +980,7 @@ const UsersPage = () => {
                   <div className="p-4 rounded-lg border bg-card">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-medium text-lg">{selectedUserProfile.first_name} {selectedUserProfile.last_name}</h3>
+                        <h3 className="font-medium text-lg">{selectedUserProfile.full_name}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{selectedUserProfile.email}</p>
                         <p className="text-xs text-muted-foreground mt-2">
                           Joined on {format(new Date(selectedUserProfile.date_joined), "dd MMM yyyy, h:mm:ss a 'IST'")}

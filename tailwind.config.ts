@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 export default {
-	darkMode: ["class"],
+	darkMode: "class", // Use only class, but your app sets [data-theme]
 	content: [
 		"./pages/**/*.{ts,tsx}",
 		"./components/**/*.{ts,tsx}",
@@ -27,8 +27,7 @@ export default {
     			input: 'hsl(var(--input))',
     			ring: 'hsl(var(--ring))',
     			background: {
-    				DEFAULT: 'hsl(var(--background))', // Dark background
-    				muted: 'hsl(var(--background-muted))'
+    				DEFAULT: 'hsl(var(--background))'
     			},
     			foreground: 'hsl(var(--foreground))',
     			primary: {
@@ -39,9 +38,21 @@ export default {
     				DEFAULT: 'hsl(var(--secondary))',
     				foreground: 'hsl(var(--secondary-foreground))'
     			},
+    			warning: {
+    				DEFAULT: 'hsl(var(--warning))',
+    				foreground: 'hsl(var(--warning-foreground))'
+    			},
+    			error: {
+    				DEFAULT: 'hsl(var(--error))',
+    				foreground: 'hsl(var(--error-foreground))'
+    			},
+    			success: {
+    				DEFAULT: 'hsl(var(--success))',
+    				foreground: 'hsl(var(--success-foreground))'
+    			},
     			destructive: {
-    				DEFAULT: 'hsl(var(--destructive))',
-    				foreground: 'hsl(var(--destructive-foreground))'
+    				DEFAULT: 'hsl(var(--error))',
+    				foreground: 'hsl(var(--error-foreground))'
     			},
     			muted: {
     				DEFAULT: 'hsl(var(--muted))',
@@ -56,7 +67,7 @@ export default {
     				foreground: 'hsl(var(--popover-foreground))'
     			},
     			card: {
-    				DEFAULT: 'hsl(var(--card))', // #141414
+    				DEFAULT: 'hsl(var(--card))',
     				foreground: 'hsl(var(--card-foreground))'
     			},
     			sidebar: {

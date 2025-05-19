@@ -5,7 +5,19 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, Lock, ArrowRight } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
-import { TradingPair } from "@/types/trading";
+// If the TradingPair type exists elsewhere, update the import path accordingly, for example:
+
+// Or, if you don't have a TradingPair type, define it temporarily here:
+export interface TradingPair {
+  id: string | number;
+  symbol: string;
+  name: string;
+  type: string;
+  is_active: boolean;
+  image_url: string;
+  short_name: string;
+  // Add other properties as needed
+}
 import { supabase } from "@/lib/supabase";
 
 interface PlanCardProps {
@@ -23,34 +35,17 @@ interface PlanCardProps {
   benefits?: string[];
 }
 
-const getBadgeStyle = (planName: string) => {
-  switch (planName.toLowerCase()) {
-    case 'basic plan': 
-      return {
-        background: 'linear-gradient(45deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.1))',
-        border: '1px solid rgba(59, 130, 246, 0.2)',
-        icon: 'bg-blue-500/20'
-      };
-    case 'pro plan': 
-      return {
-        background: 'linear-gradient(45deg, rgba(34, 197, 94, 0.1), rgba(21, 128, 61, 0.1))',
-        border: '1px solid rgba(34, 197, 94, 0.2)',
-        icon: 'bg-green-500/20'
-      };
-    case 'premium plan': 
-      return {
-        background: 'linear-gradient(45deg, rgba(168, 85, 247, 0.1), rgba(126, 34, 206, 0.1))',
-        border: '1px solid rgba(168, 85, 247, 0.2)',
-        icon: 'bg-purple-500/20'
-      };
-    default: 
-      return {
-        background: 'linear-gradient(45deg, rgba(75, 85, 99, 0.1), rgba(55, 65, 81, 0.1))',
-        border: '1px solid rgba(75, 85, 99, 0.2)',
-        icon: 'bg-gray-500/20'
-      };
-  }
-};
+// Remove getBadgeStyle and use a random gradient for hover
+const gradients = [
+  "bg-gradient-to-r from-primary/10 to-secondary/30",
+  "bg-gradient-to-r from-primary/20 to-primary/5",
+  "bg-gradient-to-r from-secondary/20 to-primary/10",
+  "bg-gradient-to-r from-primary/10 via-secondary/10 to-primary/5",
+  "bg-gradient-to-r from-primary/10 to-foreground/10"
+];
+function getRandomGradient() {
+  return gradients[Math.floor(Math.random() * gradients.length)];
+}
 
 const CACHE_KEY = 'trading-pairs-cache';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
@@ -121,9 +116,9 @@ export function PlanCard({
   onCancel,
   benefits = []
 }: PlanCardProps) {
-  const style = getBadgeStyle(name);
   const tradingPairs = useTradingPairs();
   const [randomPairs, setRandomPairs] = useState<TradingPair[]>([]);
+  const [hoverGradient, setHoverGradient] = useState(gradients[0]);
 
   useEffect(() => {
     if (tradingPairs.length > 0) {
@@ -132,18 +127,24 @@ export function PlanCard({
   }, [tradingPairs]);
 
   return (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg">
-      <div className="absolute inset-0" style={{ background: style.background }} />
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-primary/5 via-primary/2 to-transparent" />
+    <Card
+      className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg bg-secondary"
+      onMouseEnter={() => setHoverGradient(getRandomGradient())}
+    >
+      {/* Static secondary background */}
+      <div className="absolute inset-0 bg-secondary" />
+      {/* Random gradient on hover */}
+      <div
+        className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${hoverGradient}`}
+      />
       
       <div className="relative p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <Badge 
-              variant="outline" 
-              style={{ borderColor: style.border }}
-              className="px-4 py-1 text-sm font-medium backdrop-blur-sm"
+              variant="outline"
+              className="px-4 py-1 text-sm font-medium backdrop-blur-sm border-primary"
             >
               {name}
             </Badge>
@@ -169,7 +170,7 @@ export function PlanCard({
             </div>
           </div>
 
-          <div className={`p-3 rounded-xl ${style.icon} transition-transform group-hover:scale-110`}>
+          <div className="p-3 rounded-xl bg-primary/10 transition-transform group-hover:scale-110">
             {variant === 'available' ? (
               <Lock className="h-5 w-5 text-primary" />
             ) : (
@@ -241,7 +242,7 @@ export function PlanCard({
               <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-xl flex items-center gap-2">
-                    <div className={`p-2 rounded-lg ${style.icon}`}>
+                    <div className={`p-2 rounded-lg bg-primary/10`}>
                       <Lock className="h-4 w-4 text-primary" />
                     </div>
                     {name}
@@ -312,7 +313,7 @@ export function PlanCard({
               <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-xl flex items-center gap-2">
-                    <div className={`p-2 rounded-lg ${style.icon}`}>
+                    <div className={`p-2 rounded-lg bg-primary/10`}>
                       <Clock className="h-4 w-4 text-primary" />
                     </div>
                     {name}

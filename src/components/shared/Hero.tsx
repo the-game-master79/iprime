@@ -24,7 +24,7 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
   return (
     <section className="pt-24 pb-12">
       <div className="container max-w-[1200px] mx-auto px-4">
-        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-2xl border border-border/50">
+        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-2xl border border-border">
           <div className="border border-border/50 rounded-xl p-8 md:p-10 relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute inset-0 pointer-events-none">

@@ -1,10 +1,12 @@
-import { CaretLeft, Wallet as WalletIcon, User } from "@phosphor-icons/react";
+import { CaretLeft, Wallet as WalletIcon, User, Sun, Moon, UserCircle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface TopbarProps {
   title: string;
@@ -27,6 +29,7 @@ export const Topbar = ({
 }: TopbarProps) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [balance, setBalance] = useState(0);
 
   useEffect(() => {
@@ -52,10 +55,10 @@ export const Topbar = ({
   };
 
   const handleBalanceClick = () => {
-    if (window.location.pathname === '/deposit') {
+    if (window.location.pathname === '/cashier') {
       window.location.reload();
     } else {
-      navigate('/deposit');
+      navigate('/cashier');
     }
   };
 
@@ -77,7 +80,11 @@ export const Topbar = ({
           onClick={() => navigate('/platform')}
         >
           <img 
-            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+            src={
+              theme === "dark"
+                ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+            }
             alt="CloudForex" 
             className="h-8 w-auto"
           />
@@ -88,7 +95,7 @@ export const Topbar = ({
         {!hideBalance && (
           <div onClick={handleBalanceClick} className="flex items-center gap-2 rounded-full bg-[#3D3D3D] px-4 py-1.5 shadow-sm transition-colors hover:bg-[#3D3D3D]/80 cursor-pointer">
             <WalletIcon className="h-4 w-4 text-white" weight="fill" />
-            <span className="text-sm font-medium text-white">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+            <span className="text-sm font-medium text-white">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         )}
 
@@ -107,11 +114,11 @@ export const Topbar = ({
   return (
     <>
       <header className={cn(
-        "sticky top-0 z-50 w-full bg-[#141414]",
+        "sticky top-0 z-50 w-full bg-secondary",
         variant === 'default' && "",
         variant === 'minimal' && "bg-transparent",
         variant === 'transparent' && "absolute bg-transparent",
-        variant === 'ai' && "border-b border-[#525252]",
+        variant === 'ai' && "border-none",
         className
       )}>
         <div className="mx-auto flex h-14 max-w-[1000px] items-center px-4">
@@ -121,7 +128,7 @@ export const Topbar = ({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 text-white hover:bg-[#3D3D3D]"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 text-foreground hover:bg-secondary-foreground"
                   onClick={backButtonAction || (() => window.history.back())}
                 >
                   <CaretLeft className="h-4 w-4" />
@@ -132,7 +139,11 @@ export const Topbar = ({
                 onClick={() => navigate('/platform')}
               >
                 <img 
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+                  src={
+                    theme === "dark"
+                      ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                      : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                  }
                   alt="CloudForex" 
                   className="h-6 sm:h-8 w-auto"
                 />
@@ -141,37 +152,65 @@ export const Topbar = ({
 
             <div className="flex items-center gap-2">
               {!hideBalance && (
-                <div onClick={handleBalanceClick} className="flex items-center gap-2 rounded-full bg-[#3D3D3D] px-2 py-1.5 shadow-sm transition-colors hover:bg-[#3D3D3D]/80 cursor-pointer">
-                  <WalletIcon className="h-4 w-4 text-white" weight="fill" />
-                  <span className="text-sm font-medium text-white">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                <div
+                  onClick={handleBalanceClick}
+                  className="flex items-center gap-2 rounded-full bg-secondary-foreground px-2 py-1.5 shadow-sm cursor-pointer"
+                >
+                  <WalletIcon className="h-4 w-4 text-primary" weight="fill" />
+                  <span className="text-sm font-medium text-foreground">
+                    {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
               )}
 
-              <Button 
-                variant="ghost" 
+              {/* Theme toggle button */}
+              <Button
+                variant="ghost"
                 size="icon"
-                className="rounded-lg bg-[#3D3D3D] hover:bg-[#3D3D3D]/80"
-                onClick={() => navigate('/profile')}
+                className="rounded-lg bg-secondary-foreground text-primary hover:bg-secondary"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                aria-label="Toggle theme"
               >
-                <User className="h-5 w-5 text-white" weight="fill" />
+                {theme === "dark" ? (
+                  <Sun className="h-5 w-5 text-yellow-400" weight="bold" />
+                ) : (
+                  <Moon className="h-5 w-5 text-blue-500" weight="bold" />
+                )}
               </Button>
+
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="rounded-lg bg-secondary hover:bg-secondary-foreground"
+              onClick={() => navigate('/profile')}
+            >
+              <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
+                <AvatarFallback className="bg-primary rounded-lg">
+                  <UserCircle weight="bold" className="h-6 w-6 text-primary-foreground" />
+                </AvatarFallback>
+              </Avatar>
+            </Button>
             </div>
           </div>
         </div>
       </header>
       
-      <div className="bg-[#141414]">
+      <div className="bg-secondary">
         <div className="mx-auto max-w-[1000px] px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {variant === 'ai' && (
                 <img
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
-                  alt="Trading"
+                  src={
+                    theme === "dark"
+                      ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-dark.svg"
+                      : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-light.svg"
+                  }
+                  alt="AI Trading"
                   className="h-6 w-6"
                 />
               )}
-              <h1 className="text-2xl font-semibold text-white">{title}</h1>
+              <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
             </div>
 
             {variant === 'ai' && (
@@ -195,8 +234,8 @@ export const Topbar = ({
                   {/* Core dot */}
                   <span className={cn(
                     "relative inline-flex rounded-full h-full w-full shadow-[0_0_12px_0_rgba(0,255,0,0.6)]",
-                    plansCount > 0 ? "bg-green-500" : "bg-red-500",
-                    plansCount > 0 ? "shadow-green-500/50" : "shadow-red-500/50"
+                    plansCount > 0 ? "bg-success" : "bg-error",
+                    plansCount > 0 ? "shadow-success" : "shadow-error"
                   )}></span>
                 </div>
                 {plansCount > 0 ? "AI Agent is Working" : "AI Agent Offline"}

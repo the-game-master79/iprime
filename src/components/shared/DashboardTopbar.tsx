@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bell, UserCircle } from "@phosphor-icons/react";
+import { Bell, UserCircle, Sun, Moon } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/hooks/use-theme";
 
 interface Notice {
   id: string;
@@ -20,6 +21,7 @@ export const DashboardTopbar = () => {
   const navigate = useNavigate();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     fetchNotices();
@@ -61,12 +63,16 @@ export const DashboardTopbar = () => {
   };
 
   return (
-    <header className="flex items-center justify-between py-4 bg-background">
+    <header className="flex items-center justify-between py-4 bg-secondary">
       <div className="container mx-auto max-w-[1000px] px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img 
-              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+              src={
+                theme === "dark"
+                  ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                  : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+              }
               alt="CloudForex" 
               className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => window.location.reload()}
@@ -74,12 +80,26 @@ export const DashboardTopbar = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Theme toggle button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-xl bg-secondary-foreground hover:bg-secondary-foreground"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5 text-yellow-400" weight="bold" />
+              ) : (
+                <Moon className="h-5 w-5 text-blue-500" weight="bold" />
+              )}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  className="hover:bg-accent/80 h-10 w-10 rounded-xl relative bg-card"
+                  className="h-10 w-10 rounded-xl relative bg-secondary-foreground hover:bg-secondary-foreground"
                 >
                   <Bell className="h-5 w-5 text-foreground" weight="bold" />
                   {unreadCount > 0 && (
@@ -136,7 +156,7 @@ export const DashboardTopbar = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="rounded-lg hover:bg-primary/10"
+              className="rounded-lg bg-secondary hover:bg-secondary-foreground"
               onClick={() => navigate('/profile')}
             >
               <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">

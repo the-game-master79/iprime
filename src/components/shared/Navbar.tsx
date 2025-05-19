@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowCircleRight, CaretDown } from "@phosphor-icons/react";
+import { ArrowCircleRight, CaretDown, Moon, Sun } from "@phosphor-icons/react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
@@ -9,11 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { setTheme, theme } = useTheme();
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -25,20 +27,24 @@ export const Navbar = () => {
 
   return (
     <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[1200px]">
-      <div className="mx-auto backdrop-blur-sm bg-background/95 border border-[#525252] rounded-2xl px-2 py-2">
+      <div className="mx-2 md:mx-auto backdrop-blur-sm bg-background/95 border border-border rounded-2xl px-2 py-2">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
-              alt="CloudForex Logo" 
-              className="h-8 w-auto" 
+            <img
+              src={
+                theme === "dark"
+                  ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                  : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+              }
+              alt="CloudForex Logo"
+              className="h-8 w-auto"
             />
           </Link>
           <nav className="hidden md:flex items-center gap-2">
             {['investing', 'partners', 'company'].map((item) => (
-              <button 
+              <button
                 key={item}
-                onClick={() => handleNavigation(`/${item}`)} 
+                onClick={() => handleNavigation(`/${item}`)}
                 className={cn(
                   "text-sm font-medium px-4 py-2 rounded-2xl transition-colors",
                   "text-muted-foreground",
@@ -51,6 +57,20 @@ export const Navbar = () => {
             ))}
           </nav>
           <div className="flex items-center gap-4">
+            {/* Theme toggle button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" weight="bold" />
+              ) : (
+                <Moon className="h-5 w-5" weight="bold" />
+              )}
+            </Button>
             <Link to={user ? "/platform" : "/auth/login"}>
               <Button variant="default" className="rounded-xl px-6 gap-2">
                 {user ? "Access Platform" : "Open Account"}

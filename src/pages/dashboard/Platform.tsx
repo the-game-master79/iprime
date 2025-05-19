@@ -25,7 +25,9 @@ import {
   ChartLine,
   Trophy,
   Target,
-  Users
+  Users,
+  Sun,
+  Moon
 } from "@phosphor-icons/react";
 
 // Utilities
@@ -34,6 +36,7 @@ import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { useTheme } from "@/hooks/use-theme"; // Use your custom theme hook
 
 // Types
 import type { 
@@ -82,6 +85,7 @@ const ShimmerEffect = ({ className }: { className?: string }) => (
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const { isMobile } = useBreakpoints();
   const { canInstall, install } = usePwaInstall(); // Add hook
+  const { theme, setTheme } = useTheme();
 
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -139,6 +143,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [showDirectsDialog, setShowDirectsDialog] = useState(false);
 
+
   // Data fetching functions
   const fetchUserProfile = async () => {
     try {
@@ -148,7 +153,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       const [profileData, plansData] = await Promise.all([
         supabase
           .from('profiles')
-          .select('*, withdrawal_wallet, multiplier_bonus, direct_count')
+          .select('*, withdrawal_wallet, multiplier_bonus, direct_count, full_name')
           .eq('id', user.id)
           .single(),
         supabase
@@ -204,8 +209,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
           level,
           referred:profiles!referral_relationships_referred_id_fkey (
             id,
-            first_name,
-            last_name,
+            full_name,
             created_at,
             status,
             referred_by
@@ -651,9 +655,17 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     setShowDirectsDialog(true);
   };
 
+  // Add a theme toggle handler
+  const handleThemeToggle = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
   return (
-    <div className="min-h-[100dvh] bg-[#000000]">
-      <DashboardTopbar />
+    <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
+      {/* DashboardTopbar with Theme Toggle */}
+      <div className="relative">
+        <DashboardTopbar />
+      </div>
 
       <main className="py-8">
         <div className="container mx-auto px-4 max-w-[1000px]">
@@ -666,29 +678,33 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               {/* Referral Card with Promotions Button */}
               <div className="space-y-4">
                 {/* Referral Link Container */}
-                <div className="bg-gradient-to-br from-[#141414] to-[#1E1E1E] rounded-2xl p-4 border border-white/5">
+                <div className="bg-secondary rounded-2xl p-4 border border-border">
                   <div className="flex flex-col gap-4">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <ShareNetwork className="h-5 w-5 text-primary" weight="fill" />
-                        <span className="text-sm font-medium text-white/80">Your Referral Link</span>
+                        <span className="text-sm font-medium text-muted-foreground">Your Referral Link</span>
                       </div>
                       <div 
                         className={cn(
                           "px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5",
-                          directCount >= 2 ? "bg-[#20BF55]/10 text-[#20BF55]" : 
-                          directCount === 1 ? "bg-[#FFA500]/10 text-[#FFA500]" : 
-                          "bg-[#FF005C]/10 text-[#FF005C]"
+                          directCount >= 2
+                            ? "bg-success text-secondary"
+                            : directCount === 1
+                            ? "bg-warning text-secondary"
+                            : "bg-error text-secondary"
                         )}
                         onClick={handleDirectsClick}
                         style={{ cursor: 'pointer' }}
                       >
                         <div className={cn(
                           "h-1.5 w-1.5 rounded-full",
-                          directCount >= 2 ? "bg-[#20BF55]" : 
-                          directCount === 1 ? "bg-[#FFA500]" : 
-                          "bg-[#FF005C]"
+                          directCount >= 2
+                            ? "bg-secondary"
+                            : directCount === 1
+                            ? "bg-secondary"
+                            : "bg-secondary"
                         )} />
                         <span>{directCount}/2 Directs</span>
                       </div>
@@ -700,7 +716,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <Input
                           readOnly
                           value={referralLink}
-                          className="w-full pr-[120px] pl-4 font-mono text-sm bg-black/20 border-white/5 h-12 focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
+                          className="w-full pr-[120px] pl-4 font-mono text-foreground text-sm bg-secondary-foreground h-12 border border-border"
                         />
                         <div className="absolute right-1 top-1 h-10 flex items-center gap-1">
                           <Button 
@@ -709,7 +725,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                             onClick={handleCopyLink}
                             className="h-8 w-8 rounded-lg hover:bg-white/5"
                           >
-                            <Copy className="h-4 w-4 text-white/70" weight="regular" />
+                            <Copy className="h-4 w-4 text-foreground" weight="regular" />
                           </Button>
                           <Button 
                             size="icon" 
@@ -717,52 +733,34 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                             onClick={handleShowQrCode}
                             className="h-8 w-8 rounded-lg hover:bg-white/5"
                           >
-                            <QrCode className="h-4 w-4 text-white/70" weight="regular" />
+                            <QrCode className="h-4 w-4 text-foreground" weight="regular" />
                           </Button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                {/* Promotions Card */}
-                <div className="w-full p-4 bg-[#1E1E1E] rounded-2xl">
-                  <Button 
-                    variant="ghost"
-                    onClick={() => navigate('/promotions')}
-                    className="w-full h-auto py-2 px-4 hover:bg-white/5"
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-base">View Active Promotions</span>
-                      {promotions.length > 0 && (
-                        <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
-                          {promotions.length} Active
-                        </span>
-                      )}
-                    </div>
-                  </Button>
-                </div>
               </div>
 
               {/* Balance Container */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Combined Balance Card */}
-                <div className="md:col-span-2 bg-[#141414] rounded-2xl p-6">
+                <div className="md:col-span-2 bg-secondary border border-border rounded-2xl p-6">
                   <div className="flex flex-col gap-6">
                     {/* Balances Section */}
                     <div className="flex flex-col md:flex-row gap-6">
                       {/* Available Balance */}
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <Wallet className="h-5 w-5 text-white/50" />
-                          <span className="text-sm text-white/50">Available Balance</span>
+                          <Wallet className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">Available Balance</span>
                         </div>
                         <div className="space-y-1">
                           <h3 className="text-3xl font-medium">
                             {withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                           </h3>
                           {userProfile?.multiplier_bonus > 0 && (
-                            <p className="text-sm text-white/50">
+                            <p className="text-sm text-muted-foreground">
                               Including bonus: {(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                             </p>
                           )}
@@ -771,17 +769,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
                       {/* AI Trading Balance */}
                       <div className="flex-1">
-                        <div className="rounded-lg bg-secondary p-4">
+                        <div className="rounded-lg bg-secondary-foreground p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
+                              {/* Use a key to force re-render on theme change */}
                               <img 
-                                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-trading.svg"
+                                key={theme}
+                                src={
+                                  theme === "dark"
+                                    ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-dark.svg"
+                                    : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-light.svg"
+                                }
                                 alt="AI Trading"
                                 className="h-5 w-5"
                               />
-                              <span className="text-sm text-white/50">Trading</span>
+                              <span className="text-sm text-foreground">Trading</span>
                             </div>
-                            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
+                            <span className="text-xs bg-background/20 text-foreground px-2 py-1 rounded-full">
                               {activePlans.count} {activePlans.count === 1 ? 'Plan' : 'Plans'}
                             </span>
                           </div>
@@ -795,24 +799,32 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     {/* Action Buttons Row - 2x2 grid on mobile */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <Button 
-                        className="h-12 gap-2 bg-[#FFA500] text-white hover:bg-[#FFA500]/80" 
+                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#FFA500] via-[#FF7F50] to-[#FFA500] animate-gradient-x"
+                        style={{
+                          backgroundSize: "200% 200%",
+                          animation: "gradient-x 3s ease infinite"
+                        }}
                         onClick={() => navigate('/tradingstation')}
                       >
                         <ChartLine className="h-5 w-5" />
                         Trade
                       </Button>
                       <Button 
-                        className="h-12 gap-2" 
+                        className="h-12 gap-2 text-black font-regular border-0 bg-gradient-to-r from-[#f4e6f1] via-[#f3a0d7] to-[#b3e8f7] animate-gradient-x"
+                        style={{
+                          backgroundSize: "200% 200%",
+                          animation: "gradient-x 3s ease infinite"
+                        }}
                         onClick={() => navigate('/cashier')}
                       >
                         <ArrowDown className="h-5 w-5" />
                         Add Funds
                       </Button>
-                      {/* Replace Withdraw with Agent button with gradient */}
                       <Button
-                        className="h-12 gap-2 bg-gradient-to-r from-[#6a11cb] via-[#2575fc] to-[#43e97b] text-white font-semibold border-0 shadow-md hover:from-[#43e97b] hover:to-[#6a11cb] hover:via-[#2575fc]"
+                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#6a11cb] via-[#2575fc] to-[#43e97b] animate-gradient-x"
                         style={{
-                          backgroundImage: "linear-gradient(90deg, #6a11cb 0%, #2575fc 50%, #43e97b 100%)"
+                          backgroundSize: "200% 200%",
+                          animation: "gradient-x 3s ease infinite"
                         }}
                         onClick={() => navigate('/affiliate')}
                       >
@@ -820,8 +832,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         Agent
                       </Button>
                       <Button 
-                        variant="secondary"
-                        className="h-12 gap-2" 
+                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#2278fb] via-[#19b0ec] to-[#19b0ec] animate-gradient-x"
+                        style={{
+                          backgroundSize: "200% 200%",
+                          animation: "gradient-x 3s ease infinite"
+                        }}
                         onClick={() => navigate('/plans')}
                       >
                         <img 
@@ -836,12 +851,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 </div>
 
                 {/* Affiliate Rank Card */}
-                <div className="bg-[#141414] rounded-2xl p-6">
+                <div className="bg-secondary rounded-2xl p-6">
                   <div className="h-full flex flex-col justify-between">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5 text-white/50" />
-                        <span className="text-sm text-white/50">Affiliate Status</span>
+                        <Trophy className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Affiliate Status</span>
                       </div>
                       <div className="space-y-1">
                         <h3 className="text-3xl font-medium">
@@ -851,7 +866,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                           {businessStats.totalVolume < 0 ? (
                             <span className="text-[#FFA500]">Pending</span>
                           ) : (
-                            <span className="text-white/50">{businessStats.totalVolume.toLocaleString()} USD Business Volume</span>
+                            <span className="text-muted-foreground">{businessStats.totalVolume.toLocaleString()} USD Business Volume</span>
                           )}
                         </p>
                       </div>
@@ -861,12 +876,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     {businessStats.nextRank && (
                       <div className="space-y-2 mt-auto pt-4">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-white/50">Next: {businessStats.nextRank.title}</span>
+                          <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
                           <span>
                             {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
                           </span>
                         </div>
-                        <div className="h-2 bg-[#1E1E1E] rounded-full overflow-hidden">
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div 
                             className="h-full bg-primary transition-all duration-500"
                             style={{ 
@@ -955,7 +970,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
       {/* QR Code Dialog */}
       <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
-        <DialogContent className="bg-[#141414] border-0">
+        <DialogContent className="bg-secondary border-0">
           <DialogHeader>
             <DialogTitle>Share Referral Code</DialogTitle>
             <DialogDescription>
@@ -995,8 +1010,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>          <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
-        <AlertDialogContent className="bg-[#141414] border-0">
+      </Dialog>
+      <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
+        <AlertDialogContent className="bg-secondary border-0">
           <div className="absolute right-4 top-4">
             <Button
               variant="ghost"

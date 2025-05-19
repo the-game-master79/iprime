@@ -34,8 +34,7 @@ interface PlanSubscription {
     name: string;
   };
   profiles: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
     email: string;
   };
   total_returns?: number; // Add new optional property
@@ -63,7 +62,7 @@ const PlansSubscriptionPage = () => {
         .select(`
           *,
           plans:plan_id (name),
-          profiles:user_id (first_name, last_name, email)
+          profiles:user_id (full_name, email)
         `)
         .order('created_at', { ascending: false });
 
@@ -154,8 +153,7 @@ const PlansSubscriptionPage = () => {
   };
 
   const filteredSubscriptions = subscriptions.filter(sub => 
-    sub.profiles.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sub.profiles.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    sub.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     sub.profiles.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -199,8 +197,8 @@ const PlansSubscriptionPage = () => {
     
     switch (sortField) {
       case "name":
-        const nameA = `${a.profiles.first_name} ${a.profiles.last_name}`;
-        const nameB = `${b.profiles.first_name} ${b.profiles.last_name}`;
+        const nameA = `${a.profiles.full_name}`;
+        const nameB = `${b.profiles.full_name}`;
         return direction * nameA.localeCompare(nameB);
       case "amount":
         return direction * (a.amount - b.amount);
@@ -311,7 +309,7 @@ const PlansSubscriptionPage = () => {
                     <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">
-                          {subscription.profiles.first_name} {subscription.profiles.last_name}
+                          {subscription.profiles.full_name}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {subscription.profiles.email}

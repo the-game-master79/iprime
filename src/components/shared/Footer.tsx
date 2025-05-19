@@ -19,7 +19,14 @@ export const Footer = () => {
             <Link to="/legal/privacy" className="text-sm text-muted-foreground hover:text-foreground">
               Privacy Policy
             </Link>
-            <Link to="/contact" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link
+              to="#"
+              className="text-sm text-muted-foreground hover:text-foreground"
+              onClick={e => {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent("open-contact-dialog"));
+              }}
+            >
               Contact Us
             </Link>
           </div>

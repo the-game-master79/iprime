@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, X, Copy, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, X, Copy, Check } from "lucide-react";
+import { supabase } from "@/lib/supabase"; // Add this import at the top
 
 interface ActivityPanelProps {
   isCollapsed: boolean;
@@ -70,7 +71,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   openTrades = [],
   pendingTrades = [],
   localPrices = {},
-  handleCloseTrade = () => {},
+  handleCloseTrade = undefined, // allow undefined to override below
   formatPairName = (s) => s,
   getCryptoImageForSymbol = () => "",
   getForexImageForSymbol = () => "",
@@ -299,15 +300,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                     alt={g.pair}
                     className="h-6 w-6"
                   />
-                  <span className="mr-2">{formatPairName(g.pair)}</span>
+                  <span className="mr-2 text-foreground">{formatPairName(g.pair)}</span>
                   {/* Only show expand button if there are multiple trades */}
                   {g.trades.length > 1 && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="ml-auto h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100 flex items-center justify-center"
+                      className="ml-auto h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100 flex items-center justify-center bg-secondary text-foreground"
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click from triggering
+                        e.stopPropagation();
                         toggleGroupExpand(g.key);
                       }}
                       title={isExpanded ? "Collapse" : "Expand"}
@@ -324,14 +325,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 <span
                   className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
                     g.type === "buy"
-                      ? "bg-blue-500 hover:bg-blue-600"
-                      : "bg-red-500 hover:bg-red-600"
+                      ? "bg-primary hover:bg-primary/90"
+                      : "bg-destructive hover:bg-destructive/90"
                   }`}
                 >
                   {g.type.toUpperCase()}
                 </span>
                 {isHedged && (
-                  <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold transition-all ml-1 hover:bg-blue-500/20">
+                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold transition-all ml-1 hover:bg-primary/20">
                     Hedged
                   </span>
                 )}
@@ -351,10 +352,10 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                     {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </Button>
                 )} */}
-                <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold">
+                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold">
                   {g.totalLots.toFixed(2)}
                 </span>
-                <span className="ml-2 px-2 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                <span className="ml-2 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
                   {g.trades.length} open
                 </span>
               </div>
@@ -381,29 +382,29 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 </div>
               )} */}
             </td>
-            <td className="px-4 py-2 text-xs">
+            <td className="px-4 py-2 text-xs text-foreground">
               {Number(firstTrade.open_price).toFixed(decimals)}
             </td>
-            <td className="px-4 py-2 text-xs">
+            <td className="px-4 py-2 text-xs text-foreground">
               {Number(currentPrice).toFixed(decimals)}
             </td>
-            <td className="px-4 py-2 text-xs">
+            <td className="px-4 py-2 text-xs text-foreground">
               ${g.totalMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </td>
             <td className="px-4 py-2">
               <span
                 className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
                   firstTrade.leverage <= 20
-                    ? "bg-green-500 hover:bg-green-600"
+                    ? "bg-success hover:bg-success/90"
                     : firstTrade.leverage <= 500
-                    ? "bg-yellow-500 hover:bg-yellow-600"
-                    : "bg-red-500 hover:bg-red-600"
+                    ? "bg-warning hover:bg-warning/90"
+                    : "bg-destructive hover:bg-destructive/90"
                 }`}
               >
                 1:{firstTrade.leverage}
               </span>
             </td>
-            <td className="px-4 py-2 text-xs">
+            <td className="px-4 py-2 text-xs text-foreground">
               {new Date(g.openedAt).toLocaleString("en-US", {
                 day: "2-digit",
                 month: "short",
@@ -418,17 +419,16 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               ${g.totalLivePnl.toFixed(2)}
             </td>
             <td className="px-4 py-2 text-xs">
-              {/* Show X button for open trades (all trades in group are open) */}
               {g.trades.every((t) => t.status === "open") && (
                 <Button
                   variant={hasMultiplePositions ? "destructive" : "ghost"}
                   size="sm"
                   onClick={() => g.trades.forEach((t) => handleCloseTrade(t))}
                   className={`
-                    ${hasMultiplePositions 
-                      ? "w-8 h-8 p-0 rounded-full bg-red-500/20 text-red-500 hover:bg-red-500/30" 
-                      : "w-8 h-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                    }
+                    w-8 h-8 p-0 rounded-full
+                    text-destructive
+                    hover:bg-destructive/10
+                    ${hasMultiplePositions ? "bg-destructive/10" : ""}
                   `}
                   title={
                     isForexTrade(g.trades[0]) && !isForexMarketOpen
@@ -484,48 +484,48 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                     <span
                       className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
                         trade.type?.toLowerCase() === "buy"
-                          ? "bg-blue-500 hover:bg-blue-600"
-                          : "bg-red-500 hover:bg-red-600"
+                          ? "bg-primary hover:bg-primary/90"
+                          : "bg-destructive hover:bg-destructive/90"
                       }`}
                     >
                       {trade.type?.toUpperCase() || "UNKNOWN"}
                     </span>
                     {/* Only show hedged badge for truly hedged positions */}
                     {isTradeHedged && (
-                      <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold transition-all ml-1 hover:bg-blue-500/20">
+                      <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold transition-all ml-1 hover:bg-primary/20">
                         H
                       </span>
                     )}
                   </div>
                 </td>
                 <td className="px-4 py-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold">
+                  <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold">
                     {Number(trade.lots).toFixed(2)}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-xs">
+                <td className="px-4 py-2 text-xs text-foreground">
                   {Number(trade.open_price).toFixed(decimals)}
                 </td>
-                <td className="px-4 py-2 text-xs">
+                <td className="px-4 py-2 text-xs text-foreground">
                   {Number(currentPrice).toFixed(decimals)}
                 </td>
-                <td className="px-4 py-2 text-xs">
+                <td className="px-4 py-2 text-xs text-foreground">
                   ${Number(trade.margin_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </td>
                 <td className="px-4 py-2 text-xs">
                   <span
                     className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
                       trade.leverage <= 20
-                        ? "bg-green-500 hover:bg-green-600"
+                        ? "bg-success hover:bg-success/90"
                         : trade.leverage <= 500
-                        ? "bg-yellow-500 hover:bg-yellow-600"
-                        : "bg-red-500 hover:bg-red-600"
+                        ? "bg-warning hover:bg-warning/90"
+                        : "bg-destructive hover:bg-destructive/90"
                     }`}
                   >
                     1:{trade.leverage}
                   </span>
                 </td>
-                <td className="px-4 py-2 text-xs">
+                <td className="px-4 py-2 text-xs text-foreground">
                   {new Date(trade.created_at).toLocaleString("en-US", {
                     day: "2-digit",
                     month: "short",
@@ -583,7 +583,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                     }
                     
                     return (
-                      <span className={individualPnL >= 0 ? "text-green-500" : "text-red-500"}>
+                      <span className={individualPnL >= 0 ? "text-success" : "text-destructive"}>
                         ${individualPnL.toFixed(2)}
                       </span>
                     );
@@ -592,8 +592,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 <td className="px-4 py-2 text-xs">
                   {trade.status === "open" && (
                     <div
-                      onClick={() => handleCloseTrade(trade)}
-                      className="w-6 h-6 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500 flex items-center justify-center cursor-pointer"
+                      onClick={() => _handleCloseTrade(trade)}
+                      className="w-6 h-6 p-0 rounded-full flex items-center justify-center cursor-pointer text-destructive hover:bg-destructive/10"
                       title="Close Position"
                     >
                       <X size={14} />
@@ -699,6 +699,70 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
     }));
   };
 
+  // --- Add: Proper closeTrade handler using backend function ---
+  async function closeTradeWithWalletUpdate(trade: any) {
+    // Calculate current price
+    const currentPrice =
+      localPrices[trade.pair]?.price !== undefined
+        ? parseFloat(localPrices[trade.pair].price)
+        : parseFloat(trade.open_price);
+
+    // Calculate PnL
+    let pnl = 0;
+    const openPrice = parseFloat(trade.open_price);
+    let pipSize = 0.0001;
+    let lotSize = 100000;
+    if (trade.pair.endsWith("USDT")) {
+      pipSize = 1;
+      lotSize = 1;
+    } else if (trade.pair === "XAUUSD") {
+      pipSize = 0.01;
+      lotSize = 100;
+    } else if (trade.pair.endsWith("JPY")) {
+      pipSize = 0.01;
+      lotSize = 100000;
+    }
+    const lots = Number(trade.lots) || 0;
+    let pipValue = 0;
+    if (trade.pair === "XAUUSD") {
+      pipValue = pipSize * lots * 100;
+    } else {
+      pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
+    }
+
+    if (trade.pair.endsWith("USDT")) {
+      if (trade.type?.toLowerCase() === "buy") {
+        pnl = currentPrice - openPrice;
+      } else if (trade.type?.toLowerCase() === "sell") {
+        pnl = openPrice - currentPrice;
+      }
+    } else {
+      if (trade.type?.toLowerCase() === "buy") {
+        pnl = ((currentPrice - openPrice) / pipSize) * pipValue;
+      } else if (trade.type?.toLowerCase() === "sell") {
+        pnl = ((openPrice - currentPrice) / pipSize) * pipValue;
+      }
+    }
+
+    // Call backend function to close trade and update wallet
+    const { data, error } = await supabase.rpc("close_trade", {
+      p_trade_id: trade.id,
+      p_close_price: currentPrice,
+      p_pnl: pnl,
+    });
+
+    if (error) {
+      // Optionally show error toast
+      // toast({ title: "Close Trade Failed", description: error.message, variant: "destructive" });
+      return;
+    }
+
+    // Optionally update UI state here if needed (parent should refresh trades/balance)
+  }
+
+  // Use the correct close handler
+  const _handleCloseTrade = handleCloseTrade || closeTradeWithWalletUpdate;
+
   return (
     <div
       className={`${fullPage 
@@ -728,7 +792,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
         {/* Header for full page mode */}
         {fullPage && (
           <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-            <h2 className="text-xl font-semibold">Trading Activity</h2>
+            <h2 className="text-xl font-semibold" id="activity-panel-title">Trading Activity</h2>
           </div>
         )}
       
@@ -741,26 +805,26 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             <Button
               variant={activeTradeTab === "open" ? "default" : "outline"}
               onClick={() => handleTabChange("open")}
-              className={`flex items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
+              className={`flex text-foreground items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
             >
               Open
-              <span className={`ml-1 bg-blue-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{openCount}</span>
+              <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{openCount}</span>
             </Button>
             <Button
               variant={activeTradeTab === "pending" ? "default" : "outline"}
               onClick={() => handleTabChange("pending")}
-              className={`flex items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
+              className={`flex text-foreground items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
             >
               Pending
-              <span className={`ml-1 bg-yellow-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{pendingCount}</span>
+              <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{pendingCount}</span>
             </Button>
             <Button
               variant={activeTradeTab === "closed" ? "default" : "outline"}
               onClick={() => handleTabChange("closed")}
-              className={`flex items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
+              className={`flex text-foreground items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
             >
               Closed
-              <span className={`ml-1 bg-gray-500 text-white rounded-full px-2 py-0.5 text-xs font-semibold`}>{closedCount}</span>
+              <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{closedCount}</span>
             </Button>
           </div>
           
@@ -775,13 +839,13 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               <span
                 className={`font-bold font-mono text-sm ${
                   (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) > 0
-                    ? "text-green-500"
+                    ? "text-success"
                     : (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) < 0
-                    ? "text-red-500"
-                    : "text-gray-400"
+                    ? "text-destructive"
+                    : "text-muted-foreground"
                 }`}
               >
-                ${(activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL).toFixed(2)}
+                {formatAmountCompact(activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL)} USD
               </span>
             </div>
           )}
@@ -813,13 +877,13 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               <span
                 className={`font-bold font-mono text-xl ${
                   (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) > 0
-                    ? "text-green-500"
+                    ? "text-success"
                     : (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) < 0
-                    ? "text-red-500"
-                    : "text-gray-400"
+                    ? "text-destructive"
+                    : "text-muted-foreground"
                 }`}
               >
-                ${(activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL).toFixed(2)}
+                {formatAmountCompact(activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL)} USD
               </span>
             </div>
             
@@ -829,7 +893,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => openTrades.forEach(trade => handleCloseTrade(trade))}
-                className="h-9 px-3 gap-1 text-xs"
+                className="h-9 px-3 gap-1 text-xs bg-destructive text-white hover:bg-destructive/90"
                 disabled={
                   openTrades.some(isForexTrade) && !isForexMarketOpen
                 }
@@ -880,13 +944,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             >
               <table className="w-full text-left border-collapse">
                 <thead
-                  className={`top-0 bg-muted/30 sticky${fullPage ? " hidden" : ""}`}
+                  className={`top-0 bg-muted/30${fullPage ? " hidden" : ""}`}
+                  style={!fullPage ? {} : {}}
                 >
                   {activeTradeTab === "closed" ? (
                     <tr>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Pair</th>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Type</th>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Lots</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Pair</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Type</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Lots</th>
                       {!fullPage && (
                         <>
                           <th className="px-4 py-2 font-medium text-sm text-muted-foreground">Open Price</th>
@@ -896,13 +961,13 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                           <th className="px-4 py-2 font-medium text-sm text-muted-foreground">Closed At</th>
                         </>
                       )}
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>P&L</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>P&L</th>
                     </tr>
                   ) : (
                     <tr>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Pair</th>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Type</th>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Lots</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Pair</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Type</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Lots</th>
                       {!fullPage && (
                         <>
                           <th className="px-4 py-2 font-medium text-sm text-muted-foreground">Open Price</th>
@@ -912,8 +977,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                           <th className="px-4 py-2 font-medium text-sm text-muted-foreground">Opened At</th>
                         </>
                       )}
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>P&L</th>
-                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-muted-foreground`}>Action</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>P&L</th>
+                      <th className={`px-4 py-2 font-medium ${fullPage ? "text-xs" : "text-sm"} text-foreground`}>Action</th>
                     </tr>
                   )}
                 </thead>
@@ -968,7 +1033,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                       <span className="font-semibold text-base">{formatPairName(trade.pair)}</span>
                                     </div>
                                     
-                                    <span className={`font-bold text-base ${isProfitable ? "text-green-500" : "text-red-500"}`}>
+                                    <span className={`font-bold text-base ${isProfitable ? "text-success" : "text-destructive"}`}>
                                       {isProfitable ? "+" : ""}${pnl.toFixed(2)}
                                     </span>
                                   </div>
@@ -978,13 +1043,13 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                     <span
                                       className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
                                         trade.type?.toLowerCase() === "buy"
-                                          ? "bg-blue-500/80"
-                                          : "bg-red-500/80"
+                                          ? "bg-primary/80"
+                                          : "bg-destructive/80"
                                       }`}
                                     >
                                       {trade.type?.toUpperCase() || "UNKNOWN"}
                                     </span>
-                                    <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-800 text-xs font-medium">
+                                    <span className="px-2 py-1 rounded-md bg-muted text-foreground text-xs font-medium">
                                       {Number(trade.lots).toFixed(2)} lot{Number(trade.lots) !== 1 ? 's' : ''}
                                     </span>
                                     <div className="flex-grow"></div>
@@ -1001,10 +1066,10 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
 
                                   {/* Third row: Open and Close prices */}
                                   <div className="flex items-center justify-between mt-2">
-                                    <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium">
+                                    <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium">
                                       Open: {Number(openPrice).toFixed(decimals)}
                                     </span>
-                                    <span className="px-2 py-1 rounded-md bg-purple-50 text-purple-800 text-xs font-medium">
+                                    <span className="px-2 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium">
                                       Close: {Number(closePrice).toFixed(decimals)}
                                     </span>
                                   </div>
@@ -1161,6 +1226,34 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                   };
                                 });
 
+                                // --- FIX: Do not mutate g.hedgingTracker during render ---
+                                // Instead, precompute which trades are hedged before rendering
+                                // This avoids setState or mutation during render
+
+                                // For each group, build an array of booleans for hedged status
+                                const groupHedgedStatus: Record<string, boolean[]> = {};
+                                Object.values(grouped).forEach((g) => {
+                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
+                                  let buyHedgeLeft = g.hedgingTracker!.maxHedgedBuyLots;
+                                  let sellHedgeLeft = g.hedgingTracker!.maxHedgedSellLots;
+                                  groupHedgedStatus[g.key] = g.trades.map((trade) => {
+                                    const type = trade.type?.toLowerCase();
+                                    const lots = Number(trade.lots) || 0;
+                                    if (!isHedged) return false;
+                                    if (type === "buy" && buyHedgeLeft > 0) {
+                                      const hedged = buyHedgeLeft >= lots;
+                                      buyHedgeLeft -= lots;
+                                      return hedged || buyHedgeLeft >= 0;
+                                    }
+                                    if (type === "sell" && sellHedgeLeft > 0) {
+                                      const hedged = sellHedgeLeft >= lots;
+                                      sellHedgeLeft -= lots;
+                                      return hedged || sellHedgeLeft >= 0;
+                                    }
+                                    return false;
+                                  });
+                                });
+
                                 return Object.values(grouped).map((g, idx) => {
                                   const isProfitable = g.totalLivePnL >= 0;
                                   const isExpanded = mobileExpandedGroups[g.key] || false;
@@ -1183,7 +1276,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                           <span className="font-semibold text-base">{formatPairName(g.pair)}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          <span className={`font-bold text-base ${isProfitable ? "text-green-500" : "text-red-500"}`}>
+                                          <span className={`font-bold text-base ${isProfitable ? "text-success" : "text-destructive"}`}>
                                             {isProfitable ? "+" : ""}${g.totalLivePnL.toFixed(2)}
                                           </span>
                                           {(() => {
@@ -1212,22 +1305,22 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                         <span
                                           className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
                                             g.type === "buy"
-                                              ? "bg-blue-500/80"
-                                              : "bg-red-500/80"
+                                              ? "bg-primary/80"
+                                              : "bg-destructive/80"
                                           }`}
                                         >
                                           {g.type.toUpperCase()}
                                         </span>
                                         {/* Show Hedged badge for group if hedged */}
                                         {isHedged && (
-                                          <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold transition-all ml-1 hover:bg-blue-500/20">
+                                          <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold transition-all ml-1 hover:bg-primary/20">
                                             Hedged
                                           </span>
                                         )}
-                                        <span className="px-2 py-1 rounded-md bg-gray-200 text-gray-800 text-xs font-medium">
+                                        <span className="px-2 py-1 rounded-md bg-secondary text-foreground text-xs font-semibold">
                                           {g.totalLots.toFixed(2)} lot{g.totalLots !== 1 ? 's' : ''}
                                         </span>
-                                        <span className="px-2 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-medium flex items-center gap-1">
+                                        <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium flex items-center gap-1">
                                           O: {Number(g.openPrice).toFixed(g.decimals)}
                                           {/* Arrow button for expand/collapse if multiple trades */}
                                           {g.trades.length > 1 && (
@@ -1242,7 +1335,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                           )}
                                         </span>
                                         <div className="flex-grow"></div>
-                                        <span className="px-2 py-1 rounded-md bg-green-50 text-green-800 text-xs font-medium">
+                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium">
                                           {Number(g.currentPrice).toFixed(g.decimals)}
                                         </span>
                                       </div>
@@ -1292,55 +1385,27 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                             const isProfitable = livePnL >= 0;
 
                                             // --- HEDGED BADGE LOGIC FOR MOBILE ---
-                                            let isTradeHedged = false;
-                                            const type = trade.type?.toLowerCase();
-                                            const lots = Number(trade.lots) || 0;
-                                            if (isHedged) {
-                                              if (type === "buy" && g.hedgingTracker!.hedgedBuyLots < g.hedgingTracker!.maxHedgedBuyLots) {
-                                                isTradeHedged = true;
-                                                g.hedgingTracker!.hedgedBuyLots += lots;
-                                                if (g.hedgingTracker!.hedgedBuyLots > g.hedgingTracker!.maxHedgedBuyLots) {
-                                                  g.hedgingTracker!.hedgedBuyLots = g.hedgingTracker!.maxHedgedBuyLots;
-                                                }
-                                              } else if (type === "sell" && g.hedgingTracker!.hedgedSellLots < g.hedgingTracker!.maxHedgedSellLots) {
-                                                isTradeHedged = true;
-                                                g.hedgingTracker!.hedgedSellLots += lots;
-                                                if (g.hedgingTracker!.hedgedSellLots > g.hedgingTracker!.maxHedgedSellLots) {
-                                                  g.hedgingTracker!.hedgedSellLots = g.hedgingTracker!.maxHedgedSellLots;
-                                                }
-                                              }
-                                            }
+                                            // Use precomputed hedged status
+                                            const isTradeHedged = groupHedgedStatus[g.key]?.[tIdx] ?? false;
 
                                             return (
                                               <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-3 py-3 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 44 }}>
                                                 <span className="text-xs text-muted-foreground min-w-[90px]">
                                                   ID: {trade.id.substring(0, 8)}...
                                                 </span>
-                                                <span className="px-2 py-1 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold min-w-[48px] text-center">
+                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[48px] text-center">
                                                   {Number(trade.lots).toFixed(2)}
                                                 </span>
-                                                {/* Removed buy/sell badge here */}
-                                                {/* 
-                                                <span
-                                                  className={`px-2 py-1 rounded-full text-white text-xs font-semibold ${
-                                                    trade.type?.toLowerCase() === "buy"
-                                                      ? "bg-blue-500"
-                                                      : "bg-red-500"
-                                                  }`}
-                                                >
-                                                  {trade.type?.toUpperCase() || "UNKNOWN"}
-                                                </span>
-                                                */}
                                                 {/* Show H badge for hedged positions */}
                                                 {isTradeHedged && (
-                                                  <span className="px-2 py-1 rounded-full border border-blue-400 text-blue-400 bg-blue-500/10 text-xs font-semibold ml-1 hover:bg-blue-500/20 min-w-[28px] text-center">
+                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold ml-1 hover:bg-primary/20 min-w-[28px] text-center">
                                                     H
                                                   </span>
                                                 )}
-                                                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium min-w-[60px] text-center">
+                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[60px] text-center">
                                                   {Number(openPrice).toFixed(decimals)}
                                                 </span>
-                                                <span className={`font-mono text-xs ${isProfitable ? "text-green-500" : "text-red-500"} min-w-[60px] text-center`}>
+                                                <span className={`font-mono text-xs ${isProfitable ? "text-success" : "text-destructive"} min-w-[60px] text-center`}>
                                                   ${livePnL.toFixed(2)}
                                                 </span>
                                                 <Button
@@ -1399,15 +1464,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                               <span
                                 className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
                                   trade.type?.toLowerCase() === "buy"
-                                    ? "bg-blue-500 hover:bg-blue-600"
-                                    : "bg-red-500 hover:bg-red-600"
+                                    ? "bg-primary hover:bg-primary/90"
+                                    : "bg-destructive hover:bg-destructive/90"
                                 }`}
                               >
                                 {trade.type?.toUpperCase() || "UNKNOWN"}
                               </span>
                             </td>
                             <td className="px-4 py-2">
-                              <span className="px-2 py-1 rounded-full bg-white text-gray-800 text-xs font-semibold">
+                              <span className="px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
                                 {Number(trade.lots).toFixed(2)}
                               </span>
                             </td>
@@ -1456,17 +1521,17 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             {activeTradeTab === "closed" && (
               <div className={`flex justify-between items-center px-4 py-3 ${fullPage ? "border-t border-border/50" : "bg-muted/20 border-t border-border/50"}`}>
                 <button
-                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted/30 rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
+                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                 >
                   Previous
                 </button>
-                <span className={`${fullPage ? "text-xs" : "text-sm"} font-medium text-muted-foreground`}>
+                <span className={`${fullPage ? "text-xs" : "text-sm"} font-medium text-foreground`}>
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
-                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted/30 rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
+                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages || totalPages === 0}
                 >
@@ -1495,37 +1560,46 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       
       {/* Bottom Badge - only show in desktop view and when not collapsed */}
       {!activityCollapsed && !fullPage && (
-        <div className="flex justify-between w-full gap-4 text-sm font-medium mb-2 border-t border-border/50 pt-4">
-          <div className="flex-1 text-center">
-            Equity: <span className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD</span>
+        <div
+          className="flex w-full gap-0 text-sm font-medium mb-2 border-t border-border/50 pt-4"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "nowrap",
+          }}
+        >
+          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
+            <span>Equity:</span>
+            <span className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD</span>
           </div>
-          <div className="flex-1 text-center text-gray-400">
-            Used Margin: <span className="font-bold">${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
+            <span>Used Margin:</span>
+            <span className="font-bold">${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
-          <div className="flex-1 text-center text-gray-400">
-            Free Margin: 
+          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
+            <span>Free Margin:</span>
             <span className={`font-bold flex items-center justify-center gap-1 transition-colors ${
-              freeMarginChange === 'increase' ? 'text-green-500' : 
-              freeMarginChange === 'decrease' ? 'text-red-500' : ''
+              freeMarginChange === 'increase' ? 'text-success' : 
+              freeMarginChange === 'decrease' ? 'text-destructive' : ''
             }`}>
-              ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })
-              }
+              ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               {freeMarginChange && (
-                <span className={`text-xs ${freeMarginChange === 'increase' ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-xs ${freeMarginChange === 'increase' ? 'text-success' : 'text-destructive'}`}>
                   {freeMarginChange === 'increase' ? '↑' : '↓'}
                 </span>
               )}
             </span>
           </div>
-          <div className="flex-1 text-center text-gray-400">
-            Margin Level: 
+          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
+            <span>Margin Level:</span>
             <span className={`font-bold flex items-center justify-center gap-1 transition-colors ${
-              marginLevelChange === 'increase' ? 'text-green-500' : 
-              marginLevelChange === 'decrease' ? 'text-red-500' : ''
+              marginLevelChange === 'increase' ? 'text-success' : 
+              marginLevelChange === 'decrease' ? 'text-destructive' : ''
             }`}>
               {usedMargin > 0 ? marginLevel.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "100.00"}%
               {marginLevelChange && (
-                <span className={`text-xs ${marginLevelChange === 'increase' ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-xs ${marginLevelChange === 'increase' ? 'text-success' : 'text-destructive'}`}>
                   {marginLevelChange === 'increase' ? '↑' : '↓'}
                 </span>
               )}
@@ -1548,8 +1622,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
           <div className="p-3 rounded-lg bg-muted/20">
             <div className="text-xs text-muted-foreground">Free Margin</div>
             <div className={`font-bold flex items-center gap-1 ${
-              freeMarginChange === 'increase' ? 'text-green-500' : 
-              freeMarginChange === 'decrease' ? 'text-red-500' : ''
+              freeMarginChange === 'increase' ? 'text-success' : 
+              freeMarginChange === 'decrease' ? 'text-destructive' : ''
             }`}>
               ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })
               }
@@ -1561,8 +1635,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
           <div className="p-3 rounded-lg bg-muted/20">
             <div className="text-xs text-muted-foreground">Margin Level</div>
             <div className={`font-bold flex items-center gap-1 ${
-              marginLevelChange === 'increase' ? 'text-green-500' : 
-              marginLevelChange === 'decrease' ? 'text-red-500' : ''
+              marginLevelChange === 'increase' ? 'text-success' : 
+              marginLevelChange === 'decrease' ? 'text-destructive' : ''
             }`}>
               {usedMargin > 0 ? marginLevel.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "100.00"}%
               {marginLevelChange && (
@@ -1588,6 +1662,7 @@ function getForexMarketStatus() {
   const utcDay = now.getUTCDay();
   const utcHour = now.getUTCHours();
   const utcMinute = now.getUTCMinutes();
+
   let isOpen = false;
    if (
     (utcDay > 0 && utcDay < 5) ||
@@ -1601,3 +1676,14 @@ function getForexMarketStatus() {
 const isForexMarketOpen = getForexMarketStatus();
 
 export default ActivityPanel;
+
+// Helper for compact amount formatting
+function formatAmountCompact(amount: number): string {
+  if (Math.abs(amount) >= 1_000_000) {
+    return (amount / 1_000_000).toFixed(2).replace(/\.00$/, "") + "M";
+  }
+  if (Math.abs(amount) >= 1_000) {
+    return (amount / 1_000).toFixed(2).replace(/\.00$/, "") + "K";
+  }
+  return amount.toFixed(2).replace(/\.00$/, "");
+}

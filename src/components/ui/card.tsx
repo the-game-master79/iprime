@@ -100,4 +100,6 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
+// All Card components already use bg-card, text-card-foreground, etc. for theme support.
+
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }

@@ -4,45 +4,125 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%; /* Dark background */
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --card-muted: 240 4% 16%;
-    --card-accent: 240 4% 16%;
-    --card: 0 0% 8%; /* #141414 */
-    --card-foreground: 0 0% 100%; /* Pure white */
-    --popover: 0 0% 8%; /* Match card */
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 353, 86%, 54%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 32.2%; /* #525252 */
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-
-    /* Custom Badge Colors */
-    --badge-warning-bg: 353, 86%, 54%;
-    --badge-warning-text: 0 0% 98%;
-    --badge-success-bg: 142 71% 43%;
-    --badge-success-text: 0 0% 98%;
-    --badge-pending-bg: 39 100% 50%;
-    --badge-pending-text: 0 0% 98%;
-    
     --radius: 0.5rem;
+
+    /* ====== Light Theme ====== */
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --primary: 216 100% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 212 29% 84%;
+    --card: 210 20% 98%;
+    --muted: 210 16% 93%;
+    --muted-foreground: 215 16% 47%;
+    --border: 212, 29%, 84%;
+    --input: 210 16% 85%;
+    --ring: 221 83% 53%;
+    --shadow: 0 0% 0% / 0.04;
+    --scrollbar-thumb: 210 16% 85%;
+    --scrollbar-track: 210 20% 98%;
+    --warning: 44 100% 50%;
+    --warning-foreground: 36 100% 50%;
+    --error: 345 100% 56%;
+    --error-foreground: 344 100% 46%;
+    --success: 150 96% 45%;
+    --success-foreground: 142 100% 33%;
   }
-  
+
+  [data-theme="light"] {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --primary: 216 100% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 212 29% 84%;
+    --card: 210 20% 98%;
+    --muted:212 29% 84%;
+    --muted-foreground: 215 16% 47%;
+    --border: 210 16% 85%;
+    --input: 210 16% 85%;
+    --ring: 221 83% 53%;
+    --shadow: 0 0% 0% / 0.04;
+    --scrollbar-thumb: 210 16% 85%;
+    --scrollbar-track: 210 20% 98%;
+    --warning: 44 100% 50%;
+    --warning-foreground: 36 100% 50%;
+    --error: 345 100% 56%;
+    --error-foreground: 344 100% 46%;
+    --success: 150 96% 45%;
+    --success-foreground: 142 100% 33%;
+  }
+
+  [data-theme="dark"] {
+    --background: 224 71% 4%;
+    --foreground: 0 0% 98%;
+    --primary: 199 100% 48%;
+    --primary-foreground: 240 6% 10%;
+    --secondary: 216 31% 17%;
+    --secondary-foreground: 215 28% 27%;
+    --card: 240 6% 15%;
+    --muted: 240 6% 15%;
+    --muted-foreground: 215 16% 67%;
+    --border: 240 6% 25%;
+    --input: 240 6% 15%;
+    --ring: 221 83% 53%;
+    --shadow: 0 0% 0% / 0.24;
+    --scrollbar-thumb: 240 6% 15%;
+    --scrollbar-track: 240 6% 10%;
+    --warning: 44 100% 50%;
+    --warning-foreground: 36 100% 50%;
+    --error: 345 100% 56%;
+    --error-foreground: 344 100% 46%;
+    --success: 146 63% 50%;
+    --success-foreground: 0 0% 0%;
+    color-scheme: dark;
+    background-color: hsl(var(--background));
+  }
+
+  /* Optional: Tailwind's dark: selector fallback for legacy classes */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --color-bg: 240 6% 10%;
+      --color-primary: 210 100% 60%;
+      --color-primary-fg: 240 6% 10%;
+      --color-secondary: 240 6% 15%;
+      --color-secondary-fg: 210 20% 98%;
+      --color-card: 240 6% 15%;
+      --color-muted: 240 6% 15%;
+      --color-muted-fg: 215 16% 67%;
+      --color-border: 240 6% 25%;
+      /* ...other variables... */
+      color-scheme: dark;
+      background-color: hsl(var(--color-bg));
+    }
+  }
+
+  html[data-theme="dark"] body,
+  body[data-theme="dark"] {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+  html[data-theme="light"] body,
+  body[data-theme="light"] {
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Aeonik', sans-serif;
   }
+}
+
+/* ====== Scrollbar Styling ====== */
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--color-scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 8px;
 }
 
 @layer utilities {

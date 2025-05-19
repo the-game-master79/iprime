@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "@/hooks/use-theme"; // Add this import
 
 interface MiniChartProps {
   symbol: string;
@@ -9,6 +10,7 @@ const MiniChart = ({ symbol, timezone }: MiniChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const [tradingViewLoaded, setTradingViewLoaded] = useState(false);
+  const { theme } = useTheme(); // Add this line
   
   // Load TradingView script first
   useEffect(() => {
@@ -51,7 +53,7 @@ const MiniChart = ({ symbol, timezone }: MiniChartProps) => {
           symbol: symbol,
           interval: "15",
           timezone: timezone,
-          theme: "dark",
+          theme: theme === "dark" ? "dark" : "light",
           style: "1",
           locale: "en",
           toolbar_bg: "#f1f3f6",
@@ -67,14 +69,15 @@ const MiniChart = ({ symbol, timezone }: MiniChartProps) => {
     }, 0);
     
     // No need to clean up with this approach
-  }, [symbol, timezone, tradingViewLoaded]);
+  }, [symbol, timezone, tradingViewLoaded, theme]); // Add theme as dependency
   
-  // Generate a stable ID for the container
-  const uniqueId = useRef(`tradingview-mini-widget-${Math.random().toString(36).substring(2, 9)}`).current;
-  
+  // Generate a stable ID for the container, but change it when theme or symbol changes
+  const uniqueId = `tradingview-mini-widget-${symbol.replace(/[^a-zA-Z0-9]/g, '')}-${theme}`;
+
   return (
     <div 
       id={uniqueId}
+      key={uniqueId}
       className="w-full h-full" 
       ref={containerRef}
     >

@@ -10,8 +10,7 @@ const STATIC_ASSETS = [
   '/src/main.tsx',
   '/manifest.json',
   // Add critical CSS/JS
-  '/src/styles/critical.css',
-  '/src/styles/globals.css'
+  '/src/styles/critical.css'
 ];
 
 self.addEventListener('install', (event) => {

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, House } from "@phosphor-icons/react";
+import { Plus, House, Sun, Moon } from "@phosphor-icons/react";
+import { useTheme } from "@/hooks/use-theme";
 
 interface NavbarProps {
   balance: number;
@@ -10,6 +11,7 @@ interface NavbarProps {
 
 const Navbar = ({ balance, isMobile = false, toggleMobileMenu }: NavbarProps) => {
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   return (
     <nav className={`fixed top-0 left-0 w-full h-16 ${isMobile ? 'bg-background' : 'bg-muted/10'} border-b border-border/50 flex items-center px-4 justify-between z-50`}>
@@ -31,35 +33,67 @@ const Navbar = ({ balance, isMobile = false, toggleMobileMenu }: NavbarProps) =>
           title="Refresh"
         >
           <img
-            src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudtrade.svg"
-            alt="CloudTrade Logo"
+            src={theme === "dark"
+              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cf-dark.svg"
+              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cf-light.svg"
+            }
+            alt="CloudForex Logo"
             className="h-8"
           />
         </button>
       </div>
       <div className="flex items-center gap-4">
         {isMobile ? (
-          // Mobile balance with integrated add funds button
-          <div className="bg-secondary rounded-full flex items-center pr-1">
+          // Mobile balance with theme toggle
+          <div
+            className="bg-secondary rounded-full flex items-center pr-1 cursor-pointer"
+            onClick={() => navigate("/cashier")}
+          >
             <div className="text-sm font-medium px-3 py-1">
               {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-6 w-6 rounded-full bg-primary p-0 flex items-center justify-center"
-              onClick={() => navigate("/deposit")}
+              size="icon"
+              className="h-6 w-6 ml-1 rounded-full bg-secondary-foreground text-primary hover:bg-secondary"
+              onClick={e => {
+                e.stopPropagation();
+                setTheme(theme === "dark" ? "light" : "dark");
+              }}
+              aria-label="Toggle theme"
             >
-              <Plus size={14} weight="bold" className="text-background" />
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4 text-yellow-400" weight="bold" />
+              ) : (
+                <Moon className="h-4 w-4 text-blue-500" weight="bold" />
+              )}
             </Button>
           </div>
         ) : (
-          // Desktop separate balance and button
+          // Desktop: Theme toggle, Balance badge, Add Funds (rightmost)
           <>
-            <div className="bg-secondary text-sm font-medium px-3 py-1 rounded-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-full bg-secondary-foreground text-primary hover:bg-secondary"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4 text-yellow-400" weight="bold" />
+              ) : (
+                <Moon className="h-4 w-4 text-blue-500" weight="bold" />
+              )}
+            </Button>
+            <div className="bg-secondary text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2">
               {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
             </div>
-            <Button variant="default" onClick={() => navigate("/deposit")}>
+            <Button
+              variant="default"
+              size="default"
+              className="ml-2"
+              onClick={() => navigate("/cashier")}
+            >
               Add Funds
             </Button>
           </>

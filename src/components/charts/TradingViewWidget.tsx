@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, memo, useState } from 'react';
+import { useTheme } from "@/hooks/use-theme"; // Add this import
 
 // Define allowed props for the TradingView widget
 interface TradingViewWidgetProps {
@@ -45,6 +46,7 @@ function TradingViewWidget({
   const [showPnL, setShowPnL] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isWidgetReady, setIsWidgetReady] = useState(false);
+  const { theme: userTheme } = useTheme(); // Add this line
 
   // Combine default props with provided props
   const {
@@ -60,7 +62,8 @@ function TradingViewWidget({
     symbol,
     interval,
     timezone,
-    theme,
+    // theme,
+    theme: userTheme === "dark" ? "dark" : "light", // Use user theme
     style,
     locale,
     hide_legend,
@@ -182,7 +185,10 @@ function TradingViewWidget({
   };
 
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%" }}>
+    <div
+      key={`${userTheme}-${symbol || ''}`}
+      style={{ position: "relative", height: "100%", width: "100%" }}
+    >
       {/* PnL display rendered outside the TradingView container */}
       {showPnL && totalPnL !== undefined && (
         <div 

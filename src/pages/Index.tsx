@@ -6,7 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Envelope, Lightning } from "@phosphor-icons/react";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
@@ -28,6 +28,13 @@ const Index = () => {
   // Add scroll animation hook
   useScrollAnimation();
 
+  // Listen for open-contact-dialog event
+  useEffect(() => {
+    const handler = () => setShowContact(true);
+    window.addEventListener("open-contact-dialog", handler);
+    return () => window.removeEventListener("open-contact-dialog", handler);
+  }, []);
+
   const handleNavigation = (section: string) => {
     // If it's a section scroll, handle it
     if (section.startsWith('#')) {
@@ -48,7 +55,7 @@ const Index = () => {
         description="Experience next-gen cloud forex trading with AI-powered analytics and 4X CPU boost technology for lightning-fast execution."
         keywords="cloud forex, AI trading, advanced trading platform, forex trading, cryptocurrency trading"
       />
-      <div className="flex min-h-screen flex-col bg-background tracking-tight overflow-hidden">
+      <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden">
         {/* Magic Gradient Orb - Updated for dark mode */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse-slower" />
@@ -61,8 +68,8 @@ const Index = () => {
 
           <Hero 
             badge={{
-              icon: <Lightning className="h-5 w-5" />,
-              text: "2X CPU Power | Advanced AI Trading"
+              icon: <Lightning className="h-5 w-5 text-primary" />,
+              text: "20X More Profits | Advanced AI Trading"
             }}
             title="Experience the Future of Trading with CloudForex"
             description="AI-Powered Trading Platform with Lightning-Fast Execution."
@@ -92,29 +99,25 @@ const Index = () => {
           <CtaPage />
 
           <Footer />
-
-          {/* Contact Dialog - Updated for dark mode */}
           <Dialog open={showContact} onOpenChange={setShowContact}>
-            <DialogContent className="bg-card shadow-md backdrop-blur-sm backdrop-filter backdrop-opacity-90 border border-border/50">
+            <DialogContent className="bg-card text-foreground shadow-md backdrop-blur-sm backdrop-filter backdrop-opacity-90 border border-border/50 max-w-md">
               <DialogHeader>
-                <DialogTitle>Contact Us</DialogTitle>
+                <DialogTitle className="text-2xl text-center">Contact Us</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                    <Envelope className="h-5 w-5 text-primary" />
-                    <a 
-                      href="mailto:support@cloudforex.club" 
-                      className="text-sm hover:text-primary transition-colors"
-                    >
-                      support@cloudforex.club
-                    </a>
-                  </div>
+              <div className="py-4 text-center space-y-2">
+                <Envelope className="mx-auto h-8 w-8 text-primary mb-2" />
+                <div className="text-base text-foreground font-medium">
+                  You can email us for any support, marketing or questions to
                 </div>
+                <a
+                  href="mailto:hello@cloudforex.club"
+                  className="text-primary font-semibold underline break-all"
+                >
+                  hello@cloudforex.club
+                </a>
               </div>
             </DialogContent>
           </Dialog>
-
         </main>
       </div>
     </PageTransition>

@@ -54,6 +54,21 @@ const Affiliate = () => {
   });
   const [legendType, setLegendType] = useState<"investments" | "directCount">("investments");
   const [userDirectCount, setUserDirectCount] = useState(0);
+  const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', user.id)
+        .single();
+      setUserProfile(data);
+    };
+    fetchProfile();
+  }, []);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -62,7 +77,7 @@ const Affiliate = () => {
         if (user) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('referral_code, referred_by, direct_count')
+            .select('referral_code, referred_by, direct_count, full_name')
             .eq('id', user.id)
             .single();
 
@@ -123,11 +138,9 @@ const Affiliate = () => {
           .select(`
             id,
             level,
-            referred_id,
             referred:profiles!referral_relationships_referred_id_fkey (
               id,
-              first_name,
-              last_name,
+              full_name,
               created_at,
               status,
               referred_by,
@@ -174,7 +187,7 @@ const Affiliate = () => {
           ?.filter(rel => rel.referred)
           .map(rel => ({
             id: rel.referred.id,
-            name: `${rel.referred.first_name} ${rel.referred.last_name}`,
+            name: rel.referred.full_name || "",
             level: rel.level,
             joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
             status: rel.referred.status || 'Active',

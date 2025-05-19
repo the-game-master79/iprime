@@ -121,7 +121,7 @@ const Plans = () => {
           .single();
 
         if (error) throw error;
-        setUserProfile(profile);
+        setUserProfile(profile as UserProfile);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -431,207 +431,209 @@ const Plans = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Topbar 
-        title="Trading" 
-        variant="ai" 
-        plansCount={subscribedPlans.length}
-      />
-      <div className="container mx-auto max-w-[1000px] py-6 px-4">
-        {/* Balance cards section */}
-        <div className="grid gap-4 md:grid-cols-2 mb-8">
-          <BalanceCard 
-            label="Available to Invest"
-            amount={userProfile?.withdrawal_wallet || 0}
-            variant="default"
-          />
-          <BalanceCard
-            label="Total Invested"
-            amount={totalInvested}
-            variant="success"
-          />
-        </div>
-
-        {/* Steps section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-            <div className="flex justify-center mb-6">
-              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-            </div>
-            <h3 className="font-medium text-lg mb-3 text-white/90">What is Compute?</h3>
-            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
-              AI-powered trading bot that executes trades automatically based on market analysis
-            </p>
-          </div>
-
-          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-            <div className="flex justify-center mb-6">
-              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                <DollarSign className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-            </div>
-            <h3 className="font-medium text-lg mb-3 text-white/90">Subscribe to Compute</h3>
-            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
-              Choose a compute plan that matches your investment goals and activate it
-            </p>
-          </div>
-
-          <div className="group relative bg-card/30 hover:bg-card/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-            <div className="flex justify-center mb-6">
-              <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-            </div>
-            <h3 className="font-medium text-lg mb-3 text-white/90">Earn Daily</h3>
-            <p className="text-sm text-white/60 group-hover:text-white/80 transition-colors">
-              Get daily returns from your compute's trading activities automatically
-            </p>
-          </div>
-        </div>
-
-        <Tabs defaultValue="available" className="space-y-8">
-          <div className="flex items-center justify-between">
-            <TabsList className="w-[400px]">
-              <TabsTrigger value="available" className="flex-1">Available Computes</TabsTrigger>
-              <TabsTrigger value="subscribed" className="flex-1 relative">
-                Active Computes
-                {subscribedPlans.length > 0 && (
-                  <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
-                    {subscribedPlans.length}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="available" className="space-y-4">
-            <AvailablePlanVariant 
-              plans={plans}
-              loading={loading}
-              onInvest={handleInvestClick}
+    <>
+      <div className="min-h-screen bg-background">
+        <Topbar 
+          title="Trading" 
+          variant="ai" 
+          plansCount={subscribedPlans.length}
+        />
+        <div className="container mx-auto max-w-[1000px] py-6 px-4">
+          {/* Balance cards section */}
+          <div className="grid gap-4 md:grid-cols-2 mb-8">
+            <BalanceCard 
+              label="Available to Invest"
+              amount={userProfile?.withdrawal_wallet || 0}
+              variant="default"
             />
-          </TabsContent>
+            <BalanceCard
+              label="Total Invested"
+              amount={totalInvested}
+              variant="success"
+            />
+          </div>
 
-          <TabsContent value="subscribed">
-            {subscribedPlans.length === 0 ? (
-              <div className="text-center py-12">
-                <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                <h3 className="mt-4 text-lg font-medium">No Active Computes</h3>
-                <p className="mt-2 text-muted-foreground">
-                  You haven't subscribed to any computes yet.
-                </p>
-                <Button
-                  variant="outline"
-                  className="mt-6"
-                  onClick={() => {
-                    const availableTab = document.querySelector('[value="available"]') as HTMLElement | null;
-                    availableTab?.click();
-                  }}
-                >
-                  View Available Computes
-                </Button>
-              </div>
-            ) : (
-              <ActivePlanVariant 
-                plans={subscribedPlans}
-                onCancel={handleCancelClick}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      <AlertDialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Subscription</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-4">
-                <div>Please confirm your subscription to {planToSubscribe?.name}</div>
-                
-                <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Current Balance:</span>
-                    <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
-                  </div>
-                  <div className="flex justify-between text-destructive">
-                    <span>Investment Amount:</span>
-                    <span>-${planToSubscribe?.investment.toLocaleString()} USD</span>
-                  </div>
-                  <Separator className="my-2" />
-                  <div className="flex justify-between font-medium">
-                    <span>Remaining Balance:</span>
-                    <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
-                  </div>
+          {/* Steps section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+              <div className="flex justify-center mb-6">
+                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSubscription}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is Compute?</h3>
+              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                AI-powered trading bot that executes trades automatically based on market analysis
+              </p>
+            </div>
 
-      {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Plan</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-4">
-                <p>Are you sure you want to cancel this plan? This action cannot be undone.</p>
-                
-                <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
-                  <div className="flex justify-between">
-                    <span>Plan Name:</span>
-                    <span className="font-medium">{planToCancel?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Investment Amount:</span>
-                    <span className="font-medium">${planToCancel?.investment.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Earned:</span>
-                    <span className="font-medium text-green-500">
-                      +${(planToCancel?.actual_earnings || 0).toLocaleString()}
+            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+              <div className="flex justify-center mb-6">
+                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <DollarSign className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                </div>
+              </div>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">Subscribe to Compute</h3>
+              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                Choose a compute plan that matches your investment goals and activate it
+              </p>
+            </div>
+
+            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+              <div className="flex justify-center mb-6">
+                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                </div>
+              </div>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">Earn Daily</h3>
+              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                Get daily returns from your compute's trading activities automatically
+              </p>
+            </div>
+          </div>
+
+          <Tabs defaultValue="available" className="space-y-8">
+            <div className="flex items-center justify-between">
+              <TabsList className="w-[400px]">
+                <TabsTrigger value="available" className="flex-1">Available Computes</TabsTrigger>
+                <TabsTrigger value="subscribed" className="flex-1 relative">
+                  Active Computes
+                  {subscribedPlans.length > 0 && (
+                    <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
+                      {subscribedPlans.length}
                     </span>
-                  </div>
-                  <Separator className="my-2" />
-                  {planToCancel && (
-                    <>
-                      <div className="flex justify-between text-destructive/80">
-                        <span>Pre-closure Fee (10%):</span>
-                        <span>-${(planToCancel.investment * 0.10).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-destructive/80">
-                        <span>Admin Fee (5%):</span>
-                        <span>-${(planToCancel.investment * 0.05).toLocaleString()}</span>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="flex justify-between font-medium">
-                        <span>Final Refund Amount:</span>
-                        <span>${(planToCancel.investment * 0.85).toLocaleString()}</span>
-                      </div>
-                    </>
                   )}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Plan</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90">
-              Cancel Plan
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-    </div>
+            <TabsContent value="available" className="space-y-4">
+              <AvailablePlanVariant 
+                plans={plans}
+                loading={loading}
+                onInvest={handleInvestClick}
+              />
+            </TabsContent>
+
+            <TabsContent value="subscribed">
+              {subscribedPlans.length === 0 ? (
+                <div className="text-center py-12">
+                  <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                  <h3 className="mt-4 text-lg font-medium">No Active Computes</h3>
+                  <p className="mt-2 text-muted-foreground">
+                    You haven't subscribed to any computes yet.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-6"
+                    onClick={() => {
+                      const availableTab = document.querySelector('[value="available"]') as HTMLElement | null;
+                      availableTab?.click();
+                    }}
+                  >
+                    View Available Computes
+                  </Button>
+                </div>
+              ) : (
+                <ActivePlanVariant 
+                  plans={subscribedPlans}
+                  onCancel={handleCancelClick}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <AlertDialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Subscription</AlertDialogTitle>
+              <AlertDialogDescription>
+                <div className="space-y-4">
+                  <div>Please confirm your subscription to {planToSubscribe?.name}</div>
+                  
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Current Balance:</span>
+                      <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
+                    </div>
+                    <div className="flex justify-between text-destructive">
+                      <span>Investment Amount:</span>
+                      <span>-${planToSubscribe?.investment.toLocaleString()} USD</span>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between font-medium">
+                      <span>Remaining Balance:</span>
+                      <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
+                    </div>
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmSubscription}>Confirm</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Cancel Confirmation Dialog */}
+        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Plan</AlertDialogTitle>
+              <AlertDialogDescription>
+                <div className="space-y-4">
+                  <p>Are you sure you want to cancel this plan? This action cannot be undone.</p>
+                  
+                  <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
+                    <div className="flex justify-between">
+                      <span>Plan Name:</span>
+                      <span className="font-medium">{planToCancel?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Investment Amount:</span>
+                      <span className="font-medium">${planToCancel?.investment.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Earned:</span>
+                      <span className="font-medium text-green-500">
+                        +${(planToCancel?.actual_earnings || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <Separator className="my-2" />
+                    {planToCancel && (
+                      <>
+                        <div className="flex justify-between text-destructive/80">
+                          <span>Pre-closure Fee (10%):</span>
+                          <span>-${(planToCancel.investment * 0.10).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-destructive/80">
+                          <span>Admin Fee (5%):</span>
+                          <span>-${(planToCancel.investment * 0.05).toLocaleString()}</span>
+                        </div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-medium">
+                          <span>Final Refund Amount:</span>
+                          <span>${(planToCancel.investment * 0.85).toLocaleString()}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Plan</AlertDialogCancel>
+              <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90">
+                Cancel Plan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+      </div>
+    </>
   );
 };
 

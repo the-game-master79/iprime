@@ -76,8 +76,7 @@ const PaymentsPage = () => {
           status, 
           created_at,
           profiles:user_id (
-            first_name,
-            last_name,
+            full_name,
             email
           )
         `);
@@ -95,8 +94,7 @@ const PaymentsPage = () => {
           status,
           created_at,
           profiles:user_id (
-            first_name,
-            last_name,
+            full_name,
             email
           )
         `);
@@ -112,7 +110,7 @@ const PaymentsPage = () => {
         status: d.status,
         created_at: d.created_at,
         method: d.crypto_name ? `${d.crypto_name} (${d.crypto_symbol})` : 'Unknown',
-        user_name: d.profiles ? `${d.profiles.first_name} ${d.profiles.last_name}` : d.user_id,
+        user_name: d.profiles ? d.profiles.full_name : d.user_id,
         email: d.profiles?.email
       }));
 
@@ -125,7 +123,7 @@ const PaymentsPage = () => {
         status: s.status,
         created_at: s.created_at,
         method: 'Compute Subscription',
-        user_name: s.profiles ? `${s.profiles.first_name} ${s.profiles.last_name}` : s.user_id,
+        user_name: s.profiles ? s.profiles.full_name : s.user_id,
         email: s.profiles?.email
       }));
 

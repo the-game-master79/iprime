@@ -14,8 +14,7 @@ export interface BusinessRankState {
 
 export interface UserProfile {
   id: string;
-  first_name?: string;
-  last_name?: string;
+  full_name?: string;
   referral_code?: string;
   withdrawal_wallet?: number;
   multiplier_bonus?: number;

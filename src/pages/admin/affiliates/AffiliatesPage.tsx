@@ -98,8 +98,7 @@ const AffiliatesPage = () => {
         .from('profiles')
         .select(`
           id,
-          first_name,
-          last_name,
+          full_name,
           email,
           status,
           created_at,
@@ -165,7 +164,7 @@ const AffiliatesPage = () => {
 
         return {
           id: profile.id,
-          name: `${profile.first_name} ${profile.last_name}`,
+          name: profile.full_name || "",
           email: profile.email || '',
           referral_code: profile.referral_code || '',
           referrals: {

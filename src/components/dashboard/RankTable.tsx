@@ -49,12 +49,12 @@ export function RankTable({
     const nextRankTitle = getNextUnachievedRank();
     
     if (rank.title === nextRankTitle) {
-      return "border-blue-500/50 bg-blue-500/5";
+      return "border-primary bg-primary/5";
     }
     if (businessVolume >= rank.business_amount) {
-      return "border-green-500/50 bg-green-500/5";
+      return "border-success bg-success/5";
     }
-    return "border-border hover:bg-muted/50";
+    return "border-border bg-secondary hover:bg-secondary-foreground";
   };
 
   const getTrophyStyles = (rank: Rank) => {
@@ -62,19 +62,19 @@ export function RankTable({
     
     if (rank.title === nextRankTitle) {
       return {
-        bg: "bg-blue-500/20",
-        icon: "text-blue-500"
+        bg: "bg-primary/20",
+        icon: "text-primary"
       };
     }
     if (businessVolume >= rank.business_amount) {
       return {
-        bg: "bg-green-500/20",
-        icon: "text-green-500"
+        bg: "bg-success/20",
+        icon: "text-success"
       };
     }
     return {
-      bg: "bg-muted",
-      icon: "text-muted-foreground/40"
+      bg: "bg-secondary-foreground",
+      icon: "text-foreground"
     };
   };
 
@@ -107,14 +107,14 @@ export function RankTable({
             return (
               <div
                 key={rank.id}
-                className="relative rounded-lg border bg-card p-4 transition-colors"
+                className="relative rounded-lg border bg-secondary p-4 transition-colors"
               >
                 <div className="flex items-start gap-4">
                   <div className={cn(
                     "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-                    "bg-muted"
+                    "bg-secondary-foreground"
                   )}>
-                    <Trophy className="h-6 w-6 text-muted-foreground/40" />
+                    <Trophy className="h-6 w-6 text-foreground" />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold flex items-center gap-2">
@@ -134,7 +134,7 @@ export function RankTable({
             <div
               key={rank.id}
               className={cn(
-                "relative rounded-lg border bg-card p-4 transition-colors",
+                "relative rounded-lg border p-4 transition-colors",
                 getRankStyles(rank)
               )}
             >
@@ -170,7 +170,7 @@ export function RankTable({
                         Target Volume: ${rank.business_amount.toLocaleString()}
                       </div>
                       <div className="flex items-center gap-2 max-w-[200px] sm:max-w-none">
-                        <div className="h-1.5 sm:h-2 flex-1 rounded-full bg-muted">
+                        <div className="h-1.5 sm:h-2 flex-1 rounded-full bg-secondary-foreground">
                           <div
                             className={cn(
                               "h-1.5 sm:h-2 rounded-full transition-all",
@@ -195,15 +195,12 @@ export function RankTable({
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className={cn(
-                            "flex items-center gap-1 rounded-full px-3 py-1",
-                            claimedRanks.includes(rank.title) 
-                              ? "bg-green-100" 
-                              : "bg-primary/10"
+                            "flex items-center gap-1 rounded-full px-3 py-1 bg-primary/10"
                           )}>
                             <span className={cn(
                               "text-sm font-medium",
                               claimedRanks.includes(rank.title)
-                                ? "text-green-600"
+                                ? "text-success"
                                 : "text-primary"
                             )}>
                               {claimedRanks.includes(rank.title) ? (

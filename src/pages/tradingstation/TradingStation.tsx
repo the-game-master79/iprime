@@ -58,6 +58,7 @@ const TradingStation = () => {
 
   // Timezone state
   const [userTimezone, setUserTimezone] = useState("Etc/UTC");
+  const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
   
   // Check screen size on mount and resize
   useEffect(() => {
@@ -135,6 +136,21 @@ const TradingStation = () => {
       fetchBalanceCalled.current = true; // Ensure fetchBalance is only called once
       fetchBalance();
     }
+  }, []);
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('id', user.id)
+        .single();
+      setUserProfile(data);
+    };
+    fetchProfile();
   }, []);
 
   // Setup WebSocket connection - refactored to prevent duplicates and with proper retry logic
@@ -429,7 +445,7 @@ const TradingStation = () => {
     DOGEUSDT: ["1"],
     BTCUSDT: ["2", "5", "10", "20", "50", "100", "200", "500", "1000"],
     USDJPY: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    XAUUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
+    XAUUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000"],
     TRXUSDT: ["2", "5", "10", "20", "50", "100"],
     AUDUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
     EURCHF: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
@@ -439,6 +455,31 @@ const TradingStation = () => {
     USDCAD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
     EURGBP: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
     ADAUSDT: ["2", "5", "10", "20", "50", "100"],
+  };
+
+  // Add lots limits for all pairs
+  const lotsLimits: Record<string, { min: number; max: number }> = {
+    USDCHF: { min: 0.01, max: 100 },
+    SOLUSDT: { min: 0.01, max: 100 },
+    BNBUSDT: { min: 0.01, max: 100 },
+    DOTUSDT: { min: 0.01, max: 100 },
+    EURUSD: { min: 0.01, max: 100 },
+    ETHUSDT: { min: 0.01, max: 100 },
+    EURJPY: { min: 0.01, max: 100 },
+    DOGEUSDT: { min: 1, max: 100000 },
+    BTCUSDT: { min: 0.001, max: 10 },
+    USDJPY: { min: 0.01, max: 100 },
+    XAUUSD: { min: 0.01, max: 50 },
+    TRXUSDT: { min: 10, max: 100000 },
+    AUDUSD: { min: 0.01, max: 100 },
+    EURCHF: { min: 0.01, max: 100 },
+    POLUSDT: { min: 0.01, max: 100 },
+    LINKUSDT: { min: 0.01, max: 100 },
+    GBPUSD: { min: 0.01, max: 100 },
+    USDCAD: { min: 0.01, max: 100 },
+    EURGBP: { min: 0.01, max: 100 },
+    ADAUSDT: { min: 1, max: 100000 },
+    // Add more pairs as needed
   };
 
   const calculateMargin = () => {
@@ -475,10 +516,16 @@ const TradingStation = () => {
     return volume / leverage;
   };
 
+  // Calculate usedMargin as the sum of margin_amount for open and pending trades
+  const usedMargin = [
+    ...openTrades,
+    ...pendingTrades,
+  ].reduce((sum, trade) => sum + (Number(trade.margin_amount) || 0), 0);
+
   useEffect(() => {
     const calculatedMargin = calculateMargin();
     setMargin(calculatedMargin);
-  }, [quantity, selectedLeverage, selectedPair]); // Recalculate margin when these values change
+  }, [quantity, selectedLeverage, selectedPair?.symbol, selectedPair?.price]); // Use primitive dependencies
 
   const handleBuy = () => {
     if (margin > balance) {
@@ -522,19 +569,6 @@ const TradingStation = () => {
     }
     // eslint-disable-next-line
   }, [localPrices, activeTab]); // Only runs when localPrices or activeTab changes
-
-  // Fix: Don't reset selectedPair if already set, even if localPrices/activeTab changes
-  // Add a useEffect to update selectedPair price only if the symbol is still the same
-  useEffect(() => {
-    if (selectedPair && localPrices[selectedPair.symbol]?.price && 
-        selectedPair.price !== localPrices[selectedPair.symbol].price) {
-      // Only update when the price has actually changed
-      setSelectedPair(prev => prev ? { 
-        ...prev, 
-        price: localPrices[selectedPair.symbol].price 
-      } : prev);
-    }
-  }, [localPrices, selectedPair?.symbol]);
 
   const handlePairClick = (pair: PriceData) => {
     // Always use the latest price from localPrices for the selected pair
@@ -689,7 +723,7 @@ const TradingStation = () => {
       const decimals = getPriceDecimals(trade.pair);
       return (
         <tr key={trade.id} className="border-t border-border/50">
-          <td className="px-4 py-2 flex items-center gap-2">
+          <td className="px-4 py-2 flex items-center gap-2 text-foreground">
             <img
               src={
                 trade.pair.endsWith("USDT")
@@ -711,17 +745,17 @@ const TradingStation = () => {
             </span>
           </td>
           <td className="px-4 py-2">
-            <span className="px-2 py-1 rounded-full bg-muted/20 text-xs font-semibold hover:bg-muted/30 transition-all">
+            <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold hover:bg-muted/30 transition-all">
               {trade.lots.toFixed(2)}
             </span>
           </td>
-          <td className="px-4 py-2 text-xs">
+          <td className="px-4 py-2 text-xs text-foreground">
             {Number(trade.open_price).toFixed(decimals)}
           </td>
-          <td className="px-4 py-2 text-xs">
+          <td className="px-4 py-2 text-xs text-foreground">
             {Number(trade.close_price).toFixed(decimals)}
           </td>
-          <td className="px-4 py-2 text-xs">${Number(trade.margin_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+          <td className="px-4 py-2 text-xs text-foreground">${Number(trade.margin_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
           <td className="px-4 py-2">
             <span
               className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
@@ -735,7 +769,7 @@ const TradingStation = () => {
               1:{trade.leverage}
             </span>
           </td>
-          <td className="px-4 py-2 text-xs">
+          <td className="px-4 py-2 text-xs text-foreground">
             {new Date(trade.closed_at).toLocaleString("en-US", {
               day: "2-digit",
               month: "short",
@@ -746,7 +780,7 @@ const TradingStation = () => {
               hour12: true,
             })}
           </td>
-          <td className={`px-4 py-2 text-xs ${Number(trade.pnl ?? 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
+          <td className={`px-4 py-2 text-xs ${Number(trade.pnl ?? 0) >= 0 ? "text-success" : "text-error"}`}>
             ${Number(trade.pnl ?? 0).toFixed(2)}
           </td>
         </tr>
@@ -794,9 +828,6 @@ const TradingStation = () => {
   const openCount = openTrades.length;
   const pendingCount = pendingTrades.length;
   const closedCount = closedTrades.length;
-
-  // Calculate usedMargin as the sum of margin_amount for open trades
-  const usedMargin = openTrades.reduce((sum, trade) => sum + (Number(trade.margin_amount) || 0), 0);
 
   // Calculate free margin as balance minus used margin
   const freeMargin = balance - usedMargin;
@@ -1087,11 +1118,12 @@ const TradingStation = () => {
       });
       return;
     }
-    
-    if (margin > balance) {
+
+    // Margin utilization check
+    if (margin > freeMargin) {
       toast({
-        title: "Insufficient Balance",
-        description: "You do not have enough balance to open this trade.",
+        title: "Insufficient Free Margin",
+        description: `You only have $${freeMargin.toFixed(2)} free margin available.`,
         variant: "destructive",
       });
       return;
@@ -1156,15 +1188,14 @@ const TradingStation = () => {
     ]);
   }
 
-  // Add close trade handler
+  // Replace handleCloseTrade with backend wallet update logic
   async function handleCloseTrade(trade: any) {
-    // Get current price for the pair
     const currentPrice =
       localPrices[trade.pair]?.price !== undefined
         ? parseFloat(localPrices[trade.pair].price)
         : parseFloat(trade.open_price);
 
-    // Calculate PnL for closing (match the logic used in renderTrades for display)
+    // Calculate PnL
     let pnl = 0;
     const openPrice = parseFloat(trade.open_price);
     let pipSize = 0.0001;
@@ -1175,8 +1206,7 @@ const TradingStation = () => {
     } else if (trade.pair === "XAUUSD") {
       pipSize = 0.01;
       lotSize = 100;
-    } else if (trade.pair === "EURJPY" || trade.pair === "USDJPY") {
-      // Special handling for EURJPY and USDJPY
+    } else if (trade.pair.endsWith("JPY")) {
       pipSize = 0.01;
       lotSize = 100000;
     }
@@ -1189,14 +1219,12 @@ const TradingStation = () => {
     }
 
     if (trade.pair.endsWith("USDT")) {
-      // Crypto PnL calculation (show only price difference, not multiplied by lots)
       if (trade.type?.toLowerCase() === "buy") {
         pnl = currentPrice - openPrice;
       } else if (trade.type?.toLowerCase() === "sell") {
         pnl = openPrice - currentPrice;
       }
     } else {
-      // Forex/XAUUSD PnL calculation (same as renderTrades)
       if (trade.type?.toLowerCase() === "buy") {
         pnl = ((currentPrice - openPrice) / pipSize) * pipValue;
       } else if (trade.type?.toLowerCase() === "sell") {
@@ -1204,53 +1232,23 @@ const TradingStation = () => {
       }
     }
 
-    // Only allow closing trades with a valid UUID id (skip UI-only trades)
-    // UUIDs are 36 characters with dashes, e.g. "b3e1c3e2-2b7b-4c7e-9c8e-1b2c3d4e5f6a"
-    if (!trade.id || typeof trade.id !== "string" || trade.id.length !== 36 || !trade.id.includes("-")) {
-      toast({
-        title: "Cannot Close Trade",
-        description: "This trade is not yet saved in the database or has an invalid ID. Please refresh the page to sync your trades.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Update trade in DB: set status to "closed", set close_price, closed_at, pnl
-    const { error } = await supabase
-      .from("trades")
-      .update({
-        status: "closed",
-        close_price: currentPrice,
-        closed_at: new Date().toISOString(),
-        pnl,
-      })
-      .eq("id", trade.id);
+    // Call backend function to close trade and update wallet
+    const { data, error } = await supabase.rpc("close_trade", {
+      p_trade_id: trade.id,
+      p_close_price: currentPrice,
+      p_pnl: pnl,
+    });
 
     if (error) {
       toast({
         title: "Close Trade Failed",
-        description: "Could not close trade. Please try again.",
+        description: error.message,
         variant: "destructive",
       });
       return;
     }
 
-    // Update user's withdrawal_wallet in profiles table
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && user.id) {
-        // Only update by pnl (profit or loss), not margin amount
-        const newBalance = balance + pnl;
-        await supabase
-          .from("profiles")
-          .update({ withdrawal_wallet: newBalance })
-          .eq("id", user.id);
-      }
-    } catch (e) {
-      // Optionally log or toast error
-    }
-
-    // Remove from openTrades and add to closedTrades in UI
+    // Optionally update UI state here if needed (refresh trades/balance)
     setOpenTrades((prev) => prev.filter((t) => t.id !== trade.id));
     setClosedTrades((prev) => [
       {
@@ -1479,208 +1477,249 @@ const TradingStation = () => {
   }
 
   return (
-    <div className="relative">
-      {/* Animations styles */}
-      <style>
-        {`
-          @keyframes price-up {
-            0% { color: #16a34a; }
-            100% { color: #16a34a; }
-          }
-          @keyframes price-down {
-            0% { color: #dc2626; }
-            100% { color: #dc2626; }
-          }
-          .animate-price-up {
-            animation: price-up 1s;
-          }
-          .animate-price-down {
-            animation: price-down 1s;
-          }
-          .tradingview-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-          }
-          
-          /* Market status styles */
-          .market-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-left: 6px;
-            white-space: nowrap;
-          }
-          .market-open {
-            background-color: rgba(22, 163, 74, 0.2);
-            color: rgb(34, 197, 94);
-          }
-          .market-closed {
-            background-color: rgba(220, 38, 38, 0.2);
-            color: rgb(248, 113, 113);
-          }
-          
-          /* Mobile styles */
-          @media (max-width: 767px) {
-            .mobile-hidden {
-              display: none;
+    <>
+      <div className="relative">
+        {/* Animations styles */}
+        <style>
+          {`
+            @keyframes price-up {
+              0% { color: #16a34a; }
+              100% { color: #16a34a; }
             }
-            .mobile-full-width {
-              width: 100% !important;
+            @keyframes price-down {
+              0% { color: #dc2626; }
+              100% { color: #dc2626; }
             }
-            .mobile-full-height {
-              height: calc(100vh - 60px - 56px) !important; /* Adjusted for nav bar */
+            .animate-price-up {
+              animation: price-up 1s;
             }
-            .mobile-sidebar {
-              position: fixed;
-              top: 60px; /* Below navbar */
-              left: 0;
-              right: 0;
-              bottom: 56px; /* Above bottom nav */
-              width: 100%;
-              height: calc(100vh - 60px - 56px); /* Full height minus navbar and bottom nav */
-              z-index: 100;
-              background-color: var(--background);
-              overflow-y: auto;
-              padding-bottom: 20px; /* Extra padding at bottom for usability */
+            .animate-price-down {
+              animation: price-down 1s;
             }
-            .mobile-menu {
-              position: fixed;
-              bottom: 0;
-              left: 0;
-              right: 0;
-              height: 56px;
-              background: #1a1b1e;
+            .tradingview-container {
               display: flex;
-              justify-content: space-around;
-              padding: 0;
-              border-top: 1px solid rgba(255,255,255,0.1);
-              z-index: 50;
-              box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-            }
-            .mobile-menu-button {
-              flex: 1;
-              height: 56px;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
               justify-content: center;
-              font-size: 12px;
-              color: #a1a1aa;
-              transition: all 0.2s;
-              gap: 4px;
+              align-items: center;
+              height: 100%;
             }
-            .mobile-menu-button.active {
-              background: rgba(255,255,255,0.05);
-              color: #ffffff;
-              border-top: 2px solid #3b82f6;
+            
+            /* Market status styles */
+            .market-badge {
+              display: inline-flex;
+              align-items: center;
+              padding: 2px 6px;
+              border-radius: 4px;
+              font-size: 11px;
+              font-weight: 600;
+              margin-left: 6px;
+              white-space: nowrap;
             }
-            .mobile-menu-button svg {
-              width: 20px;
-              height: 20px;
+            .market-open {
+              background-color: rgba(22, 163, 74, 0.2);
+              color: rgb(34, 197, 94);
             }
-          }
-        `}
-      </style>
+            .market-closed {
+              background-color: rgba(220, 38, 38, 0.2);
+              color: rgb(248, 113, 113);
+            }
+            
+            /* Mobile styles */
+            @media (max-width: 767px) {
+              .mobile-hidden {
+                display: none;
+              }
+              .mobile-full-width {
+                width: 100% !important;
+              }
+              .mobile-full-height {
+                height: calc(100vh - 60px - 56px) !important; /* Adjusted for nav bar */
+              }
+              .mobile-sidebar {
+                position: fixed;
+                top: 60px; /* Below navbar */
+                left: 0;
+                right: 0;
+                bottom: 56px; /* Above bottom nav */
+                width: 100%;
+                height: calc(100vh - 60px - 56px); /* Full height minus navbar and bottom nav */
+                z-index: 100;
+                background-color: var(--background);
+                overflow-y: auto;
+                padding-bottom: 20px; /* Extra padding at bottom for usability */
+              }
+              .mobile-menu {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 56px;
+                background: #1a1b1e;
+                display: flex;
+                justify-content: space-around;
+                padding: 0;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                z-index: 50;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+              }
+              .mobile-menu-button {
+                flex: 1;
+                height: 56px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                color: #a1a1aa;
+                transition: all 0.2s;
+                gap: 4px;
+              }
+              .mobile-menu-button.active {
+                background: rgba(255,255,255,0.05);
+                color: #ffffff;
+                border-top: 2px solid #3b82f6;
+              }
+              .mobile-menu-button svg {
+                width: 20px;
+                height: 20px;
+              }
+            }
+          `}
+        </style>
 
-      {/* Navbar Component */}
-      <Navbar 
-        balance={balance} 
-        isMobile={isMobile} 
-        toggleMobileMenu={toggleMobileMenu} 
-      />
+        {/* Navbar Component */}
+        <Navbar 
+          balance={balance} 
+          isMobile={isMobile} 
+          toggleMobileMenu={toggleMobileMenu} 
+        />
 
-      <div className="relative flex flex-col md:flex-row">
-        {/* Mobile Menu Overlay */}
-        {isMobile && showMobileMenu && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-40"
-            onClick={() => setShowMobileMenu(false)}
-          />
-        )}
-
-        {/* Sidebar - always full screen when shown on mobile */}
-        {(!isMobile || (isMobile && showMobileMenu)) && (
-          <div className={isMobile ? "fixed inset-0 z-50 pt-[60px] pb-[56px]" : ""}>
-            <Sidebar
-              isCollapsed={isMobile ? false : isCollapsed}
-              toggleCollapse={toggleCollapse}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              filteredPairs={filteredPairs}
-              selectedPair={selectedPair}
-              handlePairClick={handlePairClick}
-              formatPairName={formatPairName}
-              getFullName={getFullName}
-              getCryptoImageForSymbol={getCryptoImageForSymbol}
-              getForexImageForSymbol={getForexImageForSymbol}
-              isMobile={isMobile}
-              closeMobileMenu={() => setShowMobileMenu(false)}
-              navigateToTradeTab={() => toggleMobileView("trading")} 
+        <div className="relative flex flex-col md:flex-row">
+          {/* Mobile Menu Overlay */}
+          {isMobile && showMobileMenu && (
+            <div 
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setShowMobileMenu(false)}
             />
-          </div>
-        )}
+          )}
 
-        {/* Main content area with conditional visibility on mobile */}
-        <div className={`flex-1 flex ${isMobile ? "flex-col" : "flex-row"}`}>
-          {/* Chart Component - visible on mobile only when activeView is chart */}
-          <div className={`${isMobile && activeView !== "chart" ? "hidden" : "flex-1"}`}>
-            <ChartComponent 
-              symbol={getTradingViewSymbol(selectedPair)}
-              timezone={userTimezone}
-              isCollapsed={isCollapsed}
-              activityCollapsed={activityCollapsed}
-              activityHeight={activityHeight}
-              totalPnL={totalOpenPnL}
-              closeAllTrades={closeAllTrades}
-            />
-          </div>
+          {/* Sidebar - always full screen when shown on mobile */}
+          {(!isMobile || (isMobile && showMobileMenu)) && (
+            <div className={isMobile ? "fixed inset-0 z-50 pt-[60px] pb-[56px]" : ""}>
+              <Sidebar
+                isCollapsed={isMobile ? false : isCollapsed}
+                toggleCollapse={toggleCollapse}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                filteredPairs={filteredPairs}
+                selectedPair={selectedPair}
+                handlePairClick={handlePairClick}
+                formatPairName={formatPairName}
+                getFullName={getFullName}
+                getCryptoImageForSymbol={getCryptoImageForSymbol}
+                getForexImageForSymbol={getForexImageForSymbol}
+                isMobile={isMobile}
+                closeMobileMenu={() => setShowMobileMenu(false)}
+                navigateToTradeTab={() => toggleMobileView("trading")} 
+              />
+            </div>
+          )}
 
-          {/* Trading Panel - visible on mobile only when activeView is trading */}
-          <div className={`${isMobile && activeView !== "trading" ? "hidden" : ""} ${isMobile ? "w-full h-full" : ""}`}>
-            <TradingPanel
-              selectedPair={selectedPair}
-              quantity={quantity}
-              setQuantity={setQuantity}
-              selectedLeverage={selectedLeverage}
-              handleLeverageChange={handleLeverageChange}
-              leverageOptions={leverageOptions}
-              margin={margin}
-              balance={balance}
-              localPrices={localPrices}
-              handlePlaceTrade={handlePlaceTrade}
-              calculatePipValue={calculatePipValue}
-              calculateVolumeWithLeverage={calculateVolumeWithLeverage}
-              getQuoteCurrency={getQuoteCurrency}
-              calculateActualVolume={calculateActualVolume}
-              formatLargeNumber={formatLargeNumber}
-              orderType={orderType}
-              setOrderType={setOrderType}
-              getFullName={getFullName}
-              getCryptoImageForSymbol={getCryptoImageForSymbol}
-              getForexImageForSymbol={getForexImageForSymbol}
-              isMobile={isMobile}
-              timezone={userTimezone}
-              totalOpenPnL={totalOpenPnL}
-              closeAllTrades={closeAllTrades}
-              openCount={openCount}
-            />
+          {/* Main content area with conditional visibility on mobile */}
+          <div className={`flex-1 flex ${isMobile ? "flex-col" : "flex-row"}`}>
+            {/* Chart Component - visible on mobile only when activeView is chart */}
+            <div className={`${isMobile && activeView !== "chart" ? "hidden" : "flex-1"}`}>
+              <ChartComponent 
+                symbol={getTradingViewSymbol(selectedPair)}
+                timezone={userTimezone}
+                isCollapsed={isCollapsed}
+                activityCollapsed={activityCollapsed}
+                activityHeight={activityHeight}
+                totalPnL={totalOpenPnL}
+                closeAllTrades={closeAllTrades}
+              />
+            </div>
+
+            {/* Trading Panel - visible on mobile only when activeView is trading */}
+            <div className={`${isMobile && activeView !== "trading" ? "hidden" : ""} ${isMobile ? "w-full h-full" : ""}`}>
+              <TradingPanel
+                selectedPair={selectedPair}
+                quantity={quantity}
+                setQuantity={setQuantity}
+                selectedLeverage={selectedLeverage}
+                handleLeverageChange={handleLeverageChange}
+                leverageOptions={leverageOptions}
+                margin={margin}
+                balance={balance}
+                freeMargin={freeMargin}
+                usedMargin={usedMargin}
+                localPrices={localPrices}
+                handlePlaceTrade={handlePlaceTrade}
+                calculatePipValue={calculatePipValue}
+                calculateVolumeWithLeverage={calculateVolumeWithLeverage}
+                getQuoteCurrency={getQuoteCurrency}
+                calculateActualVolume={calculateActualVolume}
+                formatLargeNumber={formatLargeNumber}
+                orderType={orderType}
+                setOrderType={setOrderType}
+                getFullName={getFullName}
+                getCryptoImageForSymbol={getCryptoImageForSymbol}
+                getForexImageForSymbol={getForexImageForSymbol}
+                isMobile={isMobile}
+                timezone={userTimezone}
+                totalOpenPnL={totalOpenPnL}
+                closeAllTrades={closeAllTrades}
+                openCount={openCount}
+                lotsLimits={lotsLimits}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Activity Panel - Only show in mobile when activeView is "activity" */}
-      {isMobile && activeView === "activity" ? (
-        <div className="w-full h-full">
+        {/* Activity Panel - Only show in mobile when activeView is "activity" */}
+        {isMobile && activeView === "activity" ? (
+          <div className="w-full h-full">
+            <ActivityPanel
+              isCollapsed={isCollapsed}
+              activityCollapsed={false} // Always expanded in mobile view
+              setActivityCollapsed={setActivityCollapsed}
+              activityHeight={activityHeight}
+              activeTradeTab={activeTradeTab}
+              setActiveTradeTab={setActiveTradeTab}
+              openCount={openCount}
+              pendingCount={pendingCount}
+              closedCount={closedCount}
+              totalOpenPnL={totalOpenPnL}
+              totalClosedPnL={totalClosedPnL}
+              renderOpenTrades={(trades) => renderTrades(trades)}
+              renderPendingTrades={(trades) => renderTrades(trades)}
+              renderClosedTrades={renderClosedTrades}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              handlePageChange={handlePageChange}
+              balance={balance}
+              usedMargin={usedMargin}
+              freeMargin={freeMargin}
+              marginLevel={marginLevel}
+              onResizeStart={onResizeStart}
+              openTrades={openTrades}
+              pendingTrades={pendingTrades}
+              localPrices={localPrices}
+              handleCloseTrade={handleCloseTrade}
+              formatPairName={formatPairName}
+              getCryptoImageForSymbol={getCryptoImageForSymbol}
+              getForexImageForSymbol={getForexImageForSymbol}
+              getPriceDecimals={getPriceDecimals}
+              closedTrades={closedTrades}
+              fullPage={true} // Set fullPage mode to true for mobile
+            />
+          </div>
+        ) : !isMobile && (
+          // Desktop version - standard bottom panel
           <ActivityPanel
             isCollapsed={isCollapsed}
-            activityCollapsed={false} // Always expanded in mobile view
+            activityCollapsed={activityCollapsed}
             setActivityCollapsed={setActivityCollapsed}
             activityHeight={activityHeight}
             activeTradeTab={activeTradeTab}
@@ -1710,98 +1749,62 @@ const TradingStation = () => {
             getForexImageForSymbol={getForexImageForSymbol}
             getPriceDecimals={getPriceDecimals}
             closedTrades={closedTrades}
-            fullPage={true} // Set fullPage mode to true for mobile
+            fullPage={false} // Standard bottom panel for desktop
           />
-        </div>
-      ) : !isMobile && (
-        // Desktop version - standard bottom panel
-        <ActivityPanel
-          isCollapsed={isCollapsed}
-          activityCollapsed={activityCollapsed}
-          setActivityCollapsed={setActivityCollapsed}
-          activityHeight={activityHeight}
-          activeTradeTab={activeTradeTab}
-          setActiveTradeTab={setActiveTradeTab}
-          openCount={openCount}
-          pendingCount={pendingCount}
-          closedCount={closedCount}
-          totalOpenPnL={totalOpenPnL}
-          totalClosedPnL={totalClosedPnL}
-          renderOpenTrades={(trades) => renderTrades(trades)}
-          renderPendingTrades={(trades) => renderTrades(trades)}
-          renderClosedTrades={renderClosedTrades}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          handlePageChange={handlePageChange}
-          balance={balance}
-          usedMargin={usedMargin}
-          freeMargin={freeMargin}
-          marginLevel={marginLevel}
-          onResizeStart={onResizeStart}
-          openTrades={openTrades}
-          pendingTrades={pendingTrades}
-          localPrices={localPrices}
-          handleCloseTrade={handleCloseTrade}
-          formatPairName={formatPairName}
-          getCryptoImageForSymbol={getCryptoImageForSymbol}
-          getForexImageForSymbol={getForexImageForSymbol}
-          getPriceDecimals={getPriceDecimals}
-          closedTrades={closedTrades}
-          fullPage={false} // Standard bottom panel for desktop
-        />
-      )}
+        )}
 
-      {/* Mobile Bottom Navigation - only visible on mobile */}
-      {isMobile && (
-        <div className="mobile-menu">
-          <button 
-            className={`mobile-menu-button ${showMobileMenu && activeView !== "trading" && activeView !== "activity" ? "active" : ""}`}
-            onClick={() => {
-              toggleMobileMenu();
-              // Reset the activeView to prevent trade/activity from remaining selected
-              setActiveView(showMobileMenu ? "chart" : "chart");
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect>
-              <line x1="8" y1="12" x2="16" y2="12"></line>
-              <line x1="8" y1="16" x2="16" y2="16"></line>
-              <line x1="8" y1="8" x2="16" y2="8"></line>
-            </svg>
-            <span>Market</span>
-          </button>
-          
-          <button
-            className={`mobile-menu-button ${activeView === "trading" ? "active" : ""}`}
-            onClick={() => {
-              toggleMobileView("trading");
-              setShowMobileMenu(false); // Always hide mobile menu when selecting trade
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-            <span>Trade</span>
-          </button>
-          
-          <button
+        {/* Mobile Bottom Navigation - only visible on mobile */}
+        {isMobile && (
+          <div className="mobile-menu">
+            <button 
+              className={`mobile-menu-button ${showMobileMenu && activeView !== "trading" && activeView !== "activity" ? "active" : ""}`}
+              onClick={() => {
+                toggleMobileMenu();
+                // Reset the activeView to prevent trade/activity from remaining selected
+                setActiveView(showMobileMenu ? "chart" : "chart");
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+                <line x1="8" y1="16" x2="16" y2="16"></line>
+                <line x1="8" y1="8" x2="16" y2="8"></line>
+              </svg>
+              <span>Market</span>
+            </button>
+            
+            <button
+              className={`mobile-menu-button ${activeView === "trading" ? "active" : ""}`}
+              onClick={() => {
+                toggleMobileView("trading");
+                setShowMobileMenu(false); // Always hide mobile menu when selecting trade
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+              <span>Trade</span>
+            </button>
+            
+            <button
 
-            className={`mobile-menu-button ${activeView === "activity" ? "active" : ""}`}
-            onClick={() => {
-              toggleMobileView("activity");
-              setShowMobileMenu(false); // Always hide mobile menu when selecting activity
-            }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20V10"></path>
-              <path d="M18 20V4"></path>
-              <path d="M6 20v-6"></path>
-            </svg>
-            <span>Activity</span>
-          </button>
-        </div>
-      )}
-    </div>
+              className={`mobile-menu-button ${activeView === "activity" ? "active" : ""}`}
+              onClick={() => {
+                toggleMobileView("activity");
+                setShowMobileMenu(false); // Always hide mobile menu when selecting activity
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20V10"></path>
+                <path d="M18 20V4"></path>
+                <path d="M6 20v-6"></path>
+              </svg>
+              <span>Activity</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
