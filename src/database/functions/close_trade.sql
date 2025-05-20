@@ -6,7 +6,10 @@ CREATE OR REPLACE FUNCTION close_trade(
   p_trade_id UUID,  
   p_close_price DECIMAL,
   p_pnl DECIMAL
-) RETURNS DECIMAL AS $$
+) RETURNS DECIMAL
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
   v_trade RECORD;
   v_withdrawal_wallet DECIMAL;
@@ -47,7 +50,7 @@ BEGIN
 
   RETURN v_withdrawal_wallet;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Create or replace notification function
 CREATE OR REPLACE FUNCTION notify_trade_close()

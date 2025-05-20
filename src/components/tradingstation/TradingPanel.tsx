@@ -199,10 +199,15 @@ const TradingPanel = ({
     return { min: staticLimits.min, max: maxLots };
   };
 
+  // Force orderType to "market" always
+  if (orderType !== "market") {
+    setOrderType("market");
+  }
+
   return (
     <div className={`
       ${isMobile 
-        ? "w-full h-full pb-16 overflow-y-auto" // Full width/height on mobile with padding for bottom nav
+        ? "w-full h-full pb-16 overflow-y-auto"
         : "fixed top-16 right-0 h-[calc(100%-4rem)] w-[350px] bg-muted/10 border-l border-border/50"
       } flex flex-col p-0`}
     >
@@ -277,7 +282,8 @@ const TradingPanel = ({
             </div>
           )}
 
-          {/* Tab switch for Market and Limit orders */}
+          {/* Tab switch for Market and Limit orders - HIDDEN */}
+          {/* 
           <div className={`flex gap-1 ${isMobile ? 'mb-2' : 'mb-4'} bg-muted/20 rounded-xl p-1`}>
             <Button
               variant={orderType === "market" ? "default" : "outline"}
@@ -294,6 +300,7 @@ const TradingPanel = ({
               Limit
             </Button>
           </div>
+          */}
 
           {/* Lots input with + and - buttons */}
           <div className={`${isMobile ? 'mb-2' : 'mb-4'}`}>
@@ -390,8 +397,8 @@ const TradingPanel = ({
                   <span className={`${isMobile ? 'text-lg' : 'text-2xl'}`}>
                     .{(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[1] || "00"}
                   </span>
-                </span>
-              </div>
+                  </span>
+                </div>
             </button>
             <button
               className={`flex-1 ${isMobile ? 'h-16 px-3' : 'h-20 pl-5'} bg-primary text-white hover:bg-primary/80 text-left items-start rounded-lg ${
@@ -407,8 +414,8 @@ const TradingPanel = ({
                   <span className={`${isMobile ? 'text-lg' : 'text-2xl'}`}>
                     .{(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[1] || "00"}
                   </span>
-                </span>
-              </div>
+                  </span>
+                </div>
             </button>
           </div>
 

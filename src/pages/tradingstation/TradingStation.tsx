@@ -1190,6 +1190,17 @@ const TradingStation = () => {
 
   // Replace handleCloseTrade with backend wallet update logic
   async function handleCloseTrade(trade: any) {
+    // Defensive: ensure trade.id is a string and trimmed
+    const tradeId = typeof trade.id === "string" ? trade.id.trim() : String(trade.id ?? "").trim();
+    if (!tradeId) {
+      toast({
+        title: "Invalid Trade",
+        description: "Trade ID is missing or invalid.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const currentPrice =
       localPrices[trade.pair]?.price !== undefined
         ? parseFloat(localPrices[trade.pair].price)
@@ -1234,7 +1245,7 @@ const TradingStation = () => {
 
     // Call backend function to close trade and update wallet
     const { data, error } = await supabase.rpc("close_trade", {
-      p_trade_id: trade.id,
+      p_trade_id: tradeId,
       p_close_price: currentPrice,
       p_pnl: pnl,
     });

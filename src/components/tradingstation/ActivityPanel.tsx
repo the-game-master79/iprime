@@ -592,7 +592,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 <td className="px-4 py-2 text-xs">
                   {trade.status === "open" && (
                     <div
-                      onClick={() => _handleCloseTrade(trade)}
+                      onClick={() => _handleCloseTrade({ ...trade, id: typeof trade.id === "string" ? trade.id.trim() : String(trade.id ?? "").trim() })}
                       className="w-6 h-6 p-0 rounded-full flex items-center justify-center cursor-pointer text-destructive hover:bg-destructive/10"
                       title="Close Position"
                     >
@@ -701,6 +701,24 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
 
   // --- Add: Proper closeTrade handler using backend function ---
   async function closeTradeWithWalletUpdate(trade: any) {
+    // Defensive: ensure trade.id is a string and trimmed
+    const tradeId = typeof trade.id === "string" ? trade.id.trim() : String(trade.id ?? "").trim();
+
+    // Debug: Log the trade object and ID before calling the backend
+    console.log("[closeTradeWithWalletUpdate] Attempting to close trade:", {
+      trade,
+      tradeId,
+      status: trade?.status,
+      isOpen: trade?.status === "open"
+    });
+
+    if (!tradeId) {
+      // Optionally show error toast here
+      // toast({ title: "Invalid Trade", description: "Trade ID is missing or invalid.", variant: "destructive" });
+      console.error("Invalid trade object passed to closeTradeWithWalletUpdate:", trade);
+      return;
+    }
+
     // Calculate current price
     const currentPrice =
       localPrices[trade.pair]?.price !== undefined
@@ -746,12 +764,14 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
 
     // Call backend function to close trade and update wallet
     const { data, error } = await supabase.rpc("close_trade", {
-      p_trade_id: trade.id,
+      p_trade_id: tradeId,
       p_close_price: currentPrice,
       p_pnl: pnl,
     });
 
     if (error) {
+      // Log the trade object and error for debugging
+      console.error("Failed to close trade:", { trade, tradeId, error });
       // Optionally show error toast
       // toast({ title: "Close Trade Failed", description: error.message, variant: "destructive" });
       return;
@@ -802,6 +822,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
           style={fullPage ? {} : { minHeight: 44, height: 44, paddingTop: 6, paddingBottom: 6 }}
         >
           <div className="flex gap-2">
+            {/* 
             <Button
               variant={activeTradeTab === "open" ? "default" : "outline"}
               onClick={() => handleTabChange("open")}
@@ -810,6 +831,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               Open
               <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{openCount}</span>
             </Button>
+            */}
             <Button
               variant={activeTradeTab === "pending" ? "default" : "outline"}
               onClick={() => handleTabChange("pending")}
