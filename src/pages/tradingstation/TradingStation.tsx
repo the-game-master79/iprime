@@ -50,11 +50,10 @@ const TradingStation = () => {
   const [activeTradeTab, setActiveTradeTab] = useState<"open" | "pending" | "closed">("open"); // State for active trade tab
   const [margin, setMargin] = useState<number>(0); // State to track margin
   const fetchBalanceCalled = useRef(false); // Track if fetchBalance has been called
-  const [closedTrades, setClosedTrades] = useState<any[]>([]); // State for closed trades
-
-  // Real trades state
+  // Trade state
   const [openTrades, setOpenTrades] = useState<any[]>([]);
   const [pendingTrades, setPendingTrades] = useState<any[]>([]);
+  const [closedTrades, setClosedTrades] = useState<any[]>([]);
 
   // Timezone state
   const [userTimezone, setUserTimezone] = useState("Etc/UTC");
@@ -1486,6 +1485,40 @@ const TradingStation = () => {
 
     return { isOpen, nextEventType, nextEventDate, formattedTime };
   }
+
+  // Add this helper to format price with big digits for bid/ask
+  const renderPriceWithBigDigits = (value: number | string | undefined, decimals: number) => {
+    if (value === undefined) return "-";
+    const str = Number(value).toFixed(decimals);
+
+    if (decimals === 2) {
+      // Make the digit before the decimal and the decimal point bigger
+      const dotIdx = str.indexOf(".");
+      if (dotIdx <= 0) return str;
+      const before = str.slice(0, dotIdx - 1);
+      const big = str.slice(dotIdx - 1, dotIdx + 1); // digit before + "."
+      const after = str.slice(dotIdx + 1);
+      return (
+        <>
+          {before}
+          <span className="text-lg font-bold">{big}</span>
+          {after}
+        </>
+      );
+    } else if (decimals > 2) {
+      // Make the last 2 digits bigger
+      const normal = str.slice(0, -2);
+      const big = str.slice(-2);
+      return (
+        <>
+          {normal}
+          <span className="text-lg font-bold">{big}</span>
+        </>
+      );
+    }
+    // fallback
+    return str;
+  };
 
   return (
     <>

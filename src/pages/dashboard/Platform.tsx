@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { usePwaInstall } from "@/hooks/use-pwa-install";
 import { useTheme } from "@/hooks/use-theme"; // Use your custom theme hook
+import { isForexTradingTime } from "@/lib/utils"; // Add this import
 
 // Types
 import type { 
@@ -81,6 +82,59 @@ interface DashboardContentProps {
 const ShimmerEffect = ({ className }: { className?: string }) => (
   <div className={cn("animate-pulse bg-muted/50 rounded-lg", className)} />
 );
+
+// Add this utility function before the DashboardContent component
+const getPriceDecimals = (symbol: string) => {
+  if (symbol === "XAUUSD") return 2;
+  if (symbol.endsWith("JPY")) return 3;
+  if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
+  if (symbol === "DOGEUSDT") return 5;
+  if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
+  if (symbol === "DOTUSDT") return 3;
+  // Default: forex pairs (non-JPY, non-XSUPER, non-crypto)
+  if (!symbol.endsWith("USDT")) return 5;
+  // Fallback
+  return 2;
+};
+
+// Add this utility for price animation (before DashboardContent)
+const getPriceChangeClass = (isUp?: boolean) => {
+  if (isUp === undefined) return "";
+  return isUp
+    ? "text-green-500"
+    : "text-red-500";
+};
+
+// Add this helper to format price with big digits
+const renderPriceWithBigDigits = (value: number | undefined, decimals: number) => {
+  if (value === undefined) return "-";
+  const str = Number(value).toFixed(decimals);
+
+  if (decimals === 2) {
+    // Make the last 2 digits bigger (including the decimal point)
+    if (str.length < 4) return str;
+    const normal = str.slice(0, -3); // up to before ".dd"
+    const big = str.slice(-3); // ".dd"
+    return (
+      <>
+        {normal}
+        <span className="text-lg font-bold">{big}</span>
+      </>
+    );
+  } else if (decimals > 2) {
+    // Make the last 2 digits bigger
+    const normal = str.slice(0, -2);
+    const big = str.slice(-2);
+    return (
+      <>
+        {normal}
+        <span className="text-lg font-bold">{big}</span>
+      </>
+    );
+  }
+  // fallback
+  return str;
+};
 
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const { isMobile } = useBreakpoints();
@@ -143,6 +197,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [showDirectsDialog, setShowDirectsDialog] = useState(false);
 
+  // Only symbol and image_url from Supabase, but display static bid/ask values
+  const [cryptoData, setCryptoData] = useState<{ symbol: string, image_url: string }[]>([]);
+  const [forexData, setForexData] = useState<{ symbol: string, image_url: string }[]>([]);
+
+  // Add state for live prices (now storing price and isPriceUp)
+  const [marketPrices, setMarketPrices] = useState<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
 
   // Data fetching functions
   const fetchUserProfile = async () => {
@@ -631,12 +691,17 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         supabase.removeChannel(channel);
       }
     };
-  }, [userProfile?.id]);
+  }, [userProfile?.id, theme]);
 
   useEffect(() => {
     fetchTransactions();
     fetchRanks();
   }, [userProfile?.id]);
+
+  useEffect(() => {
+    // Remove the WebSocket connection and related logic
+    return () => {};
+  }, []);
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -659,6 +724,93 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const handleThemeToggle = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
+
+  // Fetch trading pairs for crypto and forex
+  useEffect(() => {
+    const fetchTradingPairs = async () => {
+      try {
+        // Fetch all crypto pairs
+        const { data: cryptoPairs, error: cryptoError } = await supabase
+          .from('trading_pairs')
+          .select('symbol, image_url, type')
+          .eq('type', 'crypto');
+
+        // Fetch all forex pairs
+        const { data: forexPairs, error: forexError } = await supabase
+          .from('trading_pairs')
+          .select('symbol, image_url, type')
+          .eq('type', 'forex');
+
+        if (cryptoError) throw cryptoError;
+        if (forexError) throw forexError;
+
+        // Helper to pick N random elements from an array
+        function pickRandom<T>(arr: T[], n: number): T[] {
+          if (!arr) return [];
+          const shuffled = [...arr].sort(() => 0.5 - Math.random());
+          return shuffled.slice(0, n);
+        }
+
+        setCryptoData(pickRandom(cryptoPairs || [], 3));
+        setForexData(pickRandom(forexPairs || [], 3));
+      } catch (err) {
+        setCryptoData([]);
+        setForexData([]);
+      }
+    };
+
+    fetchTradingPairs();
+  }, []);
+
+  // WebSocket for live bid/ask prices
+  useEffect(() => {
+    if (cryptoData.length === 0 && forexData.length === 0) return;
+
+    const ws = new WebSocket('wss://transfers.cloudforex.club/ws');
+    let isOpen = false;
+
+    ws.onopen = () => {
+      isOpen = true;
+      // No need to subscribe to symbols; data is received automatically.
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Accept price, or fallback to bid, or ask (like TradingStation)
+        const price =
+          data.data?.price ??
+          data.data?.bid ??
+          data.data?.ask;
+        if (data.symbol && price) {
+          setMarketPrices(prev => {
+            const symbol = data.symbol.toUpperCase();
+            const prevPrice = parseFloat(prev[symbol]?.price || "0");
+            const newPrice = parseFloat(price);
+            return {
+              ...prev,
+              [symbol]: {
+                price: price.toString(),
+                bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
+                ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
+                isPriceUp: newPrice > prevPrice
+              }
+            };
+          });
+        }
+      } catch (e) {}
+    };
+
+    ws.onerror = () => {};
+    ws.onclose = () => {};
+
+    return () => {
+      if (isOpen) ws.close();
+    };
+  }, [cryptoData, forexData]);
+
+  // Determine if the forex market is open
+  const forexMarketOpen = isForexTradingTime();
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
@@ -686,30 +838,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <ShareNetwork className="h-5 w-5 text-primary" weight="fill" />
                         <span className="text-sm font-medium text-muted-foreground">Your Referral Link</span>
                       </div>
-                      <div 
-                        className={cn(
-                          "px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5",
-                          directCount >= 2
-                            ? "bg-success text-secondary"
-                            : directCount === 1
-                            ? "bg-warning text-secondary"
-                            : "bg-error text-secondary"
-                        )}
-                        onClick={handleDirectsClick}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <div className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          directCount >= 2
-                            ? "bg-secondary"
-                            : directCount === 1
-                            ? "bg-secondary"
-                            : "bg-secondary"
-                        )} />
-                        <span>{directCount}/2 Directs</span>
-                      </div>
+                      {/* Removed badge type from here */}
                     </div>
-
                     {/* Referral Link Input */}
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
@@ -772,17 +902,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <div className="rounded-lg bg-secondary-foreground p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              {/* Use a key to force re-render on theme change */}
-                              <img 
-                                key={theme}
-                                src={
-                                  theme === "dark"
-                                    ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-dark.svg"
-                                    : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-light.svg"
-                                }
-                                alt="AI Trading"
-                                className="h-5 w-5"
-                              />
+                              {/* AI Trading Box with "AI" text, no fill, only stroke */}
+                              <div
+                                className="flex items-center justify-center h-8 w-8 border-2 border-foreground rounded-lg"
+                              >
+                                  <span
+                                    className="text-base font-bold uppercase text-foreground"
+                                    style={{
+                                      color: "currentColor", // fill color (inside)
+                                      letterSpacing: "0.05em"
+                                    }}
+                                  >
+                                    AI
+                                  </span>
+                              </div>
                               <span className="text-sm text-foreground">Trading</span>
                             </div>
                             <span className="text-xs bg-background/20 text-foreground px-2 py-1 rounded-full">
@@ -796,61 +929,58 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                       </div>
                     </div>
 
-                    {/* Action Buttons Row - 2x2 grid on mobile */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Button 
-                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#FFA500] via-[#FF7F50] to-[#FFA500] animate-gradient-x"
-                        style={{
-                          backgroundSize: "200% 200%",
-                          animation: "gradient-x 3s ease infinite"
-                        }}
-                        onClick={() => navigate('/tradingstation')}
-                      >
-                        <ChartLine className="h-5 w-5" />
-                        Trade
-                      </Button>
-                      <Button 
-                        className="h-12 gap-2 text-black font-regular border-0 bg-gradient-to-r from-[#f4e6f1] via-[#f3a0d7] to-[#b3e8f7] animate-gradient-x"
-                        style={{
-                          backgroundSize: "200% 200%",
-                          animation: "gradient-x 3s ease infinite"
-                        }}
-                        onClick={() => navigate('/cashier')}
-                      >
-                        <ArrowDown className="h-5 w-5" />
-                        Add Funds
-                      </Button>
-                      <Button
-                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#6a11cb] via-[#2575fc] to-[#43e97b] animate-gradient-x"
-                        style={{
-                          backgroundSize: "200% 200%",
-                          animation: "gradient-x 3s ease infinite"
-                        }}
-                        onClick={() => navigate('/affiliate')}
-                      >
-                        <Users className="h-5 w-5" />
-                        Agent
-                      </Button>
-                      <Button 
-                        className="h-12 gap-2 text-white font-regular border-0 bg-gradient-to-r from-[#2278fb] via-[#19b0ec] to-[#19b0ec] animate-gradient-x"
-                        style={{
-                          backgroundSize: "200% 200%",
-                          animation: "gradient-x 3s ease infinite"
-                        }}
-                        onClick={() => navigate('/plans')}
-                      >
-                        <img 
-                          key={theme}
-                          src={
-                            theme === "dark"
-                              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-dark.svg"
-                              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ai-light.svg"
-                          }
-                          alt="AI Trading"
-                          className="h-5 w-5"
-                        />
-                        Trading
-                      </Button>
+                    {/* Action Buttons Row - horizontal row for mobile, grid for desktop */}
+                    <div className="flex flex-row gap-3 md:grid md:grid-cols-4 md:gap-3 mt-2" key={theme}>
+                      {/* Common container buttons with icon/logo only, label below */}
+                      <div className="flex flex-col items-center h-full w-full">
+                        <Button 
+                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                          onClick={() => navigate('/tradingstation')}
+                        >
+                          <ChartLine className="h-10 w-10 text-foreground" weight="duotone" />
+                        </Button>
+                        <span className="mt-2 text-sm font-medium text-foreground">Trade</span>
+                      </div>
+                      <div className="flex flex-col items-center h-full w-full">
+                        <Button 
+                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                          onClick={() => navigate('/cashier')}
+                        >
+                          <ArrowDown className="h-10 w-10 text-foreground" weight="duotone" />
+                        </Button>
+                        <span className="mt-2 text-sm font-medium text-foreground">Add Funds</span>
+                      </div>
+                      <div className="flex flex-col items-center h-full w-full">
+                        <Button
+                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                          onClick={() => navigate('/affiliate')}
+                        >
+                          <Users className="h-10 w-10 text-foreground" weight="duotone" />
+                        </Button>
+                        <span className="mt-2 text-sm font-medium text-foreground">Agent</span>
+                      </div>
+                      <div className="flex flex-col items-center h-full w-full">
+                        <Button 
+                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                          onClick={() => navigate('/plans')}
+                        >
+                          {/* AI Trading Button Icon */}
+                          <div
+                            className="flex items-center justify-center h-6 w-6 border-2 border-foreground rounded-lg"
+                          >
+                              <span
+                                className="text-xs font-bold uppercase !text-foreground"
+                                style={{
+                                  color: "currentColor",
+                                  letterSpacing: "0.05em"
+                                }}
+                              >
+                                AI
+                              </span>
+                          </div>
+                        </Button>
+                        <span className="mt-2 text-sm font-medium text-foreground">Trading</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -858,6 +988,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 {/* Affiliate Rank Card */}
                 <div className="bg-secondary rounded-2xl p-6">
                   <div className="h-full flex flex-col justify-between">
+                    {/* Top: Affiliate Status */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Trophy className="h-5 w-5 text-muted-foreground" />
@@ -867,16 +998,36 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         <h3 className="text-3xl font-medium">
                           {businessStats.currentRank || 'New Member'}
                         </h3>
-                        <p className="text-sm">
-                          {businessStats.totalVolume < 0 ? (
-                            <span className="text-[#FFA500]">Pending</span>
-                          ) : (
-                            <span className="text-muted-foreground">{businessStats.totalVolume.toLocaleString()} USD Business Volume</span>
-                          )}
-                        </p>
                       </div>
                     </div>
                     
+                    {/* Business Volume & Directs Row */}
+                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                      {/* Business Volume Container */}
+                      <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
+                        <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
+                        <span className="text-lg font-semibold text-foreground">
+                          {businessStats.totalVolume.toLocaleString()} USD
+                        </span>
+                      </div>
+                      {/* Directs Container with dialog trigger */}
+                      <div
+                        className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
+                        onClick={handleDirectsClick}
+                        title="View Direct Referral Status"
+                      >
+                        <span className="text-xs text-muted-foreground mb-1">Directs</span>
+                        <span className={cn(
+                          "text-lg font-semibold",
+                          directCount >= 2 ? "text-[#20BF55]" : 
+                          directCount === 1 ? "text-[#FFA500]" : 
+                          "text-[#FF005C]"
+                        )}>
+                          {directCount}/2
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Progress to Next Rank - Moved to bottom */}
                     {businessStats.nextRank && (
                       <div className="space-y-2 mt-auto pt-4">
@@ -896,6 +1047,154 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Redesigned Markets Section as Table */}
+              <div className="w-full mt-2">
+                <div className="rounded-2xl border border-border p-0 shadow-lg overflow-x-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    {/* Crypto Markets Table */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 px-6 pt-6 pb-2">
+                        <span className="font-semibold text-lg tracking-tight">Crypto Markets</span>
+                        <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                          Live
+                        </span>
+                      </div>
+                      <table className="min-w-full text-left">
+                        <thead className="bg-secondary">
+                          <tr className="border-b border-border text-xs text-muted-foreground">
+                            <th className="py-2 px-6 font-semibold">Symbol</th>
+                            <th className="py-2 px-2 font-semibold">Bid</th>
+                            <th className="py-2 px-2 font-semibold">Ask</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-background">
+                          {cryptoData.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="py-4 px-6 text-muted-foreground text-sm">
+                                No crypto pairs found.
+                              </td>
+                            </tr>
+                          ) : (
+                            cryptoData.map((pair) => {
+                              const symbol = pair.symbol.toUpperCase();
+                              const priceObj = marketPrices[symbol];
+                              const decimals = getPriceDecimals(symbol);
+                              return (
+                                <tr
+                                  key={pair.symbol}
+                                  className="border-b border-border hover:bg-muted/10 transition cursor-pointer"
+                                  onClick={() => navigate('/tradingstation')}
+                                >
+                                  <td className="py-2 px-6 flex items-center gap-2 font-mono font-bold text-base">
+                                    {pair.image_url && (
+                                      <img
+                                        src={pair.image_url}
+                                        alt={pair.symbol}
+                                        className="w-7 h-7 object-contain"
+                                      />
+                                    )}
+                                    {pair.symbol}
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <span
+                                      className={getPriceChangeClass(priceObj?.isPriceUp)}
+                                      key={priceObj?.bid}
+                                    >
+                                      {renderPriceWithBigDigits(priceObj?.bid, decimals)}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <span
+                                      className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
+                                      key={priceObj?.ask}
+                                    >
+                                      {renderPriceWithBigDigits(priceObj?.ask, decimals)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Forex Markets Table */}
+                    <div className="flex-1 border-l border-border">
+                      <div className="flex items-center gap-2 px-6 pt-6 pb-2">
+                        <span className="font-semibold text-lg tracking-tight">Forex Markets</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold
+                          ${forexMarketOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          {forexMarketOpen ? "Live" : "Closed"}
+                        </span>
+                      </div>
+                      {!forexMarketOpen && (
+                        <div className="mb-2 px-6 text-xs text-destructive font-medium">
+                          Forex market is currently closed. You can still view prices, but trading is unavailable.
+                        </div>
+                      )}
+                      <table className="min-w-full text-left">
+                        <thead className="bg-secondary">
+                          <tr className="border-b border-border text-xs text-muted-foreground">
+                            <th className="py-2 px-6 font-semibold">Symbol</th>
+                            <th className="py-2 px-2 font-semibold">Bid</th>
+                            <th className="py-2 px-2 font-semibold">Ask</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-background">
+                          {forexData.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="py-4 px-6 text-muted-foreground text-sm">
+                                No forex pairs found.
+                              </td>
+                            </tr>
+                          ) : (
+                            forexData.map((pair) => {
+                              const symbol = pair.symbol.toUpperCase();
+                              const priceObj = marketPrices[symbol];
+                              const decimals = getPriceDecimals(symbol);
+                              return (
+                                <tr
+                                  key={pair.symbol}
+                                  className="border-b border-border hover:bg-muted/10 transition cursor-pointer"
+                                  onClick={() => navigate('/tradingstation')}
+                                >
+                                  <td className="py-2 px-6 flex items-center gap-2 font-mono font-bold text-base">
+                                    {pair.image_url && (
+                                      <img
+                                        src={pair.image_url}
+                                        alt={pair.symbol}
+                                        className="w-7 h-7 object-contain"
+                                      />
+                                    )}
+                                    {pair.symbol}
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <span
+                                      className={getPriceChangeClass(priceObj?.isPriceUp)}
+                                      key={priceObj?.bid}
+                                    >
+                                      {renderPriceWithBigDigits(priceObj?.bid, decimals)}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <span
+                                      className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
+                                      key={priceObj?.ask}
+                                    >
+                                      {renderPriceWithBigDigits(priceObj?.ask, decimals)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1017,47 +1316,84 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         </DialogContent>
       </Dialog>
       <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
-        <AlertDialogContent className="bg-secondary border-0">
-          <div className="absolute right-4 top-4">
+        <AlertDialogContent className="bg-gradient-to-br from-secondary via-background to-secondary-foreground border-0 shadow-2xl rounded-2xl p-0 overflow-hidden max-w-[380px]">
+          <div className="flex flex-col items-center justify-center px-6 py-8 relative">
             <Button
               variant="ghost"
-              className="h-6 w-6 p-0 hover:bg-white/10"
+              className="absolute right-4 top-4 h-8 w-8 p-0 rounded-full hover:bg-white/10"
               onClick={() => setShowDirectsDialog(false)}
             >
-              <XCircle className="h-4 w-4" />
+              <XCircle className="h-5 w-5 text-muted-foreground" />
             </Button>
+            <div className="w-full flex flex-col items-center">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-2xl font-bold text-center mb-2 tracking-tight">
+                  Direct Referral Status
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  <div className="flex flex-col items-center gap-6">
+                    <div className="relative flex items-center justify-center mb-2">
+                      <div className={cn(
+                        "rounded-full flex items-center justify-center transition-all duration-300",
+                        directCount >= 2
+                          ? "bg-gradient-to-br from-[#20BF55] to-[#01BAEF] shadow-[0_0_32px_0_rgba(32,191,85,0.3)]"
+                          : directCount === 1
+                          ? "bg-gradient-to-br from-[#FFA500] to-[#FF005C] shadow-[0_0_32px_0_rgba(255,165,0,0.2)]"
+                          : "bg-gradient-to-br from-[#FF005C] to-[#FFA500] shadow-[0_0_32px_0_rgba(255,0,92,0.2)]"
+                      )} style={{ width: 110, height: 110 }}>
+                        <span className={cn(
+                          "text-5xl font-extrabold tracking-tight",
+                          directCount >= 2 ? "text-white" :
+                          directCount === 1 ? "text-white" :
+                          "text-white"
+                        )}>
+                          {directCount}/2
+                        </span>
+                      </div>
+                      {/* Animated check or warning icon */}
+                      <div className="absolute -bottom-3 right-0">
+                        {directCount >= 2 ? (
+                          <svg className="h-8 w-8 text-[#20BF55] animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <circle cx="12" cy="12" r="11" stroke="#20BF55" strokeWidth="2" fill="#fff" />
+                            <path stroke="#20BF55" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M8 12l2.5 2.5L16 9" />
+                          </svg>
+                        ) : (
+                          <svg className="h-8 w-8 text-[#FFA500] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <circle cx="12" cy="12" r="11" stroke="#FFA500" strokeWidth="2" fill="#fff" />
+                            <path stroke="#FFA500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
+                          </svg>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-center text-base font-medium">
+                      {directCount >= 2 ? (
+                        <span>
+                          <span className="text-[#20BF55] font-bold">Congratulations!</span> <br />
+                          You have achieved the required direct referrals.<br />
+                          You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
+                        </span>
+                      ) : (
+                        <span>
+                          <span className={cn(
+                            "font-bold",
+                            directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
+                          )}>
+                            {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''}
+                          </span> needed to start earning <span className={cn(
+                            "font-bold",
+                            directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
+                          )}>commissions and bonuses</span>.<br />
+                          <span className="text-muted-foreground text-xs block mt-2">
+                            Invite friends to join and activate their plans.
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+            </div>
           </div>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl mb-6">Direct Referral Status</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-6">
-                <div className="flex items-center justify-center">
-                  <span className={cn(
-                    "text-7xl font-bold",
-                    directCount >= 2 ? "text-[#20BF55]" : 
-                    directCount === 1 ? "text-[#FFA500]" : 
-                    "text-[#FF005C]"
-                  )}>
-                    {directCount}/2
-                  </span>
-                </div>
-                <div className="text-center">
-                  {directCount >= 2 ? (
-                    <>
-                      Congratulations! You have achieved the required direct referrals. You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
-                    </>
-                  ) : (
-                    <>
-                      You need {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''} to start earning <span className={cn(
-                        "font-bold",
-                        directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
-                      )}>commissions and bonuses</span>.
-                    </>
-                  )}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
         </AlertDialogContent>
       </AlertDialog>
     </div>
@@ -1090,7 +1426,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) return null;
+  if (!user) return null;;
 
   return <DashboardContent loading={loading} />;
 };

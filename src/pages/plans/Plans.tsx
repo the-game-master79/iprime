@@ -39,6 +39,13 @@ interface UserProfile {
   total_invested: number;
 }
 
+interface TradingPair {
+  id: string;
+  symbol: string;
+  image_url: string;
+  type?: string; // 'crypto' | 'forex'
+}
+
 const getRandomGradient = () => {
   const gradients = [
     'bg-gradient-to-r from-blue-500/20 to-purple-500/20',
@@ -62,6 +69,11 @@ const Plans = () => {
   const [totalInvested, setTotalInvested] = useState(0);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [planToCancel, setPlanToCancel] = useState<PlanWithSubscription | null>(null);
+  const [tradingPairs, setTradingPairs] = useState<TradingPair[]>([]);
+  const [loadingPairs, setLoadingPairs] = useState(true);
+  const [selectedPairId, setSelectedPairId] = useState<string | null>(null);
+  const [showAllPairs, setShowAllPairs] = useState(false);
+  const [daysCount, setDaysCount] = useState(48);
 
   // Add this new function
   const calculateTotalInvested = async () => {
@@ -191,6 +203,25 @@ const Plans = () => {
 
   useEffect(() => {
     calculateTotalInvested();
+  }, []);
+
+  // Fetch trading pairs for "Create Your Compute" tab
+  useEffect(() => {
+    const fetchTradingPairs = async () => {
+      setLoadingPairs(true);
+      try {
+        const { data, error } = await supabase
+          .from('trading_pairs')
+          .select('id, symbol, image_url, type'); // <-- fetch type as well
+        if (error) throw error;
+        setTradingPairs(data || []);
+      } catch (error) {
+        console.error('Error fetching trading pairs:', error);
+      } finally {
+        setLoadingPairs(false);
+      }
+    };
+    fetchTradingPairs();
   }, []);
 
   const handleSubscribe = async (plan: Plan) => {
@@ -494,7 +525,7 @@ const Plans = () => {
 
           <Tabs defaultValue="available" className="space-y-8">
             <div className="flex items-center justify-between">
-              <TabsList className="w-[400px]">
+              <TabsList className="w-[600px">
                 <TabsTrigger value="available" className="flex-1">Available Computes</TabsTrigger>
                 <TabsTrigger value="subscribed" className="flex-1 relative">
                   Active Computes
@@ -504,6 +535,7 @@ const Plans = () => {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger>
               </TabsList>
             </div>
 
@@ -540,6 +572,70 @@ const Plans = () => {
                   onCancel={handleCancelClick}
                 />
               )}
+            </TabsContent>
+
+            <TabsContent value="create">
+              <div className="py-6">
+                {/* Steps for creating compute */}
+                <div className="flex flex-col gap-8">
+                  {/* Step 1: Select pairs */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Step 1: Select Crypto & Forex Pairs</h3>
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {/* Crypto Pairs */}
+                      <div className="flex-1 bg-secondary rounded-lg border p-4">
+                        <h4 className="font-semibold mb-2 text-xl text-foreground">Crypto Pairs</h4>
+                        <TradingPairsBento
+                          tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'crypto')}
+                          selectedPairId={selectedPairId}
+                          setSelectedPairId={setSelectedPairId}
+                        />
+                      </div>
+                      {/* Forex Pairs */}
+                      <div className="flex-1 bg-secondary rounded-lg border p-4">
+                        <h4 className="font-semibold mb-2 text-xl text-foreground">Forex Pairs</h4>
+                        <TradingPairsBento
+                          tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'forex')}
+                          selectedPairId={selectedPairId}
+                          setSelectedPairId={setSelectedPairId}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Step 2: Amount required and days slider */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Step 2: Configure Trade</h3>
+                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                      {/* Amount Required (mock calculation) */}
+                      <div className="flex-1 bg-secondary rounded-lg border p-4 flex flex-col gap-2">
+                        <span className="font-medium text-foreground">Amount Required</span>
+                        {/* Mock calculation: $1000 + 10 * (days - 48) */}
+                        <span className="text-2xl font-bold text-primary">
+                          ${1000 + 10 * ((typeof daysCount !== "undefined" ? daysCount : 48) - 48)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">This is a mock calculation.</span>
+                      </div>
+                      {/* Days Slider */}
+                      <div className="flex-1 bg-secondary rounded-lg border p-4 flex flex-col gap-2">
+                        <span className="font-medium text-foreground">Select Duration (Days)</span>
+                        <input
+                          type="range"
+                          min={48}
+                          max={720}
+                          value={daysCount}
+                          onChange={e => setDaysCount(Number(e.target.value))}
+                          className="w-full accent-primary"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>48</span>
+                          <span>{daysCount} days</span>
+                          <span>720</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -672,4 +768,85 @@ function toast({ title, description, variant }: { title: string; description: st
       document.body.removeChild(toastContainer);
     }, 500);
   }, 3000);
+}
+
+import React from "react";
+function TradingPairsBento({
+  tradingPairs,
+  selectedPairId,
+  setSelectedPairId,
+}: {
+  tradingPairs: TradingPair[];
+  selectedPairId: string | null;
+  setSelectedPairId: (id: string) => void;
+}) {
+  const INITIAL_COUNT = 3;
+  const INCREMENT = 3;
+  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
+
+  React.useEffect(() => {
+    setVisibleCount(INITIAL_COUNT);
+  }, [tradingPairs]);
+
+  const visiblePairs = tradingPairs.slice(0, visibleCount);
+  const hasMore = visibleCount < tradingPairs.length;
+
+  if (tradingPairs.length === 0) {
+    return <div className="text-muted-foreground text-sm">No pairs available.</div>;
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-3">
+        {visiblePairs.map(pair => (
+          <label
+            key={pair.id}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer bg-muted/70 hover:bg-primary/10 transition
+              ${selectedPairId === pair.id ? "border-primary ring-2 ring-primary/30" : "border-muted"}
+              shadow-sm
+            `}
+            style={{ minWidth: 0 }}
+          >
+            <input
+              type="radio"
+              name="tradingPair"
+              value={pair.id}
+              checked={selectedPairId === pair.id}
+              onChange={() => setSelectedPairId(pair.id)}
+              className="accent-primary"
+            />
+            <img
+              src={pair.image_url}
+              alt={pair.symbol}
+              className="w-8 h-8 rounded-full object-contain bg-white border"
+            />
+            <span className="font-medium text-foreground text-sm truncate">{pair.symbol}</span>
+          </label>
+        ))}
+      </div>
+      {tradingPairs.length > INITIAL_COUNT && (
+        <div className="mt-3 flex justify-center">
+          {hasMore ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleCount(c => Math.min(c + INCREMENT, tradingPairs.length))}
+              className="px-4"
+            >
+              +{Math.min(INCREMENT, tradingPairs.length - visibleCount)} more
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleCount(INITIAL_COUNT)}
+              className="px-4"
+            >
+              Show Less
+            </Button>
+          )}
+        </div>
+      )}
+    </>
+  );
 }

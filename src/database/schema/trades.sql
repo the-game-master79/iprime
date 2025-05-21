@@ -73,3 +73,6 @@ CREATE TRIGGER check_margin_before_trade
 CREATE INDEX IF NOT EXISTS idx_trades_margin
 ON trades(user_id, status, margin_amount)
 WHERE status IN ('open', 'pending');
+
+-- Table constraints for trades (type, user_id FK)
+-- Trigger: check_margin_before_trade (prevents margin overuse)

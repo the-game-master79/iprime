@@ -204,6 +204,51 @@ const TradingPanel = ({
     setOrderType("market");
   }
 
+  // Add this helper to format price with big digits for bid/ask
+  const renderPriceWithBigDigits = (value: string | number | undefined, decimals: number) => {
+    if (value === undefined) return "-";
+    const str = Number(value).toFixed(decimals);
+
+    if (decimals === 2) {
+      // Make the last 2 digits (including the decimal point) bigger
+      if (str.length < 4) return str;
+      const normal = str.slice(0, -3); // up to before ".dd"
+      const big = str.slice(-3); // ".dd"
+      return (
+        <>
+          {normal}
+          <span className="text-2xl font-bold">{big}</span>
+        </>
+      );
+    } else if (decimals > 2) {
+      // Make the last 2 digits bigger
+      const normal = str.slice(0, -2);
+      const big = str.slice(-2);
+      return (
+        <>
+          {normal}
+          <span className="text-2xl font-bold">{big}</span>
+        </>
+      );
+    }
+    // fallback
+    return str;
+  };
+
+  // Helper to get decimals for a symbol
+  const getPriceDecimals = (symbol: string) => {
+    if (symbol === "XAUUSD") return 2;
+    if (symbol.endsWith("JPY")) return 3;
+    if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
+    if (symbol === "DOGEUSDT") return 5;
+    if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
+    if (symbol === "DOTUSDT") return 3;
+    // Default: forex pairs (non-JPY, non-XSUPER, non-crypto)
+    if (!symbol.endsWith("USDT")) return 5;
+    // Fallback
+    return 2;
+  };
+
   return (
     <div className={`
       ${isMobile 
@@ -393,12 +438,12 @@ const TradingPanel = ({
               <div className="flex flex-col items-start">
                 <span className={`w-full ${isMobile ? 'text-sm' : 'text-md'} font-regular`}>Sell</span>
                 <span className={`${isMobile ? 'text-base' : 'text-lg'} w-full font-bold font-mono`}>
-                  {(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[0]}
-                  <span className={`${isMobile ? 'text-lg' : 'text-2xl'}`}>
-                    .{(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[1] || "00"}
-                  </span>
-                  </span>
-                </div>
+                  {renderPriceWithBigDigits(
+                    localPrices[selectedPair.symbol]?.price || selectedPair.price,
+                    getPriceDecimals(selectedPair.symbol)
+                  )}
+                </span>
+              </div>
             </button>
             <button
               className={`flex-1 ${isMobile ? 'h-16 px-3' : 'h-20 pl-5'} bg-primary text-white hover:bg-primary/80 text-left items-start rounded-lg ${
@@ -410,12 +455,12 @@ const TradingPanel = ({
               <div className="flex flex-col items-start">
                 <span className={`w-full ${isMobile ? 'text-sm' : 'text-md'} font-regular`}>Buy</span>
                 <span className={`${isMobile ? 'text-base' : 'text-lg'} w-full font-bold font-mono`}>
-                  {(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[0]}
-                  <span className={`${isMobile ? 'text-lg' : 'text-2xl'}`}>
-                    .{(localPrices[selectedPair.symbol]?.price || selectedPair.price).split(".")[1] || "00"}
-                  </span>
-                  </span>
-                </div>
+                  {renderPriceWithBigDigits(
+                    localPrices[selectedPair.symbol]?.price || selectedPair.price,
+                    getPriceDecimals(selectedPair.symbol)
+                  )}
+                </span>
+              </div>
             </button>
           </div>
 

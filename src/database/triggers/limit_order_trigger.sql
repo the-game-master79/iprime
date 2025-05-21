@@ -1,3 +1,6 @@
+-- Function: execute_limit_orders (executes pending limit trades when price matches)
+-- Triggers: check_limit_orders_crypto, check_limit_orders_forex
+
 -- Drop existing triggers first
 DROP TRIGGER IF EXISTS check_limit_orders_crypto ON crypto_prices;
 DROP TRIGGER IF EXISTS check_limit_orders_forex ON forex_prices;

@@ -140,6 +140,54 @@ const Sidebar = ({
     }
   };
   
+  // Add this helper to format price with big digits for bid/ask
+  const renderPriceWithBigDigits = (value: string | number | undefined, decimals: number) => {
+    if (value === undefined) return "-";
+    const str = Number(value).toFixed(decimals);
+
+    if (decimals === 2) {
+      // Make the digit before the decimal and the decimal point bigger
+      const dotIdx = str.indexOf(".");
+      if (dotIdx <= 0) return str;
+      const before = str.slice(0, dotIdx - 1);
+      const big = str.slice(dotIdx - 1, dotIdx + 1); // digit before + "."
+      const after = str.slice(dotIdx + 1);
+      return (
+        <>
+          {before}
+          <span className="text-lg font-bold">{big}</span>
+          {after}
+        </>
+      );
+    } else if (decimals > 2) {
+      // Make the last 2 digits bigger
+      const normal = str.slice(0, -2);
+      const big = str.slice(-2);
+      return (
+        <>
+          {normal}
+          <span className="text-lg font-bold">{big}</span>
+        </>
+      );
+    }
+    // fallback
+    return str;
+  };
+
+  // Helper to get decimals for a symbol
+  const getPriceDecimals = (symbol: string) => {
+    if (symbol === "XAUUSD") return 2;
+    if (symbol.endsWith("JPY")) return 3;
+    if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
+    if (symbol === "DOGEUSDT") return 5;
+    if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
+    if (symbol === "DOTUSDT") return 3;
+    // Default: forex pairs (non-JPY, non-XSUPER, non-crypto)
+    if (!symbol.endsWith("USDT")) return 5;
+    // Fallback
+    return 2;
+  };
+
   return (
     <>
       {/* Hamburger Menu Container - Only show on desktop */}
@@ -217,55 +265,58 @@ const Sidebar = ({
           
           {/* Market pairs grid */}
           <div className="grid grid-cols-1 gap-2 overflow-y-auto">
-            {filteredPairs.map((pair) => (
-              <Button
-                key={pair.symbol}
-                variant={selectedPair?.symbol === pair.symbol ? "default" : "ghost"}
-                className={`
-                  flex items-center justify-between p-4 
-                  ${isMobile ? "h-16" : "h-16"} 
-                  border border-border/50 rounded-lg
-                  group transition-all duration-200
-                  ${selectedPair?.symbol === pair.symbol
-                    ? "bg-secondary text-foreground border-primary"
-                    : "hover:bg-secondary/60 hover:text-foreground"}
-                `}
-                onClick={() => handlePairSelection(pair)}
-              >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={
-                      pair.symbol.endsWith("USDT")
-                        ? getCryptoImageForSymbol(pair.symbol)
-                        : getForexImageForSymbol(pair.symbol)
-                    }
-                    alt={pair.symbol}
-                    className="h-8 w-8"
-                  />
-                  <div className="flex flex-col text-left">
-                    <span className="font-medium group-hover:text-foreground/90 transition-colors">
-                      {formatPairName(pair.symbol)}
-                    </span>
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">
-                      {getFullName(pair.symbol)}
-                    </span>
+            {filteredPairs.map((pair) => {
+              const decimals = getPriceDecimals(pair.symbol);
+              return (
+                <Button
+                  key={pair.symbol}
+                  variant={selectedPair?.symbol === pair.symbol ? "default" : "ghost"}
+                  className={`
+                    flex items-center justify-between p-4 
+                    ${isMobile ? "h-16" : "h-16"} 
+                    border border-border/50 rounded-lg
+                    group transition-all duration-200
+                    ${selectedPair?.symbol === pair.symbol
+                      ? "bg-secondary text-foreground border-primary"
+                      : "hover:bg-secondary/60 hover:text-foreground"}
+                  `}
+                  onClick={() => handlePairSelection(pair)}
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={
+                        pair.symbol.endsWith("USDT")
+                          ? getCryptoImageForSymbol(pair.symbol)
+                          : getForexImageForSymbol(pair.symbol)
+                      }
+                      alt={pair.symbol}
+                      className="h-8 w-8"
+                    />
+                    <div className="flex flex-col text-left">
+                      <span className="font-medium group-hover:text-foreground/90 transition-colors">
+                        {formatPairName(pair.symbol)}
+                      </span>
+                      <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">
+                        {getFullName(pair.symbol)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div
-                    className={`font-mono transition-all duration-500 ${
-                      pair.isPriceUp === true
-                        ? "animate-price-up"
-                        : pair.isPriceUp === false
-                        ? "animate-price-down"
-                        : ""
-                    }`}
-                  >
-                    {pair.price || "0.00"}
+                  <div className="text-right">
+                    <div
+                      className={`font-mono font-medium transition-all duration-500 ${
+                        pair.isPriceUp === true
+                          ? "animate-price-up"
+                          : pair.isPriceUp === false
+                          ? "animate-price-down"
+                          : ""
+                      }`}
+                    >
+                      {renderPriceWithBigDigits(pair.price, decimals)}
+                    </div>
                   </div>
-                </div>
-              </Button>
-            ))}
+                </Button>
+              );
+            })}
             
             {/* Show empty state if no pairs match the search */}
             {filteredPairs.length === 0 && (

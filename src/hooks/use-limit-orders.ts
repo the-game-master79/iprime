@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 
+// Trade interface
 interface Trade {
   id: string;
   type: 'buy' | 'sell';
@@ -10,6 +11,7 @@ interface Trade {
   limitPrice?: number;
 }
 
+// useLimitOrders hook: listens for trade status updates (pending -> open) for limit orders
 interface PriceData {
   bid: string;
   ask: string;
