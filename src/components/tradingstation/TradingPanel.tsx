@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 
 // Import the chart component so we can use it in mobile view
@@ -77,8 +77,20 @@ const TradingPanel = ({
 }: TradingPanelProps) => {
   // Add state to control the custom dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  // Add state for 0% fees dialog
   const [showFeesDialog, setShowFeesDialog] = useState(false);
+
+  // --- FIX: Reset PnL display when all trades are closed (mobile) ---
+  // Add a local state to track the displayed PnL for mobile
+  const [mobilePnL, setMobilePnL] = useState<number>(totalOpenPnL);
+
+  // When openCount becomes 0, clear the mobilePnL
+  useEffect(() => {
+    if (openCount === 0) {
+      setMobilePnL(0);
+    } else {
+      setMobilePnL(totalOpenPnL);
+    }
+  }, [openCount, totalOpenPnL]);
 
   // Helper function to get TradingView symbol format
   const getTradingViewSymbol = (pair: PriceData | null): string => {
@@ -270,16 +282,16 @@ const TradingPanel = ({
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col items-end">
                     <span className="text-xs text-muted-foreground">Live P&L</span>
+                    {/* FIX: Only show PnL if there are open trades */}
                     {openCount === 0 ? (
                       <span className="font-medium text-gray-400">No trades</span>
                     ) : (
-                      <span className={`font-bold ${totalOpenPnL >= 0 ? "text-green-500" : "text-red-500"}`}>
-                        ${totalOpenPnL.toFixed(2)}
+                      <span className={`font-bold ${mobilePnL >= 0 ? "text-green-500" : "text-red-500"}`}>
+                        ${mobilePnL.toFixed(2)}
                       </span>
                     )}
                   </div>
-                  
-                  {/* Simple X button that opens our custom dialog */}
+                  {/* FIX: Only show X button if there are open trades */}
                   {openCount > 0 && (
                     <Button 
                       variant="ghost" 
