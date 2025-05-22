@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -51,7 +51,7 @@ const Login = () => {
   const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
 
   // Fix: Always measure the height of the currently active tab content
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (formWrapperRef.current) {
       // Find the active tab content inside the wrapper
       const activeContent = formWrapperRef.current.querySelector(
@@ -216,7 +216,7 @@ const Login = () => {
   };
 
   // Fetch current user's referral code and email after login/signup
-  useLayoutEffect(() => {
+  useEffect(() => {
     let ignore = false;
     supabase.auth.getUser?.().then(async (userRes) => {
       if (ignore) return;
@@ -243,7 +243,7 @@ const Login = () => {
   }, [supabase]);
 
   // Validate referral code on change
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!referralCode) {
       setReferralEmail(null);
       setReferralError(null);
