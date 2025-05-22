@@ -10,10 +10,10 @@ export default defineConfig({
     viteCompression({
       algorithm: 'gzip',
       ext: '.gz',
-      threshold: 10240, // Only compress files > 10KB
+      threshold: 10240,
       deleteOriginFile: false,
     }),
-    visualizer({ open: true }) // Optional: comment out if not needed
+    visualizer({ open: false }) // You can enable this for bundle analysis
   ],
   root: './',
   base: './',
@@ -25,19 +25,18 @@ export default defineConfig({
       usePolling: true,
     }
   },
-  
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false, // ✅ Hides .tsx source files in production
+    sourcemap: false, // ✅ hides .tsx in production
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,   // ✅ Removes all console logs
-        drop_debugger: true,  // ✅ Removes all debugger statements
+        drop_console: true,
+        drop_debugger: true,
       },
       format: {
-        comments: false,      // ✅ Strips all inline comments
+        comments: false,
       },
     },
     rollupOptions: {
@@ -57,7 +56,10 @@ export default defineConfig({
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
-      },
+        globals: {
+          react: 'React' // ✅ Prevents missing React reference in vendor bundle
+        }
+      }
     },
     chunkSizeWarningLimit: 1000,
   },
