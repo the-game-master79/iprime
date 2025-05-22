@@ -11,43 +11,6 @@
   ],
   "headers": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "no-referrer-when-downgrade"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "geolocation=(), microphone=(), camera=()"
-        },
-        {
-          "key": "Strict-Transport-Security",
-          "value": "max-age=63072000; includeSubDomains; preload"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://s3.tradingview.com https://www.tradingview.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://www.tradingview.com https://s3.tradingview.com; connect-src 'self' https://*.supabase.co https://www.google-analytics.com https://widget-api.tradingview.com wss://widgetdata.tradingview.com; frame-src https://s.tradingview.com https://www.tradingview.com; font-src 'self'; frame-ancestors 'none';"
-        }
-      ]
-    },
-    {
       "source": "/assets/(.*)",
       "headers": [
         {
@@ -60,8 +23,7 @@
   "build": {
     "env": {
       "NODE_VERSION": "18",
-      "NPM_VERSION": "9",
-      "NPM_CONFIG_FORCE": "true"
+      "NPM_VERSION": "9"
     }
   }
 }
