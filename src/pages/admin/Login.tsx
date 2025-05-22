@@ -23,10 +23,35 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { loginAdmin } = useAdminAuth();
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 60 * 1000; // 1 minute
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      toast({
+        title: "Too many failed attempts",
+        description: "Please wait before trying again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
+
+    // Password strength check (frontend)
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 8 characters, include a number and an uppercase letter.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       if (!loginAdmin) {
@@ -41,12 +66,21 @@ const AdminLogin = () => {
         description: "Welcome to the admin panel.",
       });
     } catch (error: any) {
-      console.error('Login error:', error);
-      toast({
-        title: "Authentication Failed", 
-        description: error.message || "Invalid credentials or not authorized.",
-        variant: "destructive",
-      });
+      setLoginAttempts(prev => prev + 1);
+      if (loginAttempts + 1 >= MAX_ATTEMPTS) {
+        setLockoutUntil(Date.now() + LOCKOUT_TIME);
+        toast({
+          title: "Too many failed attempts",
+          description: "Please wait before trying again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Authentication Failed",
+          description: "Login failed. Please check your credentials and try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -119,6 +153,7 @@ const AdminLogin = () => {
                   >
                     {isLoading ? "Processing..." : "Continue"}
                   </Button>
+                  {/* TODO: Add CAPTCHA here for production */}
                 </form>
               </div>
             </div>

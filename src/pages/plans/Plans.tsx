@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { DollarSign, Info, Bot, Coins } from "lucide-react";
 import { supabase } from "@/lib/supabase"; // Removed ShellLayout
@@ -8,6 +8,16 @@ import { Topbar } from "@/components/shared/Topbar"; // Added Topbar import
 import { BalanceCard } from "@/components/shared/BalanceCards"; // Add this import
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast"; // <-- add this import
+import {
+  getPlans,
+  getUserProfile,
+  getSubscribedPlans,
+  subscribeToPlan,
+  cancelPlanSubscription,
+  getTradingPairs,
+  getTotalInvested
+} from "@/pages/plans/planService";
 
 import { AvailablePlanVariant, ActivePlanVariant } from "@/components/shared/PlanCardVariants";
 
@@ -56,6 +66,8 @@ const getRandomGradient = () => {
   return gradients[Math.floor(Math.random() * gradients.length)];
 };
 
+const PAGE_SIZE = 6;
+
 const Plans = () => {
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -74,6 +86,23 @@ const Plans = () => {
   const [showAllPairs, setShowAllPairs] = useState(false);
   const [daysCount, setDaysCount] = useState(48);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [availableOffset, setAvailableOffset] = useState(0);
+  const [availableHasMore, setAvailableHasMore] = useState(true);
+  const [activeOffset, setActiveOffset] = useState(0);
+  const [activeHasMore, setActiveHasMore] = useState(true);
+  const { toast } = useToast();
+
+  // Loading states for Supabase actions
+  const [subscribing, setSubscribing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // DRY: Refund calculation utility
+  function getRefundDetails(investment: number) {
+    const forexFee = investment * 0.10;
+    const adminFee = investment * 0.05;
+    const refundAmount = investment - (forexFee + adminFee);
+    return { forexFee, adminFee, refundAmount };
+  }
 
   useEffect(() => {
     if (currentUser) return;
@@ -84,17 +113,11 @@ const Plans = () => {
     fetchUser();
   }, [currentUser]);
 
-  // Update calculateTotalInvested to accept user
+  // Refactored: calculateTotalInvested
   const calculateTotalInvested = async (user: any) => {
     try {
       if (!user) return 0;
-      const { data, error } = await supabase
-        .from('plans_subscriptions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
-      if (error) throw error;
-      const total = data?.reduce((sum, sub) => sum + (sub.amount || 0), 0) || 0;
+      const total = await getTotalInvested(user.id);
       setTotalInvested(total);
       return total;
     } catch (error) {
@@ -103,40 +126,38 @@ const Plans = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('plans')
-          .select('*')
-          .eq('status', 'active')
-          .order('investment', { ascending: true });
-
-        if (error) throw error;
-        setPlans(data || []);
-        if (data && data.length > 0) {
-          setSelectedPlan(data[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching plans:', error);
-      } finally {
-        setLoading(false);
+  // Refactored: fetchPlans
+  const fetchPlansHandler = async (reset = false) => {
+    try {
+      setLoading(true);
+      const offset = reset ? 0 : availableOffset;
+      const data = await getPlans(offset, PAGE_SIZE);
+      if (reset) {
+        setPlans(data);
+        setAvailableOffset(PAGE_SIZE);
+      } else {
+        setPlans(prev => [...prev, ...data]);
+        setAvailableOffset(offset + PAGE_SIZE);
       }
-    };
+      setAvailableHasMore((data.length || 0) === PAGE_SIZE);
+      if (data && data.length > 0 && reset) setSelectedPlan(data[0].id);
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchPlans();
+  useEffect(() => {
+    fetchPlansHandler(true);
+    // eslint-disable-next-line
   }, []);
 
-  // Update fetchUserProfile to accept user
-  const fetchUserProfile = async (user: any) => {
+  // Refactored: fetchUserProfile
+  const fetchUserProfileHandler = async (user: any) => {
     try {
       if (user) {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, withdrawal_wallet, total_invested')
-          .eq('id', user.id)
-          .single();
-        if (error) throw error;
+        const profile = await getUserProfile(user.id);
         setUserProfile(profile as UserProfile);
       }
     } catch (error) {
@@ -145,82 +166,55 @@ const Plans = () => {
   };
 
   useEffect(() => {
-    if (currentUser) fetchUserProfile(currentUser);
+    if (currentUser) fetchUserProfileHandler(currentUser);
   }, [currentUser]);
 
-  // Update fetchSubscribedPlans to accept user
-  const fetchSubscribedPlans = async (user: any) => {
+  // Refactored: fetchSubscribedPlans
+  const fetchSubscribedPlansHandler = async (user: any, reset = false) => {
     try {
       if (!user) return;
-      const { data: subscriptions, error: subsError } = await supabase
-        .from('plans_subscriptions')
-        .select(`
-          id,
-          plan_id,
-          created_at,
-          plans (*)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
-      if (subsError) throw subsError;
-      const plansWithEarnings = await Promise.all(
-        subscriptions.map(async (subscription) => {
-          const { data: earnings, error: earningsError } = await supabase
-            .from('transactions')
-            .select('amount, created_at')
-            .eq('user_id', user.id)
-            .eq('type', 'investment_return')
-            .eq('reference_id', subscription.id)
-            .eq('status', 'Completed')
-            .order('created_at', { ascending: false });
-          if (earningsError) throw earningsError;
-          const totalEarnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
-          const lastEarningDate = earnings?.[0]?.created_at;
-          const daysCredited = earnings?.length || 0;
-          return {
-            ...subscription.plans,
-            subscription_id: subscription.id,
-            subscription_date: format(new Date(subscription.created_at), "MMMM d, yyyy"),
-            actual_earnings: totalEarnings,
-            days_credited: daysCredited,
-            last_earning_date: lastEarningDate
-          };
-        })
-      );
-      setSubscribedPlans(plansWithEarnings);
+      const offset = reset ? 0 : activeOffset;
+      const plansWithEarnings = await getSubscribedPlans(user.id, offset, PAGE_SIZE);
+      if (reset) {
+        setSubscribedPlans(plansWithEarnings);
+        setActiveOffset(PAGE_SIZE);
+      } else {
+        setSubscribedPlans(prev => [...prev, ...plansWithEarnings]);
+        setActiveOffset(offset + PAGE_SIZE);
+      }
+      setActiveHasMore((plansWithEarnings.length || 0) === PAGE_SIZE);
     } catch (error) {
       console.error('Error fetching subscribed plans:', error);
     }
   };
 
   useEffect(() => {
-    if (currentUser) fetchSubscribedPlans(currentUser);
+    if (currentUser) fetchSubscribedPlansHandler(currentUser, true);
+    // eslint-disable-next-line
   }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) calculateTotalInvested(currentUser);
   }, [currentUser]);
 
-  // Fetch trading pairs for "Create Your Compute" tab
+  // Refactored: fetch trading pairs
   useEffect(() => {
-    const fetchTradingPairs = async () => {
+    const fetchTradingPairsHandler = async () => {
       setLoadingPairs(true);
       try {
-        const { data, error } = await supabase
-          .from('trading_pairs')
-          .select('id, symbol, image_url, type'); // <-- fetch type as well
-        if (error) throw error;
-        setTradingPairs(data || []);
+        const data = await getTradingPairs();
+        setTradingPairs(data);
       } catch (error) {
         console.error('Error fetching trading pairs:', error);
       } finally {
         setLoadingPairs(false);
       }
     };
-    fetchTradingPairs();
+    fetchTradingPairsHandler();
   }, []);
 
   const handleSubscribe = async (plan: Plan) => {
+    setSubscribing(true);
     try {
       if (!userProfile) {
         toast({
@@ -239,43 +233,37 @@ const Plans = () => {
         return;
       }
       if (!currentUser) return;
-      // Create subscription without wallet_type
-      const { data: subscription, error: subscriptionError } = await supabase
-        .from('plans_subscriptions')
-        .insert({
-          user_id: currentUser.id,
-          plan_id: plan.id,
-          amount: plan.investment,
-          status: 'approved'
-        })
-        .select()
-        .single();
-      if (subscriptionError) throw subscriptionError;
-      // Update withdrawal wallet balance directly
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          withdrawal_wallet: userProfile.withdrawal_wallet - plan.investment,
-          total_invested: (userProfile.total_invested || 0) + plan.investment 
-        })
-        .eq('id', currentUser.id);
-      if (updateError) throw updateError;
-      // Call the RPC function to distribute business volume
-       await supabase.rpc('distribute_business_volume', {
-       subscription_id: subscription.id,
-        user_id: currentUser.id,
-        amount: plan.investment
+
+      const newSubscribedPlan = await subscribeToPlan({
+        userId: currentUser.id,
+        plan,
+        withdrawal_wallet: userProfile.withdrawal_wallet,
+        total_invested: userProfile.total_invested
       });
 
       await calculateTotalInvested(currentUser);
+
+      setSubscribedPlans(prev => [newSubscribedPlan, ...prev]);
+
       toast({
         title: "Success",
         description: `Successfully subscribed to ${plan.name}`,
         variant: "default"
       });
-      // Refresh data
-      fetchSubscribedPlans(currentUser);
-      fetchUserProfile(currentUser);
+
+      setUserProfile(prev =>
+        prev
+          ? {
+              ...prev,
+              withdrawal_wallet: prev.withdrawal_wallet - plan.investment,
+              total_invested: (prev.total_invested || 0) + plan.investment,
+            }
+          : prev
+      );
+
+      fetchUserProfileHandler(currentUser);
+      // No need to call fetchSubscribedPlansHandler immediately, as we already updated state
+
     } catch (error) {
       console.error('Error subscribing to plan:', error);
       toast({
@@ -283,6 +271,8 @@ const Plans = () => {
         description: "Failed to subscribe to plan. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setSubscribing(false);
     }
   };
 
@@ -378,7 +368,7 @@ const Plans = () => {
         variant: "default"
       });
 
-      fetchSubscribedPlans(currentUser);
+      fetchSubscribedPlansHandler(currentUser, true);
 
     } catch (error) {
       console.error('Error cancelling subscription:', error);
@@ -395,31 +385,38 @@ const Plans = () => {
     setShowCancelDialog(true);
   };
 
+  // Refactored: handleCancelConfirm
   const handleCancelConfirm = async () => {
     if (!planToCancel) return;
-
+    setCancelling(true);
     try {
       if (!currentUser) return;
-      // Update subscription status to cancelled
-      const { error: updateError } = await supabase
-        .from('plans_subscriptions')
-        .update({ status: 'cancelled' })
-        .eq('id', planToCancel.subscription_id);
 
-      if (updateError) throw updateError;
+      const { refundAmount } = getRefundDetails(planToCancel.investment);
 
-      // Recalculate total invested
+      await cancelPlanSubscription({
+        subscription_id: planToCancel.subscription_id,
+        userId: currentUser.id,
+        refundAmount,
+        withdrawal_wallet: userProfile?.withdrawal_wallet || 0
+      });
+
+      // Remove the cancelled plan from the UI immediately
+      setSubscribedPlans(prev => prev.filter(p => p.subscription_id !== planToCancel.subscription_id));
+
       await calculateTotalInvested(currentUser);
       
       toast({
         title: "Success",
-        description: "Plan cancelled successfully",
+        description: "Plan cancelled successfully. Refund credited to your wallet.",
         variant: "default"
       });
 
       setShowCancelDialog(false);
       setPlanToCancel(null);
-      fetchSubscribedPlans(currentUser);
+      fetchUserProfileHandler(currentUser);
+      // Optionally, you can keep the fetchSubscribedPlansHandler for full sync, but UI is instant now
+      fetchSubscribedPlansHandler(currentUser, true);
 
     } catch (error) {
       console.error('Error cancelling subscription:', error);
@@ -428,7 +425,19 @@ const Plans = () => {
         description: "Failed to cancel plan",
         variant: "destructive"
       });
+    } finally {
+      setCancelling(false);
     }
+  };
+
+  // For "Load More" in Available Computes
+  const handleLoadMoreAvailable = () => {
+    fetchPlansHandler();
+  };
+
+  // For "Load More" in Active Computes
+  const handleLoadMoreActive = () => {
+    if (currentUser) fetchSubscribedPlansHandler(currentUser);
   };
 
   return (
@@ -510,15 +519,26 @@ const Plans = () => {
             </div>
 
             <TabsContent value="available" className="space-y-4">
-              <AvailablePlanVariant 
-                plans={plans}
-                loading={loading}
-                onInvest={handleInvestClick}
-              />
+              {loading ? (
+                <PlansSkeleton />
+              ) : (
+                <AvailablePlanVariant 
+                  plans={plans}
+                  loading={loading}
+                  onInvest={handleInvestClick}
+                />
+              )}
+              {availableHasMore && !loading && (
+                <div className="flex justify-center mt-4">
+                  <Button onClick={handleLoadMoreAvailable} variant="outline" disabled={loading}>
+                    {loading ? "Loading..." : "Load More"}
+                  </Button>
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="subscribed">
-              {subscribedPlans.length === 0 ? (
+              {subscribedPlans.length === 0 && !loading ? (
                 <div className="text-center py-12">
                   <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
                   <h3 className="mt-4 text-lg font-medium">No Active Computes</h3>
@@ -536,11 +556,22 @@ const Plans = () => {
                     View Available Computes
                   </Button>
                 </div>
+              ) : loading ? (
+                <PlansSkeleton />
               ) : (
-                <ActivePlanVariant 
-                  plans={subscribedPlans}
-                  onCancel={handleCancelClick}
-                />
+                <>
+                  <ActivePlanVariant 
+                    plans={subscribedPlans}
+                    onCancel={handleCancelClick}
+                  />
+                  {activeHasMore && (
+                    <div className="flex justify-center mt-4">
+                      <Button onClick={handleLoadMoreActive} variant="outline">
+                        Load More
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
 
@@ -555,20 +586,28 @@ const Plans = () => {
                       {/* Crypto Pairs */}
                       <div className="flex-1 bg-secondary rounded-lg border p-4">
                         <h4 className="font-semibold mb-2 text-xl text-foreground">Crypto Pairs</h4>
-                        <TradingPairsBento
-                          tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'crypto')}
-                          selectedPairId={selectedPairId}
-                          setSelectedPairId={setSelectedPairId}
-                        />
+                        {loadingPairs ? (
+                          <TradingPairsSkeleton />
+                        ) : (
+                          <TradingPairsBento
+                            tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'crypto')}
+                            selectedPairId={selectedPairId}
+                            setSelectedPairId={setSelectedPairId}
+                          />
+                        )}
                       </div>
                       {/* Forex Pairs */}
                       <div className="flex-1 bg-secondary rounded-lg border p-4">
                         <h4 className="font-semibold mb-2 text-xl text-foreground">Forex Pairs</h4>
-                        <TradingPairsBento
-                          tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'forex')}
-                          selectedPairId={selectedPairId}
-                          setSelectedPairId={setSelectedPairId}
-                        />
+                        {loadingPairs ? (
+                          <TradingPairsSkeleton />
+                        ) : (
+                          <TradingPairsBento
+                            tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'forex')}
+                            selectedPairId={selectedPairId}
+                            setSelectedPairId={setSelectedPairId}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -637,8 +676,10 @@ const Plans = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmSubscription}>Confirm</AlertDialogAction>
+              <AlertDialogCancel disabled={subscribing}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmSubscription} disabled={subscribing}>
+                {subscribing ? "Subscribing..." : "Confirm"}
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -668,31 +709,34 @@ const Plans = () => {
                       </span>
                     </div>
                     <Separator className="my-2" />
-                    {planToCancel && (
-                      <>
-                        <div className="flex justify-between text-destructive/80">
-                          <span>Pre-closure Fee (10%):</span>
-                          <span>-${(planToCancel.investment * 0.10).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-destructive/80">
-                          <span>Admin Fee (5%):</span>
-                          <span>-${(planToCancel.investment * 0.05).toLocaleString()}</span>
-                        </div>
-                        <Separator className="my-2" />
-                        <div className="flex justify-between font-medium">
-                          <span>Final Refund Amount:</span>
-                          <span>${(planToCancel.investment * 0.85).toLocaleString()}</span>
-                        </div>
-                      </>
-                    )}
+                    {planToCancel && (() => {
+                      const { forexFee, adminFee, refundAmount } = getRefundDetails(planToCancel.investment);
+                      return (
+                        <>
+                          <div className="flex justify-between text-destructive/80">
+                            <span>Pre-closure Fee (10%):</span>
+                            <span>-{forexFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between text-destructive/80">
+                            <span>Admin Fee (5%):</span>
+                            <span>-{adminFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <Separator className="my-2" />
+                          <div className="flex justify-between font-medium">
+                            <span>Final Refund Amount:</span>
+                            <span>{refundAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Keep Plan</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90">
-                Cancel Plan
+              <AlertDialogCancel disabled={cancelling}>Keep Plan</AlertDialogCancel>
+              <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90" disabled={cancelling}>
+                {cancelling ? "Cancelling..." : "Cancel Plan"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -705,42 +749,6 @@ const Plans = () => {
 
 export default Plans;
 
-function toast({ title, description, variant }: { title: string; description: string; variant: string }) {
-  const toastContainer = document.createElement("div");
-  toastContainer.className = `toast toast-${variant}`;
-  toastContainer.style.position = "fixed";
-  toastContainer.style.bottom = "20px";
-  toastContainer.style.right = "20px";
-  toastContainer.style.padding = "16px";
-  toastContainer.style.backgroundColor = variant === "destructive" ? "#f44336" : "#4caf50";
-  toastContainer.style.color = "#fff";
-  toastContainer.style.borderRadius = "4px";
-  toastContainer.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.2)";
-  toastContainer.style.zIndex = "1000";
-
-  const toastTitle = document.createElement("strong");
-  toastTitle.textContent = title;
-  toastTitle.style.display = "block";
-  toastTitle.style.marginBottom = "8px";
-
-  const toastDescription = document.createElement("span");
-  toastDescription.textContent = description;
-
-  toastContainer.appendChild(toastTitle);
-  toastContainer.appendChild(toastDescription);
-
-  document.body.appendChild(toastContainer);
-
-  setTimeout(() => {
-    toastContainer.style.opacity = "0";
-    toastContainer.style.transition = "opacity 0.5s";
-    setTimeout(() => {
-      document.body.removeChild(toastContainer);
-    }, 500);
-  }, 3000);
-}
-
-import React from "react";
 function TradingPairsBento({
   tradingPairs,
   selectedPairId,
@@ -818,5 +826,35 @@ function TradingPairsBento({
         </div>
       )}
     </>
+  );
+}
+
+// Skeleton for plans
+function PlansSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[...Array(PAGE_SIZE)].map((_, i) => (
+        <div key={i} className="rounded-lg border bg-muted/40 p-6 animate-pulse h-[220px]">
+          <div className="h-6 w-1/2 bg-muted mb-4 rounded"></div>
+          <div className="h-4 w-1/3 bg-muted mb-2 rounded"></div>
+          <div className="h-4 w-2/3 bg-muted mb-2 rounded"></div>
+          <div className="h-8 w-1/2 bg-muted mt-6 rounded"></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Skeleton for trading pairs
+function TradingPairsSkeleton() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-muted/40 animate-pulse w-32 h-12">
+          <div className="w-8 h-8 rounded-full bg-muted" />
+          <div className="h-4 w-12 bg-muted rounded" />
+        </div>
+      ))}
+    </div>
   );
 }

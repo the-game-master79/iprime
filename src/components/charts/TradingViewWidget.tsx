@@ -195,7 +195,6 @@ function TradingViewWidget({
           className="absolute top-0 right-0 z-50 flex mt-2 items-center"
           style={{ pointerEvents: "auto" }}
         >
-          <span className="font-medium text-xs text-white px-2 py-1">Unrealized P&L:</span>
           <span 
             className={`font-bold font-mono text-xs px-2 py-1 ${
               totalPnL > 0
@@ -207,19 +206,6 @@ function TradingViewWidget({
           >
             {totalPnL.toFixed(2)} USD
           </span>
-          {/* Only show the close button if there are open trades (totalPnL is not zero) */}
-          {totalPnL !== 0 && (
-            <button
-              onClick={handleCloseAllTrades}
-              className="flex items-center justify-center rounded-full hover:bg-red-500/20 hover:text-red-500 transition-colors cursor-pointer w-6 h-6"
-              title="Close All Open Positions"
-              type="button"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12"></path>
-              </svg>
-            </button>
-          )}
         </div>
       )}
       

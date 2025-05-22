@@ -121,7 +121,7 @@ const getPriceChangeClass = (isUp?: boolean) => {
 
 // Add this helper to format price with big digits
 const renderPriceWithBigDigits = (value: number | undefined, decimals: number) => {
-  if (value === undefined) return "-";
+  if (value === undefined) return <span className="text-xs text-muted-foreground">Awaiting tick</span>;
   const str = Number(value).toFixed(decimals);
 
   if (decimals === 2) {
@@ -187,18 +187,24 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const { isMobile } = useBreakpoints();
   const { canInstall, install } = usePwaInstall();
   const { theme, setTheme } = useTheme();
+  const { user: authUser } = useAuth(); // <-- get user from context
 
-  // Add user state
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  // Replace useState/useEffect for currentUser with this:
+  const [currentUser, setCurrentUser] = useState<any>(authUser);
 
   useEffect(() => {
-    if (currentUser) return;
+    // If authUser is available, always use it
+    if (authUser) {
+      setCurrentUser(authUser);
+      return;
+    }
+    // Fallback: fetch from supabase if not present
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
     };
     fetchUser();
-  }, [currentUser]);
+  }, [authUser]);
 
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -247,6 +253,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   // Add this state near other state declarations
@@ -256,12 +263,25 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [showDirectsDialog, setShowDirectsDialog] = useState(false);
 
+  // Add ranksLoading state for loading indicator in ranks tab
+  const [ranksLoading, setRanksLoading] = useState(false);
+
   // Only symbol and image_url from Supabase, but display static bid/ask values
   const [cryptoData, setCryptoData] = useState<{ symbol: string, image_url: string }[]>([]);
   const [forexData, setForexData] = useState<{ symbol: string, image_url: string }[]>([]);
 
   // Add state for live prices (now storing price and isPriceUp)
   const [marketPrices, setMarketPrices] = useState<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
+
+  // Debounced market price update ref
+  const marketPricesRef = React.useRef(marketPrices);
+  const pendingUpdatesRef = React.useRef<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
+  const rafRef = React.useRef<number | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    marketPricesRef.current = marketPrices;
+  }, [marketPrices]);
 
   // Add state for closed trades
   const [closedTrades, setClosedTrades] = useState<Trade[]>([]);
@@ -605,16 +625,26 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   };
 
   // Event handlers
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    toast({
-      title: "Referral Link Copied!",
-      description: "Share this Link in your network",
-    });
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(referralLink);
+      toast({
+        title: "Referral Link Copied!",
+        description: "Share this Link in your network",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard. Please copy manually.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleShowQrCode = async () => {
     try {
+      // NOTE: window.location.origin is safe here because this is a trusted dashboard context.
+      // For transactional QR codes, use a server-signed URL.
       const referralUrl = `${window.location.origin}/auth/login?ref=${userProfile?.referral_code}&tab=register`;
       const qrDataUrl = await QRCode.toDataURL(referralUrl);
       setQrCodeUrl(qrDataUrl);
@@ -633,6 +663,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const fetchTransactions = async (user: any, pageNumber = 1) => {
     try {
       setIsLoadingMore(true);
+      setTransactionsLoading(true);
       if (!user) return;
 
       const from = (pageNumber - 1) * ITEMS_PER_PAGE;
@@ -651,7 +682,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (pageNumber === 1) {
         setTransactions(data || []);
       } else {
-        // Filter out any duplicate transactions by ID
         setTransactions(prev => {
           const existingIds = new Set(prev.map(tx => tx.id));
           const newTransactions = (data || []).filter(tx => !existingIds.has(tx.id));
@@ -664,19 +694,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       console.error('Error fetching transactions:', error);
     } finally {
       setIsLoadingMore(false);
-    }
-  };
-
-  // Add load more handler
-  const handleLoadMore = () => {
-    if (!isLoadingMore && hasMore && currentUser) {
-      setPage(prev => prev + 1);
-      fetchTransactions(currentUser, page + 1);
+      setTransactionsLoading(false);
     }
   };
 
   const fetchRanks = async () => {
     try {
+      setRanksLoading(true);
       const { data, error } = await supabase
         .from('ranks')
         .select('*')
@@ -686,26 +710,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       setRanks(data || []);
     } catch (error) {
       console.error('Error fetching ranks:', error);
+    } finally {
+      setRanksLoading(false);
     }
   };
 
-  // Add this function with other fetch functions
-  const fetchPromotions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('promotions')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPromotions(data || []);
-    } catch (error) {
-      console.error('Error fetching promotions:', error);
-    }
-  };
-
-  // Fetch closed trades from trades table
+  // Update fetchClosedTrades to set loading state
   const fetchClosedTrades = async (user: any) => {
     if (!user) return;
     setClosedTradesLoading(true);
@@ -726,6 +736,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
+  // Fetch promotions from Supabase
+  const fetchPromotions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPromotions(data || []);
+    } catch (error) {
+      setPromotions([]);
+      console.error('Error fetching promotions:', error);
+    }
+  };
+
   // Effects
   useEffect(() => {
     let mounted = true;
@@ -733,7 +760,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
     const initializeDashboard = async () => {
       if (!mounted || !currentUser) return;
-      await Promise.all([
+      // Batch all fetches and don't throw if one fails
+      await Promise.allSettled([
         fetchUserProfile(currentUser),
         fetchReferralData(currentUser),
         fetchCommissions(currentUser),
@@ -788,12 +816,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     return () => {};
   }, []);
 
-  const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    toast({
-      title: "Copied",
-      description: "Transaction ID copied to clipboard",
-    });
+  const handleCopyId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      toast({
+        title: "Copied",
+        description: "Transaction ID copied to clipboard",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard. Please copy manually.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleTradeClick = () => {
@@ -862,26 +898,34 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        // Accept price, or fallback to bid, or ask (like TradingStation)
         const price =
           data.data?.price ??
           data.data?.bid ??
           data.data?.ask;
         if (data.symbol && price) {
-          setMarketPrices(prev => {
-            const symbol = data.symbol.toUpperCase();
-            const prevPrice = parseFloat(prev[symbol]?.price || "0");
-            const newPrice = parseFloat(price);
-            return {
-              ...prev,
-              [symbol]: {
-                price: price.toString(),
-                bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
-                ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
-                isPriceUp: newPrice > prevPrice
-              }
-            };
-          });
+          const symbol = data.symbol.toUpperCase();
+          const prevPrice = parseFloat(marketPricesRef.current[symbol]?.price || "0");
+          const newPrice = parseFloat(price);
+
+          // Batch updates in pendingUpdatesRef
+          pendingUpdatesRef.current[symbol] = {
+            price: price.toString(),
+            bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
+            ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
+            isPriceUp: newPrice > prevPrice
+          };
+
+          // Debounce with requestAnimationFrame
+          if (rafRef.current === null) {
+            rafRef.current = window.requestAnimationFrame(() => {
+              setMarketPrices(prev => ({
+                ...prev,
+                ...pendingUpdatesRef.current
+              }));
+              pendingUpdatesRef.current = {};
+              rafRef.current = null;
+            });
+          }
         }
       } catch (e) {}
     };
@@ -891,11 +935,39 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
     return () => {
       if (isOpen) ws.close();
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      pendingUpdatesRef.current = {};
     };
   }, [cryptoData, forexData]);
 
   // Determine if the forex market is open
   const forexMarketOpen = isForexTradingTime();
+
+  function handleLoadMore(event: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
+    event.preventDefault();
+    if (isLoadingMore || !currentUser) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchTransactions(currentUser, nextPage);
+  }
+
+  // Utility to trim referral link for display
+  const getTrimmedReferralLink = (link: string) => {
+    if (!link) return "";
+    // Show ...ref=abc123 (last 10 chars after 'ref='), keep protocol and domain
+    const refMatch = link.match(/ref=([a-zA-Z0-9]+)/);
+    if (link.length <= 38) return link;
+    if (refMatch) {
+      const refCode = refMatch[1];
+      const base = link.split('?')[0];
+      return `${base}/...ref=${refCode}`;
+    }
+    // fallback: trim middle
+    return link.slice(0, 18) + "..." + link.slice(-10);
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
@@ -930,7 +1002,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                       <div className="relative flex-1">
                         <Input
                           readOnly
-                          value={referralLink}
+                          // Show trimmed visually, but keep full value for copy/QR
+                          value={getTrimmedReferralLink(referralLink)}
+                          title={referralLink}
                           className="w-full pr-[120px] pl-4 font-mono text-foreground text-sm bg-secondary-foreground h-12 border border-border"
                         />
                         <div className="absolute right-1 top-1 h-10 flex items-center gap-1">
@@ -984,12 +1058,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
                       {/* AI Trading Balance */}
                       <div className="flex-1">
-                        <div className="rounded-lg bg-secondary-foreground p-4">
+                        {/* Add hover effect: scale and shadow */}
+                        <div
+                          className="rounded-lg bg-secondary-foreground p-4 transition-transform duration-200 hover:scale-[1.03] hover:shadow-lg group cursor-pointer"
+                          tabIndex={0}
+                          title="View AI Trading Plans"
+                          onClick={() => navigate('/plans')}
+                          onKeyDown={e => { if (e.key === 'Enter') navigate('/plans'); }}
+                          style={{ outline: "none" }}
+                        >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               {/* AI Trading Box with "AI" text, no fill, only stroke */}
                               <div
-                                className="flex items-center justify-center h-8 w-8 border-2 border-foreground rounded-lg"
+                                className="flex items-center justify-center h-8 w-8 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
                               >
                                   <span
                                     className="text-base font-bold uppercase text-foreground"
@@ -1296,7 +1378,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     value="transactions" 
                     className="space-y-3 w-full"
                   >
-                    {transactions.length === 0 ? (
+                    {transactionsLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : transactions.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Target 
                           className="h-16 w-16 mb-4 text-white/20"
@@ -1342,14 +1428,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   </TabsContent>
 
                   <TabsContent value="ranks" className="space-y-4 w-full">
-                    <RankTable
-                      ranks={ranks}
-                      businessVolume={businessStats.totalVolume}
-                      currentRank={businessStats.currentRank}
-                      claimedRanks={claimedRanks}
-                      claimingRank={claimingRank}
-                      onClaimBonus={handleClaimRankBonus}
-                    />
+                    {ranksLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : (
+                      <RankTable
+                        ranks={ranks}
+                        businessVolume={businessStats.totalVolume}
+                        currentRank={businessStats.currentRank}
+                        claimedRanks={claimedRanks}
+                        claimingRank={claimingRank}
+                        onClaimBonus={handleClaimRankBonus}
+                      />
+                    )}
                   </TabsContent>
 
                   {/* Closed Trades Tab */}
@@ -1467,14 +1559,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
         <DialogContent className="bg-secondary border-0">
           <DialogHeader>
-            <DialogTitle>Share Referral Code</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-bold tracking-tight text-foreground">Share Referral Code</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
               Scan this QR code to share your referral link
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center p-4 space-y-4">
             {qrCodeUrl && (
-              <div className="bg-white p-4 rounded-lg">
+              <div className="bg-foreground p-4 rounded-lg">
                 <img src={qrCodeUrl} alt="Referral QR Code" className="w-64 h-64" />
               </div>
             )}
@@ -1483,12 +1575,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                 <Input
                   readOnly
                   value={referralLink}
-                  className="pr-24 bg-[#1E1E1E] border-0"
+                  className="pr-24 bg-secondary-foreground text-foreground border-0"
                 />
                 <Button
                   size="sm"
                   onClick={handleCopyLink}
-                  className="absolute right-1 top-1 h-7"
+                  className="absolute right-1 top-2 h-7 bg-primary"
                 >
                   Copy Link
                 </Button>

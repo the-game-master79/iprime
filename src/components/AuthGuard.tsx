@@ -27,9 +27,14 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
         replace: true 
       });
     } else if (user && authPage) {
-      // Navigate to platform by default, unless there's a specific return path
+      // Prevent redirect loop: only redirect if not already on /platform
       const returnPath = location.state?.from || '/platform';
-      navigate(returnPath, { replace: true });
+      if (location.pathname !== returnPath) {
+        // Optional: add a short delay for UX (e.g., splash/transition)
+        setTimeout(() => {
+          navigate(returnPath, { replace: true });
+        }, 400);
+      }
     }
   }, [user, loading, navigate, location]);
 
@@ -43,3 +48,5 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
 
   return <>{children}</>;
 };
+
+export default AuthGuard;

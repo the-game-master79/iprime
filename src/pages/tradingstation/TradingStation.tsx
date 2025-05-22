@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 
@@ -8,10 +8,18 @@ import { supabase } from "@/lib/supabase-client";
 // Import our custom components
 import Navbar from "@/components/tradingstation/Navbar";
 import Sidebar from "@/components/tradingstation/Sidebar";
-import TradingPanel from "@/components/tradingstation/TradingPanel";
 import ChartComponent from "@/components/tradingstation/ChartComponent";
-import ActivityPanel from "@/components/tradingstation/ActivityPanel";
 import { Button } from "@/components/ui/button";
+import TradingPanel from "@/components/tradingstation/TradingPanel";
+import ActivityPanel from "@/components/tradingstation/ActivityPanel";
+
+// Lazy load TradingPanel and ActivityPanel for mobile only
+const LazyTradingPanel = typeof window !== "undefined" && window.innerWidth < 768
+  ? React.lazy(() => import("@/components/tradingstation/TradingPanel"))
+  : null;
+const LazyActivityPanel = typeof window !== "undefined" && window.innerWidth < 768
+  ? React.lazy(() => import("@/components/tradingstation/ActivityPanel"))
+  : null;
 
 // WebSocket URL from environment variables
 const WS_URL = import.meta.env.VITE_WS_URL || "wss://transfers.cloudforex.club/ws";
@@ -32,7 +40,8 @@ const TradingStation = () => {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
-  const [activeTab, setActiveTab] = useState<"forex" | "crypto">("forex");
+  // Change default tab to "crypto"
+  const [activeTab, setActiveTab] = useState<"forex" | "crypto">("crypto");
   const [selectedPair, setSelectedPair] = useState<PriceData | null>(null);
   const [quantity, setQuantity] = useState<number>(0.01); // Set initial value to 0.01
   const [balance, setBalance] = useState<number>(0); // User's balance
@@ -45,6 +54,9 @@ const TradingStation = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null); // Animation frame ref for throttling price updates
+  const pendingPricesRef = useRef<Record<string, PriceData>>({}); // Pending price updates
+
   const [wsStatus, setWsStatus] = useState<"connecting" | "connected" | "disconnected" | "error">("disconnected");
   // Add state to track initial page load
   const initialLoadRef = useRef(true);
@@ -118,7 +130,7 @@ const TradingStation = () => {
       setCurrentUser(user);
     };
     fetchUser();
-  }, [currentUser]);
+  }, []);
 
   // Fetch user's balance from Supabase
   useEffect(() => {
@@ -181,18 +193,24 @@ const TradingStation = () => {
               data.data?.bid ??
               data.data?.ask;
             if (data.symbol && price) {
-              setLocalPrices((prev) => {
-                const prevPrice = parseFloat(prev[data.symbol]?.price || "0");
-                const newPrice = parseFloat(price);
-                return {
-                  ...prev,
-                  [data.symbol]: {
-                    price: price.toString(),
-                    symbol: data.symbol,
-                    isPriceUp: newPrice > prevPrice, // Determine if price went up
-                  },
-                };
-              });
+              // Throttle price updates using requestAnimationFrame
+              const prevPrice = parseFloat(localPrices[data.symbol]?.price || "0");
+              const newPrice = parseFloat(price);
+              pendingPricesRef.current[data.symbol] = {
+                price: price.toString(),
+                symbol: data.symbol,
+                isPriceUp: newPrice > prevPrice,
+              };
+              if (!rafRef.current) {
+                rafRef.current = window.requestAnimationFrame(() => {
+                  setLocalPrices((prev) => ({
+                    ...prev,
+                    ...pendingPricesRef.current,
+                  }));
+                  pendingPricesRef.current = {};
+                  rafRef.current = null;
+                });
+              }
             }
           } catch (error) {
             console.error("Error processing WebSocket message:", error);
@@ -247,6 +265,11 @@ const TradingStation = () => {
       if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
         wsRef.current.close();
         wsRef.current = null;
+      }
+      // Cancel any pending animation frame
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
     };
   }, []); // Empty dependency array ensures this runs only once
@@ -1678,78 +1701,117 @@ const TradingStation = () => {
 
             {/* Trading Panel - visible on mobile only when activeView is trading */}
             <div className={`${isMobile && activeView !== "trading" ? "hidden" : ""} ${isMobile ? "w-full h-full" : ""}`}>
-              <TradingPanel
-                selectedPair={selectedPair}
-                quantity={quantity}
-                setQuantity={setQuantity}
-                selectedLeverage={selectedLeverage}
-                handleLeverageChange={handleLeverageChange}
-                leverageOptions={leverageOptions}
-                margin={margin}
-                balance={balance}
-                freeMargin={freeMargin}
-                usedMargin={usedMargin}
-                localPrices={localPrices}
-                handlePlaceTrade={handlePlaceTrade}
-                calculatePipValue={calculatePipValue}
-                calculateVolumeWithLeverage={calculateVolumeWithLeverage}
-                getQuoteCurrency={getQuoteCurrency}
-                calculateActualVolume={calculateActualVolume}
-                formatLargeNumber={formatLargeNumber}
-                orderType={orderType}
-                setOrderType={setOrderType}
-                getFullName={getFullName}
-                getCryptoImageForSymbol={getCryptoImageForSymbol}
-                getForexImageForSymbol={getForexImageForSymbol}
-                isMobile={isMobile}
-                timezone={userTimezone}
-                totalOpenPnL={totalOpenPnL}
-                closeAllTrades={closeAllTrades}
-                openCount={openCount}
-                lotsLimits={lotsLimits}
-              />
+              {isMobile && LazyTradingPanel ? (
+                <Suspense fallback={<div className="p-4 text-center">Loading trading panel...</div>}>
+                  <LazyTradingPanel
+                    selectedPair={selectedPair}
+                    quantity={quantity}
+                    setQuantity={setQuantity}
+                    selectedLeverage={selectedLeverage}
+                    handleLeverageChange={handleLeverageChange}
+                    leverageOptions={leverageOptions}
+                    margin={margin}
+                    balance={balance}
+                    freeMargin={freeMargin}
+                    usedMargin={usedMargin}
+                    localPrices={localPrices}
+                    handlePlaceTrade={handlePlaceTrade}
+                    calculatePipValue={calculatePipValue}
+                    calculateVolumeWithLeverage={calculateVolumeWithLeverage}
+                    getQuoteCurrency={getQuoteCurrency}
+                    calculateActualVolume={calculateActualVolume}
+                    formatLargeNumber={formatLargeNumber}
+                    orderType={orderType}
+                    setOrderType={setOrderType}
+                    getFullName={getFullName}
+                    getCryptoImageForSymbol={getCryptoImageForSymbol}
+                    getForexImageForSymbol={getForexImageForSymbol}
+                    isMobile={isMobile}
+                    timezone={userTimezone}
+                    totalOpenPnL={totalOpenPnL}
+                    closeAllTrades={closeAllTrades}
+                    openCount={openCount}
+                    lotsLimits={lotsLimits}
+                  />
+                </Suspense>
+              ) : (
+                !isMobile && (
+                  <TradingPanel
+                    selectedPair={selectedPair}
+                    quantity={quantity}
+                    setQuantity={setQuantity}
+                    selectedLeverage={selectedLeverage}
+                    handleLeverageChange={handleLeverageChange}
+                    leverageOptions={leverageOptions}
+                    margin={margin}
+                    balance={balance}
+                    freeMargin={freeMargin}
+                    usedMargin={usedMargin}
+                    localPrices={localPrices}
+                    handlePlaceTrade={handlePlaceTrade}
+                    calculatePipValue={calculatePipValue}
+                    calculateVolumeWithLeverage={calculateVolumeWithLeverage}
+                    getQuoteCurrency={getQuoteCurrency}
+                    calculateActualVolume={calculateActualVolume}
+                    formatLargeNumber={formatLargeNumber}
+                    orderType={orderType}
+                    setOrderType={setOrderType}
+                    getFullName={getFullName}
+                    getCryptoImageForSymbol={getCryptoImageForSymbol}
+                    getForexImageForSymbol={getForexImageForSymbol}
+                    isMobile={isMobile}
+                    timezone={userTimezone}
+                    totalOpenPnL={totalOpenPnL}
+                    closeAllTrades={closeAllTrades}
+                    openCount={openCount}
+                    lotsLimits={lotsLimits}
+                  />
+                )
+              )}
             </div>
           </div>
         </div>
 
         {/* Activity Panel - Only show in mobile when activeView is "activity" */}
         {isMobile && activeView === "activity" ? (
-          <div className="w-full h-full">
-            <ActivityPanel
-              isCollapsed={isCollapsed}
-              activityCollapsed={false} // Always expanded in mobile view
-              setActivityCollapsed={setActivityCollapsed}
-              activityHeight={activityHeight}
-              activeTradeTab={activeTradeTab}
-              setActiveTradeTab={setActiveTradeTab}
-              openCount={openCount}
-              pendingCount={pendingCount}
-              closedCount={closedCount}
-              totalOpenPnL={totalOpenPnL}
-              totalClosedPnL={totalClosedPnL}
-              renderOpenTrades={(trades) => renderTrades(trades)}
-              renderPendingTrades={(trades) => renderTrades(trades)}
-              renderClosedTrades={renderClosedTrades}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              handlePageChange={handlePageChange}
-              balance={balance}
-              usedMargin={usedMargin}
-              freeMargin={freeMargin}
-              marginLevel={marginLevel}
-              onResizeStart={onResizeStart}
-              openTrades={openTrades}
-              pendingTrades={pendingTrades}
-              localPrices={localPrices}
-              handleCloseTrade={handleCloseTrade}
-              formatPairName={formatPairName}
-              getCryptoImageForSymbol={getCryptoImageForSymbol}
-              getForexImageForSymbol={getForexImageForSymbol}
-              getPriceDecimals={getPriceDecimals}
-              closedTrades={closedTrades}
-              fullPage={true} // Set fullPage mode to true for mobile
-            />
-          </div>
+          LazyActivityPanel ? (
+            <Suspense fallback={<div className="p-4 text-center">Loading activity...</div>}>
+              <LazyActivityPanel
+                isCollapsed={isCollapsed}
+                activityCollapsed={false} // Always expanded in mobile view
+                setActivityCollapsed={setActivityCollapsed}
+                activityHeight={activityHeight}
+                activeTradeTab={activeTradeTab}
+                setActiveTradeTab={setActiveTradeTab}
+                openCount={openCount}
+                pendingCount={pendingCount}
+                closedCount={closedCount}
+                totalOpenPnL={totalOpenPnL}
+                totalClosedPnL={totalClosedPnL}
+                renderOpenTrades={(trades) => renderTrades(trades)}
+                renderPendingTrades={(trades) => renderTrades(trades)}
+                renderClosedTrades={renderClosedTrades}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                handlePageChange={handlePageChange}
+                balance={balance}
+                usedMargin={usedMargin}
+                freeMargin={freeMargin}
+                marginLevel={marginLevel}
+                onResizeStart={onResizeStart}
+                openTrades={openTrades}
+                pendingTrades={pendingTrades}
+                localPrices={localPrices}
+                handleCloseTrade={handleCloseTrade}
+                formatPairName={formatPairName}
+                getCryptoImageForSymbol={getCryptoImageForSymbol}
+                getForexImageForSymbol={getForexImageForSymbol}
+                getPriceDecimals={getPriceDecimals}
+                closedTrades={closedTrades}
+                fullPage={true} // Set fullPage mode to true for mobile
+              />
+            </Suspense>
+          ) : null
         ) : !isMobile && (
           // Desktop version - standard bottom panel
           <ActivityPanel

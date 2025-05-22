@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 // Replace Lucide icons with Phosphor regular icons
 import {
@@ -52,8 +52,29 @@ const isValidOccupation = (occupation: string) => /^[A-Za-z\s-]+$/.test(occupati
 // Postal code: only numbers, spaces, hyphens allowed (no alphabets)
 const isValidPostalCode = (code: string) => /^[0-9\s-]+$/.test(code);
 
-// Add phone validation helper
-const isValidPhone = (phone: string) => /^\d+$/.test(phone);
+// Stronger phone validation: 7-15 digits, optional leading +
+const isValidPhone = (phone: string) => {
+  const clean = phone.replace(/[^0-9]/g, "");
+  return clean.length >= 7 && clean.length <= 15;
+};
+
+// Sanitize input helper
+const sanitizeInput = (input: string) =>
+  input.replace(/[^\w\s\-.,@']/gi, "").trim();
+
+// Debounce hook
+function useDebouncedCallback<T extends (...args: any[]) => void>(callback: T, delay: number) {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cbRef = useRef(callback);
+  cbRef.current = callback;
+
+  return useCallback((...args: Parameters<T>) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      cbRef.current(...args);
+    }, delay);
+  }, [delay]);
+}
 
 const Profile = () => {
   const { profile, loading } = useUserProfile();
@@ -109,13 +130,13 @@ const Profile = () => {
   });
 
   const [isLoadingKyc, setIsLoadingKyc] = useState(false);
-  const [kycData, setKycData] = useState<any>(null);
 
   // Add new state for location dropdowns
   const [countryInfo, setCountryInfo] = useState<{name: string, code: string, phone: string} | null>(null);
   const [cityError, setCityError] = useState("");
   const [postalError, setPostalError] = useState("");
   const [phonePrefix, setPhonePrefix] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Add validation states
   const [nameError, setNameError] = useState("");
@@ -270,7 +291,7 @@ const Profile = () => {
       });
       
       // Refresh user data
-      await fetchProfile();
+      await loadProfile();
       
     } catch (error: any) {
       toast({
@@ -283,27 +304,12 @@ const Profile = () => {
     }
   };
 
-  const fetchReferrerName = async (referralCode: string) => {
+  // Unified profile and KYC loader
+  const loadProfile = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('referral_code', referralCode)
-        .single();
-  
-      if (error || !data) return null;
-      return data.full_name;
-    } catch (error) {
-      return null;
-    }
-  };
+      if (!currentUser) return;
 
-  // Main fetchProfile function (keep only one)
-  const fetchProfile = async () => {
-    try {
-      if (!currentUser) return; // Only run if currentUser is set
-
-      // Get profile data including contact details
+      // Fetch profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
@@ -356,179 +362,76 @@ const Profile = () => {
         setCurrentReferrerName(referrerMaskedEmail);
       }
 
-      // Fetch KYC data
-      const { data: kycData } = await supabase
+      // Fetch latest KYC data
+      const { data: kycRows, error: kycError } = await supabase
         .from('kyc')
         .select('*')
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
-      if (kycData?.[0]) {
-        setKycData(kycData[0]);
-        // Only set KYC form data if status is not rejected
-        if (profile?.kyc_status !== 'rejected') {
-          setKycFormData({
-            full_name: kycData[0].full_name || "",
-            date_of_birth: kycData[0].date_of_birth || "",
-            address: kycData[0].address || "",
-            city: kycData[0].city || "",
-            state: kycData[0].state || "",
-            country: kycData[0].country || "",
-            document_type: kycData[0].document_type || "passport",
-            document_number: kycData[0].document_number || "",
-            document_front: null,
-            document_back: null,
-            occupation: kycData[0].occupation || "",
-            postal_code: kycData[0].postal_code || ""
-          });
-        } else {
-          // Reset form if KYC was rejected
-          setKycFormData({
-            full_name: "",
-            date_of_birth: "",
-            address: "",
-            city: "",
-            state: "",
-            country: "",
-            document_type: "passport",
-            document_number: "",
-            document_front: null,
-            document_back: null,
-            occupation: "",
-            postal_code: ""
-          });
-        }
+      let kyc = kycRows?.[0];
+
+      // Only set KYC form data if status is not rejected, else reset
+      if (kyc && profile?.kyc_status !== 'rejected') {
+        setKycFormData({
+          full_name: kyc.full_name || "",
+          date_of_birth: kyc.date_of_birth || "",
+          address: kyc.address || "",
+          city: kyc.city || "",
+          state: kyc.state || "",
+          country: kyc.country || "",
+          document_type: kyc.document_type || "passport",
+          document_number: kyc.document_number || "",
+          document_front: null,
+          document_back: null,
+          occupation: kyc.occupation || "",
+          postal_code: kyc.postal_code || ""
+        });
+      } else {
+        setKycFormData({
+          full_name: "",
+          date_of_birth: "",
+          address: "",
+          city: "",
+          state: "",
+          country: "",
+          document_type: "passport",
+          document_number: "",
+          document_front: null,
+          document_back: null,
+          occupation: "",
+          postal_code: ""
+        });
       }
 
-    } catch (error) {
-      console.error('Profile fetch failed:', {
-        error,
-        type: error instanceof Error ? error.constructor.name : typeof error,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
+      // Optionally, you can store kyc.updated_at in a ref or variable if needed for UI
 
+    } catch (error) {
+      console.error(error);
       toast({
         title: "Error Loading Profile",
         description: error instanceof Error ? error.message : "Failed to load profile data",
         variant: "destructive",
       });
     }
-  };
+  }, [currentUser, toast, fetchReferrerMaskedEmail]);
 
+  // Only load profile once per user session
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
-
-  // Add validation handlers
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (!isValidName(value)) {
-      setNameError("Only letters, spaces and hyphens are allowed");
-    } else {
-      setNameError("");
-    }
-    setKycFormData(prev => ({...prev, full_name: value}));
-  };
-
-  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (!isValidAge(value)) {
-      setDobError("You must be at least 16 years old");
-    } else {
-      setDobError("");
-    }
-    setKycFormData(prev => ({...prev, date_of_birth: value}));
-  };
-
-  const handleFileValidation = (file: File | null) => {
-    if (!file) return false;
-    
-    if (file.size > MAX_FILE_SIZE) {
-      setFileError("File size must be less than 10MB");
-      return false;
-    }
-    
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      setFileError("Only JPG, PNG, SVG and PDF files are allowed");
-      return false;
-    }
-    
-    setFileError("");
-    return true;
-  };
-
-  // Add city validation handler
-  const handleCityChange = (value: string) => {
-    if (!isValidCity(value)) {
-      setCityError("Only letters, spaces and hyphens are allowed");
-    } else {
-      setCityError("");
-    }
-    setKycFormData(prev => ({...prev, city: value}));
-  };
-
-  // Add handlers before the return statement
-  const handlePostalChange = (value: string) => {
-    if (!isValidPostalCode(value)) {
-      setPostalError("Only numbers, spaces and hyphens are allowed");
-    } else {
-      setPostalError("");
-    }
-    setKycFormData(prev => ({...prev, postal_code: value}));
-  };
-
-  // Add phone validation handler
-  const handlePhoneChange = (value: string) => {
-    // Remove any non-digit characters 
-    const cleanValue = value.replace(/[^\d]/g, '');
-    
-    if (!cleanValue) {
-      setPhoneError("Phone number is required");
-      setUserData(prev => ({...prev, phone: cleanValue}));
-      return;
-    }
-
-    if (!/^\d+$/.test(cleanValue)) {
-      setPhoneError("Only numbers are allowed");
-    } else if (cleanValue.length > 40) {
-      setPhoneError("Phone number cannot exceed 40 digits");
-    } else {
-      setPhoneError("");
-    }
-
-    // Store the number with the country code
-    setUserData(prev => ({...prev, phone: cleanValue.slice(0, 40)}));
-  };
-
-  // Add state validation handler
-  const handleStateChange = (value: string) => {
-    if (!isValidState(value)) {
-      setStateError("Only letters, spaces and hyphens are allowed");
-    } else {
-      setStateError("");
-    }
-    setKycFormData(prev => ({...prev, state: value}));
-  };
-
-  // Add occupation validation handler
-  const handleOccupationChange = (value: string) => {
-    if (!isValidOccupation(value)) {
-      setOccupationError("Only letters, spaces and hyphens are allowed");
-    } else {
-      setOccupationError("");
-    }
-    setKycFormData(prev => ({...prev, occupation: value}));
-  };
-
-  // Effect to set initial country info and phone prefix
   useEffect(() => {
-    if (userData.country) {
-      const country = countryList[0].find(c => c.name === userData.country);
-      if (country) {
-        setCountryInfo(country);
-        setPhonePrefix(country.phone);
-      }
+    if (currentUser && !profileLoaded) {
+      loadProfile().then(() => setProfileLoaded(true));
     }
-  }, [userData.country]);    const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
+  }, [currentUser, profileLoaded, loadProfile]);
+
+  // Reset loaded state if user changes (logout/login)
+  useEffect(() => {
+    setProfileLoaded(false);
+  }, [currentUser?.id]);
+
+  const handlePersonalInfoUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate required fields before submission
@@ -555,7 +458,7 @@ const Profile = () => {
     if (!isValidPhone(userData.phone)) {
       toast({
         title: "Error",
-        description: "Please enter a valid phone number",
+        description: "Please enter a valid phone number (7-15 digits)",
         variant: "destructive",
       });
       return;
@@ -566,14 +469,15 @@ const Profile = () => {
     try {
       if (!currentUser) throw new Error('No user found');
 
+      // Sanitize all inputs before DB write
       const updates = {
-        phone: `${phonePrefix}${userData.phone}`,
-        address: userData.address,
-        city: userData.city,
-        country: userData.country,
-        first_name: userData.firstName,
-        last_name: userData.lastName,
-        full_name: `${userData.firstName} ${userData.lastName}`.trim(),
+        phone: `${phonePrefix}${sanitizeInput(userData.phone)}`,
+        address: sanitizeInput(userData.address),
+        city: sanitizeInput(userData.city),
+        country: sanitizeInput(userData.country),
+        first_name: sanitizeInput(userData.firstName),
+        last_name: sanitizeInput(userData.lastName),
+        full_name: `${sanitizeInput(userData.firstName)} ${sanitizeInput(userData.lastName)}`.trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -592,7 +496,7 @@ const Profile = () => {
       });
 
       // Refresh profile data
-      await fetchProfile();
+      await loadProfile();
 
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -613,10 +517,57 @@ const Profile = () => {
     }));
   };
 
+  // Helper to get preview URL for file
+  const getFilePreview = (file: File | null) => {
+    if (!file) return null;
+    if (file.type.startsWith("image/")) {
+      return URL.createObjectURL(file);
+    }
+    // For PDF or others, show a generic icon or text
+    return null;
+  };
+
+  // Remove file handler
+  const handleRemoveFile = (docType: 'front' | 'back') => {
+    setSelectedFiles(prev => ({
+      ...prev,
+      [docType]: null
+    }));
+    setKycFormData(prev => ({
+      ...prev,
+      [docType === 'front' ? 'document_front' : 'document_back']: null
+    }));
+  };
+
   const handleSubmitKYC = async () => {
     setIsSubmittingKYC(true);
+    setUploading(true);
     try {
       if (!currentUser) return;
+
+      // Throttle KYC submission: check last_kyc_submitted_at
+      const { data: lastKyc, error: lastKycError } = await supabase
+        .from('kyc')
+        .select('created_at')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(); // <-- changed from .single() to .maybeSingle()
+
+      if (lastKyc && lastKyc.created_at) {
+        const last = new Date(lastKyc.created_at).getTime();
+        const now = Date.now();
+        if (now - last < 5 * 60 * 1000) {
+          toast({
+            title: "Too Many Attempts",
+            description: "Please wait at least 5 minutes before submitting KYC again.",
+            variant: "destructive",
+          });
+          setIsSubmittingKYC(false);
+          setUploading(false);
+          return;
+        }
+      }
 
       if (!kycFormData.document_front || !kycFormData.document_back) {
         throw new Error('Please select both front and back documents');
@@ -630,7 +581,36 @@ const Profile = () => {
         }
       }
 
-      // Create the storage path with user ID
+      // Sanitize all KYC form fields before upload
+      const sanitizedKycFormData = {
+        ...kycFormData,
+        full_name: sanitizeInput(kycFormData.full_name),
+        address: sanitizeInput(kycFormData.address),
+        city: sanitizeInput(kycFormData.city),
+        state: sanitizeInput(kycFormData.state),
+        country: sanitizeInput(kycFormData.country),
+        document_type: sanitizeInput(kycFormData.document_type),
+        document_number: sanitizeInput(kycFormData.document_number),
+        occupation: sanitizeInput(kycFormData.occupation),
+        postal_code: sanitizeInput(kycFormData.postal_code)
+      };
+
+      // Restrict file upload MIME type at "server" (client-side before upload)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/svg+xml', 'application/pdf'];
+      if (
+        !kycFormData.document_front ||
+        !allowedTypes.includes(kycFormData.document_front.type)
+      ) {
+        throw new Error('Front document type not allowed');
+      }
+      if (
+        !kycFormData.document_back ||
+        !allowedTypes.includes(kycFormData.document_back.type)
+      ) {
+        throw new Error('Back document type not allowed');
+      }
+
+      // Only store storage path, not public URL
       const frontFileName = `${currentUser.id}/front_${Date.now()}${getFileExtension(kycFormData.document_front.name)}`;
       const backFileName = `${currentUser.id}/back_${Date.now()}${getFileExtension(kycFormData.document_back.name)}`;
 
@@ -652,25 +632,25 @@ const Profile = () => {
         });
       if (backError) throw backError;
 
-      // Get public URLs
-      const frontUrl = supabase.storage.from('kyc_documents').getPublicUrl(frontFileName).data.publicUrl;
-      const backUrl = supabase.storage.from('kyc_documents').getPublicUrl(backFileName).data.publicUrl;
+      // Store only the storage path (not public URL)
+      const frontPath = frontFileName;
+      const backPath = backFileName;
 
-      // First try to delete any existing KYC record
+      // Delete any existing KYC record
       await supabase
         .from('kyc')
         .delete()
         .eq('user_id', currentUser.id);
 
-      // Then create new KYC record
+      // Insert new KYC record with storage paths
       const { error: kycError } = await supabase
         .from('kyc')
         .insert({
           user_id: currentUser.id,
-          document_front: frontUrl,
-          document_back: backUrl,
+          document_front: frontPath,
+          document_back: backPath,
           status: 'processing',
-          ...kycFormData,
+          ...sanitizedKycFormData,
           updated_at: new Date().toISOString(),
           created_at: new Date().toISOString()
         });
@@ -715,7 +695,7 @@ const Profile = () => {
         postal_code: ""
       });
 
-      await fetchProfile();
+      await loadProfile();
 
     } catch (error: any) {
       console.error('Error submitting KYC:', error);
@@ -726,6 +706,7 @@ const Profile = () => {
       });
     } finally {
       setIsSubmittingKYC(false);
+      setUploading(false);
     }
   };
 
@@ -760,6 +741,44 @@ const Profile = () => {
       setBasicDetailsSet(!!(profile?.phone && profile?.address && profile?.city && profile?.country));
     }
   }, [profile, currentUser]);
+
+  // Memoize country array
+  const countries = useMemo(() => countryList[0], [countryList]);
+
+  // Debounced referral code validation
+  const debouncedValidateReferralCode = useDebouncedCallback(validateReferralCode, 300);
+
+  function handleNameChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const value = event.target.value;
+    setKycFormData(prev => ({ ...prev, full_name: value }));
+    if (!isValidName(value)) {
+      setNameError("Name can only contain letters, spaces, and hyphens.");
+    } else {
+      setNameError("");
+    }
+  }
+  function handleDobChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const value = event.target.value;
+    setKycFormData(prev => ({ ...prev, date_of_birth: value }));
+    if (!isValidAge(value)) {
+      setDobError("You must be at least 16 years old.");
+    } else {
+      setDobError("");
+    }
+  }
+  function handleFileValidation(file: File): boolean {
+    if (!file) return false;
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("File size must be less than 10MB.");
+      return false;
+    }
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      setFileError("Invalid file type. Only JPG, PNG, SVG, and PDF are allowed.");
+      return false;
+    }
+    setFileError("");
+    return true;
+  }
 
   return (
     <>
@@ -802,7 +821,11 @@ const Profile = () => {
                               id="firstName"
                               name="firstName"
                               value={userData.firstName}
-                              onChange={e => setUserData(prev => ({ ...prev, firstName: e.target.value }))}
+                              onChange={e => setUserData(prev => ({
+                                ...prev,
+                                firstName: e.target.value,
+                                fullName: `${e.target.value} ${prev.lastName}`.trim()
+                              }))}
                               placeholder="First Name"
                               className="bg-secondary text-foreground placeholder:text-foreground"
                             />
@@ -813,7 +836,11 @@ const Profile = () => {
                               id="lastName"
                               name="lastName"
                               value={userData.lastName}
-                              onChange={e => setUserData(prev => ({ ...prev, lastName: e.target.value }))}
+                              onChange={e => setUserData(prev => ({
+                                ...prev,
+                                lastName: e.target.value,
+                                fullName: `${prev.firstName} ${e.target.value}`.trim()
+                              }))}
                               placeholder="Last Name"
                               className="bg-secondary text-foreground placeholder:text-foreground"
                             />
@@ -848,7 +875,7 @@ const Profile = () => {
                             <Select
                               value={userData.country}
                               onValueChange={(value) => {
-                                const country = countryList[0].find(c => c.name === value);
+                                const country = countries.find(c => c.name === value);
                                 if (country) {
                                   setCountryInfo(country);
                                   setPhonePrefix(country.phone);
@@ -862,10 +889,10 @@ const Profile = () => {
                             >
                               <SelectTrigger className="bg-secondary text-foreground">
                                 <SelectValue placeholder="Select your country" className="text-foreground">
-                                  {userData.country && countryList[0].find(c => c.name === userData.country) && (
+                                  {userData.country && countries.find(c => c.name === userData.country) && (
                                     <div className="flex items-center gap-2">
                                       <img
-                                        src={`https://flagcdn.com/w20/${countryList[0].find(c => c.name === userData.country)?.code.toLowerCase()}.png`}
+                                        src={`https://flagcdn.com/w20/${countries.find(c => c.name === userData.country)?.code.toLowerCase()}.png`}
                                         alt={`${userData.country} flag`}
                                         className="h-4 w-auto object-contain"
                                       />
@@ -877,7 +904,7 @@ const Profile = () => {
                               <SelectContent position="popper" align="start" side="bottom" sideOffset={5} className="w-[400px] bg-secondary text-foreground">
                                 <ScrollArea className="h-[200px]">
                                   <SelectGroup>
-                                    {countryList[0].map((country) => (
+                                    {countries.map((country) => (
                                       <SelectItem
                                         key={`personal-${country.code}`}
                                         value={country.name}
@@ -1031,10 +1058,13 @@ const Profile = () => {
                               placeholder="Enter referral code"
                               value={referralCode}
                               onChange={(e) => {
-                                setReferralCode(e.target.value);
-                                validateReferralCode(e.target.value);
+                                // Only allow alphanumeric, max 8 chars
+                                let value = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
+                                setReferralCode(value);
+                                debouncedValidateReferralCode(value);
                               }}
                               className="bg-secondary text-foreground placeholder:text-foreground"
+                              maxLength={8}
                             />
                             {isValidatingCode && (
                               <p className="text-sm text-muted-foreground">
@@ -1076,235 +1106,262 @@ const Profile = () => {
                       </div>
                     ) : (
                       <KycVariant 
-                        status={userData.kycStatus || 'required'} 
-                        date={kycData?.updated_at ? new Date(kycData.updated_at) : undefined}
+                        status={
+                          (['completed', 'processing', 'rejected', 'required'].includes(userData.kycStatus)
+                            ? userData.kycStatus
+                            : 'required'
+                          ) as 'completed' | 'processing' | 'rejected' | 'required'
+                        }
+                        date={undefined}
                       />
                     )}
 
                     {/* Show KYC form for rejected, pending or initial state */}
                     {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
-                        <div className="space-y-8">
-                          {/* Personal Details Section */}
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <UserIcon className="h-4 w-4 text-blue-600" weight="regular" />
-                              </div>
-                              <h3 className="text-lg font-medium text-foreground">Personal Details</h3>
+                      <div className="space-y-8">
+                        {/* Personal Details Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <UserIcon className="h-4 w-4 text-blue-600" weight="regular" />
                             </div>
+                            <h3 className="text-lg font-medium text-foreground">Personal Details</h3>
+                          </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2">
-                                <label htmlFor="full_name" className="text-sm text-muted-foreground">
-                                  Full Name (as per the document)
-                                </label>
-                                <Input
-                                  id="full_name"
-                                  value={kycFormData.full_name}
-                                  onChange={handleNameChange}
-                                  className={`bg-secondary text-foreground placeholder:text-foreground ${nameError ? "border-red-500" : ""}`}
-                                  placeholder="Enter your full name"
-                                  aria-label="Full Name"
-                                />
-                                {nameError && <p className="text-xs text-red-500">{nameError}</p>}
-                              </div>
-                              <div className="space-y-2">
-                                <label htmlFor="date_of_birth" className="text-sm text-muted-foreground">
-                                  Date of Birth
-                                </label>
-                                <div className="relative">
-                                  <Input
-                                    id="date_of_birth"
-                                    type="date"
-                                    max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
-                                    value={kycFormData.date_of_birth}
-                                    onChange={handleDobChange}
-                                    className={`bg-secondary text-foreground placeholder:text-foreground ${dobError ? "border-red-500 pr-10" : "pr-10"}`}
-                                    placeholder="Date of Birth"
-                                    style={{ colorScheme: "dark" }}
-                                  />
-                                  {/* White calendar icon overlay */}
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                    <CalendarIcon color="#fff" size={20} weight="regular" />
-                                  </span>
-                                </div>
-                                {dobError && <p className="text-xs text-red-500">{dobError}</p>}
-                              </div>
-                            </div>
-
+                          <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                              <label htmlFor="address" className="text-sm text-muted-foreground">
-                                Residential Address
+                              <label htmlFor="full_name" className="text-sm text-muted-foreground">
+                                Full Name (as per the document)
                               </label>
                               <Input
-                                id="address"
-                                value={kycFormData.address}
-                                onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
-                                placeholder="Enter your residential address"
-                                className="w-full bg-secondary text-foreground placeholder:text-foreground"
-                                aria-label="Residential Address"
+                                id="full_name"
+                                value={kycFormData.full_name}
+                                onChange={handleNameChange}
+                                className={`bg-secondary text-foreground placeholder:text-foreground ${nameError ? "border-red-500" : ""}`}
+                                placeholder="Enter your full name"
+                                aria-label="Full Name"
                               />
+                              {nameError && <p className="text-xs text-red-500">{nameError}</p>}
                             </div>
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2">
-                                <label htmlFor="country" className="text-sm text-muted-foreground">
-                                  Country
-                                </label>
-                                <Select
-                                  value={kycFormData.country}
-                                  onValueChange={(value) => setKycFormData(prev => ({...prev, country: value}))}
-                                >
-                                  <SelectTrigger className="bg-secondary text-foreground">
-                                    <SelectValue placeholder="Your country" className="text-foreground" />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-secondary text-foreground">
-                                    <SelectItem value="passport" className="text-foreground">Passport</SelectItem>
-                                    <SelectItem value="national_id" className="text-foreground">National ID Card</SelectItem>
-                                    <SelectItem value="driving_license" className="text-foreground">Driving License</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label htmlFor="state" className="text-sm text-muted-foreground">
-                                  State/Province
-                                </label>
+                            <div className="space-y-2">
+                              <label htmlFor="date_of_birth" className="text-sm text-muted-foreground">
+                                Date of Birth
+                              </label>
+                              <div className="relative">
                                 <Input
-                                  id="state"
-                                  value={kycFormData.state}
-                                  onChange={e => {
-                                    // Only allow letters, spaces, hyphens
-                                    const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
-                                    setKycFormData(prev => ({ ...prev, state: value }));
-                                  }}
-                                  placeholder="Enter your state or province"
-                                  aria-label="State or Province"
-                                  className="bg-secondary text-foreground placeholder:text-foreground"
+                                  id="date_of_birth"
+                                  type="date"
+                                  max={format(subYears(new Date(), 16), 'yyyy-MM-dd')}
+                                  value={kycFormData.date_of_birth}
+                                  onChange={handleDobChange}
+                                  className={`bg-secondary text-foreground placeholder:text-foreground ${dobError ? "border-red-500 pr-10" : "pr-10"}`}
+                                  placeholder="Date of Birth"
+                                  style={{ colorScheme: "dark" }}
                                 />
+                                {/* White calendar icon overlay */}
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                  <CalendarIcon color="#fff" size={20} weight="regular" />
+                                </span>
                               </div>
-                            </div>
-
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2">
-                                <label htmlFor="city" className="text-sm text-muted-foreground">
-                                  City
-                                </label>
-                                <Input
-                                  id="city"
-                                  value={kycFormData.city}
-                                  onChange={e => {
-                                    // Only allow letters, spaces, hyphens
-                                    const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
-                                    setKycFormData(prev => ({ ...prev, city: value }));
-                                  }}
-                                  placeholder="Your city name"
-                                  className="bg-secondary text-foreground placeholder:text-foreground"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label htmlFor="postal_code" className="text-sm text-muted-foreground">
-                                  Postal Code
-                                </label>
-                                <Input
-                                  id="postal_code"
-                                  value={kycFormData.postal_code}
-                                  onChange={e => {
-                                    // Only allow numbers, spaces, hyphens
-                                    const value = e.target.value.replace(/[^0-9\s-]/g, "");
-                                    setKycFormData(prev => ({ ...prev, postal_code: value }));
-                                  }}
-                                  placeholder="Enter your postal code"
-                                  aria-label="Postal Code"
-                                  className="bg-secondary text-foreground placeholder:text-foreground"
-                                />
-                              </div>
+                              {dobError && <p className="text-xs text-red-500">{dobError}</p>}
                             </div>
                           </div>
 
-                          {/* Document Identification Section */}
-                          <div className="space-y-4 pt-4 border-t border-secondary">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <CreditCardIcon className="h-4 w-4 text-blue-600" weight="regular" />
-                              </div>
-                              <h3 className="text-lg font-medium text-foreground">Document Identification</h3>
-                            </div>
+                          <div className="space-y-2">
+                            <label htmlFor="address" className="text-sm text-muted-foreground">
+                              Residential Address
+                            </label>
+                            <Input
+                              id="address"
+                              value={kycFormData.address}
+                              onChange={(e) => setKycFormData(prev => ({...prev, address: e.target.value}))}
+                              placeholder="Enter your residential address"
+                              className="w-full bg-secondary text-foreground placeholder:text-foreground"
+                              aria-label="Residential Address"
+                            />
+                          </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2">
-                                <Select 
-                                  value={kycFormData.document_type}
-                                  onValueChange={(value: DocumentType) => 
-                                    setKycFormData(prev => ({...prev, document_type: value}))
-                                  }
-                                >
-                                  <SelectTrigger className="bg-secondary text-foreground">
-                                    <SelectValue placeholder="Select document type" className="text-foreground" />
-                                  </SelectTrigger>
-                                  <SelectContent className="bg-secondary text-foreground">
-                                    <SelectItem value="passport" className="text-foreground">Passport</SelectItem>
-                                    <SelectItem value="national_id" className="text-foreground">National ID Card</SelectItem>
-                                    <SelectItem value="driving_license" className="text-foreground">Driving License</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label htmlFor="document_number" className="text-sm text-muted-foreground">
-                                  Document Number
-                                </label>
-                                <Input
-                                  id="document_number"
-                                  value={kycFormData.document_number}
-                                  onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
-                                  placeholder="Enter your document number"
-                                  aria-label="Document Number"
-                                  className="bg-secondary text-foreground placeholder:text-foreground"
-                                />
-                              </div>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <label htmlFor="country" className="text-sm text-muted-foreground">
+                                Country
+                              </label>
+                              <Select
+                                value={kycFormData.country}
+                                onValueChange={(value) => setKycFormData(prev => ({...prev, country: value}))}
+                              >
+                                <SelectTrigger className="bg-secondary text-foreground" id="document_type">
+                                  <SelectValue placeholder="Select document type" className="text-foreground" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-secondary text-foreground">
+                                  <SelectItem value="passport" className="text-foreground">Passport</SelectItem>
+                                  <SelectItem value="national_id" className="text-foreground">National ID Card</SelectItem>
+                                  <SelectItem value="driving_license" className="text-foreground">Driving License</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
 
                             <div className="space-y-2">
-                              <label htmlFor="occupation" className="text-sm text-muted-foreground">
-                                Occupation
+                              <label htmlFor="state" className="text-sm text-muted-foreground">
+                                State/Province
                               </label>
                               <Input
-                                id="occupation"
-                                value={kycFormData.occupation}
+                                id="state"
+                                value={kycFormData.state}
                                 onChange={e => {
                                   // Only allow letters, spaces, hyphens
                                   const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
-                                  setKycFormData(prev => ({ ...prev, occupation: value }));
+                                  setKycFormData(prev => ({ ...prev, state: value }));
                                 }}
-                                placeholder="Your occupation"
+                                placeholder="Enter your state or province"
+                                aria-label="State or Province"
                                 className="bg-secondary text-foreground placeholder:text-foreground"
                               />
                             </div>
                           </div>
 
-                          {/* Document Upload Section */}
-                          <div className="space-y-4 pt-4 border-t border-secondary">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                <UploadIcon className="h-4 w-4 text-blue-600" weight="regular" />
-                              </div>
-                              <h3 className="text-lg font-medium text-foreground">Document Upload</h3>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <label htmlFor="city" className="text-sm text-muted-foreground">
+                                City
+                              </label>
+                              <Input
+                                id="city"
+                                value={kycFormData.city}
+                                onChange={e => {
+                                  // Only allow letters, spaces, hyphens
+                                  const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
+                                  setKycFormData(prev => ({ ...prev, city: value }));
+                                }}
+                                placeholder="Your city name"
+                                className="bg-secondary text-foreground placeholder:text-foreground"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label htmlFor="postal_code" className="text-sm text-muted-foreground">
+                                Postal Code
+                              </label>
+                              <Input
+                                id="postal_code"
+                                value={kycFormData.postal_code}
+                                onChange={e => {
+                                  // Only allow numbers, spaces, hyphens
+                                  const value = e.target.value.replace(/[^0-9\s-]/g, "");
+                                  setKycFormData(prev => ({ ...prev, postal_code: value }));
+                                }}
+                                placeholder="Enter your postal code"
+                                aria-label="Postal Code"
+                                className="bg-secondary text-foreground placeholder:text-foreground"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Document Identification Section */}
+                        <div className="space-y-4 pt-4 border-t border-secondary">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <CreditCardIcon className="h-4 w-4 text-blue-600" weight="regular" />
+                            </div>
+                            <h3 className="text-lg font-medium text-foreground">Document Identification</h3>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <label htmlFor="document_type" className="text-sm text-muted-foreground">
+                                Document Type
+                              </label>
+                              <Select 
+                                value={kycFormData.document_type}
+                                onValueChange={(value: DocumentType) => 
+                                  setKycFormData(prev => ({...prev, document_type: value}))
+                                }
+                              >
+                                <SelectTrigger className="bg-secondary text-foreground" id="document_type">
+                                  <SelectValue placeholder="Select document type" className="text-foreground" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-secondary text-foreground">
+                                  <SelectItem value="passport" className="text-foreground">Passport</SelectItem>
+                                  <SelectItem value="national_id" className="text-foreground">National ID Card</SelectItem>
+                                  <SelectItem value="driving_license" className="text-foreground">Driving License</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
 
-                            <div className="rounded-lg border border-dashed p-4 bg-secondary/50">
-                              <p className="font-medium text-sm mb-2 text-foreground">Document Upload Requirements:</p>
-                              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                                <li>File size must be less than 10MB</li>
-                                <li>Accepted formats: JPG, PNG, SVG, PDF</li>
-                                <li>Images must be clear and legible</li>
-                                <li>All document edges must be visible</li>
-                                <li>No videos or animated GIFs allowed</li>
-                              </ul>
+                            <div className="space-y-2">
+                              <label htmlFor="document_number" className="text-sm text-muted-foreground">
+                                Document Number
+                              </label>
+                              <Input
+                                id="document_number"
+                                value={kycFormData.document_number}
+                                onChange={(e) => setKycFormData(prev => ({...prev, document_number: e.target.value}))}
+                                placeholder="Enter your document number"
+                                aria-label="Document Number"
+                                className="bg-secondary text-foreground placeholder:text-foreground"
+                              />
                             </div>
+                          </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                              <div className="space-y-2">
+                          <div className="space-y-2">
+                            <label htmlFor="occupation" className="text-sm text-muted-foreground">
+                              Occupation
+                            </label>
+                            <Input
+                              id="occupation"
+                              value={kycFormData.occupation}
+                              onChange={e => {
+                                // Only allow letters, spaces, hyphens
+                                const value = e.target.value.replace(/[^A-Za-z\s-]/g, "");
+                                setKycFormData(prev => ({ ...prev, occupation: value }));
+                              }}
+                              placeholder="Your occupation"
+                              className="bg-secondary text-foreground placeholder:text-foreground"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Document Upload Section */}
+                        <div className="space-y-4 pt-4 border-t border-secondary">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <UploadIcon className="h-4 w-4 text-blue-600" weight="regular" />
+                            </div>
+                            <h3 className="text-lg font-medium text-foreground">Document Upload</h3>
+                          </div>
+
+                          <div className="rounded-lg border border-dashed p-4 bg-secondary/50">
+                            <p className="font-medium text-sm mb-2 text-foreground">Document Upload Requirements:</p>
+                            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                              <li>File size must be less than 10MB</li>
+                              <li>Accepted formats: JPG, PNG, SVG, PDF</li>
+                              <li>Images must be clear and legible</li>
+                              <li>All document edges must be visible</li>
+                              <li>No videos or animated GIFs allowed</li>
+                            </ul>
+                          </div>
+
+                          {/* File preview and upload */}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {/* Front Document */}
+                            <div className="space-y-2">
+                              <label className="block text-sm text-muted-foreground mb-1">Front of Document</label>
+                              {selectedFiles.front ? (
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-foreground font-medium">
+                                    {selectedFiles.front.name}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRemoveFile('front')}
+                                    className="ml-2"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ) : (
                                 <Input 
                                   id="idFront" 
                                   type="file" 
@@ -1318,9 +1375,27 @@ const Profile = () => {
                                     }
                                   }}
                                 />
-                              </div>
-
-                              <div className="space-y-2">
+                              )}
+                            </div>
+                            {/* Back Document */}
+                            <div className="space-y-2">
+                              <label className="block text-sm text-muted-foreground mb-1">Back of Document</label>
+                              {selectedFiles.back ? (
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-foreground font-medium">
+                                    {selectedFiles.back.name}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRemoveFile('back')}
+                                    className="ml-2"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ) : (
                                 <Input 
                                   id="idBack" 
                                   type="file" 
@@ -1334,11 +1409,22 @@ const Profile = () => {
                                     }
                                   }}
                                 />
-                              </div>
+                              )}
                             </div>
-                            {fileError && <p className="text-xs text-red-500">{fileError}</p>}
                           </div>
+                          {fileError && <p className="text-xs text-red-500">{fileError}</p>}
+
+                          {/* Upload progress indicator */}
+                          {uploading && (
+                            <div className="w-full flex items-center gap-2 mt-2">
+                              <div className="flex-1 h-2 bg-secondary rounded">
+                                <div className="h-2 bg-primary rounded animate-pulse" style={{ width: "100%" }} />
+                              </div>
+                              <span className="text-xs text-muted-foreground">Uploading...</span>
+                            </div>
+                          )}
                         </div>
+                      </div>
                     )}
                     {/* Update button visibility condition */}
                     {(userData.kycStatus === 'rejected' || userData.kycStatus === 'pending' || !userData.kycStatus) && (
@@ -1380,3 +1466,5 @@ const Profile = () => {
 };
 
 export default Profile;
+
+

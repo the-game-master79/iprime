@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MagnifyingGlass, Coins, Globe, X } from "@phosphor-icons/react";
@@ -27,6 +27,14 @@ interface SidebarProps {
   closeMobileMenu?: () => void;
   navigateToTradeTab?: () => void; // Add new prop for navigating to trade tab
 }
+
+// Add this utility for price animation (before Sidebar)
+const getPriceChangeClass = (isUp?: boolean) => {
+  if (isUp === undefined) return "";
+  return isUp
+    ? "text-green-500"
+    : "text-red-500";
+};
 
 const Sidebar = ({ 
   isCollapsed,
@@ -188,6 +196,30 @@ const Sidebar = ({
     return 2;
   };
 
+  // Track previous prices for animation
+  const prevPricesRef = useRef<{ [symbol: string]: number }>({});
+  const [animatedPairs, setAnimatedPairs] = useState<{ [symbol: string]: boolean | undefined }>({});
+
+  useEffect(() => {
+    const newAnimatedPairs: { [symbol: string]: boolean | undefined } = {};
+    filteredPairs.forEach(pair => {
+      const prev = prevPricesRef.current[pair.symbol];
+      const curr = Number(pair.price);
+      if (prev !== undefined && !isNaN(curr)) {
+        if (curr > prev) {
+          newAnimatedPairs[pair.symbol] = true; // up
+        } else if (curr < prev) {
+          newAnimatedPairs[pair.symbol] = false; // down
+        } else {
+          newAnimatedPairs[pair.symbol] = animatedPairs[pair.symbol]; // unchanged
+        }
+      }
+      prevPricesRef.current[pair.symbol] = curr;
+    });
+    setAnimatedPairs(newAnimatedPairs);
+    // eslint-disable-next-line
+  }, [filteredPairs.map(p => p.price).join(",")]);
+
   return (
     <>
       {/* Hamburger Menu Container - Only show on desktop */}
@@ -246,14 +278,6 @@ const Sidebar = ({
           {/* Tab buttons - Make full width on mobile */}
           <div className="flex gap-1 mb-4 w-full bg-muted/20 rounded-xl p-1">
             <Button
-              variant={activeTab === "forex" ? "default" : "outline"}
-              onClick={() => setActiveTab("forex")}
-              className="flex-1"
-            >
-              <Globe className="h-4 w-4 mr-2" />
-              Forex
-            </Button>
-            <Button
               variant={activeTab === "crypto" ? "default" : "outline"}
               onClick={() => setActiveTab("crypto")}
               className="flex-1"
@@ -261,12 +285,20 @@ const Sidebar = ({
               <Coins className="h-4 w-4 mr-2" />
               Crypto
             </Button>
+            <Button
+              variant={activeTab === "forex" ? "default" : "outline"}
+              onClick={() => setActiveTab("forex")}
+              className="flex-1"
+            >
+              <Globe className="h-4 w-4 mr-2" />
+              Forex
+            </Button>
           </div>
-          
           {/* Market pairs grid */}
           <div className="grid grid-cols-1 gap-2 overflow-y-auto">
             {filteredPairs.map((pair) => {
               const decimals = getPriceDecimals(pair.symbol);
+              const isUp = animatedPairs[pair.symbol];
               return (
                 <Button
                   key={pair.symbol}
@@ -303,13 +335,8 @@ const Sidebar = ({
                   </div>
                   <div className="text-right">
                     <div
-                      className={`font-mono font-medium transition-all duration-500 ${
-                        pair.isPriceUp === true
-                          ? "animate-price-up"
-                          : pair.isPriceUp === false
-                          ? "animate-price-down"
-                          : ""
-                      }`}
+                      key={pair.symbol + "-" + pair.price}
+                      className={`font-mono font-medium transition-all duration-500 ${getPriceChangeClass(isUp)}`}
                     >
                       {renderPriceWithBigDigits(pair.price, decimals)}
                     </div>

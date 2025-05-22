@@ -47,7 +47,7 @@ export function useTheme() {
     }
   }, [theme]);
 
-  // Listen for system theme changes
+  // Listen for system theme changes and auto-update if user hasn't set a preference
   useEffect(() => {
     if (typeof window === "undefined") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -59,6 +59,23 @@ export function useTheme() {
     };
     media.addEventListener("change", handler);
     return () => media.removeEventListener("change", handler);
+  }, [setTheme]);
+
+  // On first login, auto-set theme to system if not set
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Prevent calling setTheme during render phase (React strict mode, hydration, etc.)
+    // Only run this effect after mount
+    let didRun = false;
+    if (!didRun) {
+      const stored = localStorage.getItem("theme");
+      if (!stored) {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        // Use setTimeout to ensure this runs after initial render
+        setTimeout(() => setTheme(systemTheme), 0);
+      }
+      didRun = true;
+    }
   }, [setTheme]);
 
   // Update cssVars on mount and on theme change

@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
@@ -11,16 +11,44 @@ import { generateReferralCode, cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { Sun, Moon } from "@phosphor-icons/react"; // Add for icon consistency
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
+import { Progress } from "@/components/ui/progress";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [searchParams] = useSearchParams();
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || "");
+  // Add state for referral validation
+  const [referralEmail, setReferralEmail] = useState<string | null>(null);
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [referralError, setReferralError] = useState<string | null>(null);
   const [formHeight, setFormHeight] = useState<number | undefined>(undefined);
   const formWrapperRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
+  const [themeReady, setThemeReady] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_TIME = 60 * 1000; // 1 minute
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  // Password strength state
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [email, setEmail] = useState("");
+
+  // Store current user's referral code and email
+  const [currentUserReferralCode, setCurrentUserReferralCode] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
+  // Error states for email and password
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
 
   // Fix: Always measure the height of the currently active tab content
   useLayoutEffect(() => {
@@ -35,9 +63,49 @@ const Login = () => {
     }
   }, [showPassword]);
 
+  // Password strength calculation
+  function calculatePasswordStrength(password: string) {
+    if (!password) return 0;
+    // Very weak: only numbers or only letters (case-insensitive)
+    if (/^\d+$/.test(password) || /^[a-zA-Z]+$/.test(password)) return 0.5;
+    let score = 0;
+    if (password.length >= 8) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[a-z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+    return score;
+  }
+
+  // Mask email utility
+  function maskEmail(email: string) {
+    const [name, domain] = email.split("@");
+    if (!name || !domain) return email;
+    if (name.length <= 2) return "*".repeat(name.length) + "@" + domain;
+    return name[0] + "*".repeat(name.length - 2) + name[name.length - 1] + "@" + domain;
+  }
+
   // One-step login/signup handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setEmailError(null);
+    setPasswordError(null);
+
+    // TODO: Implement server-side IP-based rate limiting via middleware or Supabase Edge Function.
+
+    // Disable hCaptcha for now
+    // if (!captchaToken) {
+    //   setCaptchaError("Please complete the CAPTCHA.");
+    //   return;
+    // }
+    setCaptchaError(null);
+
+    // Rate limit: lock out after too many attempts
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      toast.error("Too many failed attempts. Please try again later.");
+      return;
+    }
+
     setIsLoading(true);
 
     const form = e.currentTarget;
@@ -46,6 +114,13 @@ const Login = () => {
     const password = formData.get('password') as string;
     const referral = formData.get('referral') as string;
 
+    // Password strength check (frontend)
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setPasswordError("Password must be at least 8 characters, include a number and an uppercase letter.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       // 1. Try to sign in
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -53,7 +128,21 @@ const Login = () => {
         password,
       });
 
-      if (!signInError && signInData.user) {
+      if (signInError) {
+        setPasswordError(signInError.message || "Incorrect email or password.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Check Supabase session after login
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session) {
+        setEmailError("Session invalid. Please try logging in again.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (signInData.user) {
         toast.success("Login successful!");
         navigate('/platform');
         return;
@@ -71,8 +160,14 @@ const Login = () => {
         }
       });
 
-      if (signUpError) throw signUpError;
-      if (!signUpData.user) throw new Error("Failed to create user");
+      if (signUpError) {
+        setEmailError(signUpError.message || "Signup failed.");
+        throw signUpError;
+      }
+      if (!signUpData.user) {
+        setEmailError("Failed to create user");
+        throw new Error("Failed to create user");
+      }
 
       // 3. Create profile row
       const { error: profileError } = await supabase
@@ -88,16 +183,113 @@ const Login = () => {
           withdrawal_wallet: 0,
         });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        setEmailError(profileError.message || "Profile creation failed.");
+        throw profileError;
+      }
+
+      // Check Supabase session after signup
+      const { data: postSignUpSession } = await supabase.auth.getSession();
+      if (!postSignUpSession?.session) {
+        setEmailError("Session invalid. Please try logging in again.");
+        throw new Error("Session invalid. Please try logging in again.");
+      }
 
       toast.success("Account created and logged in!");
       navigate('/platform');
     } catch (error) {
-      toast.error(`Error: ${(error as Error).message}`);
+      setLoginAttempts(prev => prev + 1);
+      if (loginAttempts + 1 >= MAX_ATTEMPTS) {
+        setLockoutUntil(Date.now() + LOCKOUT_TIME);
+        setEmailError("Too many failed attempts. Please wait before trying again.");
+      } else {
+        // Hide specific error details
+        setPasswordError(
+          error instanceof Error
+            ? error.message
+            : "Login failed. Please check your credentials and try again."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Fetch current user's referral code and email after login/signup
+  useLayoutEffect(() => {
+    let ignore = false;
+    supabase.auth.getUser?.().then(async (userRes) => {
+      if (ignore) return;
+      const user = userRes?.data?.user;
+      if (user && user.email) {
+        setCurrentUserEmail(user.email);
+        // Fetch referral_code from profiles table
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("referral_code")
+          .eq("email", user.email)
+          .single();
+        if (!error && data?.referral_code) {
+          setCurrentUserReferralCode(data.referral_code);
+        } else {
+          setCurrentUserReferralCode(null);
+        }
+      } else {
+        setCurrentUserEmail(null);
+        setCurrentUserReferralCode(null);
+      }
+    });
+    return () => { ignore = true; };
+  }, [supabase]);
+
+  // Validate referral code on change
+  useLayoutEffect(() => {
+    if (!referralCode) {
+      setReferralEmail(null);
+      setReferralError(null);
+      return;
+    }
+    let ignore = false;
+    setReferralLoading(true);
+    setReferralError(null);
+    setReferralEmail(null);
+
+    supabase
+      .from("profiles")
+      .select("email,referral_code")
+      .eq("referral_code", referralCode)
+      .single()
+      .then(({ data, error }) => {
+        if (ignore) return;
+
+        // Check for invalid code
+        if (error || !data?.email) {
+          setReferralEmail(null);
+          setReferralError("Invalid referral code.");
+        }
+        // Check for self-referral by referral code or email
+        else if (
+          (currentUserReferralCode && referralCode === currentUserReferralCode) ||
+          (currentUserEmail && data.email && currentUserEmail.toLowerCase() === data.email.toLowerCase())
+        ) {
+          setReferralEmail(null);
+          setReferralError("Self-referral is not allowed.");
+        } else {
+          setReferralEmail(maskEmail(data.email));
+          setReferralError(null);
+        }
+        setReferralLoading(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [referralCode, supabase, currentUserReferralCode, currentUserEmail]);
+
+  useEffect(() => {
+    // Wait for theme to be set (avoids flicker)
+    if (theme) setThemeReady(true);
+  }, [theme]);
 
   return (
     <AuthGuard authPage>
@@ -145,15 +337,19 @@ const Login = () => {
                     </div>
                     {/* Logo inside the form, at the top */}
                     <div className="flex justify-center mb-6">
-                      <img
-                        src={
-                          theme === "dark"
-                            ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                            : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
-                        }
-                        alt="cloudforex"
-                        className="w-auto h-12 object-contain"
-                      />
+                      {themeReady ? (
+                        <img
+                          src={
+                            theme === "dark"
+                              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                          }
+                          alt="cloudforex"
+                          className="w-auto h-12 object-contain"
+                        />
+                      ) : (
+                        <div className="w-32 h-12 bg-muted rounded animate-pulse" />
+                      )}
                     </div>
                     <div
                       ref={formWrapperRef}
@@ -172,13 +368,43 @@ const Login = () => {
                             placeholder="Email"
                             type="email"
                             autoCapitalize="none"
-                            autoComplete="email"
+                            autoComplete="off"
                             autoCorrect="off"
                             required
                             pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                             title="Please enter a valid email address"
                             className="bg-background border border-border text-foreground placeholder:text-muted-foreground"
+                            onBlur={async (e) => {
+                              const email = e.target.value;
+                              if (!email) {
+                                setCurrentUserReferralCode(null);
+                                return;
+                              }
+                              // Fetch referral_code for entered email
+                              const { data, error } = await supabase
+                                .from("profiles")
+                                .select("referral_code")
+                                .eq("email", email)
+                                .single();
+                              if (!error && data?.referral_code) {
+                                setCurrentUserReferralCode(data.referral_code);
+                              } else {
+                                setCurrentUserReferralCode(null);
+                              }
+                            }}
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
                           />
+                          {/* Inline email error */}
+                          {emailError && (
+                            <div className="text-xs text-red-500 mt-1">{emailError}</div>
+                          )}
+                          {/* Show user's referral code if available */}
+                          {currentUserReferralCode && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Your referral code: <span className="font-semibold text-foreground">{currentUserReferralCode}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="relative">
                           <label className="text-sm font-medium mb-1.5 block text-foreground">Your Password</label>
@@ -189,7 +415,15 @@ const Login = () => {
                             placeholder="*********"
                             required
                             maxLength={60}
+                            autoComplete="off"
+                            pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
+                            title="Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and be at least 8 characters long"
                             className="bg-background border border-border text-foreground placeholder:text-muted-foreground"
+                            value={passwordValue}
+                            onChange={e => {
+                              setPasswordValue(e.target.value);
+                              setPasswordStrength(calculatePasswordStrength(e.target.value));
+                            }}
                           />
                           <Button
                             type="button"
@@ -204,12 +438,83 @@ const Login = () => {
                               <Eye className="h-4 w-4 text-muted-foreground" />
                             )}
                           </Button>
+                          {/* Inline password error */}
+                          {passwordError && (
+                            <div className="text-xs text-red-500 mt-1">{passwordError}</div>
+                          )}
+                          {/* Password strength progress bar */}
+                          <div className="mt-2 flex items-center">
+                            <Progress
+                              value={
+                                passwordStrength === 0.5
+                                  ? 10
+                                  : passwordStrength === 5
+                                  ? 100
+                                  : (passwordStrength / 5) * 100
+                              }
+                              className={cn(
+                                "h-2 w-full rounded-lg",
+                                passwordStrength === 0.5
+                                  ? "bg-red-100"
+                                  : passwordStrength <= 2
+                                  ? "bg-red-100"
+                                  : passwordStrength === 3
+                                  ? "bg-yellow-100"
+                                  : passwordStrength === 4
+                                  ? "bg-green-100"
+                                  : "bg-emerald-100"
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "ml-3 text-xs font-medium",
+                                passwordStrength === 0.5
+                                  ? "text-red-700"
+                                  : passwordStrength <= 2
+                                  ? "text-red-500"
+                                  : passwordStrength === 3
+                                  ? "text-yellow-500"
+                                  : passwordStrength === 4
+                                  ? "text-green-500"
+                                  : "text-emerald-600"
+                              )}
+                            >
+                              {passwordStrength === 0.5
+                                ? "Very Weak"
+                                : passwordStrength <= 2
+                                ? "Weak"
+                                : passwordStrength === 3
+                                ? "Medium"
+                                : passwordStrength === 4
+                                ? "Strong"
+                                : passwordStrength === 5
+                                ? "Strongest"
+                                : ""}
+                            </span>
+                          </div>
                         </div>
                         {/* Referral Code Accordion */}
-                        <Accordion type="single" collapsible>
+                        <Accordion
+                          type="single"
+                          collapsible
+                          defaultValue={referralCode ? "referral" : undefined}
+                        >
                           <AccordionItem value="referral">
                             <AccordionTrigger className="text-sm font-medium text-foreground px-0 py-2 hover:underline">
-                              Have a referral code? (optional)
+                              {referralCode
+                                ? (
+                                  <span>
+                                    Referral code (added)
+                                    <span className="inline-block align-middle ml-1 text-green-500">
+                                      {/* Check mark SVG */}
+                                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                                        <path d="M5 10.5L9 14L15 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </span>
+                                  </span>
+                                )
+                                : "Referral code (optional)"
+                              }
                             </AccordionTrigger>
                             <AccordionContent>
                               <Input
@@ -220,13 +525,53 @@ const Login = () => {
                                 onChange={(e) => setReferralCode(e.target.value)}
                                 className="bg-background border border-border text-foreground placeholder:text-muted-foreground mt-2"
                               />
+                              {/* Show referral validation result */}
+                              {referralLoading && (
+                                <div className="text-xs text-muted-foreground mt-1">Validating referral code...</div>
+                              )}
+                              {/* Only show referred by if no error and not self-referral */}
+                              {referralEmail && !referralLoading && !referralError && (
+                                <div className="text-xs text-green-600 mt-1">
+                                  Referred by: <span className="font-medium">{referralEmail}</span>
+                                </div>
+                              )}
+                              {referralError && !referralLoading && (
+                                <div className="text-xs text-red-500 mt-1">{referralError}</div>
+                              )}
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>
-                        <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90 h-12 text-base mt-2 mb-2 rounded-lg" disabled={isLoading}>
+                        {/* hCaptcha widget */}
+                        {/* Disabled for now */}
+                        {/* 
+                        {!isLocalhost && (
+                          <div className="mb-2">
+                            <HCaptcha
+                              sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY}
+                              onVerify={token => setCaptchaToken(token)}
+                              onExpire={() => setCaptchaToken(null)}
+                              onError={() => setCaptchaError("CAPTCHA error, please retry.")}
+                            />
+                            {captchaError && (
+                              <p className="text-xs text-destructive mt-1">{captchaError}</p>
+                            )}
+                          </div>
+                        )}
+                        */}
+                        <Button
+                          type="submit"
+                          className="w-full bg-primary text-white hover:bg-primary/90 h-12 text-base mt-2 mb-2 rounded-lg"
+                          disabled={
+                            isLoading ||
+                            !email ||
+                            !passwordValue ||
+                            !!referralError // disables if self-referral or invalid code
+                          }
+                        >
                           {isLoading ? "Processing..." : "Continue"}
                           {!isLoading && <ArrowRight className="ml-2 h-4 w-4" />}
                         </Button>
+                        {/* TODO: Add CAPTCHA here for production */}
                       </form>
                     </div>
                   </div>

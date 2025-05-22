@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/shared/Topbar";
@@ -22,7 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import { LockSimple } from "@phosphor-icons/react";
+
 import { BalanceCard } from "@/components/shared/BalanceCards";
 import { KycVariant } from "@/components/shared/KycVariants";
 import { useUserProfile } from "@/contexts/UserProfileContext";
@@ -141,6 +141,7 @@ export default function CashierPage() {
   const [withdrawHistorySortField, setWithdrawHistorySortField] = useState<'date' | 'amount' | 'status'>('date');
   const [withdrawHistorySortDirection, setWithdrawHistorySortDirection] = useState<'asc' | 'desc'>('desc');
   const [withdrawCopied, setWithdrawCopied] = useState(false);
+  const [withdrawAddressError, setWithdrawAddressError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentUser) return;
@@ -227,16 +228,18 @@ export default function CashierPage() {
   const uniqueMethods = [...new Set(depositMethods.map(m => m.method))]
     .sort((a, b) => methodOrder[a] - methodOrder[b]);
   
-  // Get available cryptocurrencies with their networks
-  const availableCryptos = depositMethods
-    .filter(m => m.method === 'crypto' && m.is_active)
-    .map(m => ({
-      symbol: m.crypto_symbol!,
-      name: m.crypto_name!,
-      network: m.network,
-      logo_url: m.logo_url,
-      deposit_address: m.deposit_address
-    }));
+  // Memoize availableCryptos
+  const availableCryptos = useMemo(() => {
+    return depositMethods
+      .filter(m => m.method === 'crypto' && m.is_active)
+      .map(m => ({
+        symbol: m.crypto_symbol!,
+        name: m.crypto_name!,
+        network: m.network,
+        logo_url: m.logo_url,
+        deposit_address: m.deposit_address
+      }));
+  }, [depositMethods]);
 
   // Update formatCryptoDisplayName to be more defensive
   const formatCryptoDisplayName = (crypto: typeof availableCryptos[0] | undefined) => {
@@ -576,22 +579,25 @@ export default function CashierPage() {
     });
   };
 
-  const filteredAndSortedDeposits = [...deposits].sort((a, b) => {
-    if (historySortField === 'amount') {
+  // Memoize filteredAndSortedDeposits
+  const filteredAndSortedDeposits = useMemo(() => {
+    return [...deposits].sort((a, b) => {
+      if (historySortField === 'amount') {
+        return historySortDirection === 'asc'
+          ? a.amount - b.amount
+          : b.amount - a.amount;
+      }
+      if (historySortField === 'status') {
+        return historySortDirection === 'asc'
+          ? (a.status || '').localeCompare(b.status || '')
+          : (b.status || '').localeCompare(a.status || '');
+      }
+      // Default: sort by date
       return historySortDirection === 'asc'
-        ? a.amount - b.amount
-        : b.amount - a.amount;
-    }
-    if (historySortField === 'status') {
-      return historySortDirection === 'asc'
-        ? (a.status || '').localeCompare(b.status || '')
-        : (b.status || '').localeCompare(a.status || '');
-    }
-    // Default: sort by date
-    return historySortDirection === 'asc'
-      ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+        ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [deposits, historySortField, historySortDirection]);
 
   const handleBalanceClick = () => {
     if (window.location.pathname === '/cashier') {
@@ -759,8 +765,32 @@ export default function CashierPage() {
     setWithdrawForm(prev => ({ ...prev, amount: newAmount }));
     validateWithdrawAmount(newAmount);
   };
+  const handleWithdrawAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setWithdrawForm(prev => ({ ...prev, walletAddress: value }));
+    // Validate address on change
+    const selectedMethod = depositMethods.find(m => m.id === withdrawForm.cryptoId);
+    const network = selectedMethod?.network || withdrawForm.network;
+    if (!isValidAddress(value, network)) {
+      setWithdrawAddressError("Invalid wallet address for selected network.");
+    } else {
+      setWithdrawAddressError(null);
+    }
+  };
+  const canSubmit = 
+    kycStatus === 'completed' &&
+    !withdrawIsSubmitting &&
+    !withdrawAmountError &&
+    !withdrawAddressError &&
+    withdrawForm.cryptoId &&
+    withdrawForm.network &&
+    withdrawForm.walletAddress &&
+    withdrawForm.amount &&
+    parseFloat(withdrawForm.amount) > 0;
+
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (withdrawIsSubmitting) return; // Prevent double submit
     if (kycStatus !== 'completed') {
       toast({
         title: "KYC Required",
@@ -795,34 +825,21 @@ export default function CashierPage() {
         });
         return;
       }
-      if (!withdrawForm.amount || isNaN(amountValue) || amountValue <= 0) {
-        toast({
-          title: "Error",
-          description: "Please enter a valid amount.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Validate wallet address using isValidAddress
       const selectedPaymentMethod = depositMethods.find(m => m.id === withdrawForm.cryptoId);
-      if (selectedPaymentMethod && amountValue < selectedPaymentMethod.min_amount) {
+      const network = selectedPaymentMethod?.network || withdrawForm.network;
+      if (!isValidAddress(withdrawForm.walletAddress, network)) {
         toast({
           title: "Error",
-          description: `Minimum withdrawal amount for ${selectedPaymentMethod.method} is $${selectedPaymentMethod.min_amount}.`,
+          description: "Invalid wallet address for the selected network.",
           variant: "destructive",
         });
+        setWithdrawAddressError("Invalid wallet address for selected network.");
         return;
       }
-      if (amountValue > userBalance) {
-        toast({
-          title: "Error",
-          description: "Withdrawal amount exceeds your available balance.",
-          variant: "destructive",
-        });
-        return;
-      }
-      setWithdrawIsSubmitting(true);
       const selectedCrypto = depositMethods.find(m => m.id === withdrawForm.cryptoId);
       if (!selectedCrypto) throw new Error('Invalid cryptocurrency selected');
+      setWithdrawIsSubmitting(true);
       const { data, error } = await supabase
         .from('withdrawals')
         .insert({
@@ -886,6 +903,48 @@ export default function CashierPage() {
         : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
+  // Add a utility function for address validation (basic for USDT/USDC: TRC20, ERC20, etc.)
+  function isValidAddress(address: string, network: string): boolean {
+    if (!address) return false;
+    // TRC20 (starts with T, 34 chars)
+    if (network?.toUpperCase().includes('TRC20')) {
+      return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+    }
+    // ERC20 (Ethereum, starts with 0x, 42 chars)
+    if (network?.toUpperCase().includes('ERC20')) {
+      return /^0x[a-fA-F0-9]{40}$/.test(address);
+    }
+    // BEP20 (same as ERC20)
+    if (network?.toUpperCase().includes('BEP20')) {
+      return /^0x[a-fA-F0-9]{40}$/.test(address);
+    }
+    // Add more networks as needed
+    // Fallback: require at least 20 chars
+    return address.length >= 20;
+  }
+
+  // Manual sanitization function (basic)
+  function sanitize(str: string | undefined | null): string {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // If you don't already have a Spinner component, you can use a minimal inline spinner:
+  function Spinner({ size = "sm" }: { size?: "sm" | "md" | "lg" }) {
+    const sizes = { sm: "h-4 w-4", md: "h-6 w-6", lg: "h-8 w-8" };
+    return (
+      <svg className={`animate-spin text-white ${sizes[size] || sizes.sm}`} viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Topbar 
@@ -947,7 +1006,7 @@ export default function CashierPage() {
                                           {crypto.logo_url && (
                                             <img src={crypto.logo_url} alt={crypto.name} className="w-6 h-6" />
                                           )}
-                                          <span className="truncate">{crypto.name} ({crypto.symbol.toUpperCase()})</span>
+                                          <span className="truncate">{sanitize(crypto.name)} ({crypto.symbol.toUpperCase()})</span>
                                           {crypto.network && (
                                             <span className="ml-2 px-2 py-0.5 rounded bg-secondary-foreground text-xs text-foreground">
                                               {crypto.network}
@@ -981,7 +1040,7 @@ export default function CashierPage() {
                                         {crypto.logo_url && (
                                           <img src={crypto.logo_url} alt={crypto.name} className="w-6 h-6" />
                                         )}
-                                        <span className="truncate">{crypto.name} ({crypto.symbol.toUpperCase()})</span>
+                                        <span className="truncate">{sanitize(crypto.name)} ({crypto.symbol.toUpperCase()})</span>
                                         {/* Do not display network for other cryptos */}
                                       </div>
                                       <span className="text-sm font-medium text-muted-foreground ml-auto">
@@ -1088,11 +1147,18 @@ export default function CashierPage() {
                           e.preventDefault();
                           const selectedCrypto = availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType);
                           if (selectedCrypto) {
+                            setWithdrawIsSubmitting(true); // Show spinner
                             await handleSubmit(parseFloat(amount));
+                            setWithdrawIsSubmitting(false);
                             navigate('/platform');
                           }
                         }}
                       >
+                        {withdrawIsSubmitting && (
+                          <span className="inline-flex items-center mr-2 align-middle">
+                            <Spinner size="sm" />
+                          </span>
+                        )}
                         Confirm Deposit
                       </Button>
                     </div>
@@ -1103,7 +1169,7 @@ export default function CashierPage() {
                     <div className="rounded-lg bg-[#212121] p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-white">Applied Code:</span>
-                        <Badge>{selectedPromocode.code}</Badge>
+                        <Badge>{sanitize(selectedPromocode.code)}</Badge>
                       </div>
                       
                       <div className="space-y-1">
@@ -1113,7 +1179,7 @@ export default function CashierPage() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {selectedPromocode.description}
+                          {sanitize(selectedPromocode.description)}
                         </p>
                       </div>
 
@@ -1331,9 +1397,12 @@ export default function CashierPage() {
                                   withdrawSelectedCrypto?.name?.toUpperCase() || 'USDT'
                                 } ${withdrawForm.network || 'TRC20'} address`}
                                 value={withdrawForm.walletAddress}
-                                onChange={(e) => setWithdrawForm(prev => ({ ...prev, walletAddress: e.target.value }))}
+                                onChange={handleWithdrawAddressChange}
                                 className="placeholder:text-foreground bg-secondary text-foreground"
                               />
+                              {withdrawAddressError && (
+                                <p className="text-sm text-red-500">{withdrawAddressError}</p>
+                              )}
                             </div>
                             <div className="space-y-2">
                               <Label htmlFor="amount" className="text-xs font-normal text-foreground">Amount</Label>
@@ -1359,7 +1428,7 @@ export default function CashierPage() {
                               )}
                             </div>
                           </div>
-                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={withdrawIsSubmitting}>
+                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={withdrawIsSubmitting || !canSubmit}>
                             {withdrawIsSubmitting ? "Processing..." : "Request Payout"}
                           </Button>
                         </form>
