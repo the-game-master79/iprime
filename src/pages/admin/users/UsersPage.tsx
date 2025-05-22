@@ -652,9 +652,9 @@ const UsersPage = () => {
 
       if (error) throw error;
 
-      setUsers(users.map user => 
+      setUsers(users.map(user => 
         user.id === userId ? {...user, role: isAdmin ? 'admin' : 'user'} : user
-      );
+      ));
 
       toast({
         title: "Role Updated",
