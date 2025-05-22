@@ -13,7 +13,7 @@ export default defineConfig({
       threshold: 10240,
       deleteOriginFile: false,
     }),
-    visualizer({ open: false }) // You can enable this for bundle analysis
+    visualizer({ open: false }),
   ],
   root: './',
   base: './',
@@ -23,12 +23,12 @@ export default defineConfig({
     strictPort: true,
     watch: {
       usePolling: true,
-    }
+    },
   },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false, // ✅ hides .tsx in production
+    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -47,7 +47,6 @@ export default defineConfig({
             if (id.includes('react-router-dom')) return 'vendor-router';
             return 'vendor';
           }
-
           if (id.includes('/src/pages/admin/')) return 'admin';
           if (id.includes('/src/pages/dashboard/')) return 'dashboard';
           if (id.includes('/src/pages/Index')) return 'landing';
@@ -56,10 +55,8 @@ export default defineConfig({
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
-        globals: {
-          react: 'React' // ✅ Prevents missing React reference in vendor bundle
-        }
-      }
+        // ❌ DO NOT use globals.react — removed
+      },
     },
     chunkSizeWarningLimit: 1000,
   },
@@ -71,7 +68,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      react: path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom'),
       '@': path.resolve(__dirname, './src'),
     },
-  }
+    dedupe: ['react', 'react-dom'],
+  },
 });

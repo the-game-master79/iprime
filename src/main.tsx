@@ -1,4 +1,3 @@
-import * as React from 'react'; // ✅ Explicit React import to prevent undefined errors
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
