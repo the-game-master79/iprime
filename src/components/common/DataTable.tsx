@@ -1,3 +1,4 @@
+import React from "react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export function DataTable<T>({
   onSearch,
   onDownload 
 }: DataTableProps<T>) {
+  const memoizedData = React.useMemo(() => data, [data]);
   return (
     <div className="space-y-4">
       {(searchable || downloadable) && (
@@ -56,7 +58,7 @@ export function DataTable<T>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((item, i) => (
+          {memoizedData.map((item, i) => (
             <TableRow key={i}>
               {columns.map((column) => (
                 <TableCell key={String(column.accessorKey)}>

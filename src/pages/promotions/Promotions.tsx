@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -15,26 +16,19 @@ interface Promotion {
 }
 
 const Promotions = () => {
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-
-  useEffect(() => {
-    const fetchPromotions = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('promotions')
-          .select('*')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setPromotions(data || []);
-      } catch (error) {
-        console.error('Error fetching promotions:', error);
-      }
-    };
-
-    fetchPromotions();
-  }, []);
+  const { data: promotions = [], isLoading } = useQuery({
+    queryKey: ['promotions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <PageTransition>

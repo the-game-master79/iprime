@@ -6,39 +6,40 @@ DECLARE
     total_volume DECIMAL;
     new_rank TEXT;
 BEGIN
-    -- Loop through all users with 2+ direct referrals
+    -- Loop through all users who have at least 2 direct referrals in referral_relationships (level 1)
     FOR user_rec IN (
-        SELECT p.id, p.direct_count
+        SELECT p.id
         FROM profiles p
-        WHERE p.direct_count >= 2
+        WHERE (
+            SELECT COUNT(*) FROM referral_relationships rr
+            WHERE rr.referrer_id = p.id AND rr.level = 1
+        ) >= 2
     ) LOOP
-        -- Calculate total business volume
-        WITH RECURSIVE team_volume AS (
-            -- Base case: Direct referrals
-            SELECT 
-                rr.referred_id,
-                COALESCE(bv.amount, 0) as amount
+        -- Calculate total business volume (team + self)
+        -- Only include each user's own business volume once, and do not sum up the same volume up the tree
+        WITH RECURSIVE team_users AS (
+            -- Start with direct downlines only (not self)
+            SELECT rr.referred_id AS user_id
             FROM referral_relationships rr
-            LEFT JOIN business_volumes bv ON bv.user_id = rr.referred_id
             WHERE rr.referrer_id = user_rec.id
-            
-            UNION ALL
-            
-            -- Recursive case: Indirect referrals
-            SELECT 
-                rr.referred_id,
-                COALESCE(bv.amount, 0)
-            FROM team_volume tv
-            JOIN referral_relationships rr ON rr.referrer_id = tv.referred_id
-            LEFT JOIN business_volumes bv ON bv.user_id = rr.referred_id
+            UNION
+            -- Recursively add all downline users
+            SELECT rr.referred_id AS user_id
+            FROM referral_relationships rr
+            JOIN team_users tu ON rr.referrer_id = tu.user_id
         )
-        -- Get total volume including user's own volume
-        SELECT COALESCE(SUM(amount), 0) + COALESCE((
-            SELECT SUM(amount) 
-            FROM business_volumes 
-            WHERE user_id = user_rec.id
-        ), 0) INTO total_volume
-        FROM team_volume;
+        -- Sum only the business volumes of the direct and indirect downlines (not self, and only once per user)
+        SELECT COALESCE(SUM(bv.amount), 0)
+        INTO total_volume
+        FROM business_volumes bv
+        WHERE bv.user_id IN (
+            SELECT DISTINCT user_id FROM team_users WHERE user_id <> user_rec.id
+        );
+
+        -- Add self business volume (only once)
+        total_volume := total_volume + COALESCE((
+            SELECT SUM(amount) FROM business_volumes WHERE user_id = user_rec.id
+        ), 0);
 
         -- Get appropriate rank based on volume
         SELECT title INTO new_rank
@@ -75,3 +76,5 @@ CREATE TRIGGER sync_ranks_on_volume_change
     AFTER INSERT OR UPDATE OR DELETE ON business_volumes
     FOR EACH STATEMENT
     EXECUTE FUNCTION trigger_sync_ranks();
+
+-- No changes needed for business_volume in profiles

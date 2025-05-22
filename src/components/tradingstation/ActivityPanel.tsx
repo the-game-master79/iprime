@@ -881,10 +881,25 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               onClick={() => setActivityCollapsed((v) => !v)}
               aria-label={activityCollapsed ? "Expand" : "Collapse"}
             >
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <rect x="4" y="9" width="12" height="2" rx="1" fill="currentColor"/>
-                <rect x="9" y="4" width="2" height="12" rx="1" fill="currentColor"/>
-              </svg>
+              {/* Show fullscreen icon when collapsed, minimize icon when expanded */}
+              {activityCollapsed ? (
+                // Fullscreen icon
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="4" height="2" rx="1" fill="currentColor"/>
+                  <rect x="3" y="3" width="2" height="4" rx="1" fill="currentColor"/>
+                  <rect x="13" y="3" width="4" height="2" rx="1" fill="currentColor"/>
+                  <rect x="15" y="3" width="2" height="4" rx="1" fill="currentColor"/>
+                  <rect x="3" y="15" width="4" height="2" rx="1" fill="currentColor"/>
+                  <rect x="3" y="13" width="2" height="4" rx="1" fill="currentColor"/>
+                  <rect x="13" y="15" width="4" height="2" rx="1" fill="currentColor"/>
+                  <rect x="15" y="13" width="2" height="4" rx="1" fill="currentColor"/>
+                </svg>
+              ) : (
+                // Minimize icon
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                  <rect x="4" y="9" width="12" height="2" rx="1" fill="currentColor"/>
+                </svg>
+              )}
             </Button>
           )}
         </div>
@@ -1603,6 +1618,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             <span>Free Margin:</span>
             <span className={`font-bold flex items-center justify-center gap-1 transition-colors ${
               freeMarginChange === 'increase' ? 'text-success' : 
+ 
               freeMarginChange === 'decrease' ? 'text-destructive' : ''
             }`}>
               ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}

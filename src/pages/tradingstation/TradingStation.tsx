@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 
 // Import supabase client from the utility file
 import { supabase } from "@/lib/supabase-client";
@@ -27,6 +28,8 @@ interface PriceData {
 }
 
 const TradingStation = () => {
+  const { profile, loading } = useUserProfile();
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
   const [activeTab, setActiveTab] = useState<"forex" | "crypto">("forex");
@@ -58,8 +61,8 @@ const TradingStation = () => {
   // Timezone state
   const [userTimezone, setUserTimezone] = useState("Etc/UTC");
   const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
-  
-  // Check screen size on mount and resize
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   useEffect(() => {
     const checkScreenSize = () => {
       const isMobileView = window.innerWidth < 768;
@@ -109,19 +112,22 @@ const TradingStation = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
+
   // Fetch user's balance from Supabase
   useEffect(() => {
     const fetchBalance = async () => {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error("Error fetching user:", authError);
-        return;
-      }
-
+      if (!currentUser) return;
       const { data, error } = await supabase
         .from("profiles") 
         .select("withdrawal_wallet")
-        .eq("id", user.id)
+        .eq("id", currentUser.id)
         .single();
 
       if (error) {
@@ -131,26 +137,11 @@ const TradingStation = () => {
       }
     };
 
-    if (!fetchBalanceCalled.current) {
-      fetchBalanceCalled.current = true; // Ensure fetchBalance is only called once
+    if (!fetchBalanceCalled.current && currentUser) {
+      fetchBalanceCalled.current = true;
       fetchBalance();
     }
-  }, []);
-
-  // Fetch user profile
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('id', user.id)
-        .single();
-      setUserProfile(data);
-    };
-    fetchProfile();
-  }, []);
+  }, [currentUser]);
 
   // Setup WebSocket connection - refactored to prevent duplicates and with proper retry logic
   useEffect(() => {

@@ -86,7 +86,6 @@ const Login = () => {
           direct_count: 0,
           total_invested: 0,
           withdrawal_wallet: 0,
-          investment_wallet: 0
         });
 
       if (profileError) throw profileError;

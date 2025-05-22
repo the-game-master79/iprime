@@ -76,7 +76,6 @@ const TradingPanel = ({
   lotsLimits,
 }: TradingPanelProps) => {
   // Add state to control the custom dialog
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showFeesDialog, setShowFeesDialog] = useState(false);
 
   // --- FIX: Reset PnL display when all trades are closed (mobile) ---
@@ -87,8 +86,12 @@ const TradingPanel = ({
   useEffect(() => {
     if (openCount === 0) {
       setMobilePnL(0);
+      // Strictly clear any persisted PnL here if needed (e.g., session/localStorage)
+      // localStorage.removeItem("lastPnL"); // Uncomment if you persist PnL elsewhere
     } else {
       setMobilePnL(totalOpenPnL);
+      // Optionally persist PnL if needed
+      // localStorage.setItem("lastPnL", totalOpenPnL.toString());
     }
   }, [openCount, totalOpenPnL]);
 
@@ -104,46 +107,6 @@ const TradingPanel = ({
     return `FX:${symbol}`;
   };
   
-  // Handle confirm close all trades
-  const handleConfirmCloseAll = () => {
-    closeAllTrades();
-    setShowConfirmDialog(false);
-  };
-  
-  // Simple custom dialog implementation without using AlertDialog
-  const renderConfirmDialog = () => {
-    if (!showConfirmDialog) return null;
-    
-    return ReactDOM.createPortal(
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999]">
-        <div className="bg-background rounded-lg shadow-lg max-w-md w-[90vw] overflow-hidden">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold mb-2 text-foreground">Close All Positions</h3>
-            <p className="text-[#525252] mb-6">
-              Are you sure you want to close all {openCount} open positions? This action cannot be undone.
-            </p>
-            
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowConfirmDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="destructive"
-                onClick={handleConfirmCloseAll}
-              >
-                Close All
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
   // 0% Fees Dialog
   const renderFeesDialog = () => {
     if (!showFeesDialog) return null;
@@ -268,13 +231,12 @@ const TradingPanel = ({
         : "fixed top-16 right-0 h-[calc(100%-4rem)] w-[350px] bg-muted/10 border-l border-border/50"
       } flex flex-col p-0`}
     >
-      {/* Render our custom dialogs */}
-      {renderConfirmDialog()}
+      {/* Remove our custom close all dialog */}
       {renderFeesDialog()}
       
       {selectedPair ? (
         <div className="p-4 flex flex-col flex-1 h-full">
-          {/* Mobile-specific title bar with PnL display and X button */}
+          {/* Mobile-specific title bar with PnL display (no X button) */}
           {isMobile && (
             <div className="mb-4 mt-16 pb-2 border-b border-border/50">
               <div className="flex justify-between items-center">
@@ -282,7 +244,7 @@ const TradingPanel = ({
                 <div className="flex items-center gap-2">
                   <div className="flex flex-col items-end">
                     <span className="text-xs text-muted-foreground">Live P&L</span>
-                    {/* FIX: Only show PnL if there are open trades */}
+                    {/* STRICT FIX: Only show PnL if there are open trades */}
                     {openCount === 0 ? (
                       <span className="font-medium text-gray-400">No trades</span>
                     ) : (
@@ -291,17 +253,8 @@ const TradingPanel = ({
                       </span>
                     )}
                   </div>
-                  {/* FIX: Only show X button if there are open trades */}
-                  {openCount > 0 && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-                      onClick={() => setShowConfirmDialog(true)}
-                    >
-                      <X size={18} />
-                    </Button>
-                  )}
+                  {/* REMOVE: X button for closing all trades */}
+                  {/* (No button here anymore) */}
                 </div>
               </div>
             </div>

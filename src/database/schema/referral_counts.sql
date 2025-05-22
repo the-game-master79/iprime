@@ -151,21 +151,21 @@ BEGIN
             EXIT;
         END IF;
         current_retry := current_retry + 1;
-        -- Wait 1 second between retries
         PERFORM pg_sleep(1);
     END LOOP;
 
-    -- Verify profile exists
     IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_referred_id) THEN
         RAISE EXCEPTION 'Profile not found for ID: %', p_referred_id;
     END IF;
+
+    -- Remove any existing relationships for this user before rebuilding
+    DELETE FROM referral_relationships WHERE referred_id = p_referred_id;
 
     -- Get initial referrer's ID from the referral code
     current_referrer_code := p_referrer_code;
     
     -- Create relationships up to 10 levels
     WHILE current_level <= 10 AND current_referrer_code IS NOT NULL LOOP
-        -- Get referrer's ID with retry
         current_retry := 0;
         LOOP
             SELECT id, referred_by INTO current_referrer_id, current_referrer_code
@@ -180,7 +180,6 @@ BEGIN
             PERFORM pg_sleep(1);
         END LOOP;
 
-        -- Exit if no referrer found
         EXIT WHEN current_referrer_id IS NULL;
 
         -- Create relationship if it doesn't exist
@@ -198,7 +197,6 @@ BEGIN
         )
         ON CONFLICT (referrer_id, referred_id) DO NOTHING;
 
-        -- Move up to next level
         current_level := current_level + 1;
     END LOOP;
 END;
@@ -208,37 +206,22 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION handle_profile_referral_update()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Add delay for new profile creation
-    IF TG_OP = 'INSERT' THEN
-        PERFORM pg_sleep(0.5);
-    END IF;
-
-    -- Only proceed if referred_by is being set or changed
-    IF TG_OP = 'UPDATE' THEN
-        IF NEW.referred_by IS NOT NULL AND 
-           (OLD.referred_by IS NULL OR OLD.referred_by != NEW.referred_by) THEN
-            -- Delete existing relationships for this user
-            DELETE FROM referral_relationships WHERE referred_id = NEW.id;
-            -- Create new relationships
-            PERFORM create_multilevel_relationships(NEW.id, NEW.referred_by);
-        END IF;
-    ELSIF TG_OP = 'INSERT' AND NEW.referred_by IS NOT NULL THEN
-        -- Create relationships for new user
+    -- Always (re)build referral relationships if referred_by is set (on insert or update)
+    IF NEW.referred_by IS NOT NULL THEN
+        -- Remove old relationships and rebuild
         PERFORM create_multilevel_relationships(NEW.id, NEW.referred_by);
     END IF;
-
     RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
-    -- Log error but allow transaction to continue
     RAISE WARNING 'Error in handle_profile_referral_update: %', SQLERRM;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create trigger for profile changes
+-- Drop and recreate the trigger for both insert and update of referred_by
 DROP TRIGGER IF EXISTS after_profile_referral_change ON profiles;
 CREATE TRIGGER after_profile_referral_change
-    AFTER INSERT OR UPDATE ON profiles
+    AFTER INSERT OR UPDATE OF referred_by ON profiles
     FOR EACH ROW
     EXECUTE FUNCTION handle_profile_referral_update();
 

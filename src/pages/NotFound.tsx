@@ -6,15 +6,18 @@ import { AlertCircle } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    if (currentUser) return;
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
+      setCurrentUser(user);
     };
     checkAuth();
-  }, []);
+  }, [currentUser]);
+
+  const isAuthenticated = !!currentUser;
 
   const isProtectedRoute = [
     '/dashboard',

@@ -25,26 +25,38 @@ export const Topbar = ({
   hideBackButton = false,
   className,
   backButtonAction,
-  plansCount = 0
-}: TopbarProps) => {
+  plansCount = 0,
+  currentUser: propCurrentUser
+}: TopbarProps & { currentUser?: any }) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [balance, setBalance] = useState(0);
+  const [currentUser, setCurrentUser] = useState<any>(propCurrentUser || null);
+
+  useEffect(() => {
+    if (propCurrentUser) {
+      setCurrentUser(propCurrentUser);
+      return;
+    }
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    if (!propCurrentUser) fetchUser();
+  }, [propCurrentUser]);
 
   useEffect(() => {
     fetchUserBalance();
-  }, []);
+  }, [currentUser]);
 
   const fetchUserBalance = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!currentUser) return;
       const { data, error } = await supabase
         .from('profiles')
         .select('withdrawal_wallet')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single();
 
       if (error) throw error;

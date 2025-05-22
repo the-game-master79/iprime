@@ -176,6 +176,16 @@ const UsersPage = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [usersWithPlans, setUsersWithPlans] = useState<Set<string>>(new Set());
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
   useEffect(() => {
     fetchUsers();
@@ -624,14 +634,14 @@ const UsersPage = () => {
   const handleRoleChange = async (userId: string, isAdmin: boolean) => {
     try {
       // Get current user role first
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: currentUser } = await supabase
+      if (!currentUser) throw new Error('No authenticated user');
+      const { data: currentProfile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', user?.id)
+        .eq('id', currentUser.id)
         .single();
 
-      if (currentUser?.role !== 'admin') {
+      if (currentProfile?.role !== 'admin') {
         throw new Error('Not authorized to change user roles');
       }
 
@@ -642,15 +652,15 @@ const UsersPage = () => {
 
       if (error) throw error;
 
-      setUsers(users.map(user => 
+      setUsers(users.map user => 
         user.id === userId ? {...user, role: isAdmin ? 'admin' : 'user'} : user
-      ));
+      );
 
       toast({
         title: "Role Updated",
         description: `User role has been ${isAdmin ? 'upgraded to admin' : 'set to regular user'}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating role:', error);
       toast({
         title: "Error",

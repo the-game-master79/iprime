@@ -17,25 +17,37 @@ interface Notice {
   amount?: number; // Add optional amount field
 }
 
-export const DashboardTopbar = () => {
+export const DashboardTopbar = ({ currentUser: propCurrentUser }: { currentUser?: any } = {}) => {
   const navigate = useNavigate();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
+  const [currentUser, setCurrentUser] = useState<any>(propCurrentUser || null);
 
   useEffect(() => {
-    fetchNotices();
-  }, []);
+    if (propCurrentUser) {
+      setCurrentUser(propCurrentUser);
+      return;
+    }
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    if (!propCurrentUser) fetchUser();
+  }, [propCurrentUser]);
+
+  useEffect(() => {
+    if (currentUser) fetchNotices();
+  }, [currentUser]);
 
   const fetchNotices = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!currentUser) return;
 
       const { data, error } = await supabase
         .from('notices')
         .select('*')
-        .or(`user_id.eq.${user.id},user_id.is.null`)
+        .or(`user_id.eq.${currentUser.id},user_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -48,8 +60,7 @@ export const DashboardTopbar = () => {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!currentUser) return;
 
       await supabase
         .from('notices')

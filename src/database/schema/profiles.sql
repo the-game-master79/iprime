@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   total_invested numeric DEFAULT 0,
   role text DEFAULT 'user',
   withdrawal_wallet numeric DEFAULT 0,
-  investment_wallet numeric DEFAULT 0,
   direct_count integer DEFAULT 0,
   
   CONSTRAINT referral_code_length CHECK (char_length(referral_code) >= 6)
@@ -101,7 +100,6 @@ BEGIN
     NEW.total_invested := COALESCE(NEW.total_invested, 0);
     NEW.role := COALESCE(NEW.role, 'user');
     NEW.withdrawal_wallet := COALESCE(NEW.withdrawal_wallet, 0);
-    NEW.investment_wallet := COALESCE(NEW.investment_wallet, 0);
     NEW.direct_count := COALESCE(NEW.direct_count, 0);
     
     RETURN NEW;
@@ -119,3 +117,15 @@ CREATE TRIGGER initialize_profile
 ALTER TABLE profiles
   DROP COLUMN IF EXISTS first_name,
   DROP COLUMN IF EXISTS last_name;
+
+-- Drop the distribute_business_volume function if it exists
+DROP FUNCTION IF EXISTS distribute_business_volume(uuid, numeric);
+
+-- Drop the update_business_rank trigger if it exists
+DROP TRIGGER IF EXISTS update_business_rank ON business_volumes;
+
+-- Drop the update_total_business_volume function if it exists
+DROP FUNCTION IF EXISTS update_total_business_volume(uuid);
+
+-- Drop the claim_rank_bonus function if it exists
+DROP FUNCTION IF EXISTS claim_rank_bonus(uuid);

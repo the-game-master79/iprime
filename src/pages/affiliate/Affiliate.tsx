@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { LineChart, Users, ArrowUpRight, DollarSign, ArrowRight, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useUserProfile } from "@/contexts/UserProfileContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface TeamMember {
   id: string;
@@ -40,6 +42,7 @@ interface CommissionStructure {
 }
 
 const Affiliate = () => {
+  const { profile, loading } = useUserProfile();
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState("");
   const [referralCode, setReferralCode] = useState("");
@@ -54,60 +57,60 @@ const Affiliate = () => {
   });
   const [legendType, setLegendType] = useState<"investments" | "directCount">("investments");
   const [userDirectCount, setUserDirectCount] = useState(0);
-  const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
+    if (currentUser) return;
+    const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .eq('id', user.id)
-        .single();
-      setUserProfile(data);
+      setCurrentUser(user);
     };
-    fetchProfile();
-  }, []);
+    fetchUser();
+  }, [currentUser]);
+
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ['profile', currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('referral_code, referred_by, direct_count, full_name')
+        .eq('id', currentUser.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile, error: profileError } = await supabase
+        if (!currentUser) return;
+        if (profileLoading) return; // Wait for profile data to load
+
+        if (profileData?.referral_code) {
+          setReferralCode(profileData.referral_code);
+          setReferralLink(`${window.location.origin}/auth/register?ref=${profileData.referral_code}`);
+        }
+        
+        setUserDirectCount(profileData?.direct_count || 0);
+
+        if (profileData?.referred_by) {
+          const { data: referrer, error: referrerError } = await supabase
             .from('profiles')
-            .select('referral_code, referred_by, direct_count, full_name')
-            .eq('id', user.id)
+            .select('full_name')
+            .eq('referral_code', profileData.referred_by)
             .single();
 
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
+          if (referrerError) {
+            console.error('Error fetching referrer:', referrerError);
             return;
           }
 
-          if (profile?.referral_code) {
-            setReferralCode(profile.referral_code);
-            setReferralLink(`${window.location.origin}/auth/register?ref=${profile.referral_code}`);
-          }
-          
-          setUserDirectCount(profile?.direct_count || 0);
-
-          if (profile?.referred_by) {
-            const { data: referrer, error: referrerError } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('referral_code', profile.referred_by)
-              .single();
-
-            if (referrerError) {
-              console.error('Error fetching referrer:', referrerError);
-              return;
-            }
-
-            if (referrer) {
-              setCurrentReferrer(referrer.full_name);
-            }
+          if (referrer) {
+            setCurrentReferrer(referrer.full_name);
           }
         }
       } catch (error) {
@@ -120,8 +123,8 @@ const Affiliate = () => {
       }
     };
 
-    fetchUserProfile();
-  }, []);
+    if (currentUser) fetchUserProfile();
+  }, [currentUser, profileData, profileLoading]);
 
   useEffect(() => {
     const fetchTeamData = async () => {
@@ -141,6 +144,7 @@ const Affiliate = () => {
             referred:profiles!referral_relationships_referred_id_fkey (
               id,
               full_name,
+              email,
               created_at,
               status,
               referred_by,
@@ -187,7 +191,7 @@ const Affiliate = () => {
           ?.filter(rel => rel.referred)
           .map(rel => ({
             id: rel.referred.id,
-            name: rel.referred.full_name || "",
+            name: rel.referred.email || "",
             level: rel.level,
             joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
             status: rel.referred.status || 'Active',
@@ -322,6 +326,9 @@ const Affiliate = () => {
     });
   };
 
+  // Helper to count direct referrals (level 1)
+  const directReferralsCount = teamData.filter(m => m.level === 1).length;
+
   return (
     <div className="min-h-[100dvh] bg-background">
       <Topbar title="Affiliate Dashboard" />
@@ -350,7 +357,7 @@ const Affiliate = () => {
 
           <BalanceCard 
             label="Directs"
-            amount={userDirectCount}
+            amount={directReferralsCount}
             variant="direct"
           />
         </div>
@@ -378,11 +385,11 @@ const Affiliate = () => {
                     </Button>
                   </div>
                   <p className={`text-xs ${
-                    teamData.filter(m => m.level === 1).length >= 2 
+                    directReferralsCount >= 2 
                       ? 'text-green-600' 
                       : 'text-amber-600'
                   }`}>
-                    Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
+                    Direct Referrals: {directReferralsCount}/2
                   </p>
                 </div>
 
@@ -454,11 +461,11 @@ const Affiliate = () => {
                     </Button>
                   </div>
                   <p className={`text-xs ${
-                    teamData.filter(m => m.level === 1).length >= 2 
+                    directReferralsCount >= 2 
                       ? 'text-green-600' 
                       : 'text-amber-600'
                   }`}>
-                    Direct Referrals: {teamData.filter(m => m.level === 1).length}/2
+                    Direct Referrals: {directReferralsCount}/2
                   </p>
                 </div>
 

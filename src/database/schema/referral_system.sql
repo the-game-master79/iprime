@@ -16,31 +16,39 @@ DECLARE
     v_referrer_id UUID;
     v_max_level INTEGER;
 BEGIN
-    -- Check if code exists and user is active
+    -- Check if code exists
     SELECT p.id, p.status INTO v_referrer_id, v_status
     FROM profiles p
-    WHERE p.referral_code = p_referral_code
-    AND p.status = 'active';
+    WHERE p.referral_code = p_referral_code;
 
     IF v_referrer_id IS NULL THEN
         RETURN QUERY SELECT 
             FALSE::BOOLEAN,
             NULL::UUID,
-            'Invalid or inactive referral code'::TEXT;
+            'Referral code does not exist'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Check if user is active
+    IF v_status IS DISTINCT FROM 'active' THEN
+        RETURN QUERY SELECT 
+            FALSE::BOOLEAN,
+            NULL::UUID,
+            'Referral code exists but user is not active (status: ' || v_status || ')'::TEXT;
         RETURN;
     END IF;
 
     -- Check for max depth using level instead of path
-    SELECT MAX(level) INTO v_max_level
-    FROM referral_relationships
-    WHERE referrer_id = v_referrer_id
-    AND active = true;
+    SELECT MAX(rr.level) INTO v_max_level
+    FROM referral_relationships rr
+    WHERE rr.referrer_id = v_referrer_id
+    AND rr.active = true;
 
-    IF v_max_level >= 10 THEN
+    IF v_max_level IS NOT NULL AND v_max_level >= 10 THEN
         RETURN QUERY SELECT 
             FALSE::BOOLEAN,
             NULL::UUID,
-            'Network depth limit reached'::TEXT;
+            'Network depth limit reached (max level: ' || v_max_level || ')'::TEXT;
         RETURN;
     END IF;
 
@@ -133,7 +141,7 @@ CREATE OR REPLACE FUNCTION initialize_profile_fields()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Set default values for required fields if not provided
-    NEW.status := COALESCE(NEW.status, 'Active');
+    NEW.status := COALESCE(NEW.status, 'active');
     NEW.date_joined := COALESCE(NEW.date_joined, NOW());
     NEW.created_at := COALESCE(NEW.created_at, NOW());
     NEW.updated_at := COALESCE(NEW.updated_at, NOW());
@@ -143,7 +151,6 @@ BEGIN
     NEW.total_invested := COALESCE(NEW.total_invested, 0);
     NEW.role := COALESCE(NEW.role, 'user');
     NEW.withdrawal_wallet := COALESCE(NEW.withdrawal_wallet, 0);
-    NEW.investment_wallet := COALESCE(NEW.investment_wallet, 0);
     NEW.direct_count := COALESCE(NEW.direct_count, 0);
     
     RETURN NEW;
@@ -172,17 +179,19 @@ $$ LANGUAGE plpgsql;
 
 -- Add function to update direct referral count
 CREATE OR REPLACE FUNCTION update_direct_referral_count()
-RETURNS TRIGGER AS $$lize_profile
-BEGINEFORE INSERT ON profiles
+RETURNS TRIGGER AS $$
+BEGIN
     -- Update the direct count for the referrer when a new user is referred
-    IF NEW.referred_by IS NOT NULL THEN_fields();
+    IF NEW.referred_by IS NOT NULL THEN
         UPDATE profiles
-        SET direct_count = (l_relationships
-            SELECT COUNT(*)s
+        SET direct_count = (
+            SELECT COUNT(*)
             FROM profiles
             WHERE referred_by = NEW.referred_by
             AND status = 'active'
-        ) old triggers/functions
-        WHERE referral_code = NEW.referred_by;ON profiles;
-    END IF;ON IF EXISTS handle_new_referral();
-    -- If referral code changes, update old referrer's count    IF TG_OP = 'UPDATE' AND OLD.referred_by IS DISTINCT FROM NEW.referred_by THEN        UPDATE profiles        SET direct_count = (            SELECT COUNT(*)            FROM profiles            WHERE referred_by = OLD.referred_by            AND status = 'active'        )        WHERE referral_code = OLD.referred_by;    END IF;    RETURN NEW;END;$$ LANGUAGE plpgsql;-- Create triggers with correct timingDROP TRIGGER IF EXISTS initialize_profile ON profiles;CREATE TRIGGER initialize_profile    BEFORE INSERT ON profiles    FOR EACH ROW    EXECUTE FUNCTION initialize_profile_fields();CREATE TRIGGER setup_referral_relationships    AFTER INSERT ON profiles    FOR EACH ROW    EXECUTE FUNCTION handle_referral_setup();-- Add trigger for direct count updatesDROP TRIGGER IF EXISTS update_direct_count_trigger ON profiles;CREATE TRIGGER update_direct_count_trigger    AFTER INSERT OR UPDATE OF referred_by, status ON profiles    FOR EACH ROW    EXECUTE FUNCTION update_direct_referral_count();-- Remove old triggers/functionsDROP TRIGGER IF EXISTS after_profile_creation ON profiles;DROP FUNCTION IF EXISTS handle_new_referral();
+        )
+        WHERE referral_code = NEW.referred_by;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

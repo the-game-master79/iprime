@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { DashboardTopbar } from "@/components/shared/DashboardTopbar";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -21,13 +22,10 @@ import {
   XCircle,
   Wallet,
   ArrowDown,
-  ArrowUp,
   ChartLine,
   Trophy,
   Target,
   Users,
-  Sun,
-  Moon
 } from "@phosphor-icons/react";
 
 // Utilities
@@ -46,6 +44,22 @@ import type {
   UserProfile, 
   Transaction
 } from "@/types/dashboard"; // You'll need to create this types file
+
+// Define Trade interface locally since it's not exported from "@/types/dashboard"
+interface Trade {
+  id: string;
+  pair: string;
+  type: string;
+  lots: number;
+  pnl: number;
+  open_price: number;
+  close_price: number;
+  leverage: number;
+  closed_at?: string;
+  updated_at?: string;
+  created_at?: string;
+  status?: string;
+}
 
 // Constants
 const REFRESH_INTERVAL = 30000;
@@ -136,10 +150,55 @@ const renderPriceWithBigDigits = (value: number | undefined, decimals: number) =
   return str;
 };
 
+// Helper to group trades by date and format date label
+function groupTradesByDate(trades: Trade[]) {
+  const groups: Record<string, Trade[]> = {};
+  const now = new Date();
+  trades.forEach(trade => {
+    const closedAt = trade.closed_at || trade.updated_at || trade.created_at;
+    if (!closedAt) return;
+    const dateObj = new Date(closedAt);
+    const dateKey = dateObj.toISOString().slice(0, 10); // YYYY-MM-DD
+    if (!groups[dateKey]) groups[dateKey] = [];
+    groups[dateKey].push(trade);
+  });
+  // Sort groups by date descending
+  const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+  return sortedKeys.map(dateKey => ({
+    dateKey,
+    trades: groups[dateKey]
+  }));
+}
+
+function formatDateLabel(dateKey: string) {
+  const now = new Date();
+  const date = new Date(dateKey + "T00:00:00");
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (date.getTime() === today.getTime()) return "Today";
+  if (date.getTime() === yesterday.getTime()) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
+  const { profile, loading: profileLoading } = useUserProfile();
   const { isMobile } = useBreakpoints();
-  const { canInstall, install } = usePwaInstall(); // Add hook
+  const { canInstall, install } = usePwaInstall();
   const { theme, setTheme } = useTheme();
+
+  // Add user state
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
   // State management
   const [isLoading, setIsLoading] = useState(true);
@@ -204,33 +263,37 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   // Add state for live prices (now storing price and isPriceUp)
   const [marketPrices, setMarketPrices] = useState<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
 
-  // Data fetching functions
-  const fetchUserProfile = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  // Add state for closed trades
+  const [closedTrades, setClosedTrades] = useState<Trade[]>([]);
+  const [closedTradesLoading, setClosedTradesLoading] = useState(false);
 
-      const [profileData, plansData] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('*, withdrawal_wallet, multiplier_bonus, direct_count, full_name')
-          .eq('id', user.id)
-          .single(),
-        supabase
-          .from('plans_subscriptions')
-          .select(`
+  // Data fetching functions
+  const fetchUserProfile = async (user: any) => {
+    if (!user) return;
+    try {
+      // Join plans_subscriptions to get user's active plans
+      const profileData = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          withdrawal_wallet,
+          multiplier_bonus,
+          direct_count,
+          full_name,
+          plans_subscriptions:plans_subscriptions (
             id,
             amount,
             status
-          `)
-          .eq('user_id', user.id)
-          .eq('status', 'approved')
-      ]);
+          )
+        `)
+        .eq('id', user.id)
+        .single();
 
       if (profileData.error) throw profileData.error;
       
       setUserProfile(profileData.data);
-      setDirectCount(profileData.data?.direct_count || 0);
+      // setDirectCount(profileData.data?.direct_count || 0); // REMOVE this line, directCount will be set in fetchReferralData
+
       // Calculate total available balance including multiplier bonus
       const totalBalance = (profileData.data?.withdrawal_wallet || 0) + (profileData.data?.multiplier_bonus || 0);
       setWithdrawalBalance(totalBalance);
@@ -242,8 +305,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       }
 
       // Calculate total invested amount from approved subscriptions
-      const approvedSubscriptions = plansData.data || [];
-      const totalAmount = approvedSubscriptions.reduce((sum, sub) => sum + (sub.amount || 0), 0);
+      const allSubscriptions = profileData.data?.plans_subscriptions || [];
+      const approvedSubscriptions = allSubscriptions.filter((sub: any) => sub.status === "approved");
+      const totalAmount = approvedSubscriptions.reduce((sum: number, sub: any) => sum + (sub.amount || 0), 0);
       
       setActivePlans({
         count: approvedSubscriptions.length,
@@ -257,11 +321,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
-  const fetchReferralData = async () => {
+  const fetchReferralData = async (user: any) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data: relationships, error } = await supabase
         .from('referral_relationships')
         .select(`
@@ -280,7 +342,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       if (error) throw error;
 
       const processedData = relationships?.filter(rel => rel.referred);
-      const activeReferrals = processedData?.filter(ref => ref.level === 1).length || 0;
+      // Count only level 1 referrals (directs), just like in Affiliate.tsx
+      const directReferrals = processedData?.filter(ref => ref.level === 1) || [];
+      const activeReferrals = directReferrals.length;
       const totalReferrals = processedData?.length || 0;
 
       setTotalReferrals({
@@ -288,16 +352,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         total: totalReferrals
       });
 
+      setDirectCount(activeReferrals); // Set directCount here, just like Affiliate.tsx
+
     } catch (error) {
       console.error('Error fetching referral data:', error);
     }
   };
 
-  const fetchCommissions = async () => {
+  const fetchCommissions = async (user: any) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const [commissionData, rankBonusData] = await Promise.all([
         supabase
           .from('transactions')
@@ -323,11 +387,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
-  const fetchWithdrawalStats = async () => {
+  const fetchWithdrawalStats = async (user: any) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const [returnsData, commissionsData, refundsData] = await Promise.all([
         supabase
           .from('transactions')
@@ -360,11 +422,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
-  const fetchBusinessStats = async () => {
+  const fetchBusinessStats = async (user: any) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       // Get total business volume and rank directly from total_business_volumes
       const { data: volumeData } = await supabase
         .from('total_business_volumes')
@@ -372,9 +432,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         .eq('user_id', user.id)
         .single();
 
-      // Set default values if no data exists
       const businessVolume = volumeData?.total_amount || 0;
-      const currentRankTitle = volumeData?.business_rank || 'New Member';
+      const businessRank = volumeData?.business_rank || 'New Member';
 
       // Get all ranks for progression tracking
       const { data: ranks, error: ranksError } = await supabase
@@ -384,35 +443,31 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
       if (ranksError) throw ranksError;
 
-      // Default to first rank if no rank is found
-      const currentRank = ranks.find(r => r.title === currentRankTitle) || ranks[0] || { 
-        title: 'New Member',
-        business_amount: 0,
-        bonus: 0
-      };
-      
-      const currentRankIndex = ranks.findIndex(r => r.title === currentRankTitle);
-      const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null;
+      // Find the current rank object from the ranks table
+      const currentRankObj = ranks.find(r => r.title === businessRank) || { title: 'New Member', business_amount: 0, bonus: 0 };
+
+      // Find the next rank (first rank with business_amount > current business volume)
+      const nextRank = ranks.find(r => r.business_amount > businessVolume) || null;
 
       // Calculate progress to next rank
       let progress = 0;
-      if (nextRank && currentRank) {
-        const progressCalc = ((businessVolume - currentRank.business_amount) / 
-          (nextRank.business_amount - currentRank.business_amount)) * 100;
+      if (nextRank && currentRankObj) {
+        const progressCalc = ((businessVolume - currentRankObj.business_amount) /
+          (nextRank.business_amount - currentRankObj.business_amount)) * 100;
         progress = Math.min(100, Math.max(0, progressCalc));
       }
 
       setBusinessStats({
-        currentRank: currentRankTitle,
+        currentRank: businessRank,
         totalVolume: businessVolume,
-        rankBonus: currentRank?.bonus || 0,
+        rankBonus: currentRankObj?.bonus || 0,
         nextRank: nextRank ? {
           title: nextRank.title,
           bonus: nextRank.bonus,
           business_amount: nextRank.business_amount
         } : null,
         progress,
-        targetVolume: nextRank ? nextRank.business_amount : currentRank?.business_amount || 0
+        targetVolume: nextRank ? nextRank.business_amount : currentRankObj?.business_amount || 0
       });
 
     } catch (error) {
@@ -429,11 +484,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
-  const fetchClaimedRanks = async () => {
+  const fetchClaimedRanks = async (user: any) => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data, error } = await supabase
         .from('transactions')
         .select('description')
@@ -459,8 +512,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const handleClaimBonus = async (rank: string) => {
     try {
       setIsClaimingBonus(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!currentUser) return;
 
       const { error } = await supabase.rpc('claim_rank_bonus', {
         rank_title: rank
@@ -475,11 +527,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
       // Refresh states
       await Promise.all([
-        fetchBusinessStats(),
-        fetchWithdrawalStats()
+        fetchBusinessStats(currentUser),
+        fetchWithdrawalStats(currentUser)
       ]);
 
       setClaimedRanks(prev => [...prev, rank]);
+
+      // Instantly update available balance after claiming bonus
+      // Fetch latest profile to get updated withdrawal_wallet and multiplier_bonus
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('withdrawal_wallet, multiplier_bonus')
+        .eq('id', currentUser.id)
+        .single();
+      if (!profileError && profileData) {
+        const totalBalance = (profileData.withdrawal_wallet || 0) + (profileData.multiplier_bonus || 0);
+        setWithdrawalBalance(totalBalance);
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -494,8 +558,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const handleClaimRankBonus = async (rank: Rank) => {
     try {
       setClaimingRank(rank.title);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!currentUser) throw new Error('User not authenticated');
 
       const { error } = await supabase.rpc('claim_rank_bonus', {
         rank_title: rank.title
@@ -515,9 +578,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       
       // Refresh states
       await Promise.all([
-        fetchBusinessStats(),
-        fetchWithdrawalStats(),
-        fetchClaimedRanks()
+        fetchBusinessStats(currentUser),
+        fetchWithdrawalStats(currentUser),
+        fetchClaimedRanks(currentUser)
       ]);
 
     } catch (error: any) {
@@ -567,10 +630,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   };
 
   // Update fetchTransactions function
-  const fetchTransactions = async (pageNumber = 1) => {
+  const fetchTransactions = async (user: any, pageNumber = 1) => {
     try {
       setIsLoadingMore(true);
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const from = (pageNumber - 1) * ITEMS_PER_PAGE;
@@ -607,9 +669,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   // Add load more handler
   const handleLoadMore = () => {
-    if (!isLoadingMore && hasMore) {
+    if (!isLoadingMore && hasMore && currentUser) {
       setPage(prev => prev + 1);
-      fetchTransactions(page + 1);
+      fetchTransactions(currentUser, page + 1);
     }
   };
 
@@ -643,22 +705,42 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
+  // Fetch closed trades from trades table
+  const fetchClosedTrades = async (user: any) => {
+    if (!user) return;
+    setClosedTradesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false });
+
+      if (error) throw error;
+      setClosedTrades(data || []);
+    } catch (error) {
+      setClosedTrades([]);
+    } finally {
+      setClosedTradesLoading(false);
+    }
+  };
+
   // Effects
   useEffect(() => {
     let mounted = true;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     const initializeDashboard = async () => {
-      if (!mounted) return;
-      
+      if (!mounted || !currentUser) return;
       await Promise.all([
-        fetchUserProfile(),
-        fetchReferralData(),
-        fetchCommissions(),
-        fetchBusinessStats(),
-        fetchWithdrawalStats(),
-        fetchClaimedRanks(),
-        fetchPromotions() // Add this line
+        fetchUserProfile(currentUser),
+        fetchReferralData(currentUser),
+        fetchCommissions(currentUser),
+        fetchBusinessStats(currentUser),
+        fetchWithdrawalStats(currentUser),
+        fetchClaimedRanks(currentUser),
+        fetchPromotions()
       ]);
       setIsLoading(false);
     };
@@ -677,8 +759,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
             filter: `id=eq.${userProfile.id}`,
           },
           () => {
-            if (mounted) {
-              fetchBusinessStats();
+            if (mounted && currentUser) {
+              fetchBusinessStats(currentUser);
             }
           }
         )
@@ -691,15 +773,18 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         supabase.removeChannel(channel);
       }
     };
-  }, [userProfile?.id, theme]);
+  }, [userProfile?.id, theme, currentUser]);
 
   useEffect(() => {
-    fetchTransactions();
-    fetchRanks();
-  }, [userProfile?.id]);
+    if (currentUser) {
+      fetchTransactions(currentUser);
+      fetchRanks();
+      fetchClosedTrades(currentUser); // fetch closed trades
+    }
+  }, [userProfile?.id, currentUser]);
 
+  // Remove the WebSocket connection and related logic
   useEffect(() => {
-    // Remove the WebSocket connection and related logic
     return () => {};
   }, []);
 
@@ -1205,6 +1290,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   <TabsList>
                     <TabsTrigger value="transactions">Transactions</TabsTrigger>
                     <TabsTrigger value="ranks">Ranks</TabsTrigger>
+                    <TabsTrigger value="closed_trades">Closed Trades</TabsTrigger>
                   </TabsList>
                   <TabsContent 
                     value="transactions" 
@@ -1264,6 +1350,111 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                       claimingRank={claimingRank}
                       onClaimBonus={handleClaimRankBonus}
                     />
+                  </TabsContent>
+
+                  {/* Closed Trades Tab */}
+                  <TabsContent value="closed_trades" className="space-y-4 w-full">
+                    {closedTradesLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : closedTrades.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <Target 
+                          className="h-16 w-16 mb-4 text-white/20"
+                          weight="thin"
+                        />
+                        <p className="text-base">No closed trades found</p>
+                        <p className="text-sm text-white/50 mt-1">Your closed trades will appear here</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {/* Total PNL for all closed trades */}
+                        <div className="mb-4 flex items-center gap-2">
+                          <span className="font-semibold text-lg">Total PNL:</span>
+                          <span className={`font-bold text-lg ${closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0) >= 0 ? "+" : ""}
+                            ${closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0).toFixed(2)}
+                          </span>
+                        </div>
+                        {/* Grouped by date */}
+                        <div className="space-y-6">
+                          {groupTradesByDate(closedTrades).map(({ dateKey, trades }) => {
+                            const dayPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+                            return (
+                              <div key={dateKey}>
+                                <div className="flex items-center gap-4 mb-2">
+                                  <span className="font-semibold text-base">{formatDateLabel(dateKey)}</span>
+                                  <span className={`font-bold text-base ${dayPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {dayPnl >= 0 ? "+" : ""}${dayPnl.toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  {trades.map((trade) => {
+                                    const decimals =
+                                      trade.pair === "XAUUSD" ? 2 :
+                                      trade.pair.endsWith("JPY") ? 3 :
+                                      trade.pair.endsWith("USDT") && ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "BNBUSDT"].includes(trade.pair) ? 2 :
+                                      trade.pair === "DOGEUSDT" ? 5 :
+                                      trade.pair === "ADAUSDT" || trade.pair === "TRXUSDT" ? 4 :
+                                      trade.pair === "DOTUSDT" ? 3 :
+                                      !trade.pair.endsWith("USDT") ? 5 : 2;
+
+                                    const isProfitable = trade.pnl >= 0;
+                                    const closedAt = trade.closed_at || trade.updated_at || trade.created_at;
+                                    return (
+                                      <div
+                                        key={trade.id}
+                                        className="p-4 rounded-xl border border-border bg-muted/10 shadow-sm flex flex-col gap-2"
+                                      >
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <span className="font-semibold text-base">{trade.pair}</span>
+                                          <span
+                                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                              trade.type?.toLowerCase() === "buy"
+                                                ? "bg-primary/80 text-white"
+                                                : "bg-destructive/80 text-white"
+                                            }`}
+                                          >
+                                            {trade.type?.toUpperCase()}
+                                          </span>
+                                          <span className="px-2 py-1 rounded-full bg-muted text-foreground text-xs font-medium">
+                                            {Number(trade.lots).toFixed(2)} lot{Number(trade.lots) !== 1 ? 's' : ''}
+                                          </span>
+                                          <span className={`ml-auto font-bold ${isProfitable ? "text-green-500" : "text-red-500"}`}>
+                                            {isProfitable ? "+" : ""}${trade.pnl?.toFixed(2)}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 items-center text-xs">
+                                          <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+                                            O: {Number(trade.open_price).toFixed(decimals)}
+                                          </span>
+                                          <span className="bg-secondary text-foreground px-2 py-1 rounded">
+                                            C: {Number(trade.close_price).toFixed(decimals)}
+                                          </span>
+                                          <span className="bg-muted text-foreground px-2 py-1 rounded">
+                                            LX: {trade.leverage}x
+                                          </span>
+                                          <span className="text-muted-foreground ml-auto">
+                                            {closedAt ? new Date(closedAt).toLocaleString("en-US", {
+                                              day: "2-digit",
+                                              month: "short",
+                                              hour: "numeric",
+                                              minute: "numeric",
+                                              hour12: true,
+                                            }) : "-"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </div>

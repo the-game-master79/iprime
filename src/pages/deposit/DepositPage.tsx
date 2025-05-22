@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransactionTable } from "@/components/tables/TransactionTable";
-import Withdrawals from "../withdrawals/Withdrawals";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -23,6 +22,10 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import { LockSimple } from "@phosphor-icons/react";
+import { BalanceCard } from "@/components/shared/BalanceCards";
+import { KycVariant } from "@/components/shared/KycVariants";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 
 interface Promocode {
   id: string;
@@ -72,7 +75,33 @@ interface DepositHistory {
   description?: string;
 }
 
+// --- Withdrawals Types ---
+interface WithdrawalFormData {
+  amount: string;
+  cryptoId: string;
+  network: string;
+  walletAddress: string;
+}
+interface Withdrawal {
+  id: string;
+  user_id: string;
+  amount: number;
+  crypto_name: string;
+  crypto_symbol: string;
+  network: string;
+  wallet_address: string;
+  status: 'Pending' | 'Processing' | 'Completed' | 'Failed';
+  created_at: string;
+  updated_at?: string;
+}
+interface Profile {
+  id: string;
+  withdrawal_wallet: number;
+  kyc_status: 'pending' | 'completed' | 'rejected' | null;
+}
+
 export default function CashierPage() {
+  const { profile, loading } = useUserProfile();
   const navigate = useNavigate();
   const location = useLocation();
   const selectedPlan = location.state?.plan as Plan | null;
@@ -93,7 +122,34 @@ export default function CashierPage() {
   const [showPromoDialog, setShowPromoDialog] = useState(false);
   const [historySortField, setHistorySortField] = useState<'date' | 'amount' | 'status'>('date');
   const [historySortDirection, setHistorySortDirection] = useState<'asc' | 'desc'>('desc');
-  const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // --- Withdrawals State ---
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [userBalance, setUserBalance] = useState(0);
+  const [withdrawForm, setWithdrawForm] = useState<WithdrawalFormData>({
+    amount: '',
+    cryptoId: '',
+    network: '',
+    walletAddress: '',
+  });
+  const [withdrawIsSubmitting, setWithdrawIsSubmitting] = useState(false);
+  const [withdrawAmountError, setWithdrawAmountError] = useState<string | null>(null);
+  const [kycStatus, setKycStatus] = useState<'pending' | 'processing' | 'completed' | 'rejected' | 'required'>('pending');
+  const [kycDate, setKycDate] = useState<Date | undefined>(undefined);
+  const [withdrawTransactions, setWithdrawTransactions] = useState<any[]>([]);
+  const [withdrawHistorySortField, setWithdrawHistorySortField] = useState<'date' | 'amount' | 'status'>('date');
+  const [withdrawHistorySortDirection, setWithdrawHistorySortDirection] = useState<'asc' | 'desc'>('desc');
+  const [withdrawCopied, setWithdrawCopied] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -242,18 +298,14 @@ export default function CashierPage() {
   // Add null check for crypto object
   const handleSubmit = async (investment: number) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
+      if (!currentUser) throw new Error('Not authenticated');
       const selectedCrypto = availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType);
       if (!selectedCrypto?.symbol || !selectedCrypto?.name) {
         throw new Error('Please select a valid cryptocurrency');
       }
-
       const finalAmount = calculateFinalAmount(investment);
-
       const { data, error } = await supabase.from('deposits').insert({
-        user_id: user.id,
+        user_id: currentUser.id,
         amount: investment,
         crypto_name: selectedCrypto.name,
         crypto_symbol: selectedCrypto.symbol,
@@ -261,7 +313,6 @@ export default function CashierPage() {
         status: 'pending',
         promocode_id: selectedPromocode?.id
       }).select().single();
-
       if (error) throw error;
 
       // Apply promocode effects
@@ -479,30 +530,31 @@ export default function CashierPage() {
     return `${address.slice(0, start)}...${address.slice(-end)}`;
   };
 
-  // Add function to fetch deposit history
+  // Add function to fetch deposit history from transactions table
   const fetchDepositHistory = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!currentUser) return;
       const { data, error } = await supabase
-        .from('deposits')
+        .from('transactions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
+        .eq('type', 'deposit')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Format deposits to match Transaction interface with status mapping
-      const formattedDeposits = (data || []).map(deposit => ({
-        ...deposit,
+
+      // Format transactions to match TransactionTable expectations
+      const formattedDeposits = (data || []).map(tx => ({
+        ...tx,
         type: 'deposit',
-        status: deposit.status === 'approved' ? 'Completed' : 
-                deposit.status === 'rejected' ? 'Failed' : deposit.status,
-        description: `Deposit ${deposit.crypto_symbol} ${deposit.network ? `via ${deposit.network}` : ''}`,
-        statusColor: deposit.status === 'rejected' ? '#FF005C' : undefined
+        status: tx.status,
+        amount: tx.amount,
+        created_at: tx.created_at,
+        crypto_symbol: tx.method,
+        description: tx.description,
+        network: undefined, // If you want to display network, you can join with deposits table if needed
       }));
-      
+
       setDeposits(formattedDeposits);
     } catch (error) {
       console.error('Error fetching deposit history:', error);
@@ -511,11 +563,10 @@ export default function CashierPage() {
     }
   };
 
-  // Add useEffect to fetch deposit history
   useEffect(() => {
-    fetchDepositHistory();
-  }, []);
-
+    if (currentUser) fetchDepositHistory();
+  }, [currentUser]);
+  
   // Add copy handler for TransactionTable
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -550,20 +601,290 @@ export default function CashierPage() {
     }
   };
 
-  // Fetch user profile for NameDialog
+  // --- Withdrawals Effects ---
   useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
+    fetchWithdrawals();
+    fetchUserBalance();
+    fetchKycStatus();
+    fetchWithdrawalTransactions();
+  // eslint-disable-next-line
+  }, [currentUser]);
+
+  // --- Withdrawals Functions ---
+  const fetchWithdrawals = async () => {
+    try {
+      if (!currentUser) return;
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+      if (error) return;
+      setWithdrawals(data || []);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load withdrawal history",
+        variant: "destructive"
+      });
+    }
+  };
+  const fetchUserBalance = async () => {
+    try {
+      if (!currentUser) return;
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name')
-        .eq('id', user.id)
+        .select('withdrawal_wallet')
+        .eq('id', currentUser.id)
         .single();
-      setUserProfile(data);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([
+              { id: currentUser.id, withdrawal_wallet: 0, investment_wallet: 0 }
+            ])
+            .select('withdrawal_wallet')
+            .single();
+          if (createError) throw createError;
+          setUserBalance(newProfile?.withdrawal_wallet || 0);
+        } else {
+          throw error;
+        }
+      } else {
+        setUserBalance(data?.withdrawal_wallet || 0);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load withdrawal wallet balance. Please try refreshing the page.",
+        variant: "destructive"
+      });
+    }
+  };
+  const fetchKycStatus = async () => {
+    try {
+      if (!currentUser) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('kyc_status')
+        .eq('id', currentUser.id)
+        .single();
+      // Fix: always expect array for kyc, handle empty result
+      const { data: kycArr } = await supabase
+        .from('kyc')
+        .select('updated_at')
+        .eq('user_id', currentUser.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      let kycDateValue: Date | undefined = undefined;
+      if (Array.isArray(kycArr) && kycArr.length > 0 && kycArr[0]?.updated_at) {
+        kycDateValue = new Date(kycArr[0].updated_at);
+      }
+
+      setKycStatus(profile?.kyc_status || 'pending');
+      setKycDate(kycDateValue);
+    } catch (error) {}
+  };
+  const fetchWithdrawalTransactions = async () => {
+    try {
+      if (!currentUser) return;
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const mapped = (data || []).map((w: Withdrawal) => ({
+        id: w.id,
+        amount: w.amount,
+        status: w.status,
+        created_at: w.created_at,
+        updated_at: w.updated_at,
+        type: 'withdrawal',
+        description: `Withdrawal ${w.crypto_symbol || ''} ${w.network ? `via ${w.network}` : ''}`,
+        wallet_address: w.wallet_address,
+        crypto_symbol: w.crypto_symbol,
+        network: w.network,
+      }));
+      setWithdrawTransactions(mapped);
+    } catch {}
+  };
+  const getNetworksForCrypto = (cryptoSymbol: string): string[] => {
+    return depositMethods
+      .filter(m => m.crypto_symbol === cryptoSymbol && m.network)
+      .map(m => m.network!)
+      .filter((value, index, self) => self.indexOf(value) === index);
+  };
+  const withdrawCryptoOptions = [...new Set(
+    depositMethods
+      .filter(m => m.method === 'crypto')
+      .map(m => m.crypto_symbol)
+  )]
+  .filter(Boolean)
+  .map(symbol => {
+    const method = depositMethods.find(m => m.crypto_symbol === symbol);
+    return {
+      symbol,
+      name: method?.crypto_name,
+      logo: method?.logo_url,
+      id: method?.id
     };
-    fetchProfile();
-  }, []);
+  });
+  const withdrawSelectedCrypto = withdrawCryptoOptions.find(c => c.id === withdrawForm.cryptoId);
+  const withdrawNetworks = withdrawForm.cryptoId ? 
+    getNetworksForCrypto(depositMethods.find(m => m.id === withdrawForm.cryptoId)?.crypto_symbol || '') : 
+    [];
+  const validateWithdrawAmount = (amount: string) => {
+    const amountValue = parseFloat(amount);
+    if (!amount || isNaN(amountValue) || amountValue <= 0) {
+      setWithdrawAmountError("Please enter a valid amount");
+      return false;
+    }
+    if (amountValue > userBalance) {
+      setWithdrawAmountError("Amount exceeds available balance");
+      return false;
+    }
+    const selectedPaymentMethod = depositMethods.find(m => m.id === withdrawForm.cryptoId);
+    if (selectedPaymentMethod && amountValue < selectedPaymentMethod.min_amount) {
+      setWithdrawAmountError(`Minimum withdrawal amount is $${selectedPaymentMethod.min_amount}`);
+      return false;
+    }
+    setWithdrawAmountError(null);
+    return true;
+  };
+  const handleWithdrawAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAmount = e.target.value;
+    setWithdrawForm(prev => ({ ...prev, amount: newAmount }));
+    validateWithdrawAmount(newAmount);
+  };
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (kycStatus !== 'completed') {
+      toast({
+        title: "KYC Required",
+        description: "Please complete your KYC verification before making withdrawals.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const amountValue = parseFloat(withdrawForm.amount);
+      if (!withdrawForm.cryptoId) {
+        toast({
+          title: "Error",
+          description: "Please select a cryptocurrency.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!withdrawForm.network) {
+        toast({
+          title: "Error",
+          description: "Please select a network.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!withdrawForm.walletAddress) {
+        toast({
+          title: "Error",
+          description: "Please enter your wallet address.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!withdrawForm.amount || isNaN(amountValue) || amountValue <= 0) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid amount.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const selectedPaymentMethod = depositMethods.find(m => m.id === withdrawForm.cryptoId);
+      if (selectedPaymentMethod && amountValue < selectedPaymentMethod.min_amount) {
+        toast({
+          title: "Error",
+          description: `Minimum withdrawal amount for ${selectedPaymentMethod.method} is $${selectedPaymentMethod.min_amount}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (amountValue > userBalance) {
+        toast({
+          title: "Error",
+          description: "Withdrawal amount exceeds your available balance.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setWithdrawIsSubmitting(true);
+      const selectedCrypto = depositMethods.find(m => m.id === withdrawForm.cryptoId);
+      if (!selectedCrypto) throw new Error('Invalid cryptocurrency selected');
+      const { data, error } = await supabase
+        .from('withdrawals')
+        .insert({
+          user_id: currentUser.id,
+          amount: parseFloat(withdrawForm.amount),
+          crypto_name: selectedCrypto.crypto_name,
+          crypto_symbol: selectedCrypto.crypto_symbol,
+          network: withdrawForm.network,
+          wallet_address: withdrawForm.walletAddress,
+          status: 'Pending'
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      toast({
+        title: "Withdrawal Request Submitted",
+        description: `Your withdrawal request for $${withdrawForm.amount} via ${selectedCrypto.crypto_name} has been submitted.`,
+      });
+      setWithdrawForm({
+        amount: '',
+        cryptoId: '',
+        network: '',
+        walletAddress: '',
+      });
+      fetchWithdrawals();
+      fetchWithdrawalTransactions();
+      fetchUserBalance();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit withdrawal request",
+        variant: "destructive"
+      });
+    } finally {
+      setWithdrawIsSubmitting(false);
+    }
+  };
+  const handleWithdrawCopyId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id);
+      setWithdrawCopied(true);
+      setTimeout(() => setWithdrawCopied(false), 2000);
+    } catch {}
+  };
+  const withdrawPending = withdrawals.filter(w => w.status === 'Pending').reduce((sum, w) => sum + w.amount, 0);
+  const withdrawSuccess = withdrawals.filter(w => w.status === 'Completed').reduce((sum, w) => sum + w.amount, 0);
+  const filteredAndSortedWithdrawTransactions = [...withdrawTransactions]
+    .sort((a, b) => {
+      if (withdrawHistorySortField === 'amount') {
+        return withdrawHistorySortDirection === 'asc'
+          ? a.amount - b.amount
+          : b.amount - a.amount;
+      }
+      if (withdrawHistorySortField === 'status') {
+        return withdrawHistorySortDirection === 'asc'
+          ? (a.status || '').localeCompare(b.status || '')
+          : (b.status || '').localeCompare(a.status || '');
+      }
+      return withdrawHistorySortDirection === 'asc'
+        ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   return (
     <div className="min-h-screen bg-background">
@@ -575,7 +896,6 @@ export default function CashierPage() {
           </Button>
         }
       />
-
       <div className="container mx-auto max-w-[1000px] px-4 py-6 space-y-6">
         <div className="flex items-center justify-between mb-6">
           <Tabs defaultValue="add-funds" className="w-full">
@@ -584,7 +904,6 @@ export default function CashierPage() {
                 <TabsTrigger value="add-funds">Add Funds</TabsTrigger>
                 <TabsTrigger value="withdraw">Payouts</TabsTrigger>
               </TabsList>
-              
               <Button 
                 variant="outline" 
                 size="sm"
@@ -910,33 +1229,187 @@ export default function CashierPage() {
             </TabsContent>
 
             <TabsContent value="withdraw" className="w-full">
-              {/* Render Withdrawals page instead of placeholder */}
-              <Withdrawals />
-              {/* Transaction table below the form */}
-              {/* You may remove the transaction table below if Withdrawals already includes it */}
-              {/* 
-              <div className="mt-8">
-                <Card className="border-none bg-black">
-                  <CardContent className="p-6">
-                    {isLoading ? (
-                      <div className="text-center py-6">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                        <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
-                      </div>
-                    ) : deposits.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No deposits found
-                      </div>
-                    ) : (
-                      <TransactionTable 
-                        transactions={deposits}
-                        onCopyId={handleCopyId}
+              {/* Withdrawals Implementation */}
+              <div className="w-full min-h-screen bg-background">
+                <div className="container max-w-[1000px] mx-auto py-6 px-4 md:px-6">
+                  {/* Balance Cards Grid */}
+                  <div className="grid gap-4 mb-8">
+                    <BalanceCard 
+                      label="Available for Payout"
+                      amount={userBalance}
+                      variant="default"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <BalanceCard
+                        label="Processing"
+                        amount={withdrawPending}
+                        variant="processing"
                       />
+                      <BalanceCard
+                        label="Success" 
+                        amount={withdrawSuccess}
+                        variant="success"
+                      />
+                    </div>
+                  </div>
+                  {/* KYC Status */}
+                  <div className="max-w-lg mx-auto mb-8">
+                    {kycStatus !== 'completed' && (
+                      <KycVariant status={kycStatus as any} date={kycDate} />
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                  {/* Withdraw Form */}
+                  <div className="flex flex-col gap-8">
+                    <div className="w-full max-w-lg mx-auto">
+                      {kycStatus === 'completed' ? (
+                        <form onSubmit={handleWithdrawSubmit} className="space-y-6">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs font-normal">Select Currency</Label>
+                              <Select 
+                                value={withdrawForm.cryptoId || withdrawCryptoOptions[0]?.id} 
+                                onValueChange={(value) => {
+                                  const selectedMethod = depositMethods.find(m => m.id === value);
+                                  const network = selectedMethod?.network || '';
+                                  setWithdrawForm(prev => ({ 
+                                    ...prev, 
+                                    cryptoId: value,
+                                    network
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select cryptocurrency" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <div>
+                                    <div className="px-2 py-1 text-xs text-muted-foreground">USDT</div>
+                                    {depositMethods
+                                      .filter(method => 
+                                        method.method === 'crypto' && 
+                                        method.is_active && 
+                                        method.crypto_symbol?.toLowerCase() === 'usdt'
+                                      )
+                                      .map(method => (
+                                        <SelectItem key={method.id} value={method.id}>
+                                          <div className="flex items-center gap-2">
+                                            {method.logo_url && (
+                                              <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
+                                            )}
+                                            {method.crypto_name} • {method.network}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                  </div>
+                                  <div>
+                                    <div className="px-2 py-1 text-xs text-muted-foreground">USDC</div>
+                                    {depositMethods
+                                      .filter(method => 
+                                        method.method === 'crypto' && 
+                                        method.is_active && 
+                                        method.crypto_symbol?.toLowerCase() === 'usdc'
+                                      )
+                                      .map(method => (
+                                        <SelectItem key={method.id} value={method.id}>
+                                          <div className="flex items-center gap-2">
+                                            {method.logo_url && (
+                                              <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
+                                            )}
+                                            {method.crypto_name} • {method.network}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                  </div>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="walletAddress" className="text-xs font-normal text-foreground">Wallet Address</Label>
+                              <Input
+                                id="walletAddress"
+                                placeholder={`Enter ${
+                                  withdrawSelectedCrypto?.name?.toUpperCase() || 'USDT'
+                                } ${withdrawForm.network || 'TRC20'} address`}
+                                value={withdrawForm.walletAddress}
+                                onChange={(e) => setWithdrawForm(prev => ({ ...prev, walletAddress: e.target.value }))}
+                                className="placeholder:text-foreground bg-secondary text-foreground"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="amount" className="text-xs font-normal text-foreground">Amount</Label>
+                              <div className="relative">
+                                <Input
+                                  id="amount"
+                                  type="number"
+                                  min="0"
+                                  placeholder="Enter amount"
+                                  className={`${withdrawAmountError ? 'border-red-500' : ''} placeholder:text-foreground bg-secondary text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                  value={withdrawForm.amount}
+                                  onChange={handleWithdrawAmountChange}
+                                />
+                                <span className="absolute right-3 top-2.5 text-white">USD</span>
+                              </div>
+                              {withdrawAmountError && (
+                                <p className="text-sm text-red-500">{withdrawAmountError}</p>
+                              )}
+                              {withdrawForm.amount && !withdrawAmountError && (
+                                <p className="text-sm text-muted-foreground">
+                                  Your balance after withdrawal → {(userBalance - parseFloat(withdrawForm.amount)).toLocaleString()} USD
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={withdrawIsSubmitting}>
+                            {withdrawIsSubmitting ? "Processing..." : "Request Payout"}
+                          </Button>
+                        </form>
+                      ) : null}
+                    </div>
+                    {/* Payout History Table */}
+                    <div className="w-full">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                        <h2 className="text-xl font-semibold text-foreground">Payout History</h2>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            id="payout-history-filter"
+                            value={withdrawHistorySortField}
+                            onValueChange={setWithdrawHistorySortField}
+                          >
+                            <SelectTrigger className="w-[120px] bg-secondary border-none text-foreground">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="date">Date</SelectItem>
+                              <SelectItem value="amount">Amount</SelectItem>
+                              <SelectItem value="status">Status</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setWithdrawHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
+                            className="text-foreground bg-secondary hover:bg-secondary/80"
+                            title="Toggle sort direction"
+                          >
+                            {withdrawHistorySortDirection === "asc" ? (
+                              <span className="text-foreground">&uarr;</span>
+                            ) : (
+                              <span className="text-foreground">&darr;</span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="border-b border-foreground/10 mb-2" />
+                      <div className="mt-4">
+                        <TransactionTable
+                          transactions={filteredAndSortedWithdrawTransactions}
+                          onCopyId={handleWithdrawCopyId}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              */}
             </TabsContent>
           </Tabs>
         </div>

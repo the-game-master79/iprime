@@ -43,8 +43,11 @@ BEGIN
 
             EXIT WHEN current_referrer_id IS NULL;
 
-            -- Check if referrer has at least 2 direct referrals using direct_count
-            IF direct_referral_count >= 2 THEN
+            -- Check if referrer has at least 2 direct referrals using referral_relationships
+            IF (
+                SELECT COUNT(*) FROM referral_relationships
+                WHERE referrer_id = current_referrer_id AND level = 1
+            ) >= 2 THEN
                 -- Get commission rate for current level
                 SELECT percentage INTO commission_rate
                 FROM commission_structures 
@@ -179,8 +182,11 @@ BEGIN
 
             EXIT WHEN current_referrer_id IS NULL;
 
-            -- Check if referrer has at least 2 direct referrals using direct_count
-            IF direct_referral_count >= 2 THEN
+            -- Check if referrer has at least 2 direct referrals using referral_relationships
+            IF (
+                SELECT COUNT(*) FROM referral_relationships
+                WHERE referrer_id = current_referrer_id AND level = 1
+            ) >= 2 THEN
                 -- Get commission rate for current level
                 SELECT percentage INTO commission_rate
                 FROM commission_structures 

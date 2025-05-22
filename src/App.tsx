@@ -16,13 +16,12 @@ import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import { HelmetProvider } from 'react-helmet-async';
 import ThemePalettePage from "@/pages/ThemePalettePage";
+import { UserProfileProvider } from "@/contexts/UserProfileContext";
 
 // Lazy load routes
 const Platform = lazy(() => import("./pages/dashboard/Platform"));
 const Plans = lazy(() => import("./pages/plans/Plans")); 
 const Affiliate = lazy(() => import("./pages/affiliate/Affiliate"));
-const Payments = lazy(() => import("./pages/payments/Payments"));
-const Withdrawals = lazy(() => import("./pages/withdrawals/Withdrawals"));
 const Profile = lazy(() => import("./pages/profile/Profile"));
 
 // Add new lazy imports
@@ -84,7 +83,8 @@ const App = () => {
   useCacheFlush();
 
   return (
-    <HelmetProvider>
+    <UserProfileProvider>
+      <HelmetProvider>
         <Providers>
           <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center">
@@ -108,8 +108,6 @@ const App = () => {
               <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
               <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
               <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
-              <Route path="/payments" element={<AuthGuard requireAuth><Payments /></AuthGuard>} />
-              <Route path="/withdrawals" element={<AuthGuard requireAuth><Withdrawals /></AuthGuard>} />
               <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
               <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
 
@@ -152,7 +150,8 @@ const App = () => {
           </Suspense>
           <Toaster />
         </Providers>
-    </HelmetProvider>
+      </HelmetProvider>
+    </UserProfileProvider>
   );
 };
 

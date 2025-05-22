@@ -35,7 +35,6 @@ interface PlanWithSubscription extends Plan {
 interface UserProfile {
   id: string;
   withdrawal_wallet: number;
-  investment_wallet: number;
   total_invested: number;
 }
 
@@ -74,21 +73,27 @@ const Plans = () => {
   const [selectedPairId, setSelectedPairId] = useState<string | null>(null);
   const [showAllPairs, setShowAllPairs] = useState(false);
   const [daysCount, setDaysCount] = useState(48);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  // Add this new function
-  const calculateTotalInvested = async () => {
-    try {
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return 0;
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
+  // Update calculateTotalInvested to accept user
+  const calculateTotalInvested = async (user: any) => {
+    try {
+      if (!user) return 0;
       const { data, error } = await supabase
         .from('plans_subscriptions')
         .select('amount')
         .eq('user_id', user.id)
         .eq('status', 'approved');
-
       if (error) throw error;
-      
       const total = data?.reduce((sum, sub) => sum + (sub.amount || 0), 0) || 0;
       setTotalInvested(total);
       return total;
@@ -122,16 +127,15 @@ const Plans = () => {
     fetchPlans();
   }, []);
 
-  const fetchUserProfile = async () => {
+  // Update fetchUserProfile to accept user
+  const fetchUserProfile = async (user: any) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('id, withdrawal_wallet, investment_wallet, total_invested')
+          .select('id, withdrawal_wallet, total_invested')
           .eq('id', user.id)
           .single();
-
         if (error) throw error;
         setUserProfile(profile as UserProfile);
       }
@@ -141,14 +145,13 @@ const Plans = () => {
   };
 
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
+    if (currentUser) fetchUserProfile(currentUser);
+  }, [currentUser]);
 
-  const fetchSubscribedPlans = async () => {
+  // Update fetchSubscribedPlans to accept user
+  const fetchSubscribedPlans = async (user: any) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data: subscriptions, error: subsError } = await supabase
         .from('plans_subscriptions')
         .select(`
@@ -159,12 +162,9 @@ const Plans = () => {
         `)
         .eq('user_id', user.id)
         .eq('status', 'approved');
-
       if (subsError) throw subsError;
-
       const plansWithEarnings = await Promise.all(
         subscriptions.map(async (subscription) => {
-          // Get earnings with dates
           const { data: earnings, error: earningsError } = await supabase
             .from('transactions')
             .select('amount, created_at')
@@ -173,13 +173,10 @@ const Plans = () => {
             .eq('reference_id', subscription.id)
             .eq('status', 'Completed')
             .order('created_at', { ascending: false });
-
           if (earningsError) throw earningsError;
-
           const totalEarnings = earnings?.reduce((sum, tx) => sum + (tx.amount || 0), 0) || 0;
           const lastEarningDate = earnings?.[0]?.created_at;
           const daysCredited = earnings?.length || 0;
-
           return {
             ...subscription.plans,
             subscription_id: subscription.id,
@@ -190,7 +187,6 @@ const Plans = () => {
           };
         })
       );
-
       setSubscribedPlans(plansWithEarnings);
     } catch (error) {
       console.error('Error fetching subscribed plans:', error);
@@ -198,12 +194,12 @@ const Plans = () => {
   };
 
   useEffect(() => {
-    fetchSubscribedPlans();
-  }, []);
+    if (currentUser) fetchSubscribedPlans(currentUser);
+  }, [currentUser]);
 
   useEffect(() => {
-    calculateTotalInvested();
-  }, []);
+    if (currentUser) calculateTotalInvested(currentUser);
+  }, [currentUser]);
 
   // Fetch trading pairs for "Create Your Compute" tab
   useEffect(() => {
@@ -234,7 +230,6 @@ const Plans = () => {
         });
         return;
       }
-
       if (userProfile.withdrawal_wallet < plan.investment) {
         toast({
           title: "Insufficient Balance", 
@@ -243,24 +238,19 @@ const Plans = () => {
         });
         return;
       }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!currentUser) return;
       // Create subscription without wallet_type
       const { data: subscription, error: subscriptionError } = await supabase
         .from('plans_subscriptions')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           plan_id: plan.id,
           amount: plan.investment,
           status: 'approved'
         })
         .select()
         .single();
-
       if (subscriptionError) throw subscriptionError;
-
       // Update withdrawal wallet balance directly
       const { error: updateError } = await supabase
         .from('profiles')
@@ -268,23 +258,24 @@ const Plans = () => {
           withdrawal_wallet: userProfile.withdrawal_wallet - plan.investment,
           total_invested: (userProfile.total_invested || 0) + plan.investment 
         })
-        .eq('id', user.id);
-
+        .eq('id', currentUser.id);
       if (updateError) throw updateError;
+      // Call the RPC function to distribute business volume
+       await supabase.rpc('distribute_business_volume', {
+       subscription_id: subscription.id,
+        user_id: currentUser.id,
+        amount: plan.investment
+      });
 
-      // Recalculate total invested
-      await calculateTotalInvested();
-
+      await calculateTotalInvested(currentUser);
       toast({
         title: "Success",
         description: `Successfully subscribed to ${plan.name}`,
         variant: "default"
       });
-
       // Refresh data
-      fetchSubscribedPlans();
-      fetchUserProfile();
-
+      fetchSubscribedPlans(currentUser);
+      fetchUserProfile(currentUser);
     } catch (error) {
       console.error('Error subscribing to plan:', error);
       toast({
@@ -368,16 +359,7 @@ const Plans = () => {
     )) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // First get the business volumes to be removed
-      const { data: businessVolumes, error: bvError } = await supabase
-        .from('business_volumes')
-        .select('id, user_id, amount')
-        .eq('subscription_id', plan.subscription_id);
-
-      if (bvError) throw bvError;
+      if (!currentUser) return;
 
       // Update subscription status to cancelled
       const { error: updateError } = await supabase
@@ -387,18 +369,8 @@ const Plans = () => {
 
       if (updateError) throw updateError;
 
-      // Delete business volumes entries
-      if (businessVolumes && businessVolumes.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('business_volumes')
-          .delete()
-          .eq('subscription_id', plan.subscription_id);
-
-        if (deleteError) throw deleteError;
-      }
-
       // Recalculate total invested
-      await calculateTotalInvested();
+      await calculateTotalInvested(currentUser);
 
       toast({
         title: "Plan Cancelled",
@@ -406,7 +378,7 @@ const Plans = () => {
         variant: "default"
       });
 
-      fetchSubscribedPlans();
+      fetchSubscribedPlans(currentUser);
 
     } catch (error) {
       console.error('Error cancelling subscription:', error);
@@ -427,9 +399,7 @@ const Plans = () => {
     if (!planToCancel) return;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
+      if (!currentUser) return;
       // Update subscription status to cancelled
       const { error: updateError } = await supabase
         .from('plans_subscriptions')
@@ -439,7 +409,7 @@ const Plans = () => {
       if (updateError) throw updateError;
 
       // Recalculate total invested
-      await calculateTotalInvested();
+      await calculateTotalInvested(currentUser);
       
       toast({
         title: "Success",
@@ -449,7 +419,7 @@ const Plans = () => {
 
       setShowCancelDialog(false);
       setPlanToCancel(null);
-      fetchSubscribedPlans();
+      fetchSubscribedPlans(currentUser);
 
     } catch (error) {
       console.error('Error cancelling subscription:', error);

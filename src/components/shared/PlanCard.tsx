@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Lock, ArrowRight } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useTradingPairs } from "@/hooks/useTradingPairs";
 // If the TradingPair type exists elsewhere, update the import path accordingly, for example:
 
 // Or, if you don't have a TradingPair type, define it temporarily here:
@@ -33,6 +34,7 @@ interface PlanCardProps {
   onInvest?: () => void;
   onCancel?: () => void;
   benefits?: string[];
+  tradingPairs?: TradingPair[]; // Accept as prop for reusability
 }
 
 // Remove getBadgeStyle and use a random gradient for hover
@@ -55,53 +57,6 @@ const getRandomPairs = (pairs: TradingPair[], count: number) => {
   return shuffled.slice(0, count);
 };
 
-const useTradingPairs = () => {
-  const [pairs, setPairs] = useState<TradingPair[]>([]);
-
-  useEffect(() => {
-    const fetchPairs = async () => {
-      // Check cache first
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          setPairs(
-            data.map((pair: any) => ({
-              ...pair,
-              min_leverage: pair.min_leverage || 0,
-              max_leverage: pair.max_leverage || 0,
-              leverage_options: pair.leverage_options || [],
-              min_lots: pair.min_lots || 0,
-              max_lots: pair.max_lots || 0,
-              other_property: pair.other_property || null, // Add other missing properties with defaults
-            }))
-          );
-          return;
-        }
-      }
-
-      // Fetch fresh data if cache is invalid
-      const { data, error } = await supabase
-        .from('trading_pairs')
-        .select('id, symbol, name, type, is_active, image_url, short_name')
-        .eq('is_active', true);
-
-      if (!error && data) {
-        setPairs(data);
-        // Update cache
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-          data,
-          timestamp: Date.now()
-        }));
-      }
-    };
-
-    fetchPairs();
-  }, []);
-
-  return pairs;
-};
-
 export function PlanCard({
   variant = 'available',
   name,
@@ -114,17 +69,15 @@ export function PlanCard({
   subscriptionDate,
   onInvest,
   onCancel,
-  benefits = []
+  benefits = [],
+  tradingPairs: propTradingPairs,
 }: PlanCardProps) {
-  const tradingPairs = useTradingPairs();
-  const [randomPairs, setRandomPairs] = useState<TradingPair[]>([]);
+  // Use prop if provided, else use hook
+  const { data: hookPairs } = useTradingPairs();
+  const tradingPairs = propTradingPairs || hookPairs || [];
+  // Memoize random pairs
+  const randomPairs = useMemo(() => getRandomPairs(tradingPairs, 3), [tradingPairs]);
   const [hoverGradient, setHoverGradient] = useState(gradients[0]);
-
-  useEffect(() => {
-    if (tradingPairs.length > 0) {
-      setRandomPairs(getRandomPairs(tradingPairs, 3));
-    }
-  }, [tradingPairs]);
 
   return (
     <Card

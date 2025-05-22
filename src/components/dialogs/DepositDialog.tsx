@@ -54,7 +54,7 @@ interface DepositDialogProps {
   onSuccess?: () => void;
 }
 
-export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: DepositDialogProps) {
+export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess, currentUser: propCurrentUser }: DepositDialogProps & { currentUser?: any }) {
   const { toast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [cryptoType, setCryptoType] = useState<string>("");
@@ -66,6 +66,19 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
   const [promoInput, setPromoInput] = useState<string>("");
   const [selectedPromocode, setSelectedPromocode] = useState<any>(null);
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(propCurrentUser || null);
+
+  useEffect(() => {
+    if (propCurrentUser) {
+      setCurrentUser(propCurrentUser);
+      return;
+    }
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    if (!propCurrentUser) fetchUser();
+  }, [propCurrentUser]);
 
   // Fetch deposit methods from Supabase
   useEffect(() => {
@@ -182,11 +195,10 @@ export function DepositDialog({ open, onOpenChange, selectedPlan, onSuccess }: D
 
   const handleSubmit = async (investment: number) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!currentUser) throw new Error('Not authenticated');
 
       const { error } = await supabase.from('plans_subscriptions').insert({
-        user_id: user.id,
+        user_id: currentUser.id,
         plan_id: selectedPlan?.id,
         amount: investment,
         status: 'pending',

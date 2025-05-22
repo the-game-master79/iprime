@@ -15,12 +15,20 @@ const AdminAuthContext = createContext<AdminAuthContextType | null>(null);
 export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
   const checkAdminStatus = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
+      if (!currentUser) {
         setIsAdminAuthenticated(false);
         return;
       }
@@ -29,7 +37,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single();
 
       if (error) throw error;
@@ -53,6 +61,8 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (signInError) throw signInError;
       if (!authData.user) throw new Error('No user returned from login');
+
+      setCurrentUser(authData.user);
 
       // Check if user has admin role
       const { data: profile, error: profileError } = await supabase

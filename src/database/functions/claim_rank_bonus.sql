@@ -74,3 +74,5 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- No changes needed for business_volume or investment_wallet

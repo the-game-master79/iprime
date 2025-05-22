@@ -28,6 +28,7 @@ import { format, subYears } from "date-fns"; // Add this import
 import { countries as countryList } from "@/data/countries"; // Rename import to avoid conflict
 import { Topbar } from "@/components/shared/Topbar";
 import { KycVariant } from "@/components/shared/KycVariants";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 
 // Add these validation helpers at the top of the file, before the Profile component
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
@@ -55,10 +56,10 @@ const isValidPostalCode = (code: string) => /^[0-9\s-]+$/.test(code);
 const isValidPhone = (phone: string) => /^\d+$/.test(phone);
 
 const Profile = () => {
+  const { profile, loading } = useUserProfile();
   const [searchParams] = useSearchParams(); // Add this line
   const { toast } = useToast();
   const [isUpdatingPersonal, setIsUpdatingPersonal] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingKYC, setIsSubmittingKYC] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<{
     front: File | null;
@@ -128,20 +129,29 @@ const Profile = () => {
   const [basicDetailsSet, setBasicDetailsSet] = useState(false);
 
   const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentUser) return;
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchUser();
+  }, [currentUser]);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!currentUser) return;
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single();
       setUserProfile(data);
     };
-    fetchProfile();
-  }, []);
+    if (currentUser) fetchProfile();
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -149,6 +159,29 @@ const Profile = () => {
       window.location.href = '/auth/login';
     } catch (error) {
       console.error('Error logging out:', error);
+    }
+  };
+
+  // Helper to mask email
+  const maskEmail = (email: string) => {
+    const [user, domain] = email.split("@");
+    if (!user || !domain) return email;
+    if (user.length <= 2) return `${user[0]}***@${domain}`;
+    return `${user[0]}***${user[user.length - 1]}@${domain}`;
+  };
+
+  // Helper to fetch and mask referrer's email
+  const fetchReferrerMaskedEmail = async (referralCode: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('referral_code', referralCode)
+        .single();
+      if (error || !data?.email) return null;
+      return maskEmail(data.email);
+    } catch {
+      return null;
     }
   };
 
@@ -160,15 +193,15 @@ const Profile = () => {
 
     setIsValidatingCode(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!currentUser) throw new Error('Not authenticated');
 
-      // Use the enhanced validation function
       const { data, error } = await supabase
         .rpc('validate_referral_code', { 
           p_referral_code: code,
-          p_user_id: user.id 
+          p_user_id: currentUser.id 
         });
+
+      console.log("validate_referral_code response:", { data, error });
 
       if (error) {
         setReferrerName(null);
@@ -180,25 +213,34 @@ const Profile = () => {
         return;
       }
 
-      if (!data.is_valid) {
+      let result = data;
+      if (Array.isArray(data)) {
+        result = data[0];
+      }
+
+      if (!result?.is_valid) {
         setReferrerName(null);
         toast({
           title: "Invalid Code",
-          description: data.message,
+          description: result?.message || "Invalid referral code",
           variant: "destructive",
         });
         return;
       }
 
-      // Get referrer's name if code is valid
-      const { data: referrerData } = await supabase
+      // Fetch referrer's email and mask it
+      const { data: referrerData, error: refNameError } = await supabase
         .from('profiles')
-        .select('full_name')
-        .eq('id', data.referrer_id)
+        .select('email')
+        .eq('id', result.referrer_id)
         .single();
 
-      if (referrerData) {
-        setReferrerName(referrerData.full_name);
+      console.log("Referrer fetch:", { referrerData, refNameError });
+
+      if (referrerData?.email) {
+        setReferrerName(maskEmail(referrerData.email));
+      } else {
+        setReferrerName(null);
       }
     } catch (error) {
       setReferrerName(null);
@@ -213,13 +255,12 @@ const Profile = () => {
 
     setIsSubmittingReferral(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!currentUser) throw new Error("Not authenticated");
 
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ referred_by: referralCode })
-        .eq('id', user.id);
+        .eq('id', currentUser.id);
 
       if (updateError) throw updateError;
 
@@ -257,10 +298,10 @@ const Profile = () => {
     }
   };
 
+  // Main fetchProfile function (keep only one)
   const fetchProfile = async () => {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error(authError?.message || 'No authenticated user found');
+      if (!currentUser) return; // Only run if currentUser is set
 
       // Get profile data including contact details
       const { data: profile, error: profileError } = await supabase
@@ -280,7 +321,7 @@ const Profile = () => {
           status,
           referred_by
         `)
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
         .single();
 
       if (profileError) throw profileError;
@@ -298,7 +339,7 @@ const Profile = () => {
         fullName: profile?.full_name || "",
         firstName: profile?.first_name || (profile?.full_name?.split(" ")[0] || ""),
         lastName: profile?.last_name || (profile?.full_name?.split(" ").slice(1).join(" ") || ""),
-        email: profile?.email || user.email || "",
+        email: profile?.email || currentUser.email || "",
         phone: profile?.phone || "",
         address: profile?.address || "",
         city: profile?.city || "",
@@ -309,17 +350,17 @@ const Profile = () => {
         referred_by: profile?.referred_by || ""
       });
 
-      // After setting userData, fetch referrer name if exists
+      // After setting userData, fetch referrer masked email if exists
       if (profile?.referred_by) {
-        const referrerName = await fetchReferrerName(profile.referred_by);
-        setCurrentReferrerName(referrerName);
+        const referrerMaskedEmail = await fetchReferrerMaskedEmail(profile.referred_by);
+        setCurrentReferrerName(referrerMaskedEmail);
       }
 
       // Fetch KYC data
       const { data: kycData } = await supabase
         .from('kyc')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -372,8 +413,6 @@ const Profile = () => {
         description: error instanceof Error ? error.message : "Failed to load profile data",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -480,10 +519,6 @@ const Profile = () => {
     setKycFormData(prev => ({...prev, occupation: value}));
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   // Effect to set initial country info and phone prefix
   useEffect(() => {
     if (userData.country) {
@@ -529,8 +564,7 @@ const Profile = () => {
     setIsUpdatingPersonal(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!currentUser) throw new Error('No user found');
 
       const updates = {
         phone: `${phonePrefix}${userData.phone}`,
@@ -546,7 +580,7 @@ const Profile = () => {
       const { error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', user.id);
+        .eq('id', currentUser.id);
 
       if (error) throw error;
 
@@ -582,8 +616,7 @@ const Profile = () => {
   const handleSubmitKYC = async () => {
     setIsSubmittingKYC(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
+      if (!currentUser) return;
 
       if (!kycFormData.document_front || !kycFormData.document_back) {
         throw new Error('Please select both front and back documents');
@@ -598,8 +631,8 @@ const Profile = () => {
       }
 
       // Create the storage path with user ID
-      const frontFileName = `${user.id}/front_${Date.now()}${getFileExtension(kycFormData.document_front.name)}`;
-      const backFileName = `${user.id}/back_${Date.now()}${getFileExtension(kycFormData.document_back.name)}`;
+      const frontFileName = `${currentUser.id}/front_${Date.now()}${getFileExtension(kycFormData.document_front.name)}`;
+      const backFileName = `${currentUser.id}/back_${Date.now()}${getFileExtension(kycFormData.document_back.name)}`;
 
       // Upload front document
       const { error: frontError } = await supabase.storage
@@ -627,13 +660,13 @@ const Profile = () => {
       await supabase
         .from('kyc')
         .delete()
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
 
       // Then create new KYC record
       const { error: kycError } = await supabase
         .from('kyc')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           document_front: frontUrl,
           document_back: backUrl,
           status: 'processing',
@@ -651,7 +684,7 @@ const Profile = () => {
           kyc_status: 'processing',
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.id);
+        .eq('id', currentUser.id);
 
       if (profileError) throw profileError;
 
@@ -705,6 +738,29 @@ const Profile = () => {
   // Get the tab from URL or default to personal
   const defaultTab = searchParams.get('tab') || 'personal';
 
+  // Hydrate userData from profile context when profile or currentUser is loaded
+  useEffect(() => {
+    // Use email from profile, fallback to currentUser if not present
+    if (profile || currentUser) {
+      setUserData(prev => ({
+        ...prev,
+        fullName: profile?.full_name || "",
+        firstName: profile?.first_name || (profile?.full_name?.split(" ")[0] || ""),
+        lastName: profile?.last_name || (profile?.full_name?.split(" ").slice(1).join(" ") || ""),
+        email: profile?.email || currentUser?.email || "",
+        phone: profile?.phone || "",
+        address: profile?.address || "",
+        city: profile?.city || "",
+        country: profile?.country || "",
+        kycStatus: profile?.kyc_status || "pending",
+        dateJoined: profile?.date_joined ? new Date(profile.date_joined).toLocaleDateString() : "",
+        status: profile?.status || "",
+        referred_by: profile?.referred_by || ""
+      }));
+      setBasicDetailsSet(!!(profile?.phone && profile?.address && profile?.city && profile?.country));
+    }
+  }, [profile, currentUser]);
+
   return (
     <>
       <div className="min-h-screen bg-background">
@@ -712,7 +768,7 @@ const Profile = () => {
 
         <main className="py-6">
           <div className="container mx-auto max-w-[1000px]">
-            {isLoading ? (
+            {loading ? ( // Use loading from context
               <div className="flex items-center justify-center h-[400px]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
@@ -956,7 +1012,7 @@ const Profile = () => {
                             </div>
                             <div>
                               <p className="text-sm text-green-800">
-                                Referred by: <span className="font-medium">{currentReferrerName}</span>
+                                Referred by: <span className="font-medium">{currentReferrerName /* this is already the masked email */}</span>
                               </p>
                               <p className="text-xs text-green-600">Referral Code: {userData.referred_by}</p>
                             </div>
