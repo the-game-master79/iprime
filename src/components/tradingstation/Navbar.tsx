@@ -1,36 +1,167 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Plus, House, Sun, Moon } from "@phosphor-icons/react";
+import { House, Sun, Moon } from "@phosphor-icons/react";
 import { useTheme } from "@/hooks/use-theme";
+import { useMemo } from "react";
+
+interface PriceData {
+  price: string;
+  symbol: string;
+  isPriceUp?: boolean;
+}
 
 interface NavbarProps {
   balance: number;
   isMobile?: boolean;
   toggleMobileMenu?: () => void;
+  selectedPairs?: PriceData[];
+  handleRemovePair?: (symbol: string) => void;
+  getCryptoImageForSymbol?: (symbol: string) => string;
+  getForexImageForSymbol?: (symbol: string) => string;
+  formatPairName?: (symbol: string) => string;
+  localPrices?: Record<string, PriceData>;
+  onPairClick?: (pair: PriceData) => void;
+  selectedPairSymbol?: string; // <-- Add this prop
 }
 
-const Navbar = ({ balance, isMobile = false, toggleMobileMenu }: NavbarProps) => {
+const Navbar = ({
+  balance,
+  isMobile = false,
+  toggleMobileMenu,
+  selectedPairs = [],
+  handleRemovePair,
+  getCryptoImageForSymbol = () => "",
+  getForexImageForSymbol = () => "",
+  formatPairName = (s) => s,
+  localPrices = {},
+  onPairClick,
+  selectedPairSymbol, // <-- Add this
+}: NavbarProps) => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
 
+  // Animation helpers (copied from Sidebar)
+  const getPriceChangeClass = (isUp?: boolean) => {
+    if (isUp === undefined) return "";
+    return isUp ? "text-green-500" : "text-red-500";
+  };
+  // Helper to get decimals for a symbol
+  const getPriceDecimals = (symbol: string) => {
+    if (symbol === "XAUUSD") return 2;
+    if (symbol.endsWith("JPY")) return 3;
+    if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
+    if (symbol === "DOGEUSDT") return 5;
+    if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
+    if (symbol === "DOTUSDT") return 3;
+    if (!symbol.endsWith("USDT")) return 5;
+    return 2;
+  };
+  // Helper to render price with big digits
+  const renderPriceWithBigDigits = (value: string | number | undefined, decimals: number) => {
+    if (value === undefined) return "-";
+    const str = Number(value).toFixed(decimals);
+    if (decimals === 2) {
+      const dotIdx = str.indexOf(".");
+      if (dotIdx <= 0) return str;
+      const before = str.slice(0, dotIdx - 1);
+      const big = str.slice(dotIdx - 1, dotIdx + 1);
+      const after = str.slice(dotIdx + 1);
+      return (
+        <>
+          {before}
+          <span className="text-lg font-bold">{big}</span>
+          {after}
+        </>
+      );
+    } else if (decimals > 2) {
+      const normal = str.slice(0, -2);
+      const big = str.slice(-2);
+      return (
+        <>
+          {normal}
+          <span className="text-lg font-bold">{big}</span>
+        </>
+      );
+    }
+    return str;
+  };
+
+  // Memoize selectedPairs rendering to debounce rapid localPrices updates
+  const renderedPairs = useMemo(() => (
+    selectedPairs.map((pair) => {
+      const isSelected = selectedPairSymbol === pair.symbol;
+      return (
+        <div
+          key={pair.symbol}
+          className={`
+            flex items-center gap-2 px-2 py-1 rounded-md border border-border/40 shadow min-w-[80px] max-w-[130px] cursor-pointer
+            ${isSelected
+              ? "bg-primary/20 border-primary outline outline-1 outline-primary z-10"
+              : "bg-secondary hover:bg-primary/10 hover:border-primary/40"}
+            transition-all
+          `}
+          style={
+            isSelected
+              ? { padding: "0.18rem 0.7rem", overflow: "visible", boxShadow: "0 2px 8px 0 rgba(0,0,0,0.06)" }
+              : { boxShadow: "0 1px 4px 0 rgba(0,0,0,0.03)" }
+          }
+          title={pair.symbol}
+          onClick={() => onPairClick?.(pair)}
+        >
+          <img
+            src={
+              pair.symbol.endsWith("USDT")
+                ? getCryptoImageForSymbol(pair.symbol)
+                : getForexImageForSymbol(pair.symbol)
+            }
+            alt={pair.symbol}
+            className="h-5 w-5 rounded-full border border-border/30 bg-white object-contain"
+            style={{ boxShadow: "0 1px 3px 0 rgba(0,0,0,0.07)" }}
+          />
+          <span
+            className="font-semibold text-xs truncate"
+            style={isSelected ? { overflow: "visible", textOverflow: "unset", whiteSpace: "nowrap", maxWidth: "none", color: "var(--primary)" } : { maxWidth: 60 }}
+          >
+            {formatPairName(pair.symbol)}
+          </span>
+          {handleRemovePair && (
+            <button
+              className="ml-1 text-xs text-muted-foreground hover:text-destructive transition-colors rounded-full px-1"
+              style={{ lineHeight: 1, fontWeight: 700, fontSize: 14 }}
+              onClick={e => {
+                e.stopPropagation();
+                handleRemovePair(pair.symbol);
+              }}
+              title="Remove"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      );
+    })
+  ), [selectedPairs, selectedPairSymbol, getCryptoImageForSymbol, getForexImageForSymbol, formatPairName, onPairClick, handleRemovePair]);
+
   return (
-    <nav className={`fixed top-0 left-0 w-full h-16 ${isMobile ? 'bg-background' : 'bg-muted/10'} border-b border-border/50 flex items-center px-4 justify-between z-50`}>
-      <div className="flex items-center gap-4">
-        {/* Home button first */}
+    <nav
+      className="fixed top-0 left-0 w-full h-12 bg-background/80 border-b border-border/50 flex items-center px-3 justify-between z-50 shadow-sm backdrop-blur-md"
+      style={{ minHeight: 48 }}
+    >
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
-          size="sm"
-          className="h-8 px-2"
+          size="icon"
+          className="h-9 w-9 rounded-lg p-0 hover:bg-primary/10 transition"
           onClick={() => navigate("/platform")}
           title="Home"
         >
           <House size={20} weight="bold" />
         </Button>
-        {/* Logo: clicking refreshes the page */}
         <button
           onClick={() => window.location.reload()}
-          className="focus:outline-none"
+          className="focus:outline-none ml-1"
           title="Refresh"
+          style={{ borderRadius: 8, padding: 0, background: "none", border: "none" }}
         >
           <img
             src={theme === "dark"
@@ -38,66 +169,40 @@ const Navbar = ({ balance, isMobile = false, toggleMobileMenu }: NavbarProps) =>
               : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cf-light.svg"
             }
             alt="CloudForex Logo"
-            className="h-8"
+            className="h-7"
+            style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.07))" }}
           />
         </button>
-      </div>
-      <div className="flex items-center gap-4">
-        {isMobile ? (
-          // Mobile balance with theme toggle
-          <div
-            className="bg-secondary rounded-full flex items-center pr-1 cursor-pointer"
-            onClick={() => navigate("/cashier")}
-          >
-            <div className="text-sm font-medium px-3 py-1">
-              {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+        {!isMobile && selectedPairs.length > 0 && (
+          <div className="ml-3 flex-1 min-w-0">
+            <div className="flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-muted/40 scrollbar-track-transparent py-0.5">
+              {renderedPairs}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 ml-1 rounded-full bg-secondary-foreground text-primary hover:bg-secondary"
-              onClick={e => {
-                e.stopPropagation();
-                setTheme(theme === "dark" ? "light" : "dark");
-              }}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-yellow-400" weight="bold" />
-              ) : (
-                <Moon className="h-4 w-4 text-blue-500" weight="bold" />
-              )}
-            </Button>
           </div>
-        ) : (
-          // Desktop: Theme toggle, Balance badge, Add Funds (rightmost)
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full bg-secondary-foreground text-primary hover:bg-secondary"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4 text-yellow-400" weight="bold" />
-              ) : (
-                <Moon className="h-4 w-4 text-blue-500" weight="bold" />
-              )}
-            </Button>
-            <div className="bg-secondary text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2">
-              {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
-            </div>
-            <Button
-              variant="default"
-              size="default"
-              className="ml-2"
-              onClick={() => navigate("/cashier")}
-            >
-              Add Funds
-            </Button>
-          </>
         )}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 rounded-lg bg-secondary-foreground text-primary hover:bg-primary/10 transition"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? (
+            <Sun className="h-5 w-5 text-yellow-400" weight="bold" />
+          ) : (
+            <Moon className="h-5 w-5 text-blue-500" weight="bold" />
+          )}
+        </Button>
+        <div
+          className="bg-secondary text-xs font-semibold px-3 py-1 rounded-lg flex items-center cursor-pointer hover:bg-primary/10 transition h-9"
+          style={{ minWidth: 60, fontSize: 15, letterSpacing: 0.2 }}
+          onClick={() => navigate("/cashier")}
+          title="Go to Cashier"
+        >
+          {balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </div>
       </div>
     </nav>
   );

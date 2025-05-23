@@ -27,14 +27,16 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
 
   return (
     <div
-      className="flex mt-16"
+      className="flex"
       style={{
         position: "absolute",
-        top: 8,
-        left: isCollapsed ? 60 : 460,
+        top: 48, // 48px navbar
+        left: isCollapsed ? 48 : 368, // 48px sidebar or 48+320
         right: 350,
-        padding: "24px 24px 0 24px",
-        height: "calc(100vh - 4rem - 0px)",
+        // Remove all paddings and margins
+        padding: 0,
+        margin: 0,
+        height: "calc(100vh - 48px)", // fill below navbar
         minHeight: 200,
         boxSizing: "border-box",
         display: "flex",
@@ -55,6 +57,8 @@ const ChartComponent: React.FC<ChartComponentProps> = ({
           transition: "height 0.2s, width 0.2s, left 0.2s",
           pointerEvents: "auto",
           overflow: "hidden",
+          padding: 0,
+          margin: 0,
         }}
       >
         <TradingViewWidget

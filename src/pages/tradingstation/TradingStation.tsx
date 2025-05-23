@@ -61,7 +61,7 @@ const TradingStation = () => {
   // Add state to track initial page load
   const initialLoadRef = useRef(true);
   const [selectedLeverage, setSelectedLeverage] = useState<string>("2"); // Default leverage is now 2x
-  const [isCollapsed, setIsCollapsed] = useState(false); // State to track collapse
+  const [isCollapsed, setIsCollapsed] = useState(true); // Sidebar collapsed by default
   const [activeTradeTab, setActiveTradeTab] = useState<"open" | "pending" | "closed">("open"); // State for active trade tab
   const [margin, setMargin] = useState<number>(0); // State to track margin
   const fetchBalanceCalled = useRef(false); // Track if fetchBalance has been called
@@ -564,6 +564,24 @@ const TradingStation = () => {
     }
   };
 
+  // Select a default pair (first in filteredPairs) on initial load or when filteredPairs changes
+  useEffect(() => {
+    if (!selectedPair && filteredPairs.length > 0) {
+      setSelectedPair(filteredPairs[0]);
+      setSelectedPairs((prev) => {
+        if (prev.some((p) => p.symbol === filteredPairs[0].symbol)) return prev;
+        return [filteredPairs[0]];
+      });
+      // Set leverage to max available for the pair
+      const leverages = leverageOptions[filteredPairs[0].symbol || ""] || [];
+      const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
+      if (maxLeverageForPair !== -Infinity) {
+        setSelectedLeverage(maxLeverageForPair.toString());
+      }
+    }
+    // eslint-disable-next-line
+  }, [filteredPairs]);
+
   // Select first forex pair on initial load
   useEffect(() => {
     // Only set selectedPair if not already set
@@ -589,9 +607,10 @@ const TradingStation = () => {
     const updatedPair = { ...pair, price: latestPrice };
 
     setSelectedPair(updatedPair);
+    // Do NOT reorder selectedPairs, just keep as is (or add if not present)
     setSelectedPairs((prev) => {
-      const filtered = prev.filter((p) => p.symbol !== pair.symbol);
-      return [...filtered, updatedPair].slice(-5);
+      if (prev.some((p) => p.symbol === pair.symbol)) return prev;
+      return [...prev, updatedPair].slice(-5);
     });
 
     // Always select the max leverage for the pair
@@ -1500,42 +1519,27 @@ const TradingStation = () => {
     return { isOpen, nextEventType, nextEventDate, formattedTime };
   }
 
-  // Add this helper to format price with big digits for bid/ask
-  const renderPriceWithBigDigits = (value: number | string | undefined, decimals: number) => {
-    if (value === undefined) return "-";
-    const str = Number(value).toFixed(decimals);
-
-    if (decimals === 2) {
-      // Make the digit before the decimal and the decimal point bigger
-      const dotIdx = str.indexOf(".");
-      if (dotIdx <= 0) return str;
-      const before = str.slice(0, dotIdx - 1);
-      const big = str.slice(dotIdx - 1, dotIdx + 1); // digit before + "."
-      const after = str.slice(dotIdx + 1);
-      return (
-        <>
-          {before}
-          <span className="text-lg font-bold">{big}</span>
-          {after}
-        </>
-      );
-    } else if (decimals > 2) {
-      // Make the last 2 digits bigger
-      const normal = str.slice(0, -2);
-      const big = str.slice(-2);
-      return (
-        <>
-          {normal}
-          <span className="text-lg font-bold">{big}</span>
-        </>
-      );
-    }
-    // fallback
-    return str;
-  };
+  // Add helper to check if forex market is closed (isForexTimeActive)
+  function isForexTimeActive() {
+    const status = getForexMarketStatus();
+    return !status.isOpen;
+  }
 
   return (
     <>
+      <Navbar
+        balance={balance}
+        isMobile={isMobile}
+        toggleMobileMenu={toggleMobileMenu}
+        selectedPairs={selectedPairs}
+        handleRemovePair={handleRemovePair}
+        getCryptoImageForSymbol={getCryptoImageForSymbol}
+        getForexImageForSymbol={getForexImageForSymbol}
+        formatPairName={formatPairName}
+        localPrices={localPrices}
+        onPairClick={handlePairClick}
+        selectedPairSymbol={selectedPair?.symbol} // <-- Pass selected pair symbol
+      />
       <div className="relative">
         {/* Animations styles */}
         <style>
@@ -1644,13 +1648,6 @@ const TradingStation = () => {
           `}
         </style>
 
-        {/* Navbar Component */}
-        <Navbar 
-          balance={balance} 
-          isMobile={isMobile} 
-          toggleMobileMenu={toggleMobileMenu} 
-        />
-
         <div className="relative flex flex-col md:flex-row">
           {/* Mobile Menu Overlay */}
           {isMobile && showMobileMenu && (
@@ -1732,6 +1729,7 @@ const TradingStation = () => {
                     closeAllTrades={closeAllTrades}
                     openCount={openCount}
                     lotsLimits={lotsLimits}
+                    isForexTimeActive={isForexTimeActive()}
                   />
                 </Suspense>
               ) : (
@@ -1765,6 +1763,7 @@ const TradingStation = () => {
                     closeAllTrades={closeAllTrades}
                     openCount={openCount}
                     lotsLimits={lotsLimits}
+                    isForexTimeActive={isForexTimeActive()}
                   />
                 )
               )}
@@ -1809,6 +1808,7 @@ const TradingStation = () => {
                 getPriceDecimals={getPriceDecimals}
                 closedTrades={closedTrades}
                 fullPage={true} // Set fullPage mode to true for mobile
+                isForexTimeActive={isForexTimeActive()}
               />
             </Suspense>
           ) : null
@@ -1847,6 +1847,7 @@ const TradingStation = () => {
             getPriceDecimals={getPriceDecimals}
             closedTrades={closedTrades}
             fullPage={false} // Standard bottom panel for desktop
+            isForexTimeActive={isForexTimeActive()}
           />
         )}
 

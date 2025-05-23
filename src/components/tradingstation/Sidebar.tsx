@@ -128,14 +128,14 @@ const Sidebar = ({
     // eslint-disable-next-line
   }, []);
 
-  // Add effect to select first pair when tab changes or when filteredPairs changes
-  useEffect(() => {
-    // Only auto-select if no pair is currently selected or if tabs were switched
-    if ((filteredPairs.length > 0 && !selectedPair) || 
-        (filteredPairs.length > 0 && selectedPair && !filteredPairs.some(p => p.symbol === selectedPair.symbol))) {
-      handlePairClick(filteredPairs[0]);
-    }
-  }, [activeTab, filteredPairs, selectedPair, handlePairClick]);
+  // Remove the effect that auto-selects the first pair when tab or filteredPairs changes
+  // useEffect(() => {
+  //   // Only auto-select if no pair is currently selected or if tabs were switched
+  //   if ((filteredPairs.length > 0 && !selectedPair) || 
+  //       (filteredPairs.length > 0 && selectedPair && !filteredPairs.some(p => p.symbol === selectedPair.symbol))) {
+  //     handlePairClick(filteredPairs[0]);
+  //   }
+  // }, [activeTab, filteredPairs, selectedPair, handlePairClick]);
   
   // Create a function to handle pair click and navigation
   const handlePairSelection = (pair: PriceData) => {
@@ -229,14 +229,14 @@ const Sidebar = ({
     <>
       {/* Hamburger Menu Container - Only show on desktop */}
       {!isMobile && (
-        <div className="fixed top-16 left-0 h-[calc(100%-4rem)] w-[60px] bg-muted/20 border-r border-border/50 flex flex-col items-center justify-start py-4">
+        <div className="fixed top-[48px] left-0 h-[calc(100vh-48px)] w-[48px] bg-background border-r border-border/30 flex flex-col items-center justify-start py-2 shadow-sm">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-10 w-10 flex items-center justify-center"
+            size="icon"
+            className="h-9 w-9 flex items-center justify-center rounded-md"
             onClick={toggleCollapse}
           >
-            <span className="text-xl">{isCollapsed ? "☰" : "✕"}</span>
+            <span className="text-lg">{isCollapsed ? "☰" : "✕"}</span>
           </Button>
         </div>
       )}
@@ -245,81 +245,68 @@ const Sidebar = ({
       {showContent && (
         <div className={`
           ${isMobile 
-            ? "w-full h-full pb-16 bg-background" // Full width/height with mobile styling
-            : "fixed top-16 left-[60px] h-[calc(100%-4rem)] w-[400px] bg-muted/10 border-r border-border/50"
+            ? "w-full h-full pb-14 bg-background"
+            : "fixed top-[48px] left-[48px] h-[calc(100vh-48px)] w-[320px] bg-background border-r border-border/20 shadow-md"
           } 
-          flex flex-col p-4 transition-all duration-300 overflow-y-auto
+          flex flex-col p-3 transition-all duration-300 overflow-y-auto
         `}>
-          {/* Header - Adjust for mobile */}
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-semibold">
+          {/* Header - Compact */}
+          <div className="flex justify-between items-center mb-2">
+            <h1 className="text-xl font-semibold tracking-tight">
               {isMobile ? "Markets" : "Trading Station"}
             </h1>
-            
-            {/* Only show close button on desktop */}
-            {!isMobile && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleCollapse}
-                className="h-8 w-8 flex items-center justify-center"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
           </div>
           
-          {/* Search bar */}
-          <div className="relative mb-4">
-            <MagnifyingGlass className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* Search bar - Compact */}
+          <div className="relative mb-3">
+            <MagnifyingGlass className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search pairs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 h-10 placeholder:text-muted-foreground bg-muted/50 border-muted-foreground/20 hover:border-muted-foreground/30 transition-colors"
+              className="pl-8 pr-2 h-8 text-sm rounded-md bg-muted/40 border border-border/20 focus:border-primary/40 transition-colors"
             />
           </div>
           
-          {/* Tab buttons - Make full width on mobile */}
-          <div className="flex gap-1 mb-4 w-full bg-muted/20 rounded-xl p-1">
+          {/* Tab buttons - Sleek pill style */}
+          <div className="flex gap-1 mb-3 w-full bg-muted/10 rounded-lg p-1">
             <Button
-              variant={activeTab === "crypto" ? "default" : "outline"}
+              variant={activeTab === "crypto" ? "secondary" : "ghost"}
               onClick={() => setActiveTab("crypto")}
-              className="flex-1"
+              className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "crypto" ? "shadow" : ""}`}
             >
-              <Coins className="h-4 w-4 mr-2" />
+              <Coins className="h-4 w-4 mr-1" />
               Crypto
             </Button>
             <Button
-              variant={activeTab === "forex" ? "default" : "outline"}
+              variant={activeTab === "forex" ? "secondary" : "ghost"}
               onClick={() => setActiveTab("forex")}
-              className="flex-1"
+              className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "forex" ? "shadow" : ""}`}
             >
-              <Globe className="h-4 w-4 mr-2" />
+              <Globe className="h-4 w-4 mr-1" />
               Forex
             </Button>
           </div>
-          {/* Market pairs grid */}
-          <div className="grid grid-cols-1 gap-2 overflow-y-auto">
+          {/* Market pairs grid - Compact, elegant cards */}
+          <div className="grid grid-cols-1 gap-1 overflow-y-auto">
             {filteredPairs.map((pair) => {
               const decimals = getPriceDecimals(pair.symbol);
               const isUp = animatedPairs[pair.symbol];
               return (
                 <Button
                   key={pair.symbol}
-                  variant={selectedPair?.symbol === pair.symbol ? "default" : "ghost"}
+                  variant={selectedPair?.symbol === pair.symbol ? "secondary" : "ghost"}
                   className={`
-                    flex items-center justify-between p-4 
-                    ${isMobile ? "h-16" : "h-16"} 
-                    border border-border/50 rounded-lg
+                    flex items-center justify-between px-3 py-2 h-12 min-h-0
+                    border border-border/20 rounded-md
                     group transition-all duration-200
                     ${selectedPair?.symbol === pair.symbol
-                      ? "bg-secondary text-foreground border-primary"
-                      : "hover:bg-secondary/60 hover:text-foreground"}
+                      ? "bg-primary/10 text-primary border-primary/40 shadow"
+                      : "hover:bg-muted/30 hover:text-foreground"}
                   `}
                   onClick={() => handlePairSelection(pair)}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <img
                       src={
                         pair.symbol.endsWith("USDT")
@@ -327,13 +314,13 @@ const Sidebar = ({
                           : getForexImageForSymbol(pair.symbol)
                       }
                       alt={pair.symbol}
-                      className="h-8 w-8"
+                      className="h-6 w-6 rounded-full border border-border/20"
                     />
                     <div className="flex flex-col text-left">
-                      <span className="font-medium group-hover:text-foreground/90 transition-colors">
+                      <span className="font-medium text-sm group-hover:text-foreground/90 transition-colors">
                         {formatPairName(pair.symbol)}
                       </span>
-                      <span className="text-sm text-muted-foreground group-hover:text-foreground/70 transition-colors">
+                      <span className="text-xs text-muted-foreground group-hover:text-foreground/70 transition-colors">
                         {getFullName(pair.symbol)}
                       </span>
                     </div>
@@ -341,7 +328,7 @@ const Sidebar = ({
                   <div className="text-right">
                     <div
                       key={pair.symbol + "-" + pair.price}
-                      className={`font-mono font-medium transition-all duration-500 ${getPriceChangeClass(isUp)}`}
+                      className={`font-mono font-medium text-base transition-all duration-500 ${getPriceChangeClass(isUp)}`}
                     >
                       {renderPriceWithBigDigits(pair.price, decimals)}
                     </div>
@@ -352,14 +339,14 @@ const Sidebar = ({
             
             {/* Show empty state if no pairs match the search */}
             {filteredPairs.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                <div className="text-4xl mb-2">🔍</div>
-                <p>
+              <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
+                <div className="text-3xl mb-1">🔍</div>
+                <p className="text-base">
                   {activeTab === "forex" && !isForexMarketOpen
                     ? "Markets are closed today."
                     : "No matching pairs found"}
                 </p>
-                <p className="text-sm">
+                <p className="text-xs">
                   {activeTab === "forex" && !isForexMarketOpen
                     ? <>
                         Forex market is currently closed.<br />

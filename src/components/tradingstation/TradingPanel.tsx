@@ -43,6 +43,7 @@ interface TradingPanelProps {
   closeAllTrades?: () => void; // Add closeAllTrades function prop
   openCount?: number; // Add open positions count for button visibility
   lotsLimits: Record<string, { min: number; max: number }>;
+  isForexTimeActive?: boolean; // <-- Add this prop
 }
 
 const TradingPanel = ({
@@ -74,6 +75,7 @@ const TradingPanel = ({
   closeAllTrades = () => {},
   openCount = 0,
   lotsLimits,
+  isForexTimeActive = false, // <-- Default to false
 }: TradingPanelProps) => {
   // Add state to control the custom dialog
   const [showFeesDialog, setShowFeesDialog] = useState(false);
@@ -224,6 +226,9 @@ const TradingPanel = ({
     return 2;
   };
 
+  // Helper to check if selected pair is forex
+  const isSelectedPairForex = selectedPair && !selectedPair.symbol.endsWith("USDT") && selectedPair.symbol !== "XAUUSD";
+
   return (
     <div className={`
       ${isMobile 
@@ -313,13 +318,13 @@ const TradingPanel = ({
           */}
 
           {/* Lots input with + and - buttons */}
-          <div className={`${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-foreground ${isMobile ? 'mb-1' : 'mb-2'} flex items-center justify-between`}>
+          <div className={`${isMobile ? 'mb-1' : 'mb-2'}`}>
+            <label className={`block ${isMobile ? 'text-[11px]' : 'text-xs'} font-medium text-foreground ${isMobile ? 'mb-0.5' : 'mb-1'} flex items-center justify-between`}>
               <span>Lots</span>
               {/* Max lots badge - click to set max lots */}
               <span
-                className="ml-2 px-2 py-0.5 rounded-full bg-muted text-xs font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10"
-                style={{ fontSize: isMobile ? "10px" : "12px" }}
+                className="ml-2 px-2 py-0.5 rounded-full bg-muted text-[10px] font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10"
+                style={{ fontSize: isMobile ? "9px" : "10px" }}
                 title={`Set to maximum lots: ${getLotsLimits().max}`}
                 onClick={() => setQuantity(getLotsLimits().max)}
               >
@@ -379,8 +384,8 @@ const TradingPanel = ({
             </div>
             {/* Insufficient balance or margin warning */}
             {(balance <= 0 || margin > freeMargin) && (
-              <div className="mt-1 text-error text-xs flex items-center gap-1">
-                <svg className="w-4 h-4 text-error" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <div className="mt-0.5 text-error text-[11px] flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 text-error" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
                 </svg>
@@ -395,10 +400,10 @@ const TradingPanel = ({
           <div className={`flex gap-3 ${isMobile ? 'mt-2' : 'mt-4'}`}>
             <button
               className={`flex-1 ${isMobile ? 'h-16 px-3' : 'h-20 pl-5'} bg-error text-white hover:bg-error/80 text-left items-start rounded-lg ${
-                balance <= 0 || margin > freeMargin ? "opacity-50 cursor-not-allowed" : ""
+                balance <= 0 || margin > freeMargin || (isForexTimeActive && isSelectedPairForex) ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={() => handlePlaceTrade("Sell")}
-              disabled={balance <= 0 || margin > freeMargin}
+              disabled={balance <= 0 || margin > freeMargin || (isForexTimeActive && isSelectedPairForex)}
             >
               <div className="flex flex-col items-start">
                 <span className={`w-full ${isMobile ? 'text-sm' : 'text-md'} font-regular`}>Sell</span>
@@ -412,10 +417,10 @@ const TradingPanel = ({
             </button>
             <button
               className={`flex-1 ${isMobile ? 'h-16 px-3' : 'h-20 pl-5'} bg-primary text-white hover:bg-primary/80 text-left items-start rounded-lg ${
-                balance <= 0 || margin > freeMargin ? "opacity-50 cursor-not-allowed" : ""
+                balance <= 0 || margin > freeMargin || (isForexTimeActive && isSelectedPairForex) ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={() => handlePlaceTrade("Buy")}
-              disabled={balance <= 0 || margin > freeMargin}
+              disabled={balance <= 0 || margin > freeMargin || (isForexTimeActive && isSelectedPairForex)}
             >
               <div className="flex flex-col items-start">
                 <span className={`w-full ${isMobile ? 'text-sm' : 'text-md'} font-regular`}>Buy</span>
@@ -430,7 +435,7 @@ const TradingPanel = ({
           </div>
 
           {/* Grid Section - Enhanced for mobile */}
-          <div className={`space-y-2 ${isMobile ? 'mt-2 text-xs' : 'mt-4'} ${isMobile ? 'bg-secondary p-3 rounded-lg' : ''}`}>
+          <div className={`space-y-1.5 ${isMobile ? 'mt-1 text-[11px]' : 'mt-2 text-xs'} ${isMobile ? 'bg-secondary p-2 rounded-lg' : ''}`}>
             <div className="flex justify-between items-center">
               <span className="font-medium text-muted-foreground">Margin:</span>
               <span className={`font-bold font-mono ${margin > balance ? "text-error" : ""}`}>
@@ -578,25 +583,24 @@ const TradingPanel = ({
           {/* Add badge at the bottom - Only on desktop */}
           {!isMobile && (
             <div className="mt-auto flex flex-col">
-              <button
-                className="bg-success/10 text-success text-center py-2 rounded-lg font-medium hover:bg-success/20 transition-colors"
-                onClick={() => setShowFeesDialog(true)}
-                type="button"
-              >
-                0% fees for your Account
-              </button>
+            <Button
+              onClick={() => setShowFeesDialog(true)}
+              className="mt-6 w-full text-sm font-medium bg-success/10 text-success hover:bg-success/20 transition rounded-lg py-2"
+            >
+              🎁 Enjoy 0% Fees on All Trades
+            </Button>
             </div>
           )}
         </div>
       ) : (
         <div className="p-4 flex flex-col items-center justify-center h-full">
           <div className="text-center">
-            <div className="text-4xl mb-3">📊</div>
-            <p className="text-lg font-medium text-muted-foreground mb-2">
+            <div className="text-3xl mb-2">📊</div>
+            <p className="text-base font-medium text-muted-foreground mb-1">
               Select a pair to trade
             </p>
             {isMobile && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Tap on "Market" in the bottom navigation to browse available markets
               </p>
             )}
