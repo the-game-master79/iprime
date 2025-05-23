@@ -4,16 +4,10 @@ import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
 import { Building, Trophy, Target, Users, Rocket, ShieldCheck } from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
-import { SEO } from "@/components/shared/SEO";
 
 const CompanyPage = () => {
   return (
     <PageTransition>
-      <SEO
-        title="About Us"
-        description="Learn about CloudForex's mission to revolutionize financial markets with cutting-edge technology and unparalleled trading solutions."
-        keywords="forex trading company, online trading platform, financial technology, trading solutions"
-      />
       <div className="min-h-screen bg-background">
         {/* Magic Gradient Background */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">

@@ -201,24 +201,29 @@ const Sidebar = ({
   const [animatedPairs, setAnimatedPairs] = useState<{ [symbol: string]: boolean | undefined }>({});
 
   useEffect(() => {
-    const newAnimatedPairs: { [symbol: string]: boolean | undefined } = {};
-    filteredPairs.forEach(pair => {
-      const prev = prevPricesRef.current[pair.symbol];
-      const curr = Number(pair.price);
-      if (prev !== undefined && !isNaN(curr)) {
-        if (curr > prev) {
-          newAnimatedPairs[pair.symbol] = true; // up
-        } else if (curr < prev) {
-          newAnimatedPairs[pair.symbol] = false; // down
-        } else {
-          newAnimatedPairs[pair.symbol] = animatedPairs[pair.symbol]; // unchanged
+    // Only update animation for visible pairs
+    setAnimatedPairs((prevAnimated) => {
+      const newAnimated: { [symbol: string]: boolean | undefined } = {};
+      filteredPairs.forEach(pair => {
+        const prev = prevPricesRef.current[pair.symbol];
+        const curr = Number(pair.price);
+        if (prev !== undefined && !isNaN(curr)) {
+          if (curr > prev) {
+            newAnimated[pair.symbol] = true; // up
+          } else if (curr < prev) {
+            newAnimated[pair.symbol] = false; // down
+          } else {
+            newAnimated[pair.symbol] = prevAnimated[pair.symbol]; // unchanged
+          }
         }
-      }
-      prevPricesRef.current[pair.symbol] = curr;
+        prevPricesRef.current[pair.symbol] = curr;
+      });
+      // Remove animations for pairs no longer visible
+      return newAnimated;
     });
-    setAnimatedPairs(newAnimatedPairs);
+    // Only run when filteredPairs changes (not on every price change)
     // eslint-disable-next-line
-  }, [filteredPairs.map(p => p.price).join(",")]);
+  }, [filteredPairs, selectedPair]);
 
   return (
     <>

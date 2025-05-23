@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Separator } from "@/components/ui/separator";
 import { Cpu, HardDrive, DatabaseZap, BarChart2, Send, MoveRight, Timer, Percent, ArrowRight, ShieldCheck, Lock, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SEO } from "@/components/shared/SEO";
 
 interface Plan {
   id: string;
@@ -54,11 +53,6 @@ const InvestingPage = () => {
 
   return (
     <PageTransition>
-      <SEO
-        title="Investment Plans"
-        description="Choose from our range of investment plans designed for optimal returns. Start investing with CloudForex today."
-        keywords="investment plans, forex investment, crypto investment, trading investment, high return investment"
-      />
       <div className="min-h-screen bg-background">
         {/* Magic Gradient Background */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">

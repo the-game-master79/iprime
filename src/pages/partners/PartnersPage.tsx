@@ -3,16 +3,10 @@ import { Handshake, Users, ChartLineUp, Diamond, Lightning } from "@phosphor-ico
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
-import { SEO } from "@/components/shared/SEO";
 
 const PartnersPage = () => {
   return (
     <PageTransition>
-      <SEO
-        title="Partner Program"
-        description="Join CloudForex's lucrative partner program. Earn up to 34% commission and unlock exclusive benefits by referring traders to our advanced trading platform."
-        keywords="forex affiliate program, trading referral program, forex partnership, high commission trading affiliate"
-      />
       <div className="min-h-screen bg-background">
         {/* Magic Gradient Background */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">

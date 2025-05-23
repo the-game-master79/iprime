@@ -11,7 +11,6 @@ import { Envelope, Lightning } from "@phosphor-icons/react";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
-import { SEO } from "@/components/shared/SEO";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { QuickFeatures } from "@/components/shared/QuickFeatures";
@@ -50,11 +49,6 @@ const Index = () => {
 
   return (
     <PageTransition>
-      <SEO
-        title="Advanced Trading Platform"
-        description="Experience next-gen cloud forex trading with AI-powered analytics and 4X CPU boost technology for lightning-fast execution."
-        keywords="cloud forex, AI trading, advanced trading platform, forex trading, cryptocurrency trading"
-      />
       <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden">
         {/* Magic Gradient Orb - Updated for dark mode */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">

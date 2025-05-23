@@ -1,7 +1,6 @@
 import { PageTransition } from "@/components/ui-components";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
-import { SEO } from "@/components/shared/SEO";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Brain, ChartLineUp, CurrencyCircleDollar, GlobeSimple, LockKey, Users } from "@phosphor-icons/react";
 
@@ -95,11 +94,6 @@ const faqCategories = [
 const FaqPage = () => {
   return (
     <PageTransition>
-      <SEO 
-        title="FAQ - CloudForex Help Center"
-        description="Find answers to commonly asked questions about CloudForex's trading platform, security measures, deposits, withdrawals, and more."
-        keywords="trading faq, forex help, cryptocurrency faq, trading support, cloudforex help"
-      />
       <div className="min-h-screen">
         <Navbar />
         <main className="py-24 px-4">
