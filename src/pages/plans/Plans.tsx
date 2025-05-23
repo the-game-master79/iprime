@@ -514,7 +514,7 @@ const Plans = () => {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger>
+                {/* <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger> */}
               </TabsList>
             </div>
 
@@ -575,77 +575,9 @@ const Plans = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="create">
-              <div className="py-6">
-                {/* Steps for creating compute */}
-                <div className="flex flex-col gap-8">
-                  {/* Step 1: Select pairs */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Step 1: Select Crypto & Forex Pairs</h3>
-                    <div className="flex flex-col md:flex-row gap-6">
-                      {/* Crypto Pairs */}
-                      <div className="flex-1 bg-secondary rounded-lg border p-4">
-                        <h4 className="font-semibold mb-2 text-xl text-foreground">Crypto Pairs</h4>
-                        {loadingPairs ? (
-                          <TradingPairsSkeleton />
-                        ) : (
-                          <TradingPairsBento
-                            tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'crypto')}
-                            selectedPairId={selectedPairId}
-                            setSelectedPairId={setSelectedPairId}
-                          />
-                        )}
-                      </div>
-                      {/* Forex Pairs */}
-                      <div className="flex-1 bg-secondary rounded-lg border p-4">
-                        <h4 className="font-semibold mb-2 text-xl text-foreground">Forex Pairs</h4>
-                        {loadingPairs ? (
-                          <TradingPairsSkeleton />
-                        ) : (
-                          <TradingPairsBento
-                            tradingPairs={tradingPairs.filter(p => (p.type || '').toLowerCase() === 'forex')}
-                            selectedPairId={selectedPairId}
-                            setSelectedPairId={setSelectedPairId}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {/* Step 2: Amount required and days slider */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Step 2: Configure Trade</h3>
-                    <div className="flex flex-col md:flex-row gap-6 items-center">
-                      {/* Amount Required (mock calculation) */}
-                      <div className="flex-1 bg-secondary rounded-lg border p-4 flex flex-col gap-2">
-                        <span className="font-medium text-foreground">Amount Required</span>
-                        {/* Mock calculation: $1000 + 10 * (days - 48) */}
-                        <span className="text-2xl font-bold text-primary">
-                          ${1000 + 10 * ((typeof daysCount !== "undefined" ? daysCount : 48) - 48)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">This is a mock calculation.</span>
-                      </div>
-                      {/* Days Slider */}
-                      <div className="flex-1 bg-secondary rounded-lg border p-4 flex flex-col gap-2">
-                        <span className="font-medium text-foreground">Select Duration (Days)</span>
-                        <input
-                          type="range"
-                          min={48}
-                          max={720}
-                          value={daysCount}
-                          onChange={e => setDaysCount(Number(e.target.value))}
-                          className="w-full accent-primary"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>48</span>
-                          <span>{daysCount} days</span>
-                          <span>720</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+            {/* <TabsContent value="create">
+              ...Create Your Compute content...
+            </TabsContent> */}
           </Tabs>
         </div>
 
