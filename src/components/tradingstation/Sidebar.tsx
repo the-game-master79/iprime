@@ -104,14 +104,22 @@ const Sidebar = ({
           setCountdown("Market is opening...");
           clearInterval(interval);
         } else {
-          const hours = Math.floor(diff / (1000 * 60 * 60));
-          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-          setCountdown(
-            `${hours.toString().padStart(2, "0")}:${minutes
-              .toString()
-              .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
-          );
+          const totalSeconds = Math.floor(diff / 1000);
+          const days = Math.floor(totalSeconds / (60 * 60 * 24));
+          const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
+          const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+          const seconds = totalSeconds % 60;
+          let formatted = "";
+          if (days > 0) {
+            formatted = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+          } else if (hours > 0) {
+            formatted = `${hours}h ${minutes}m ${seconds}s`;
+          } else if (minutes > 0) {
+            formatted = `${minutes}m ${seconds}s`;
+          } else {
+            formatted = `${seconds}s`;
+          }
+          setCountdown(formatted);
         }
       }, 1000);
       return () => clearInterval(interval);

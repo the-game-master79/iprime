@@ -119,8 +119,15 @@ const getPriceChangeClass = (isUp?: boolean) => {
     : "text-red-500";
 };
 
-// Add this helper to format price with big digits
-const renderPriceWithBigDigits = (value: number | undefined, decimals: number) => {
+// Update renderPriceWithBigDigits to accept a "marketClosed" flag and show "Market Closed" in error color
+const renderPriceWithBigDigits = (
+  value: number | undefined,
+  decimals: number,
+  marketClosed?: boolean
+) => {
+  if (marketClosed) {
+    return <span className="text-xs text-destructive font-semibold">Market Closed</span>;
+  }
   if (value === undefined) return <span className="text-xs text-muted-foreground">Awaiting tick</span>;
   const str = Number(value).toFixed(decimals);
 
@@ -1294,15 +1301,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                       <div className="flex items-center gap-2 px-6 pt-6 pb-2">
                         <span className="font-semibold text-lg tracking-tight">Forex Markets</span>
                         <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold
-                          ${forexMarketOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          ${forexMarketOpen ? "bg-primary/10 text-primary" : "bg-error/20 text-error"}`}>
                           {forexMarketOpen ? "Live" : "Closed"}
                         </span>
                       </div>
-                      {!forexMarketOpen && (
-                        <div className="mb-2 px-6 text-xs text-destructive font-medium">
-                          Forex market is currently closed. You can still view prices, but trading is unavailable.
-                        </div>
-                      )}
                       <table className="min-w-full text-left">
                         <thead className="bg-secondary">
                           <tr className="border-b border-border text-xs text-muted-foreground">
@@ -1341,18 +1343,34 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                                   </td>
                                   <td className="py-2 px-2">
                                     <span
-                                      className={getPriceChangeClass(priceObj?.isPriceUp)}
+                                      className={
+                                        !forexMarketOpen
+                                          ? "text-destructive font-semibold"
+                                          : getPriceChangeClass(priceObj?.isPriceUp)
+                                      }
                                       key={priceObj?.bid}
                                     >
-                                      {renderPriceWithBigDigits(priceObj?.bid, decimals)}
+                                      {renderPriceWithBigDigits(
+                                        priceObj?.bid,
+                                        decimals,
+                                        !forexMarketOpen
+                                      )}
                                     </span>
                                   </td>
                                   <td className="py-2 px-2">
                                     <span
-                                      className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
+                                      className={
+                                        !forexMarketOpen
+                                          ? "text-destructive font-semibold"
+                                          : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
+                                      }
                                       key={priceObj?.ask}
                                     >
-                                      {renderPriceWithBigDigits(priceObj?.ask, decimals)}
+                                      {renderPriceWithBigDigits(
+                                        priceObj?.ask,
+                                        decimals,
+                                        !forexMarketOpen
+                                      )}
                                     </span>
                                   </td>
                                 </tr>
