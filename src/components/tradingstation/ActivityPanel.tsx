@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, X, Copy, Check } from "lucide-react";
-import { supabase } from "@/lib/supabase"; // Add this import at the top
+import { supabase } from "@/lib/supabase";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ActivityPanelProps {
   isCollapsed: boolean;
@@ -725,97 +726,94 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   // Use the correct close handler
   const _handleCloseTrade = handleCloseTrade || closeTradeWithWalletUpdate;
 
+  // --- Calculate sidebar width dynamically for marginLeft ---
+  const sidebarWidth = isCollapsed ? 48 : 368;
+
   return (
     <div
       className={`${fullPage 
         ? "w-full h-full bg-background flex flex-col" 
-        : "fixed bottom-0 left-0 right-0 bg-background text-white flex flex-col items-center justify-center border-t border-gray-700"
+        : "fixed bottom-0 left-0 right-0 bg-background text-white flex flex-col items-center justify-center border-t border-border shadow-lg"
       } transition-all duration-300`}
       ref={activityPanelRef}
       style={fullPage ? { minHeight: "100dvh", paddingBottom: fullPage ? 88 : undefined } : {
-        marginLeft: isCollapsed ? "60px" : "460px",
+        marginLeft: `${sidebarWidth}px`,
         marginRight: "350px",
         height: activityCollapsed ? 56 : activityHeight + 24,
         minHeight: activityCollapsed ? 56 : 200 + 24,
         maxHeight: 500 + 24,
         zIndex: 40,
       }}
-      role="region" 
+      role="region"
       aria-label="Trading activity panel"
     >
       {/* Trading Activity Section */}
-      <div 
+      <div
         className={`w-full ${fullPage ? "h-full flex flex-col" : "bg-muted/10 border-t border-border/50 flex flex-col"} transition-all duration-300 ${
           activityCollapsed && !fullPage ? "overflow-hidden" : "overflow-hidden"
-        }`} 
-        style={fullPage ? {height: "100%"} : {height: "100%"}}
+        }`}
+        style={fullPage ? { height: "100%" } : { height: "100%" }}
         aria-labelledby="activity-panel-title"
       >
         {/* Header for full page mode */}
         {fullPage && (
-          <div className="flex items-center justify-between px-4 py-4 border-b border-border">
-            <h2 className="text-xl font-semibold" id="activity-panel-title">Trading Activity</h2>
+          <div className="flex items-center justify-between px-4 py-4 border-b border-border bg-background/80">
+            <h2 className="text-xl font-semibold tracking-tight" id="activity-panel-title">Trading Activity</h2>
           </div>
         )}
-      
-        {/* Tabs for open and closed only */}
-        <div 
+
+        {/* Tabs */}
+        <div
           className={`flex items-center ${fullPage ? "px-4 py-2" : "bg-muted/20 border-b border-border/50 px-4"}`}
           style={fullPage ? {} : { minHeight: 44, height: 44, paddingTop: 6, paddingBottom: 6 }}
         >
-          <div className="flex gap-2">
-            <Button
-              variant={activeTradeTab === "open" ? "default" : "outline"}
-              onClick={() => handleTabChange("open")}
-              className={`flex text-foreground items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
-            >
-              Open
-              <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{openCount}</span>
-            </Button>
-            <Button
-              variant={activeTradeTab === "closed" ? "default" : "outline"}
-              onClick={() => handleTabChange("closed")}
-              className={`flex text-foreground items-center gap-1 ${fullPage ? "text-xs h-8 px-3" : "h-8 text-sm px-4"}`}
-            >
-              Closed
-              <span className={`ml-1 bg-background text-foreground rounded-full px-2 py-0.5 text-xs font-semibold`}>{closedCount}</span>
-            </Button>
-          </div>
-          
+          <Tabs value={activeTradeTab} onValueChange={setActiveTradeTab} className="mr-4">
+            <TabsList>
+              <TabsTrigger value="open">
+                Open
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-muted text-xs font-semibold border border-primary/30">
+                  {openCount}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="closed">
+                Closed
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-muted text-xs font-semibold border border-primary/30">
+                  {closedCount}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <div className="flex-1" />
-          
           {/* Total PnL display - only for desktop */}
           {!fullPage && (
             <div className="flex items-center gap-2 pr-2">
-              <span className={`text-xs font-medium text-muted-foreground`}>
+              <span className="text-xs font-medium text-muted-foreground">
                 {activeTradeTab === "closed" ? "Total Closed P&L:" : "Total P&L:"}
               </span>
               <span
-                className={`font-bold font-mono text-sm ${
+                className={`font-mono font-semibold text-base px-2 py-1 rounded-full transition-colors ${
                   (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) > 0
-                    ? "text-success"
+                    ? "bg-green-500/10 text-green-600"
                     : (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) < 0
-                    ? "text-destructive"
-                    : "text-muted-foreground"
+                    ? "bg-red-500/10 text-red-500"
+                    : "bg-muted/30 text-muted-foreground"
                 }`}
               >
                 {formatAmountCompact(activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL)} USD
               </span>
             </div>
           )}
-          
           {/* Collapse/minimize button - only show in desktop mode */}
           {!fullPage && (
             <Button
               variant="ghost"
               size="icon"
-              className="ml-2 h-8 w-8"
+              className="ml-2 h-8 w-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               onClick={() => setActivityCollapsed((v) => !v)}
               aria-label={activityCollapsed ? "Expand" : "Collapse"}
+              tabIndex={0}
             >
-              {/* Show fullscreen icon when collapsed, minimize icon when expanded */}
               {activityCollapsed ? (
-                // Fullscreen icon
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
                   <rect x="3" y="3" width="4" height="2" rx="1" fill="currentColor"/>
                   <rect x="3" y="3" width="2" height="4" rx="1" fill="currentColor"/>
@@ -827,7 +825,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   <rect x="15" y="13" width="2" height="4" rx="1" fill="currentColor"/>
                 </svg>
               ) : (
-                // Minimize icon
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
                   <rect x="4" y="9" width="12" height="2" rx="1" fill="currentColor"/>
                 </svg>
@@ -835,7 +832,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             </Button>
           )}
         </div>
-        
+
         {/* Mobile PnL display container - only for fullPage mode */}
         {fullPage && (
           <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/5">
@@ -844,11 +841,11 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 {activeTradeTab === "closed" ? "Total Closed P&L" : "Total P&L"}
               </span>
               <span
-                className={`font-bold font-mono text-xl ${
+                className={`font-mono font-bold text-xl ${
                   (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) > 0
-                    ? "text-success"
+                    ? "text-green-600"
                     : (activeTradeTab === "closed" ? totalClosedPnL : totalOpenPnL) < 0
-                    ? "text-destructive"
+                    ? "text-red-500"
                     : "text-muted-foreground"
                 }`}
               >
@@ -1763,9 +1760,11 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             {activeTradeTab === "closed" && (
               <div className={`flex justify-between items-center px-4 py-3 ${fullPage ? "border-t border-border/50" : "bg-muted/20 border-t border-border/50"}`}>
                 <button
-                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
+                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50`}
                   onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
+                  aria-label="Previous page"
+                  tabIndex={0}
                 >
                   Previous
                 </button>
@@ -1773,15 +1772,16 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
-                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 disabled:opacity-50`}
+                  className={`${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2"} bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50`}
                   onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages || totalPages === 0}
+                  aria-label="Next page"
+                  tabIndex={0}
                 >
                   Next
                 </button>
               </div>
             )}
-            
             {/* Resize handle - only show in desktop view */}
             {!fullPage && (
               <div
@@ -1794,16 +1794,18 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   zIndex: 50,
                 }}
                 onMouseDown={onResizeStart}
+                aria-label="Resize activity panel"
+                tabIndex={0}
               />
             )}
           </>
         )}
       </div>
-      
+
       {/* Bottom Badge - only show in desktop view and when not collapsed */}
       {!activityCollapsed && !fullPage && (
         <div
-          className="flex w-full gap-0 text-sm font-medium mb-2 border-t border-border/50 pt-4"
+          className="flex w-full gap-0 text-sm font-medium mb-2 border-t border-border/50 pt-4 bg-background/90"
           style={{
             flexDirection: "row",
             alignItems: "center",
@@ -1811,62 +1813,67 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
             flexWrap: "nowrap",
           }}
         >
-          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
-            <span>Equity:</span>
-            <span className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD</span>
-          </div>
-          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
-            <span>Used Margin:</span>
-            <span className="font-bold">${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
-            <span>Free Margin:</span>
-            <span className={`font-bold flex items-center justify-center gap-1 transition-colors ${
-              freeMarginChange === 'increase' ? 'text-success' : 
- 
-              freeMarginChange === 'decrease' ? 'text-destructive' : ''
-            }`}>
-              ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              {freeMarginChange && (
-                <span className={`text-xs ${freeMarginChange === 'increase' ? 'text-success' : 'text-destructive'}`}>
-                  {freeMarginChange === 'increase' ? '↑' : '↓'}
-                </span>
-              )}
-            </span>
-          </div>
-          <div className="flex-1 text-center text-foreground whitespace-nowrap flex flex-col items-center justify-center">
-            <span>Margin Level:</span>
-            <span className={`font-bold flex items-center justify-center gap-1 transition-colors ${
-              marginLevelChange === 'increase' ? 'text-success' : 
-              marginLevelChange === 'decrease' ? 'text-destructive' : ''
-            }`}>
-              {usedMargin > 0 ? marginLevel.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "100.00"}%
-              {marginLevelChange && (
-                <span className={`text-xs ${marginLevelChange === 'increase' ? 'text-success' : 'text-destructive'}`}>
-                  {marginLevelChange === 'increase' ? '↑' : '↓'}
-                </span>
-              )}
-            </span>
+          <div className="flex flex-row w-full justify-between items-center gap-4 px-4">
+            <div className="flex flex-col items-center">
+              <span className="text-xs text-muted-foreground">Equity</span>
+              <span className="font-mono font-semibold px-3 py-1 rounded-md bg-muted/40 text-foreground">
+                ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-xs text-muted-foreground">Used Margin</span>
+              <span className="font-mono font-semibold px-3 py-1 rounded-md bg-muted/40 text-foreground">
+                ${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-xs text-muted-foreground">Free Margin</span>
+              <span className={`font-mono font-semibold px-3 py-1 rounded-md flex items-center justify-center gap-1 transition-colors ${
+                freeMarginChange === 'increase' ? 'bg-green-500/10 text-green-600' :
+                freeMarginChange === 'decrease' ? 'bg-red-500/10 text-red-500' : 'bg-muted/40 text-foreground'
+              }`}>
+                ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {freeMarginChange && (
+                  <span className={`text-xs ${freeMarginChange === 'increase' ? 'text-green-600' : 'text-red-500'}`}>
+                    {freeMarginChange === 'increase' ? '↑' : '↓'}
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-xs text-muted-foreground">Margin Level</span>
+              <span className={`font-mono font-semibold px-3 py-1 rounded-md flex items-center justify-center gap-1 transition-colors ${
+                marginLevelChange === 'increase' ? 'bg-green-500/10 text-green-600' :
+                marginLevelChange === 'decrease' ? 'bg-red-500/10 text-red-500' : 'bg-muted/40 text-foreground'
+              }`}>
+                {usedMargin > 0 ? marginLevel.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "100.00"}%
+                {marginLevelChange && (
+                  <span className={`text-xs ${marginLevelChange === 'increase' ? 'text-green-600' : 'text-red-500'}`}>
+                    {marginLevelChange === 'increase' ? '↑' : '↓'}
+                  </span>
+                )}
+              </span>
+            </div>
           </div>
         </div>
       )}
-      
+
       {/* Mobile summary stats at bottom of full page view */}
       {fullPage && (
         <div className="fixed bottom-0 left-0 w-full z-50 grid grid-cols-2 gap-2 p-4 bg-secondary border-t border-border/50 mb-12">
-          <div className="p-3 rounded-lg bg-muted/20">
+          <div className="p-3 rounded-md bg-muted/20 shadow-sm">
             <div className="text-xs text-muted-foreground">Equity</div>
-            <div className="font-bold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="font-mono font-semibold">${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="p-3 rounded-lg bg-muted/20">
+          <div className="p-3 rounded-md bg-muted/20 shadow-sm">
             <div className="text-xs text-muted-foreground">Used Margin</div>
-            <div className="font-bold">${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="font-mono font-semibold">${usedMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           </div>
-          <div className="p-3 rounded-lg bg-muted/20">
+          <div className="p-3 rounded-md bg-muted/20 shadow-sm">
             <div className="text-xs text-muted-foreground">Free Margin</div>
-            <div className={`font-bold flex items-center gap-1 ${
-              freeMarginChange === 'increase' ? 'text-success' : 
-              freeMarginChange === 'decrease' ? 'text-destructive' : ''
+            <div className={`font-mono font-semibold flex items-center gap-1 ${
+              freeMarginChange === 'increase' ? 'text-green-600' :
+              freeMarginChange === 'decrease' ? 'text-red-500' : ''
             }`}>
               ${freeMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })
               }
@@ -1875,11 +1882,11 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               )}
             </div>
           </div>
-          <div className="p-3 rounded-lg bg-muted/20">
+          <div className="p-3 rounded-md bg-muted/20 shadow-sm">
             <div className="text-xs text-muted-foreground">Margin Level</div>
-            <div className={`font-bold flex items-center gap-1 ${
-              marginLevelChange === 'increase' ? 'text-success' : 
-              marginLevelChange === 'decrease' ? 'text-destructive' : ''
+            <div className={`font-mono font-semibold flex items-center gap-1 ${
+              marginLevelChange === 'increase' ? 'text-green-600' :
+              marginLevelChange === 'decrease' ? 'text-red-500' : ''
             }`}>
               {usedMargin > 0 ? marginLevel.toLocaleString(undefined, { maximumFractionDigits: 2 }) : "100.00"}%
               {marginLevelChange && (

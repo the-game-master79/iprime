@@ -13,6 +13,7 @@ import { TransactionTable } from "@/components/tables/TransactionTable";
 import { RankTable } from "@/components/dashboard/RankTable";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 // Icons
 import { 
@@ -986,9 +987,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       <main className="py-8">
         <div className="container mx-auto px-4 max-w-[1000px]">
           {loading || isLoading ? (
-            <div className="flex items-center justify-center min-h-[60vh]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
+            // Replace spinner with skeletons
+            <DashboardSkeleton />
           ) : (
             <div className="space-y-4">
               {/* Referral Card with Promotions Button */}
@@ -1701,6 +1701,38 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   );
 };
 
+// Add skeleton components before DashboardContent
+const Skeleton = ({ className = "" }: { className?: string }) => (
+  <div className={`animate-pulse bg-muted/50 rounded-lg ${className}`} />
+);
+
+const DashboardSkeleton = () => (
+  <div className="space-y-4">
+    {/* Referral Card Skeleton */}
+    <Skeleton className="h-24 w-full rounded-2xl" />
+
+    {/* Balance & Affiliate Cards Skeleton */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Skeleton className="h-48 md:col-span-2 w-full rounded-2xl" />
+      <Skeleton className="h-48 w-full rounded-2xl" />
+    </div>
+
+    {/* Markets Table Skeleton */}
+    <Skeleton className="h-40 w-full rounded-2xl" />
+
+    {/* Tabs Skeleton */}
+    <div>
+      <div className="flex gap-2 mb-4">
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-8 w-32" />
+      </div>
+      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-8 w-1/2 mt-4" />
+    </div>
+  </div>
+);
+
 const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user, loading } = useAuth();
@@ -1721,9 +1753,7 @@ const Dashboard = () => {
 
   if (loading || isLoading) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <LoadingSpinner />
     );
   }
 

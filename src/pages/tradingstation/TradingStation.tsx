@@ -1682,9 +1682,9 @@ const TradingStation = () => {
           )}
 
           {/* Main content area with conditional visibility on mobile */}
-          <div className={`flex-1 flex ${isMobile ? "flex-col" : "flex-row"}`}>
+          <div className={`flex-1 flex flex-col relative h-full`}>
             {/* Chart Component - visible on mobile only when activeView is chart */}
-            <div className={`${isMobile && activeView !== "chart" ? "hidden" : "flex-1"}`}>
+            <div className={`${isMobile && activeView !== "chart" ? "hidden" : "flex-1 flex flex-col"}`}>
               <ChartComponent 
                 symbol={getTradingViewSymbol(selectedPair)}
                 timezone={userTimezone}
@@ -1770,7 +1770,6 @@ const TradingStation = () => {
             </div>
           </div>
         </div>
-
         {/* Activity Panel - Only show in mobile when activeView is "activity" */}
         {isMobile && activeView === "activity" ? (
           LazyActivityPanel ? (
@@ -1798,7 +1797,7 @@ const TradingStation = () => {
                 freeMargin={freeMargin}
                 marginLevel={marginLevel}
                 onResizeStart={onResizeStart}
-                openTrades={openTrades}
+                               openTrades={openTrades}
                 pendingTrades={pendingTrades}
                 localPrices={localPrices}
                 handleCloseTrade={handleCloseTrade}

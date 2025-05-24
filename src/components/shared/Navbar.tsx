@@ -73,7 +73,15 @@ export const Navbar = () => {
             </Button>
             <Link to={user ? "/platform" : "/auth/login"}>
               <Button variant="default" className="rounded-xl px-6 gap-2">
-                {user ? "Access Platform" : "Open Account"}
+                {/* Desktop: Access Platform, Mobile: Dashboard */}
+                {user ? (
+                  <>
+                    <span className="hidden md:inline">Access Platform</span>
+                    <span className="inline md:hidden">Dashboard</span>
+                  </>
+                ) : (
+                  "Open Account"
+                )}
                 <ArrowCircleRight weight="bold" className="h-5 w-5" />
               </Button>
             </Link>

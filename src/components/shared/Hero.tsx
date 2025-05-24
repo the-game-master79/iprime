@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowRight, Cpu, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface HeroProps {
   badge: {
@@ -21,6 +22,7 @@ interface HeroProps {
 }
 
 export const Hero = ({ badge, badges, title, description, action, lottie }: HeroProps) => {
+  const { user } = useAuth();
   return (
     <section className="pt-24 pb-12">
       <div className="container max-w-[1200px] mx-auto px-4">
@@ -64,17 +66,31 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
 
                 <h1 className="text-4xl pb-2 md:text-6xl font-bold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground/90 to-foreground/80">{title}</h1>
                 <p className="text-xl text-muted-foreground">{description}</p>
-                {action && (
-                  <Link to={action.href} className="block pt-4">
-                    <Button 
-                      size="lg"
-                      className="gap-2 rounded-xl px-8 bg-primary hover:bg-primary/90 text-primary-foreground text-md transition-colors"
-                    >
-                      {action.text}
-                      <ArrowRight className="h-5 w-5" />
-                    </Button>
-                  </Link>
-                )}
+                {/* Show Login or Access Platform based on user authentication */}
+                <div className="block pt-4">
+                  {user ? (
+                    <Link to="/platform">
+                      <Button 
+                        size="lg"
+                        className="gap-2 rounded-xl px-8 bg-primary hover:bg-primary/90 text-primary-foreground text-md transition-colors"
+                      >
+                        <span className="hidden md:inline">Access Platform</span>
+                        <span className="inline md:hidden">Dashboard</span>
+                        <ArrowRight className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link to="/auth/login">
+                      <Button 
+                        size="lg"
+                        className="gap-2 rounded-xl px-8 bg-primary hover:bg-primary/90 text-primary-foreground text-md transition-colors"
+                      >
+                        Login
+                        <ArrowRight className="h-5 w-5" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
 
               {/* Lottie Animation */}

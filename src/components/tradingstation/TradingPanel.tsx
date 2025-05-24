@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { X } from "lucide-react";
 import { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 
@@ -450,96 +449,151 @@ const TradingPanel = ({
                     {selectedLeverage}x
                   </button>
                 </DialogTrigger>
-                <DialogContent className={`p-6 rounded-lg shadow-lg bg-background ${isMobile ? 'w-[90vw]' : ''}`}>
-                  <DialogHeader>
-                    <DialogTitle className="text-lg font-semibold text-foreground">Select Leverage</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-8 mt-4">
-                    {/* Selected Leverage Display */}
-                    <div
-                      className={`flex justify-center items-center p-4 border rounded-lg ${
-                        parseInt(selectedLeverage) <= 20
-                          ? "bg-success/10 border-success text-success"
-                          : parseInt(selectedLeverage) <= 500
-                          ? "bg-warning/10 border-warning text-warning"
-                          : "bg-error/10 border-error text-error"
-                      }`}
-                    >
-                      <span className="text-2xl font-bold">{selectedLeverage}x</span>
+                <DialogContent className={`p-0 rounded-2xl shadow-2xl bg-background border-0 ${isMobile ? 'w-[95vw] max-w-[420px]' : 'w-[420px]'}`}>
+                  <div className="p-6">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold text-center text-primary mb-2">Select Leverage</DialogTitle>
+                    </DialogHeader>
+                    {/* Risk Progress Bar */}
+                    <div className="flex flex-col items-center mb-6">
+                      <span className="text-xs text-muted-foreground mb-1">Risk Level</span>
+                      <div className="w-full flex items-center gap-2">
+                        <div className="flex-1 h-2 rounded-full bg-success/20 relative overflow-hidden">
+                          <div
+                            className={`
+                              h-2 rounded-full transition-all duration-300
+                              ${parseInt(selectedLeverage) <= 20
+                                ? "bg-success/80 w-1/4"
+                                : parseInt(selectedLeverage) <= 500
+                                ? "bg-warning/80 w-2/4"
+                                : "bg-error/80 w-full"}
+                            `}
+                          ></div>
+                        </div>
+                        <span className={`
+                          text-xs font-bold
+                          ${parseInt(selectedLeverage) <= 20
+                            ? "text-success"
+                            : parseInt(selectedLeverage) <= 500
+                            ? "text-warning"
+                            : "text-error"}
+                        `}>
+                          {parseInt(selectedLeverage) <= 20
+                            ? "Low"
+                            : parseInt(selectedLeverage) <= 500
+                            ? "Medium"
+                            : "High"}
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Low Risk */}
-                    {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) <= 20) && (
-                      <div>
-                        <h3 className="text-base font-medium text-green-600 mb-3">Low Risk (2-20x)</h3>
-                        <div className={`grid ${isMobile ? 'grid-cols-4' : 'grid-cols-5'} gap-3`}>
-                          {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) <= 20).map((leverage) => (
-                            <button
-                              key={leverage}
-                              className={`px-4 py-2 border rounded-lg transition-all duration-200 ${
-                                selectedLeverage === leverage
-                                  ? "bg-green-500 text-white border-green-600"
-                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                              }`}
-                              onClick={() => handleLeverageChange(leverage)}
-                            >
-                              {leverage}x
-                            </button>
-                          ))}
+                    {/* Selected Leverage Card */}
+                    <div
+                      className={`flex flex-col items-center justify-center p-5 rounded-2xl mb-8 shadow
+                        ${parseInt(selectedLeverage) <= 20
+                          ? "bg-success/10 border border-success/30"
+                          : parseInt(selectedLeverage) <= 500
+                          ? "bg-warning/10 border border-warning/30"
+                          : "bg-error/10 border border-error/30"}
+                      `}
+                    >
+                      <span className="text-4xl font-extrabold mb-1">
+                        {selectedLeverage}x
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {parseInt(selectedLeverage) <= 20
+                          ? "Low Risk"
+                          : parseInt(selectedLeverage) <= 500
+                          ? "Medium Risk"
+                          : "High Risk"}
+                      </span>
+                    </div>
+                    {/* Leverage Options */}
+                    <div className="space-y-7">
+                      {/* Low Risk */}
+                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) <= 20) && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-success/20 text-success">
+                              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="7" /><path d="M5 8l2 2 4-4" /></svg>
+                            </span>
+                            <h3 className="text-base font-semibold text-green-700">Low Risk (2-20x)</h3>
+                          </div>
+                          <div className={`grid ${isMobile ? 'grid-cols-4' : 'grid-cols-5'} gap-2`}>
+                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) <= 20).map((leverage) => (
+                              <button
+                                key={leverage}
+                                className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
+                                  ${selectedLeverage === leverage
+                                    ? "bg-success/80 text-white border-success/80 scale-105"
+                                    : "bg-success/10 text-success border-success/30 hover:bg-success/20"}
+                                `}
+                                onClick={() => handleLeverageChange(leverage)}
+                              >
+                                {leverage}x
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Medium Risk */}
-                    {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500) && (
-                      <div>
-                        <h3 className="text-base font-medium text-yellow-600 mb-3">Medium Risk (21-500x)</h3>
-                        <div className="grid grid-cols-5 gap-3">
-                          {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500).map((leverage) => (
-                            <button
-                              key={leverage}
-                              className={`px-4 py-2 border rounded-lg transition-all duration-200 ${
-                                selectedLeverage === leverage
-                                  ? "bg-yellow-500 text-white border-yellow-600"
-                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                              }`}
-                              onClick={() => handleLeverageChange(leverage)}
-                            >
-                              {leverage}x
-                            </button>
-                          ))}
+                      )}
+                      {/* Medium Risk */}
+                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500) && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-warning/20 text-warning">
+                              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="7" /><path d="M8 5v3l2 2" /></svg>
+                            </span>
+                            <h3 className="text-base font-semibold text-yellow-700">Medium Risk (21-500x)</h3>
+                          </div>
+                          <div className="grid grid-cols-5 gap-2">
+                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500).map((leverage) => (
+                              <button
+                                key={leverage}
+                                className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
+                                  ${selectedLeverage === leverage
+                                    ? "bg-warning/80 text-white border-warning/80 scale-105"
+                                    : "bg-warning/10 text-warning border-warning/30 hover:bg-warning/20"}
+                                `}
+                                onClick={() => handleLeverageChange(leverage)}
+                              >
+                                {leverage}x
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* High Risk */}
-                    {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 500) && (
-                      <div>
-                        <h3 className="text-base font-medium text-red-600 mb-3">High Risk (500x+)</h3>
-                        <div className="grid grid-cols-5 gap-3">
-                          {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 500).map((leverage) => (
-                            <button
-                              key={leverage}
-                              className={`px-4 py-2 border rounded-lg transition-all duration-200 ${
-                                selectedLeverage === leverage
-                                  ? "bg-red-500 text-white border-red-600"
-                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                              }`}
-                              onClick={() => handleLeverageChange(leverage)}
-                            >
-                              {leverage}x
-                            </button>
-                          ))}
+                      )}
+                      {/* High Risk */}
+                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 500) && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-error/20 text-error">
+                              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="8" cy="8" r="7" /><path d="M8 5v4" /><circle cx="8" cy="11" r="1" /></svg>
+                            </span>
+                            <h3 className="text-base font-semibold text-red-700">High Risk (500x+)</h3>
+                          </div>
+                          <div className="grid grid-cols-5 gap-2">
+                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 500).map((leverage) => (
+                              <button
+                                key={leverage}
+                                className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
+                                  ${selectedLeverage === leverage
+                                    ? "bg-error/80 text-white border-error/80 scale-105"
+                                    : "bg-error/10 text-error border-error/30 hover:bg-error/20"}
+                                `}
+                                onClick={() => handleLeverageChange(leverage)}
+                              >
+                                {leverage}x
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* No Leverage Available */}
-                    {!leverageOptions[selectedPair?.symbol || ""]?.length && (
-                      <div className="text-center text-gray-500">
-                        No leverage options available for this pair.
-                      </div>
-                    )}
+                      )}
+                      {/* No Leverage Available */}
+                      {!leverageOptions[selectedPair?.symbol || ""]?.length && (
+                        <div className="text-center text-gray-400 py-8">
+                          No leverage options available for this pair.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>

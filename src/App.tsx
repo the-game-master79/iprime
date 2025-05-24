@@ -10,6 +10,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 
 // Lazy Providers
 const AuthProvider = lazy(() => import("@/contexts/AuthContext").then(mod => ({ default: mod.AuthProvider })));
@@ -70,9 +71,7 @@ const queryClient = new QueryClient({
 });
 
 const Spinner = () => (
-  <div className="flex min-h-screen items-center justify-center">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-  </div>
+  <LoadingSpinner />
 );
 
 // Route splitter based on pathname

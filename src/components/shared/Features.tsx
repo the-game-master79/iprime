@@ -47,7 +47,7 @@ const features = [
 
 export const Features = () => {
   return (
-    <section id="advanced-trading" className="py-16 md:py-24 bg-background/50">
+    <section id="advanced-trading" className="py-16 md:py-24">
       <div className="container max-w-[1200px] mx-auto px-4">
         <div className="flex flex-col items-center text-center gap-4 max-w-2xl mx-auto mb-12 md:mb-16">
           <div className="flex items-center gap-2">

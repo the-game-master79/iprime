@@ -1,13 +1,19 @@
 import { Link } from "react-router-dom";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Footer = () => {
+  const { theme } = useTheme();
   return (
     <footer className="border-t bg-background/5 py-8 md:py-12">
       <div className="container max-w-[1200px] mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <img 
-              src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cloudforex.svg" 
+              src={
+                theme === "dark"
+                  ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                  : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+              }
               alt="CloudForex Logo" 
               className="h-8 w-auto" 
             />
