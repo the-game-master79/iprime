@@ -122,88 +122,97 @@ const Login = () => {
     }
 
     try {
-      // 1. Try to sign in
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Check if user exists in Supabase Auth
+      const { data: userExistsData, error: userExistsError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      if (signInError) {
-        setPasswordError(signInError.message || "Incorrect email or password.");
-        setIsLoading(false);
-        return;
-      }
+      if (userExistsData && !userExistsError) {
+        // User exists, try to sign in
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-      // Check Supabase session after login
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session) {
-        setEmailError("Session invalid. Please try logging in again.");
-        setIsLoading(false);
-        return;
-      }
+        if (signInError) {
+          setPasswordError(signInError.message || "Incorrect email or password.");
+          setIsLoading(false);
+          return;
+        }
 
-      if (signInData.user) {
-        toast.success("Login successful!");
+        // Check Supabase session after login
+        const { data: session } = await supabase.auth.getSession();
+        if (!session?.session) {
+          setEmailError("Session invalid. Please try logging in again.");
+          setIsLoading(false);
+          return;
+        }
+
+        if (signInData.user) {
+          toast.success("Login successful!");
+          navigate('/platform');
+          return;
+        }
+      } else {
+        // User does not exist, sign up
+        const newReferralCode = generateReferralCode();
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              referral_code: newReferralCode
+            }
+          }
+        });
+
+        if (signUpError) {
+          setEmailError(signUpError.message || "Signup failed.");
+          throw signUpError;
+        }
+        if (!signUpData.user) {
+          setEmailError("Failed to create user");
+          throw new Error("Failed to create user");
+        }
+
+        // 3. Create profile row
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: signUpData.user.id,
+            email,
+            referral_code: newReferralCode,
+            referred_by: referral || null,
+            status: 'active',
+            direct_count: 0,
+            total_invested: 0,
+            withdrawal_wallet: 0,
+          });
+
+        if (profileError) {
+          setEmailError(profileError.message || "Profile creation failed.");
+          throw profileError;
+        }
+
+        // Check Supabase session after signup
+        const { data: postSignUpSession } = await supabase.auth.getSession();
+        if (!postSignUpSession?.session) {
+          setEmailError("Session invalid. Please try logging in again.");
+          throw new Error("Session invalid. Please try logging in again.");
+        }
+
+        toast.success("Account created and logged in!");
         navigate('/platform');
         return;
       }
-
-      // 2. If sign in fails, try to sign up
-      const newReferralCode = generateReferralCode();
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            referral_code: newReferralCode
-          }
-        }
-      });
-
-      if (signUpError) {
-        setEmailError(signUpError.message || "Signup failed.");
-        throw signUpError;
-      }
-      if (!signUpData.user) {
-        setEmailError("Failed to create user");
-        throw new Error("Failed to create user");
-      }
-
-      // 3. Create profile row
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: signUpData.user.id,
-          email,
-          referral_code: newReferralCode,
-          referred_by: referral || null,
-          status: 'active',
-          direct_count: 0,
-          total_invested: 0,
-          withdrawal_wallet: 0,
-        });
-
-      if (profileError) {
-        setEmailError(profileError.message || "Profile creation failed.");
-        throw profileError;
-      }
-
-      // Check Supabase session after signup
-      const { data: postSignUpSession } = await supabase.auth.getSession();
-      if (!postSignUpSession?.session) {
-        setEmailError("Session invalid. Please try logging in again.");
-        throw new Error("Session invalid. Please try logging in again.");
-      }
-
-      toast.success("Account created and logged in!");
-      navigate('/platform');
     } catch (error) {
       setLoginAttempts(prev => prev + 1);
       if (loginAttempts + 1 >= MAX_ATTEMPTS) {
         setLockoutUntil(Date.now() + LOCKOUT_TIME);
         setEmailError("Too many failed attempts. Please wait before trying again.");
       } else {
-        // Hide specific error details
         setPasswordError(
           error instanceof Error
             ? error.message
