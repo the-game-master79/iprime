@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TransactionTable } from "@/components/tables/TransactionTable";
+import { TransactionTable } from "@/components/transactionTable/TransactionTable";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -330,9 +330,6 @@ export default function CashierPage() {
         if (promoError) throw promoError;
       }
 
-      // Notify admin of the new pending deposit
-      await notifyAdminOfDeposit(data);
-
       toast({
         title: "Success",
         description: "Deposit request submitted successfully."
@@ -347,20 +344,6 @@ export default function CashierPage() {
         description: "An error occurred while submitting the deposit request.",
         variant: "destructive"
       });
-    }
-  };
-
-  // Add this function to notify admin after deposit confirmation
-  const notifyAdminOfDeposit = async (deposit: any) => {
-    try {
-      await fetch('/api/notify-admin', { // Use relative path, not localhost
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deposit }),
-      });
-    } catch (err) {
-      // Optionally log or toast error, but don't block user flow
-      console.error('Failed to notify admin:', err);
     }
   };
 

@@ -12,6 +12,18 @@ export default defineConfig({
       threshold: 10240,
       deleteOriginFile: false,
     }),
+    // Only obfuscate in production
+    // ...(process.env.NODE_ENV === 'production'
+    //   ? [obfuscatorPlugin({
+    //       // You can customize options here
+    //       compact: true,
+    //       controlFlowFlattening: true,
+    //       deadCodeInjection: true,
+    //       stringArray: true,
+    //       stringArrayEncoding: ['rc4'],
+    //       stringArrayThreshold: 0.75,
+    //     })]
+    //   : [])
   ],
   root: './',
   base: './',
