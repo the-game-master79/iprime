@@ -11,7 +11,6 @@ import { generateReferralCode, cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { Sun, Moon } from "@phosphor-icons/react"; // Add for icon consistency
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { Progress } from "@/components/ui/progress";
 
 const Login = () => {
@@ -167,6 +166,40 @@ const Login = () => {
             }
           }
         });
+
+        // --- Fix: If user_already_exists, try to login instead of showing error ---
+        if (
+          signUpError &&
+          (signUpError.code === "user_already_exists" ||
+            signUpError.message?.toLowerCase().includes("already registered"))
+        ) {
+          // Try to sign in instead
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError) {
+            setPasswordError(signInError.message || "Incorrect email or password.");
+            setIsLoading(false);
+            return;
+          }
+
+          // Check Supabase session after login
+          const { data: session } = await supabase.auth.getSession();
+          if (!session?.session) {
+            setEmailError("Session invalid. Please try logging in again.");
+            setIsLoading(false);
+            return;
+          }
+
+          if (signInData.user) {
+            toast.success("Login successful!");
+            navigate('/platform');
+            return;
+          }
+        }
+        // --- End fix ---
 
         if (signUpError) {
           setEmailError(signUpError.message || "Signup failed.");

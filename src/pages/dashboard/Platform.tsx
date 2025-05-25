@@ -1131,7 +1131,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         >
                           <Users className="h-10 w-10 text-foreground" weight="duotone" />
                         </Button>
-                        <span className="mt-2 text-sm font-medium text-foreground">Agent</span>
+                        <span className="mt-2 text-sm font-medium text-foreground">Affiliates</span>
                       </div>
                       <div className="flex flex-col items-center h-full w-full">
                         <Button 

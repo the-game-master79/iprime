@@ -26,6 +26,7 @@ import {
 import { BalanceCard } from "@/components/shared/BalanceCards";
 import { KycVariant } from "@/components/shared/KycVariants";
 import { useUserProfile } from "@/contexts/UserProfileContext";
+import axios from "axios";
 
 interface Promocode {
   id: string;
@@ -329,6 +330,9 @@ export default function CashierPage() {
         if (promoError) throw promoError;
       }
 
+      // Notify admin of the new pending deposit
+      await notifyAdminOfDeposit(data);
+
       toast({
         title: "Success",
         description: "Deposit request submitted successfully."
@@ -336,8 +340,6 @@ export default function CashierPage() {
 
       setCryptoType('');
       setNetwork('');
-      
-      // Optionally navigate to transactions or dashboard
       navigate('/platform');
     } catch (error) {
       toast({
@@ -345,6 +347,20 @@ export default function CashierPage() {
         description: "An error occurred while submitting the deposit request.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Add this function to notify admin after deposit confirmation
+  const notifyAdminOfDeposit = async (deposit: any) => {
+    try {
+      await fetch('/api/notify-admin', { // Use relative path, not localhost
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deposit }),
+      });
+    } catch (err) {
+      // Optionally log or toast error, but don't block user flow
+      console.error('Failed to notify admin:', err);
     }
   };
 
@@ -430,7 +446,18 @@ export default function CashierPage() {
       setAmountError("Amount must be greater than 0");
       return false;
     }
-    if (numValue < 10) {
+    // Determine selected crypto symbol for min amount logic
+    let selectedSymbol = "";
+    if (cryptoType) {
+      const selectedCrypto = availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType);
+      selectedSymbol = selectedCrypto?.symbol?.toLowerCase() || "";
+    }
+    // BTC/ETH: $50 min, others: $10 min
+    if ((selectedSymbol === "btc" || selectedSymbol === "eth") && numValue < 50) {
+      setAmountError("Minimum deposit amount for BTC and ETH is $50");
+      return false;
+    }
+    if (!(selectedSymbol === "btc" || selectedSymbol === "eth") && numValue < 10) {
       setAmountError("Minimum deposit amount is $10");
       return false;
     }
@@ -977,7 +1004,7 @@ export default function CashierPage() {
 
             <TabsContent value="add-funds">
               <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-                <div className="space-y-6">
+                <div className="space-y-6 max-w-[400px]"> {/* Set max width for deposit form */}
                   {/* Remove Card and CardContent wrappers for deposit form */}
                   <form>
                     <div className="space-y-4">
@@ -1083,21 +1110,21 @@ export default function CashierPage() {
                             {/* Amount Display */}
                             <div className="p-3 sm:p-5 bg-secondary border-b border-secondary">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+                                {/* Left: You're Sending (crypto) */}
                                 <div>
                                   <div className="text-sm text-foreground mb-1">You're Sending</div>
-                                  <div className="text-xl font-mono sm:text-2xl font-semibold text-foreground">
-                                    ${parseFloat(amount).toLocaleString()} USD
+                                  <div className="flex items-center gap-2 text-xl font-mono sm:text-2xl font-semibold text-primary">
+                                    {calculateCryptoAmount(parseFloat(amount || '0'), availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol || '')}
+                                    <span className="text-bold sm:text-lg text-primary">
+                                      {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol.toUpperCase()}
+                                    </span>
                                   </div>
                                 </div>
+                                {/* Right: You'll Get (USD) */}
                                 <div className="sm:text-right">
                                   <div className="text-sm text-foreground mb-1">You'll Get</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="text-xl sm:text-2xl font-semibold text-primary break-all">
-                                      {calculateCryptoAmount(parseFloat(amount || '0'), availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol || '')}
-                                    </div>
-                                    <div className="text-bold sm:text-lg text-foreground">
-                                      {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol.toUpperCase()}
-                                    </div>
+                                  <div className="text-xl sm:text-2xl font-semibold text-foreground break-all">
+                                    {parseFloat(amount).toLocaleString()} USD
                                   </div>
                                 </div>
                               </div>
@@ -1137,7 +1164,7 @@ export default function CashierPage() {
                       )}
                     
                     </div>
-                    <div className="mt-6">
+                    <div className="mt-6 flex flex-col gap-3">
                       <Button 
                         type="submit"
                         className="w-full bg-primary text-white"
@@ -1282,8 +1309,13 @@ export default function CashierPage() {
                     <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
                   </div>
                 ) : filteredAndSortedDeposits.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No deposits found
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
+                    <Receipt size={40} weight="duotone" className="mb-2 text-primary/80" />
+                    <div className="text-lg font-semibold">No Deposits Yet</div>
+                    <div className="text-sm max-w-xs text-center">
+                      You haven't made any deposits yet.<br />
+                      Start by adding funds to your account.
+                    </div>
                   </div>
                 ) : (
                   <TransactionTable 
@@ -1293,7 +1325,7 @@ export default function CashierPage() {
                 )}
               </div>
             </TabsContent>
-
+            {/* The rest of your code remains unchanged */}
             <TabsContent value="withdraw" className="w-full">
               {/* Withdrawals Implementation */}
               <div className="w-full min-h-screen bg-background">
@@ -1326,7 +1358,7 @@ export default function CashierPage() {
                   </div>
                   {/* Withdraw Form */}
                   <div className="flex flex-col gap-8">
-                    <div className="w-full max-w-lg mx-auto">
+                    <div className="w-full max-w-[400px] mx-auto"> {/* Set max width for withdraw form */}
                       {kycStatus === 'completed' ? (
                         <form onSubmit={handleWithdrawSubmit} className="space-y-6">
                           <div className="space-y-4">
@@ -1470,17 +1502,28 @@ export default function CashierPage() {
                       </div>
                       <div className="border-b border-foreground/10 mb-2" />
                       <div className="mt-4">
-                        <TransactionTable
-                          transactions={filteredAndSortedWithdrawTransactions}
-                          onCopyId={handleWithdrawCopyId}
-                        />
+                        {filteredAndSortedWithdrawTransactions.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
+                            <CurrencyDollar size={40} weight="duotone" className="mb-2 text-primary/80" />
+                            <div className="text-lg font-semibold">No Payouts Yet</div>
+                            <div className="text-sm max-w-xs text-center">
+                              You haven't requested any payouts yet.<br />
+                              You can see all your payout requests here once you make them.
+                            </div>
+                          </div>
+                        ) : (
+                          <TransactionTable
+                            transactions={filteredAndSortedWithdrawTransactions}
+                            onCopyId={handleWithdrawCopyId}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </TabsContent>
-          </Tabs>
+            </Tabs>
         </div>
       </div>
 

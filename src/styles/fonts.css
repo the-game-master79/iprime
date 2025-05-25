@@ -1,29 +1,9 @@
+/* Add your custom font-face declarations here, or leave empty if not needed */
+/* Example:
 @font-face {
-  font-family: 'Aeonik';
-  src: local('Aeonik Regular'),
-       url('/fonts/aeonik-regular.woff2') format('woff2'),
-       url('https://www.cloudforex.club/assets/fonts/aeonik-regular.woff2') format('woff2');
-  font-weight: 400;
+  font-family: 'YourFont';
+  src: url('./YourFont.woff2') format('woff2');
+  font-weight: normal;
   font-style: normal;
-  font-display: swap;
 }
-
-@font-face {
-  font-family: 'Aeonik';
-  src: local('Aeonik Medium'),
-       url('/fonts/aeonik-medium.woff2') format('woff2'),
-       url('https://www.cloudforex.club/assets/fonts/aeonik-medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Aeonik';
-  src: local('Aeonik Bold'),
-       url('/fonts/aeonik-bold.woff2') format('woff2'),
-       url('https://www.cloudforex.club/assets/fonts/aeonik-bold.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+*/
