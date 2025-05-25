@@ -26,7 +26,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true, // keep this ON if debugging
+    sourcemap: false, // keep this ON if debugging
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -47,7 +47,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   css: {
-    devSourcemap: true,
+    devSourcemap: false,
     modules: {
       scopeBehaviour: 'local',
     },
