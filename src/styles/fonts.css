@@ -1,9 +1,25 @@
-/* Add your custom font-face declarations here, or leave empty if not needed */
-/* Example:
+/* Aeonik font-face declarations */
 @font-face {
-  font-family: 'YourFont';
-  src: url('./YourFont.woff2') format('woff2');
-  font-weight: normal;
+  font-family: 'Aeonik';
+  src: url('/public/fonts/aeonik-regular.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
 }
-*/
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/public/fonts/aeonik-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aeonik';
+  src: url('/public/fonts/aeonik-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+/* ...add more weights/styles as needed... */
