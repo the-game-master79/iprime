@@ -425,7 +425,7 @@ const Affiliate = () => {
             <DialogTrigger asChild>
               <Button variant="outline">Commission Rates</Button>
             </DialogTrigger>
-            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
@@ -464,7 +464,9 @@ const Affiliate = () => {
             <DialogTrigger asChild>
               <Button variant="outline">Rank Benefits</Button>
             </DialogTrigger>
-            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0"
+              closeIconClassName="text-foreground"
+            >
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
@@ -509,6 +511,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="text-foreground border-foreground"
                       disabled={rankPage === 1}
                       onClick={() => setRankPage(p => Math.max(1, p - 1))}
                     >
@@ -520,6 +523,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="text-foreground border-foreground"
                       disabled={rankPage === Math.ceil(ranks.length / ranksPerPage) || ranks.length === 0}
                       onClick={() => setRankPage(p => Math.min(Math.ceil(ranks.length / ranksPerPage), p + 1))}
                     >
@@ -536,7 +540,9 @@ const Affiliate = () => {
             <DialogTrigger asChild>
               <Button variant="outline">Referral Benefits</Button>
             </DialogTrigger>
-            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0"
+              closeIconClassName="text-foreground"
+            >
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
@@ -548,55 +554,55 @@ const Affiliate = () => {
               <div className="py-2">
                 <div className="grid gap-4 sm:grid-cols-2">
                   {/* Card for each volume benefit */}
-                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-secondary-foreground text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         5 Referrals
                       </Badge>
-                      <span className="ml-auto text-xs text-foreground">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         Valid until 30 June 2025
                       </span>
                     </div>
-                    <div className="text-lg font-bold text-foreground">
+                    <div className="text-lg font-bold">
                       $30 Amazon Gift Card
                     </div>
                   </div>
-                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-secondary-foreground text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         20 Referrals
                       </Badge>
-                      <span className="ml-auto text-xs text-foreground">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         Valid until 30 June 2025
                       </span>
                     </div>
-                    <div className="text-lg font-bold text-foreground">
+                    <div className="text-lg font-bold">
                       $200 Amazon Gift Card
                     </div>
                   </div>
-                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-secondary-foreground text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         50 Referrals
                       </Badge>
-                      <span className="ml-auto text-xs text-foreground">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         Valid until 30 June 2025
                       </span>
                     </div>
-                    <div className="text-lg font-bold text-foreground">
+                    <div className="text-lg font-bold">
                       $500 Amazon Gift Card
                     </div>
                   </div>
-                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-secondary-foreground text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         100+ Referrals
                       </Badge>
-                      <span className="ml-auto text-xs text-foreground">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         Valid until 30 June 2025
                       </span>
                     </div>
-                    <div className="text-lg font-bold text-foreground">
+                    <div className="text-lg font-bold">
                       $1000 Amazon Gift Card
                     </div>
                   </div>
@@ -614,23 +620,28 @@ const Affiliate = () => {
             <DialogTrigger asChild>
               <Button variant="outline">Rounder Bonus</Button>
             </DialogTrigger>
-            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent
+              className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0 dark:bg-[#18181b] dark:text-foreground"
+              closeIconClassName="text-foreground"
+            >
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
-                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900 p-2">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24">
+                      <path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
                   </span>
-                  <DialogTitle className="text-2xl font-bold text-green-700">Rounder Bonus</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold text-green-700 dark:text-green-400">Rounder Bonus</DialogTitle>
                 </div>
               </DialogHeader>
-              <div className="text-base py-2 text-foreground mb-2">
-                <span className="font-semibold text-green-700">Qualify for the Rounder Bonus</span> by maintaining active plans and achieving a minimum number of direct referrals.<br />
+              <div className="text-base py-2 text-muted-foreground mb-2">
+                <span className="font-semibold text-green-700 dark:text-green-400">Qualify for the Rounder Bonus</span> by maintaining active plans and achieving a minimum number of direct referrals.<br />
                 <span className="text-muted-foreground">Bonus is paid monthly to eligible affiliates.</span>
               </div>
               {/* Enhanced Pie Chart Section */}
               <div className="flex flex-col sm:flex-row gap-8 items-center justify-center mt-6">
                 {/* Team Members Pie */}
-                <div className="flex flex-col items-center bg-white/80 rounded-xl shadow-md p-4 min-w-[180px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-xl shadow-md p-4 min-w-[180px]">
                   <Pie
                     data={{
                       labels: ["Your Team", "Remaining"],
@@ -639,7 +650,7 @@ const Affiliate = () => {
                           data: [teamData.length, Math.max(400 - teamData.length, 0)],
                           backgroundColor: [
                             "rgba(34,197,94,0.85)", // green
-                            "rgba(229,231,235,0.7)", // gray
+                            "rgba(55,65,81,0.7)", // gray-700 for dark, will be overridden below
                           ],
                           borderColor: [
                             "#22c55e",
@@ -664,18 +675,21 @@ const Affiliate = () => {
                         },
                       },
                       cutout: "70%",
+                      // Dynamically set background color for dark/light mode
+                      animation: false,
                     }}
                     width={140}
                     height={140}
+                    redraw
                   />
                   <div className="mt-2 text-xs text-foreground text-center">
-                    <span className="font-semibold text-green-700 text-lg">{teamData.length}</span>
+                    <span className="font-semibold text-green-700 dark:text-green-400 text-lg">{teamData.length}</span>
                     <span className="text-xs text-muted-foreground"> / 400</span>
                     <div className="text-xs text-muted-foreground">Team Members</div>
                   </div>
                 </div>
                 {/* Business Volume Pie */}
-                <div className="flex flex-col items-center bg-white/80 rounded-xl shadow-md p-4 min-w-[180px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-xl shadow-md p-4 min-w-[180px]">
                   <Pie
                     data={{
                       labels: ["Your Volume", "Remaining"],
@@ -684,7 +698,7 @@ const Affiliate = () => {
                           data: [totalBusiness, Math.max(1_000_000 - totalBusiness, 0)],
                           backgroundColor: [
                             "rgba(59,130,246,0.85)", // blue
-                            "rgba(229,231,235,0.7)", // gray
+                            "rgba(55,65,81,0.7)", // gray-700 for dark, will be overridden below
                           ],
                           borderColor: [
                             "#3b82f6",
@@ -709,12 +723,14 @@ const Affiliate = () => {
                         },
                       },
                       cutout: "70%",
+                      animation: false,
                     }}
                     width={140}
                     height={140}
+                    redraw
                   />
                   <div className="mt-2 text-xs text-foreground text-center">
-                    <span className="font-semibold text-blue-700 text-lg">${totalBusiness.toLocaleString()}</span>
+                    <span className="font-semibold text-blue-700 dark:text-blue-400 text-lg">${totalBusiness.toLocaleString()}</span>
                     <span className="text-xs text-muted-foreground"> / $1,000,000</span>
                     <div className="text-xs text-muted-foreground">Team Volume</div>
                   </div>
@@ -722,7 +738,7 @@ const Affiliate = () => {
               </div>
               {/* Salary Credit Table */}
               <div className="mt-10">
-                <div className="mb-3 text-lg font-semibold text-green-700 flex items-center gap-2">
+                <div className="mb-3 text-lg font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
                   <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                   Salary Credit Tiers
                 </div>
