@@ -19,6 +19,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
 
 interface TeamMember {
   id: string;
@@ -41,6 +49,18 @@ interface CommissionStructure {
   description: string;
 }
 
+interface Rank {
+  id: string;
+  title: string;
+  business_amount: number;
+  bonus: number;
+  created_at: string;
+  updated_at: string;
+  bonus_description: string;
+}
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
 const Affiliate = () => {
   const { profile, loading } = useUserProfile();
   const { toast } = useToast();
@@ -58,6 +78,9 @@ const Affiliate = () => {
   const [legendType, setLegendType] = useState<"investments" | "directCount">("investments");
   const [userDirectCount, setUserDirectCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [ranks, setRanks] = useState<Rank[]>([]);
+  const [rankPage, setRankPage] = useState(1);
+  const ranksPerPage = 6; // Show 6 items per page
 
   useEffect(() => {
     if (currentUser) return;
@@ -318,6 +341,22 @@ const Affiliate = () => {
     fetchTotalBusiness();
   }, []);
 
+  useEffect(() => {
+    const fetchRanks = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ranks')
+          .select('*')
+          .order('business_amount', { ascending: true });
+        if (error) throw error;
+        setRanks(data || []);
+      } catch (error) {
+        console.error('Error fetching ranks:', error);
+      }
+    };
+    fetchRanks();
+  }, []);
+
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink);
     toast({
@@ -363,12 +402,374 @@ const Affiliate = () => {
         </div>
       </div>
 
+      {/* --- Dialog Buttons Section --- */}
+      <div className="container max-w-[1000px] mx-auto px-4 mb-8">
+        <div className="flex flex-wrap gap-4 items-center mb-4">
+          {/* Download Brochure Button (direct download, no dialog) */}
+          <Button
+            variant="outline"
+            asChild
+          >
+            <a
+              href="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf_final.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+            >
+              Download Brochure
+            </a>
+          </Button>
+
+          {/* Commission Rates Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Commission Rates</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#3b82f6" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  </span>
+                  <DialogTitle className="text-2xl font-bold text-blue-700">Commission Rates</DialogTitle>
+                </div>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                {commissionStructure.length === 0 ? (
+                  <div className="text-secondary-foreground text-sm">No commission structure available.</div>
+                ) : (
+                  commissionStructure.map((level) => {
+                    // Count users in this level
+                    const count = teamData.filter(m => m.level === level.level).length;
+                    return (
+                      <div key={level.level} className="flex justify-between items-center p-2 rounded-md hover:bg-secondary-foreground transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">Level {level.level}</span>
+                          <span className="text-xs text-muted-foreground">{level.description}</span>
+                          <Badge className="ml-2" variant="secondary">
+                            {count} user{count !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        <span className="font-medium text-green-600">{level.percentage}%</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Rank Benefits Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Rank Benefits</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  </span>
+                  <DialogTitle className="text-2xl font-bold text-green-700">Rank Benefits</DialogTitle>
+                </div>
+              </DialogHeader>
+              <div className="py-2">
+                {ranks.length === 0 ? (
+                  <div className="text-secondary-foreground text-sm">No referral benefits available.</div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                    {ranks
+                      .slice((rankPage - 1) * ranksPerPage, rankPage * ranksPerPage)
+                      .map(rank => (
+                        <div
+                          key={rank.id}
+                          className="rounded-xl bg-secondary-foreground hover:bg-secondary-foreground/60 p-4 flex flex-col gap-2 shadow-sm"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge className="bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                              {rank.title}
+                            </Badge>
+                            <span className="ml-auto text-xs text-foreground">
+                              {rank.business_amount?.toLocaleString?.() ?? rank.business_amount} USD
+                            </span>
+                          </div>
+                          <div className="text-lg font-bold text-foreground">
+                            {rank.bonus?.toLocaleString?.() ?? rank.bonus} USD Bonus
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {rank.bonus_description}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {/* Pagination Controls */}
+                {ranks.length > ranksPerPage && (
+                  <div className="flex justify-between items-center mt-5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={rankPage === 1}
+                      onClick={() => setRankPage(p => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-foreground">
+                      Page {rankPage} of {Math.ceil(ranks.length / ranksPerPage)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={rankPage === Math.ceil(ranks.length / ranksPerPage) || ranks.length === 0}
+                      onClick={() => setRankPage(p => Math.min(Math.ceil(ranks.length / ranksPerPage), p + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Volume Benefits Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Referral Benefits</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#3b82f6" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  </span>
+                  <DialogTitle className="text-2xl font-bold text-blue-700">Referral Benefits</DialogTitle>
+                </div>
+              </DialogHeader>
+              <div className="py-2">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {/* Card for each volume benefit */}
+                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                        5 Referrals
+                      </Badge>
+                      <span className="ml-auto text-xs text-foreground">
+                        Valid until 30 June 2025
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      $30 Amazon Gift Card
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                        20 Referrals
+                      </Badge>
+                      <span className="ml-auto text-xs text-foreground">
+                        Valid until 30 June 2025
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      $200 Amazon Gift Card
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                        50 Referrals
+                      </Badge>
+                      <span className="ml-auto text-xs text-foreground">
+                        Valid until 30 June 2025
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      $500 Amazon Gift Card
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-secondary-foreground/10 bg-secondary-foreground/5 p-4 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                        100+ Referrals
+                      </Badge>
+                      <span className="ml-auto text-xs text-foreground">
+                        Valid until 30 June 2025
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-foreground">
+                      $1000 Amazon Gift Card
+                    </div>
+                  </div>
+                </div>
+                <ul className="list-disc pl-5 space-y-1 text-sm py-2 text-muted-foreground mt-4">
+                  <li>Earn extra rewards for reaching business volume milestones.</li>
+                  <li>Unlock new tiers and incentives as your network grows.</li>
+                </ul>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Rounder Bonus Dialog */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">Rounder Bonus</Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gradient-to-br from-blue-50 via-white to-green-50 text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+              <DialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  </span>
+                  <DialogTitle className="text-2xl font-bold text-green-700">Rounder Bonus</DialogTitle>
+                </div>
+              </DialogHeader>
+              <div className="text-base py-2 text-foreground mb-2">
+                <span className="font-semibold text-green-700">Qualify for the Rounder Bonus</span> by maintaining active plans and achieving a minimum number of direct referrals.<br />
+                <span className="text-muted-foreground">Bonus is paid monthly to eligible affiliates.</span>
+              </div>
+              {/* Enhanced Pie Chart Section */}
+              <div className="flex flex-col sm:flex-row gap-8 items-center justify-center mt-6">
+                {/* Team Members Pie */}
+                <div className="flex flex-col items-center bg-white/80 rounded-xl shadow-md p-4 min-w-[180px]">
+                  <Pie
+                    data={{
+                      labels: ["Your Team", "Remaining"],
+                      datasets: [
+                        {
+                          data: [teamData.length, Math.max(400 - teamData.length, 0)],
+                          backgroundColor: [
+                            "rgba(34,197,94,0.85)", // green
+                            "rgba(229,231,235,0.7)", // gray
+                          ],
+                          borderColor: [
+                            "#22c55e",
+                            "#e5e7eb"
+                          ],
+                          borderWidth: 2,
+                          hoverOffset: 8,
+                        },
+                      ],
+                    }}
+                    options={{
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          enabled: true,
+                          callbacks: {
+                            label: (ctx) =>
+                              ctx.label === "Your Team"
+                                ? `Your Team: ${teamData.length}`
+                                : `Remaining: ${Math.max(400 - teamData.length, 0)}`,
+                          },
+                        },
+                      },
+                      cutout: "70%",
+                    }}
+                    width={140}
+                    height={140}
+                  />
+                  <div className="mt-2 text-xs text-foreground text-center">
+                    <span className="font-semibold text-green-700 text-lg">{teamData.length}</span>
+                    <span className="text-xs text-muted-foreground"> / 400</span>
+                    <div className="text-xs text-muted-foreground">Team Members</div>
+                  </div>
+                </div>
+                {/* Business Volume Pie */}
+                <div className="flex flex-col items-center bg-white/80 rounded-xl shadow-md p-4 min-w-[180px]">
+                  <Pie
+                    data={{
+                      labels: ["Your Volume", "Remaining"],
+                      datasets: [
+                        {
+                          data: [totalBusiness, Math.max(1_000_000 - totalBusiness, 0)],
+                          backgroundColor: [
+                            "rgba(59,130,246,0.85)", // blue
+                            "rgba(229,231,235,0.7)", // gray
+                          ],
+                          borderColor: [
+                            "#3b82f6",
+                            "#e5e7eb"
+                          ],
+                          borderWidth: 2,
+                          hoverOffset: 8,
+                        },
+                      ],
+                    }}
+                    options={{
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          enabled: true,
+                          callbacks: {
+                            label: (ctx) =>
+                              ctx.label === "Your Volume"
+                                ? `Your Volume: $${totalBusiness.toLocaleString()}`
+                                : `Remaining: $${Math.max(1_000_000 - totalBusiness, 0).toLocaleString()}`,
+                          },
+                        },
+                      },
+                      cutout: "70%",
+                    }}
+                    width={140}
+                    height={140}
+                  />
+                  <div className="mt-2 text-xs text-foreground text-center">
+                    <span className="font-semibold text-blue-700 text-lg">${totalBusiness.toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground"> / $1,000,000</span>
+                    <div className="text-xs text-muted-foreground">Team Volume</div>
+                  </div>
+                </div>
+              </div>
+              {/* Salary Credit Table */}
+              <div className="mt-10">
+                <div className="mb-3 text-lg font-semibold text-green-700 flex items-center gap-2">
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                  Salary Credit Tiers
+                </div>
+                <table className="min-w-full text-sm border border-green-200 rounded-lg overflow-hidden shadow">
+                  <thead>
+                    <tr className="bg-green-50">
+                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Team Members</th>
+                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Team Volume</th>
+                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Salary Credit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="bg-green-100/60 font-semibold">
+                      <td className="px-3 py-2 text-green-800">400</td>
+                      <td className="px-3 py-2 text-green-800">1 Million</td>
+                      <td className="px-3 py-2 text-green-700 font-bold">$5,000 monthly</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-green-800">800</td>
+                      <td className="px-3 py-2 text-green-800">10 Million</td>
+                      <td className="px-3 py-2 text-green-700 font-semibold">$7,500 monthly</td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 text-green-800">2000</td>
+                      <td className="px-3 py-2 text-green-800">50 Million</td>
+                      <td className="px-3 py-2 text-green-700 font-semibold">$25,000 monthly</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-8 flex items-center justify-center">
+                <span className="inline-block bg-gradient-to-r from-green-400 to-blue-400 text-white px-4 py-2 rounded-full shadow font-semibold text-sm">
+                  Keep growing your team and volume to unlock higher rewards!
+                </span>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      {/* --- End Dialog Buttons Section --- */}
+
       {/* Main Content */}
       <div className="container max-w-[1000px] mx-auto px-4">
         <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
           {/* Left Sidebar - Only visible on desktop */}
           <div className="hidden lg:block space-y-4 sm:space-y-6">
-            <Card className="bg-card">
+            <Card className="bg-secondary">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle>Share with your Network</CardTitle>
               </CardHeader>
@@ -376,8 +777,8 @@ const Affiliate = () => {
                 <div className="space-y-2">
                   <Label>Referral Code</Label>
                   <div className="flex gap-2">
-                    <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
-                    <Button variant="outline" size="icon" onClick={() => {
+                    <Input value={referralCode} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
+                    <Button className="border border-border" variant="outline" size="icon" onClick={() => {
                       navigator.clipboard.writeText(referralCode);
                       toast({ title: "Copied!", description: "Referral code copied" });
                     }}>
@@ -396,8 +797,8 @@ const Affiliate = () => {
                 <div className="space-y-2">
                   <Label>Referral Link</Label>
                   <div className="flex gap-2">
-                    <Input value={referralLink} readOnly className="font-mono text-sm bg-muted" />
-                    <Button variant="outline" size="icon" onClick={copyReferralLink}>
+                    <Input value={referralLink} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
+                    <Button className="border border-border"  variant="outline" size="icon" onClick={copyReferralLink}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -413,7 +814,7 @@ const Affiliate = () => {
             </Card>
 
             {/* Move Commission Rates below share card in desktop */}
-            <Card className="bg-card">
+            <Card className="bg-secondary">
               <Accordion type="single" collapsible>
                 <AccordionItem value="commission-rates">
                   <AccordionTrigger className="px-4 sm:px-6">
@@ -426,7 +827,7 @@ const Affiliate = () => {
                       {commissionStructure.map((level) => (
                         <div 
                           key={level.level} 
-                          className="flex justify-between items-center p-2 rounded-md hover:bg-muted"
+                          className="flex justify-between items-center p-2 rounded-md hover:bg-secondary-foreground transition-colors"
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">Level {level.level}</span>
@@ -491,7 +892,7 @@ const Affiliate = () => {
           {/* Main Content Area */}
           <div className="space-y-4 sm:space-y-6 w-full pb-10">
             {/* Network Structure */}
-            <Card className="bg-card">
+            <Card className="bg-secondary">
               <CardHeader className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
@@ -501,8 +902,8 @@ const Affiliate = () => {
                         value={legendType}
                         onValueChange={(value) => setLegendType(value as "investments" | "directCount")}
                       >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Select legend type" />
+                        <SelectTrigger className="w-[180px] bg-secondary-foreground">
+                          <SelectValue placeholder="Select filter" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="investments">Investment Status</SelectItem>
