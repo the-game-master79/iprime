@@ -219,7 +219,7 @@ export const Topbar = ({
                       : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-light.svg"
                   }
                   alt="AI Trading"
-                  className="h-6 w-6"
+                  className="h-6 w-12"
                 />
               )}
               <h1 className="text-2xl font-semibold text-foreground">{title}</h1>

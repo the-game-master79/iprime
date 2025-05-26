@@ -374,7 +374,15 @@ const Login = () => {
                     {/* Badge at the top of the form */}
                     <div className="flex justify-center mb-4">
                       <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border border-border">
-                        Please verify original URL: https://cloudforex.club
+                        Please verify original URL:{" "}
+                        <a
+                          href="https://cloudforex.club"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline text-primary hover:text-primary/80"
+                        >
+                          https://cloudforex.club
+                        </a>
                       </span>
                     </div>
                     {/* Logo inside the form, at the top */}
@@ -630,7 +638,9 @@ const Login = () => {
               <Link to="/privacy" className="underline-offset-2 hover:underline text-primary">Privacy</Link>
             </p>
             <span className="mt-1 text-[11px] text-muted-foreground text-center">
-              CloudForex is an operator of commodities, currencies, crypto and indices only.
+              CloudForex is an operator of commodities, currencies, crypto and indices only.<br />
+              CloudForex doesn't provide financial advice, and all trading carries risk.<br />
+              We don't accept clients from USA, Iran, North Korea, Syria, Afghanistan, or any other sanctioned countries.<br />
             </span>
           </div>
         </div>

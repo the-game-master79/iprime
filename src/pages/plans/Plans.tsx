@@ -471,9 +471,9 @@ const Plans = () => {
                   <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is Compute?</h3>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is Auto-Trading?</h3>
               <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                AI-powered trading bot that executes trades automatically based on market analysis
+                It’s a GEN-AI system that trades on your behalf, maximizing profits while you relax.
               </p>
             </div>
 
@@ -483,9 +483,9 @@ const Plans = () => {
                   <DollarSign className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">Subscribe to Compute</h3>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">How do I get started?</h3>
               <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                Choose a compute plan that matches your investment goals and activate it
+                Simply subscribe to a trading plan that fits your goals and activate it in seconds.
               </p>
             </div>
 
@@ -495,9 +495,9 @@ const Plans = () => {
                   <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">Earn Daily</h3>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">When do I earn?</h3>
               <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                Get daily returns from your compute's trading activities automatically
+                You start receiving daily returns as soon as your AI begins trading.
               </p>
             </div>
           </div>
@@ -505,9 +505,9 @@ const Plans = () => {
           <Tabs defaultValue="available" className="space-y-8">
             <div className="flex items-center justify-between">
               <TabsList className="w-[600px">
-                <TabsTrigger value="available" className="flex-1">Available Computes</TabsTrigger>
+                <TabsTrigger value="available" className="flex-1">Auto-trades</TabsTrigger>
                 <TabsTrigger value="subscribed" className="flex-1 relative">
-                  Active Computes
+                  Your Autos
                   {subscribedPlans.length > 0 && (
                     <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
                       {subscribedPlans.length}
@@ -541,7 +541,7 @@ const Plans = () => {
               {subscribedPlans.length === 0 && !loading ? (
                 <div className="text-center py-12">
                   <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                  <h3 className="mt-4 text-lg font-medium">No Active Computes</h3>
+                  <h3 className="mt-4 text-lg font-medium">No Active Auto-Trades</h3>
                   <p className="mt-2 text-muted-foreground">
                     You haven't subscribed to any computes yet.
                   </p>

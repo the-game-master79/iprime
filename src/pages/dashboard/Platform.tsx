@@ -1,3 +1,10 @@
+// Add Tawk_API to the Window interface for TypeScript
+declare global {
+  interface Window {
+    Tawk_API?: any;
+  }
+}
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -124,7 +131,8 @@ const getPriceChangeClass = (isUp?: boolean) => {
 const renderPriceWithBigDigits = (
   value: number | undefined,
   decimals: number,
-  marketClosed?: boolean
+  marketClosed?: boolean,
+  isUp?: boolean
 ) => {
   if (marketClosed) {
     return <span className="text-xs text-destructive font-semibold">Market Closed</span>;
@@ -280,6 +288,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
   // Add state for live prices (now storing price and isPriceUp)
   const [marketPrices, setMarketPrices] = useState<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
+  const [priceChangeDirection, setPriceChangeDirection] = useState<Record<string, boolean | undefined>>({});
 
   // Debounced market price update ref
   const marketPricesRef = React.useRef(marketPrices);
@@ -896,10 +905,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     if (cryptoData.length === 0 && forexData.length === 0) return;
 
     const ws = new WebSocket('wss://transfers.cloudforex.club/ws');
-    let isOpen = false;
 
     ws.onopen = () => {
-      isOpen = true;
       // No need to subscribe to symbols; data is received automatically.
     };
 
@@ -912,28 +919,33 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
           data.data?.ask;
         if (data.symbol && price) {
           const symbol = data.symbol.toUpperCase();
-          const prevPrice = parseFloat(marketPricesRef.current[symbol]?.price || "0");
+          const prevPrice = parseFloat(marketPrices[symbol]?.price || "0");
           const newPrice = parseFloat(price);
 
-          // Batch updates in pendingUpdatesRef
-          pendingUpdatesRef.current[symbol] = {
-            price: price.toString(),
-            bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
-            ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
-            isPriceUp: newPrice > prevPrice
-          };
+          setMarketPrices(prev => ({
+            ...prev,
+            [symbol]: {
+              price: price.toString(),
+              bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
+              ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
+              isPriceUp: newPrice > prevPrice
+            }
+          }));
 
-          // Debounce with requestAnimationFrame
-          if (rafRef.current === null) {
-            rafRef.current = window.requestAnimationFrame(() => {
-              setMarketPrices(prev => ({
-                ...prev,
-                ...pendingUpdatesRef.current
-              }));
-              pendingUpdatesRef.current = {};
-              rafRef.current = null;
+          setPriceChangeDirection(prev => ({
+            ...prev,
+            [symbol]: newPrice > prevPrice ? true : newPrice < prevPrice ? false : prev[symbol]
+          }));
+
+          // Remove color after 1s
+          setTimeout(() => {
+            setPriceChangeDirection(prev => {
+              if (prev[symbol] === undefined) return prev;
+              const next = { ...prev };
+              delete next[symbol];
+              return next;
             });
-          }
+          }, 1000);
         }
       } catch (e) {}
     };
@@ -942,12 +954,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     ws.onclose = () => {};
 
     return () => {
-      if (isOpen) ws.close();
-      if (rafRef.current !== null) {
-        window.cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      pendingUpdatesRef.current = {};
+      ws.close();
     };
   }, [cryptoData, forexData]);
 
@@ -1078,16 +1085,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                             <div className="flex items-center gap-2">
                               {/* AI Trading Box with "AI" text, no fill, only stroke */}
                               <div
-                                className="flex items-center justify-center h-8 w-8 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
+                                className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
                               >
                                   <span
-                                    className="text-base font-bold uppercase text-foreground"
+                                    className="text-xs font-bold uppercase text-foreground"
                                     style={{
                                       color: "currentColor", // fill color (inside)
                                       letterSpacing: "0.05em"
                                     }}
                                   >
-                                    AI
+                                    AUTO
                                   </span>
                               </div>
                               <span className="text-sm text-foreground">Trading</span>
@@ -1140,7 +1147,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                         >
                           {/* AI Trading Button Icon */}
                           <div
-                            className="flex items-center justify-center h-6 w-6 border-2 border-foreground rounded-lg"
+                            className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg"
                           >
                               <span
                                 className="text-xs font-bold uppercase !text-foreground"
@@ -1149,7 +1156,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                                   letterSpacing: "0.05em"
                                 }}
                               >
-                                AI
+                                AUTO
                               </span>
                           </div>
                         </Button>
@@ -1737,6 +1744,25 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+
+  // Inject Tawk.to script only on this page
+  useEffect(() => {
+    // Prevent duplicate script injection
+    if (document.getElementById('tawkto-script')) return;
+    const s1 = document.createElement("script");
+    s1.id = "tawkto-script";
+    s1.async = true;
+    s1.src = 'https://embed.tawk.to/68333d55cb17ed190c9f7bc7/1is42f5u1';
+    s1.charset = 'UTF-8';
+    s1.setAttribute('crossorigin', '*');
+    document.body.appendChild(s1);
+    // Optional: cleanup on unmount
+    return () => {
+      if (s1.parentNode) s1.parentNode.removeChild(s1);
+      // Remove Tawk_API global if needed
+      if (window.Tawk_API) delete window.Tawk_API;
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
