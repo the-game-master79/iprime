@@ -14,7 +14,9 @@ import {
   SignOut as LogOutIcon,
   Sun as SunIcon,
   Moon as MoonIcon,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  ChatCenteredDots as ChatIcon,
+  ArrowSquareOut as ExternalLinkIcon,
 } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase"; // Make sure this import exists
 import { Button } from "@/components/ui/button";
@@ -1016,7 +1018,7 @@ const Profile = () => {
                         <Button 
                           type="submit" 
                           disabled={isUpdatingPersonal || !userData.phone || !userData.address || !userData.city || !userData.country || !userData.fullName} 
-                          className="mt-6 bg-primary text-white"
+                          className="mt-6 bg-primary text-white min-h-[44px] min-w-[44px]"
                         >
                           {isUpdatingPersonal ? "Processing..." : (
                             <>
@@ -1088,7 +1090,7 @@ const Profile = () => {
                           <Button 
                             onClick={handleReferralSubmit}
                             disabled={!referralCode || !referrerName || isSubmittingReferral}
-                            className="bg-primary text-white"
+                            className="bg-primary text-white min-h-[44px] min-w-[44px]"
                           >
                             {isSubmittingReferral ? "Adding..." : "Add Referral"}
                           </Button>
@@ -1450,17 +1452,39 @@ const Profile = () => {
         </main>
 
         {/* Update logout container */}
-        <div className="container mx-auto max-w-[1000px] py-6 border-t border-secondary mt-8">
+        <div className="container mx-auto max-w-[1000px] py-6 border-t border-secondary mt-8 flex flex-row gap-4 items-center justify-between">
+          <Button
+            variant="secondary"
+            className="flex items-center gap-2 order-2 sm:order-1"
+            onClick={() => {
+              // Always open chat in a mobile-sized window
+              const width = 420;
+              const height = 700;
+              const left = window.screenX + (window.outerWidth - width) / 2;
+              const top = window.screenY + (window.outerHeight - height) / 2;
+              window.open(
+                "https://tawk.to/chat/68333d55cb17ed190c9f7bc7/1is42f5u1",
+                "_blank",
+                `width=${width},height=${height},left=${left},top=${top},resizable,scrollbars`
+              );
+            }}
+            type="button"
+          >
+            <ChatIcon className="h-4 w-4" weight="regular" />
+            Support Chat
+            <ExternalLinkIcon className="h-4 w-4 ml-1" weight="regular" />
+          </Button>
           <Button 
             variant="destructive" 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-white"
+            className="flex items-center gap-2 text-white order-1 sm:order-2"
           >
             <LogOutIcon className="h-4 w-4 text-white" weight="regular"/>
             Logout
           </Button>
         </div>
       </div>
+      {/* Remove Tawk.to overlay logic, as chat now opens in a new tab */}
     </>
   );
 };

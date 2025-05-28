@@ -1121,7 +1121,7 @@ const TradingStation = () => {
                 variant="destructive"
                 size="sm"
                 onClick={() => g.trades.forEach((t) => handleCloseTrade(t))}
-                className="w-full"
+                className="w-full min-h-[44px] min-w-[44px]"
                 disabled={isForexTrade(g.trades[0]) && !isForexMarketOpen}
                 title={
                   isForexTrade(g.trades[0]) && !isForexMarketOpen

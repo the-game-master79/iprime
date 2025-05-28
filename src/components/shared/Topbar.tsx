@@ -166,9 +166,12 @@ export const Topbar = ({
               {!hideBalance && (
                 <div
                   onClick={handleBalanceClick}
-                  className="flex items-center gap-2 rounded-full bg-secondary-foreground px-2 py-1.5 shadow-sm cursor-pointer"
+                  className="flex items-center gap-2 rounded-full bg-secondary-foreground px-2 py-1.5 shadow-sm cursor-pointer min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Go to Cashier"
                 >
-                  <WalletIcon className="h-4 w-4 text-primary" weight="fill" />
+                  <WalletIcon className="h-5 w-5 text-primary" weight="fill" />
                   <span className="text-sm font-medium text-foreground">
                     {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
@@ -179,7 +182,7 @@ export const Topbar = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-lg bg-secondary-foreground text-primary hover:bg-secondary"
+                className="rounded-lg bg-secondary-foreground text-primary hover:bg-secondary min-h-[44px] min-w-[44px]"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 aria-label="Toggle theme"
               >
@@ -193,8 +196,9 @@ export const Topbar = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              className="rounded-lg bg-secondary hover:bg-secondary-foreground"
+              className="rounded-lg bg-secondary hover:bg-secondary-foreground min-h-[44px] min-w-[44px]"
               onClick={() => navigate('/profile')}
+              aria-label="Go to Profile"
             >
               <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
                 <AvatarFallback className="bg-primary rounded-lg">

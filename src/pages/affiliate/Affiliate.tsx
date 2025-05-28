@@ -80,7 +80,7 @@ const Affiliate = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [rankPage, setRankPage] = useState(1);
-  const ranksPerPage = 6; // Show 6 items per page
+  const [ranksPerPage, setRanksPerPage] = useState(3); // Default to 3 for mobile
 
   useEffect(() => {
     if (currentUser) return;
@@ -464,9 +464,7 @@ const Affiliate = () => {
             <DialogTrigger asChild>
               <Button variant="outline">Rank Benefits</Button>
             </DialogTrigger>
-            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0"
-              closeIconClassName="text-foreground"
-            >
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
@@ -621,27 +619,27 @@ const Affiliate = () => {
               <Button variant="outline">Rounder Bonus</Button>
             </DialogTrigger>
             <DialogContent
-              className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0 dark:bg-[#18181b] dark:text-foreground"
+              className="bg-secondary text-foreground max-w-md w-full shadow-2xl rounded-xl border-0 dark:bg-[#18181b] dark:text-foreground px-2 py-3 sm:px-4 sm:py-6"
               closeIconClassName="text-foreground"
             >
               <DialogHeader>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900 p-2">
-                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-900 p-1.5">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
                       <path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                     </svg>
                   </span>
-                  <DialogTitle className="text-2xl font-bold text-green-700 dark:text-green-400">Rounder Bonus</DialogTitle>
+                  <DialogTitle className="text-lg font-bold text-green-700 dark:text-green-400">Rounder Bonus</DialogTitle>
                 </div>
               </DialogHeader>
-              <div className="text-base py-2 text-muted-foreground mb-2">
+              <div className="text-sm py-1 text-muted-foreground mb-1">
                 <span className="font-semibold text-green-700 dark:text-green-400">Qualify for the Rounder Bonus</span> by maintaining active plans and achieving a minimum number of direct referrals.<br />
                 <span className="text-muted-foreground">Bonus is paid monthly to eligible affiliates.</span>
               </div>
-              {/* Enhanced Pie Chart Section */}
-              <div className="flex flex-col sm:flex-row gap-8 items-center justify-center mt-6">
+              {/* Charts always side by side */}
+              <div className="flex flex-row gap-4 items-center justify-center mt-3">
                 {/* Team Members Pie */}
-                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-xl shadow-md p-4 min-w-[180px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px]">
                   <Pie
                     data={{
                       labels: ["Your Team", "Remaining"],
@@ -649,15 +647,15 @@ const Affiliate = () => {
                         {
                           data: [teamData.length, Math.max(400 - teamData.length, 0)],
                           backgroundColor: [
-                            "rgba(34,197,94,0.85)", // green
-                            "rgba(55,65,81,0.7)", // gray-700 for dark, will be overridden below
+                            "rgba(34,197,94,0.85)",
+                            "rgba(55,65,81,0.7)",
                           ],
                           borderColor: [
                             "#22c55e",
                             "#e5e7eb"
                           ],
-                          borderWidth: 2,
-                          hoverOffset: 8,
+                          borderWidth: 1.5,
+                          hoverOffset: 6,
                         },
                       ],
                     }}
@@ -675,21 +673,20 @@ const Affiliate = () => {
                         },
                       },
                       cutout: "70%",
-                      // Dynamically set background color for dark/light mode
                       animation: false,
                     }}
-                    width={140}
-                    height={140}
+                    width={90}
+                    height={90}
                     redraw
                   />
-                  <div className="mt-2 text-xs text-foreground text-center">
-                    <span className="font-semibold text-green-700 dark:text-green-400 text-lg">{teamData.length}</span>
+                  <div className="mt-1 text-xs text-foreground text-center">
+                    <span className="font-semibold text-green-700 dark:text-green-400">{teamData.length}</span>
                     <span className="text-xs text-muted-foreground"> / 400</span>
-                    <div className="text-xs text-muted-foreground">Team Members</div>
+                    <div className="text-xs text-muted-foreground">Team</div>
                   </div>
                 </div>
                 {/* Business Volume Pie */}
-                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-xl shadow-md p-4 min-w-[180px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px]">
                   <Pie
                     data={{
                       labels: ["Your Volume", "Remaining"],
@@ -697,15 +694,15 @@ const Affiliate = () => {
                         {
                           data: [totalBusiness, Math.max(1_000_000 - totalBusiness, 0)],
                           backgroundColor: [
-                            "rgba(59,130,246,0.85)", // blue
-                            "rgba(55,65,81,0.7)", // gray-700 for dark, will be overridden below
+                            "rgba(59,130,246,0.85)",
+                            "rgba(55,65,81,0.7)",
                           ],
                           borderColor: [
                             "#3b82f6",
                             "#e5e7eb"
                           ],
-                          borderWidth: 2,
-                          hoverOffset: 8,
+                          borderWidth: 1.5,
+                          hoverOffset: 6,
                         },
                       ],
                     }}
@@ -725,53 +722,53 @@ const Affiliate = () => {
                       cutout: "70%",
                       animation: false,
                     }}
-                    width={140}
-                    height={140}
+                    width={90}
+                    height={90}
                     redraw
                   />
-                  <div className="mt-2 text-xs text-foreground text-center">
-                    <span className="font-semibold text-blue-700 dark:text-blue-400 text-lg">${totalBusiness.toLocaleString()}</span>
-                    <span className="text-xs text-muted-foreground"> / $1,000,000</span>
-                    <div className="text-xs text-muted-foreground">Team Volume</div>
+                  <div className="mt-1 text-xs text-foreground text-center">
+                    <span className="font-semibold text-blue-700 dark:text-blue-400">${totalBusiness.toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground"> / $1M</span>
+                    <div className="text-xs text-muted-foreground">Volume</div>
                   </div>
                 </div>
               </div>
-              {/* Salary Credit Table */}
-              <div className="mt-10">
-                <div className="mb-3 text-lg font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+              {/* Compact Salary Credit Table */}
+              <div className="mt-5">
+                <div className="mb-2 text-base font-semibold text-green-700 dark:text-green-400 flex items-center gap-1">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                   Salary Credit Tiers
                 </div>
-                <table className="min-w-full text-sm border border-green-200 rounded-lg overflow-hidden shadow">
+                <table className="min-w-full text-xs border border-green-200 rounded overflow-hidden shadow">
                   <thead>
                     <tr className="bg-green-50">
-                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Team Members</th>
-                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Team Volume</th>
-                      <th className="px-3 py-2 text-left font-semibold text-green-700 border-b">Salary Credit</th>
+                      <th className="px-2 py-1 text-left font-semibold text-green-700 border-b">Team</th>
+                      <th className="px-2 py-1 text-left font-semibold text-green-700 border-b">Volume</th>
+                      <th className="px-2 py-1 text-left font-semibold text-green-700 border-b">Salary</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="bg-green-100/60 font-semibold">
-                      <td className="px-3 py-2 text-green-800">400</td>
-                      <td className="px-3 py-2 text-green-800">1 Million</td>
-                      <td className="px-3 py-2 text-green-700 font-bold">$5,000 monthly</td>
+                      <td className="px-2 py-1 text-green-800">400</td>
+                      <td className="px-2 py-1 text-green-800">1M</td>
+                      <td className="px-2 py-1 text-green-700 font-bold">$5,000/mo</td>
                     </tr>
                     <tr>
-                      <td className="px-3 py-2 text-green-800">800</td>
-                      <td className="px-3 py-2 text-green-800">10 Million</td>
-                      <td className="px-3 py-2 text-green-700 font-semibold">$7,500 monthly</td>
+                      <td className="px-2 py-1 text-green-800">800</td>
+                      <td className="px-2 py-1 text-green-800">10M</td>
+                      <td className="px-2 py-1 text-green-700 font-semibold">$7,500/mo</td>
                     </tr>
                     <tr>
-                      <td className="px-3 py-2 text-green-800">2000</td>
-                      <td className="px-3 py-2 text-green-800">50 Million</td>
-                      <td className="px-3 py-2 text-green-700 font-semibold">$25,000 monthly</td>
+                      <td className="px-2 py-1 text-green-800">2000</td>
+                      <td className="px-2 py-1 text-green-800">50M</td>
+                      <td className="px-2 py-1 text-green-700 font-semibold">$25,000/mo</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div className="mt-8 flex items-center justify-center">
-                <span className="inline-block bg-gradient-to-r from-green-400 to-blue-400 text-white px-4 py-2 rounded-full shadow font-semibold text-sm">
-                  Keep growing your team and volume to unlock higher rewards!
+              <div className="mt-4 flex items-center justify-center">
+                <span className="inline-block bg-gradient-to-r from-green-400 to-blue-400 text-white px-3 py-1.5 rounded-full shadow font-semibold text-xs">
+                  Grow your team &amp; volume to unlock rewards!
                 </span>
               </div>
             </DialogContent>
@@ -870,10 +867,14 @@ const Affiliate = () => {
                   <Label>Referral Code</Label>
                   <div className="flex gap-2">
                     <Input value={referralCode} readOnly className="font-mono text-sm bg-muted" />
-                    <Button variant="outline" size="icon" onClick={() => {
-                      navigator.clipboard.writeText(referralCode);
-                      toast({ title: "Copied!", description: "Referral code copied" });
-                    }}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="min-h-[44px] min-w-[44px]"
+                      onClick={() => {
+                        navigator.clipboard.writeText(referralCode);
+                        toast({ title: "Copied!", description: "Referral code copied" });
+                      }}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
@@ -890,7 +891,11 @@ const Affiliate = () => {
                   <Label>Referral Link</Label>
                   <div className="flex gap-2">
                     <Input value={referralLink} readOnly className="font-mono text-sm bg-muted" />
-                    <Button variant="outline" size="icon" onClick={copyReferralLink}>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="min-h-[44px] min-w-[44px]"
+                      onClick={copyReferralLink}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>

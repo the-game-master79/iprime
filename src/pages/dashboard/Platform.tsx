@@ -1047,189 +1047,284 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
 
               {/* Balance Container */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Combined Balance Card */}
-                <div className="md:col-span-2 bg-secondary border border-border rounded-2xl p-6">
-                  <div className="flex flex-col gap-6">
-                    {/* Balances Section */}
-                    <div className="flex flex-col md:flex-row gap-6">
-                      {/* Available Balance */}
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Wallet className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Available Balance</span>
-                        </div>
-                        <div className="space-y-1">
-                          <h3 className="text-3xl font-medium">
-                            {withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                          </h3>
-                          {userProfile?.multiplier_bonus > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              Including bonus: {(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* AI Trading Balance */}
-                      <div className="flex-1">
-                        {/* Add hover effect: scale and shadow */}
-                        <div
-                          className="rounded-lg bg-secondary-foreground p-4 transition-transform duration-200 hover:scale-[1.03] hover:shadow-lg group cursor-pointer"
-                          tabIndex={0}
-                          title="View AI Trading Plans"
-                          onClick={() => navigate('/plans')}
-                          onKeyDown={e => { if (e.key === 'Enter') navigate('/plans'); }}
-                          style={{ outline: "none" }}
+                {/* Show Invest First Container if both balances are zero */}
+                {withdrawalBalance === 0 && totalInvested === 0 ? (
+                  <>
+                    <div className="md:col-span-2">
+                      <div className="flex flex-col items-center justify-center bg-gradient-to-br from-primary/90 via-blue-400/80 to-secondary-foreground/80 border-2 border-primary/60 rounded-2xl p-10 shadow-xl text-center relative overflow-hidden">
+                        {/* Decorative background shapes */}
+                        <div className="absolute -top-10 -left-10 w-40 h-40 bg-primary/10 rounded-full blur-2xl z-0" />
+                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl z-0" />
+                        <svg width="72" height="72" fill="none" viewBox="0 0 64 64" className="mb-4 z-10">
+                          <circle cx="32" cy="32" r="32" fill="#F3F4F6"/>
+                          <path d="M32 18v28M18 32h28" stroke="#6366F1" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        <h2 className="text-3xl font-extrabold mb-2 text-foreground z-10 drop-shadow-lg">No Investments Yet</h2>
+                        <p className="text-base text-secondary mb-6 z-10">
+                          Start your journey by investing in an <span className="font-semibold text-primary">AI Trading Plan</span>.<br />
+                          Your available balance and trading balance will appear here after your first investment.
+                        </p>
+                        <Button
+                          className="bg-gradient-to-r from-primary to-blue-500 text-white px-10 py-3 rounded-xl text-lg font-bold shadow-lg hover:scale-105 transition"
+                          onClick={() => navigate('/cashier')}
                         >
-                          <div className="flex items-center justify-between mb-2">
+                          <span className="mr-2">🚀</span> Invest Now
+                        </Button>
+                        <div className="absolute inset-0 pointer-events-none z-0" />
+                      </div>
+                    </div>
+                    {/* Always show Affiliate Rank Card, even if zero */}
+                    <div className="bg-secondary rounded-2xl p-6">
+                      <div className="h-full flex flex-col justify-between">
+                        {/* Top: Affiliate Status */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Affiliate Status</span>
+                          </div>
+                          <div className="space-y-1">
+                            <h3 className="text-3xl font-medium">
+                              {businessStats.currentRank || 'New Member'}
+                            </h3>
+                          </div>
+                        </div>
+                        
+                        {/* Business Volume & Directs Row */}
+                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                          {/* Business Volume Container */}
+                          <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
+                            <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
+                            <span className="text-lg font-semibold text-foreground">
+                              {businessStats.totalVolume.toLocaleString()} USD
+                            </span>
+                          </div>
+                          {/* Directs Container with dialog trigger */}
+                          <div
+                            className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
+                            onClick={handleDirectsClick}
+                            title="View Direct Referral Status"
+                          >
+                            <span className="text-xs text-muted-foreground mb-1">Directs</span>
+                            <span className={cn(
+                              "text-lg font-semibold",
+                              directCount >= 2 ? "text-[#20BF55]" : 
+                              directCount === 1 ? "text-[#FFA500]" : 
+                              "text-[#FF005C]"
+                            )}>
+                              {directCount}/2
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Progress to Next Rank - Moved to bottom */}
+                        {businessStats.nextRank && (
+                          <div className="space-y-2 mt-auto pt-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
+                              <span>
+                                {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all duration-500"
+                                style={{ 
+                                  width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Combined Balance Card */}
+                    <div className="md:col-span-2 bg-secondary border border-border rounded-2xl p-6">
+                      <div className="flex flex-col gap-6">
+                        {/* Balances Section */}
+                        <div className="flex flex-col md:flex-row gap-6">
+                          {/* Available Balance */}
+                          <div className="flex-1 space-y-2">
                             <div className="flex items-center gap-2">
-                              {/* AI Trading Box with "AI" text, no fill, only stroke */}
+                              <Wallet className="h-5 w-5 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Available Balance</span>
+                            </div>
+                            <div className="space-y-1">
+                              <h3 className="text-3xl font-medium">
+                                {withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                              </h3>
+                              {userProfile?.multiplier_bonus > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Including bonus: {(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* AI Trading Balance */}
+                          <div className="flex-1">
+                            {/* Add hover effect: scale and shadow */}
+                            <div
+                              className="rounded-lg bg-secondary-foreground p-4 transition-transform duration-200 hover:scale-[1.03] hover:shadow-lg group cursor-pointer"
+                              tabIndex={0}
+                              title="View AI Trading Plans"
+                              onClick={() => navigate('/plans')}
+                              onKeyDown={e => { if (e.key === 'Enter') navigate('/plans'); }}
+                              style={{ outline: "none" }}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  {/* AI Trading Box with "AI" text, no fill, only stroke */}
+                                  <div
+                                    className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
+                                  >
+                                      <span
+                                        className="text-xs font-bold uppercase text-foreground"
+                                        style={{
+                                          color: "currentColor", // fill color (inside)
+                                          letterSpacing: "0.05em"
+                                        }}
+                                      >
+                                        AUTO
+                                      </span>
+                                  </div>
+                                  <span className="text-sm text-foreground">Trading</span>
+                                </div>
+                                <span className="text-xs bg-background/20 text-foreground px-2 py-1 rounded-full">
+                                  {activePlans.count} {activePlans.count === 1 ? 'Plan' : 'Plans'}
+                                </span>
+                              </div>
+                              <h3 className="text-3xl font-medium">
+                                {totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons Row - horizontal row for mobile, grid for desktop */}
+                        <div className="flex flex-row gap-3 md:grid md:grid-cols-4 md:gap-3 mt-2" key={theme}>
+                          {/* Common container buttons with icon/logo only, label below */}
+                          <div className="flex flex-col items-center h-full w-full">
+                            <Button 
+                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-primary"
+                              onClick={() => navigate('/tradingstation')}
+                            >
+                              <ChartLine className="h-10 w-10 text-foreground" weight="duotone" />
+                            </Button>
+                            <span className="mt-2 text-sm font-medium text-foreground">Trade</span>
+                          </div>
+                          <div className="flex flex-col items-center h-full w-full">
+                            <Button 
+                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                              onClick={() => navigate('/cashier')}
+                            >
+                              <ArrowDown className="h-10 w-10 text-foreground" weight="duotone" />
+                            </Button>
+                            <span className="mt-2 text-sm font-medium text-foreground">Cashier</span>
+                          </div>
+                          <div className="flex flex-col items-center h-full w-full">
+                            <Button
+                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                              onClick={() => navigate('/affiliate')}
+                            >
+                              <Users className="h-10 w-10 text-foreground" weight="duotone" />
+                            </Button>
+                            <span className="mt-2 text-sm font-medium text-foreground">Affiliates</span>
+                          </div>
+                          <div className="flex flex-col items-center h-full w-full">
+                            <Button 
+                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
+                              onClick={() => navigate('/plans')}
+                            >
+                              {/* AI Trading Button Icon */}
                               <div
-                                className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
+                                className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg"
                               >
                                   <span
-                                    className="text-xs font-bold uppercase text-foreground"
+                                    className="text-xs font-bold uppercase !text-foreground"
                                     style={{
-                                      color: "currentColor", // fill color (inside)
+                                      color: "currentColor",
                                       letterSpacing: "0.05em"
                                     }}
                                   >
                                     AUTO
                                   </span>
                               </div>
-                              <span className="text-sm text-foreground">Trading</span>
-                            </div>
-                            <span className="text-xs bg-background/20 text-foreground px-2 py-1 rounded-full">
-                              {activePlans.count} {activePlans.count === 1 ? 'Plan' : 'Plans'}
+                            </Button>
+                            <span className="mt-2 text-sm font-medium text-foreground">Trading</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Affiliate Rank Card */}
+                    <div className="bg-secondary rounded-2xl p-6">
+                      <div className="h-full flex flex-col justify-between">
+                        {/* Top: Affiliate Status */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Affiliate Status</span>
+                          </div>
+                          <div className="space-y-1">
+                            <h3 className="text-3xl font-medium">
+                              {businessStats.currentRank || 'New Member'}
+                            </h3>
+                          </div>
+                        </div>
+                        
+                        {/* Business Volume & Directs Row */}
+                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                          {/* Business Volume Container */}
+                          <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
+                            <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
+                            <span className="text-lg font-semibold text-foreground">
+                              {businessStats.totalVolume.toLocaleString()} USD
                             </span>
                           </div>
-                          <h3 className="text-3xl font-medium">
-                            {totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                          </h3>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons Row - horizontal row for mobile, grid for desktop */}
-                    <div className="flex flex-row gap-3 md:grid md:grid-cols-4 md:gap-3 mt-2" key={theme}>
-                      {/* Common container buttons with icon/logo only, label below */}
-                      <div className="flex flex-col items-center h-full w-full">
-                        <Button 
-                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                          onClick={() => navigate('/tradingstation')}
-                        >
-                          <ChartLine className="h-10 w-10 text-foreground" weight="duotone" />
-                        </Button>
-                        <span className="mt-2 text-sm font-medium text-foreground">Trade</span>
-                      </div>
-                      <div className="flex flex-col items-center h-full w-full">
-                        <Button 
-                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                          onClick={() => navigate('/cashier')}
-                        >
-                          <ArrowDown className="h-10 w-10 text-foreground" weight="duotone" />
-                        </Button>
-                        <span className="mt-2 text-sm font-medium text-foreground">Add Funds</span>
-                      </div>
-                      <div className="flex flex-col items-center h-full w-full">
-                        <Button
-                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                          onClick={() => navigate('/affiliate')}
-                        >
-                          <Users className="h-10 w-10 text-foreground" weight="duotone" />
-                        </Button>
-                        <span className="mt-2 text-sm font-medium text-foreground">Affiliates</span>
-                      </div>
-                      <div className="flex flex-col items-center h-full w-full">
-                        <Button 
-                          className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                          onClick={() => navigate('/plans')}
-                        >
-                          {/* AI Trading Button Icon */}
+                          {/* Directs Container with dialog trigger */}
                           <div
-                            className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg"
+                            className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
+                            onClick={handleDirectsClick}
+                            title="View Direct Referral Status"
                           >
-                              <span
-                                className="text-xs font-bold uppercase !text-foreground"
-                                style={{
-                                  color: "currentColor",
-                                  letterSpacing: "0.05em"
-                                }}
-                              >
-                                AUTO
-                              </span>
+                            <span className="text-xs text-muted-foreground mb-1">Directs</span>
+                            <span className={cn(
+                              "text-lg font-semibold",
+                              directCount >= 2 ? "text-[#20BF55]" : 
+                              directCount === 1 ? "text-[#FFA500]" : 
+                              "text-[#FF005C]"
+                            )}>
+                              {directCount}/2
+                            </span>
                           </div>
-                        </Button>
-                        <span className="mt-2 text-sm font-medium text-foreground">Trading</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Affiliate Rank Card */}
-                <div className="bg-secondary rounded-2xl p-6">
-                  <div className="h-full flex flex-col justify-between">
-                    {/* Top: Affiliate Status */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Trophy className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Affiliate Status</span>
-                      </div>
-                      <div className="space-y-1">
-                        <h3 className="text-3xl font-medium">
-                          {businessStats.currentRank || 'New Member'}
-                        </h3>
-                      </div>
-                    </div>
-                    
-                    {/* Business Volume & Directs Row */}
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                      {/* Business Volume Container */}
-                      <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
-                        <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
-                        <span className="text-lg font-semibold text-foreground">
-                          {businessStats.totalVolume.toLocaleString()} USD
-                        </span>
-                      </div>
-                      {/* Directs Container with dialog trigger */}
-                      <div
-                        className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
-                        onClick={handleDirectsClick}
-                        title="View Direct Referral Status"
-                      >
-                        <span className="text-xs text-muted-foreground mb-1">Directs</span>
-                        <span className={cn(
-                          "text-lg font-semibold",
-                          directCount >= 2 ? "text-[#20BF55]" : 
-                          directCount === 1 ? "text-[#FFA500]" : 
-                          "text-[#FF005C]"
-                        )}>
-                          {directCount}/2
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Progress to Next Rank - Moved to bottom */}
-                    {businessStats.nextRank && (
-                      <div className="space-y-2 mt-auto pt-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
-                          <span>
-                            {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
-                          </span>
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-500"
-                            style={{ 
-                              width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
-                            }}
-                          />
-                        </div>
+
+                        {/* Progress to Next Rank - Moved to bottom */}
+                        {businessStats.nextRank && (
+                          <div className="space-y-2 mt-auto pt-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
+                              <span>
+                                {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
+                              </span>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all duration-500"
+                                style={{ 
+                                  width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Redesigned Markets Section as Table */}
@@ -1744,25 +1839,6 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-
-  // Inject Tawk.to script only on this page
-  useEffect(() => {
-    // Prevent duplicate script injection
-    if (document.getElementById('tawkto-script')) return;
-    const s1 = document.createElement("script");
-    s1.id = "tawkto-script";
-    s1.async = true;
-    s1.src = 'https://embed.tawk.to/68333d55cb17ed190c9f7bc7/1is42f5u1';
-    s1.charset = 'UTF-8';
-    s1.setAttribute('crossorigin', '*');
-    document.body.appendChild(s1);
-    // Optional: cleanup on unmount
-    return () => {
-      if (s1.parentNode) s1.parentNode.removeChild(s1);
-      // Remove Tawk_API global if needed
-      if (window.Tawk_API) delete window.Tawk_API;
-    };
-  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
