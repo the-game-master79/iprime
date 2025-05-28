@@ -45,7 +45,7 @@ export const Hero = ({ badge, badges, title, description, action, lottie }: Hero
                   {/* CPU Power Badge */}
                   <div className="inline-flex items-center rounded-full bg-orange-500/10 px-3 py-1 text-sm font-medium text-orange-400">
                     <Cpu className="h-4 w-4" />
-                    <span className="ml-2">2X CPU Power</span>
+                    <span className="ml-2">18X CPU Power</span>
                   </div>
                   {/* Active Users Badge */}
                   <div className="inline-flex items-center rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-400">
