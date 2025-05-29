@@ -286,7 +286,8 @@ const Login = () => {
 
   // Validate referral code on change
   useEffect(() => {
-    if (!referralCode) {
+    // Only validate if code is exactly 8 alphanumeric characters
+    if (!referralCode || referralCode.length !== 8 || /[^A-Z0-9]/.test(referralCode)) {
       setReferralEmail(null);
       setReferralError(null);
       return;
@@ -572,8 +573,18 @@ const Login = () => {
                                 name="referral"
                                 placeholder="Referral code"
                                 value={referralCode}
-                                onChange={(e) => setReferralCode(e.target.value)}
-                                className="bg-background border border-border text-foreground placeholder:text-muted-foreground mt-2"
+                                maxLength={8}
+                                inputMode="text"
+                                autoCapitalize="characters"
+                                autoCorrect="off"
+                                pattern="^[A-Z0-9]{0,8}$"
+                                className="bg-background border border-border text-foreground placeholder:text-muted-foreground mt-2 uppercase"
+                                onChange={(e) => {
+                                  // Only allow alphanumeric, max 8 chars, uppercase
+                                  let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                                  if (val.length > 8) val = val.slice(0, 8);
+                                  setReferralCode(val);
+                                }}
                               />
                               {/* Show referral validation result */}
                               {referralLoading && (
@@ -588,6 +599,10 @@ const Login = () => {
                               {referralError && !referralLoading && (
                                 <div className="text-xs text-red-500 mt-1">{referralError}</div>
                               )}
+                              {/* Show input restriction info */}
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Referral code must be 8 uppercase letters or numbers.
+                              </div>
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>

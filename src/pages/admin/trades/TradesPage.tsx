@@ -30,6 +30,12 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 
 interface UserSummary {
   id: string;
@@ -38,7 +44,6 @@ interface UserSummary {
   email: string;
   trades_count: number;
   total_pnl: number;
-  default_leverage: number;
   last_trade_date: string | null;
   withdrawal_wallet: number;
 }
@@ -94,6 +99,10 @@ const TradesPage = () => {
   const [dialogSortField, setDialogSortField] = useState<string>("");
   const [dialogSortDirection, setDialogSortDirection] = useState<"asc" | "desc">("asc");
   const [userSearchTerm, setUserSearchTerm] = useState("");
+
+  // Pagination state for All Trades and User Trades
+  const [allTradesPage, setAllTradesPage] = useState(1);
+  const [userTablePage, setUserTablePage] = useState(1);
 
   useEffect(() => {
     fetchTrades();
@@ -175,7 +184,6 @@ const TradesPage = () => {
           first_name,
           last_name,
           email,
-          default_leverage,
           withdrawal_wallet,
           trades:trades(
             id,
@@ -193,7 +201,6 @@ const TradesPage = () => {
         email: user.email,
         trades_count: user.trades?.length || 0,
         total_pnl: user.trades?.reduce((sum, t) => sum + (t.pnl || 0), 0) || 0,
-        default_leverage: user.default_leverage || 100,
         withdrawal_wallet: user.withdrawal_wallet || 0,
         last_trade_date: user.trades?.length ? 
           new Date(Math.max(...user.trades.map(t => new Date(t.created_at).getTime()))).toISOString() 
@@ -254,27 +261,32 @@ const TradesPage = () => {
     }
   };
 
-  const filteredTrades = trades.filter(trade => 
-    (trade.profiles.full_name)
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase()) ||
-    trade.profiles.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    trade.pair.toLowerCase().includes(searchTerm.toLowerCase())
-  ).filter(trade => trade.status === activeTab);
+  const filteredTrades = trades.filter(trade => {
+    // Defensive: handle missing profiles, full_name, email, pair
+    const fullName = trade.profiles && trade.profiles.full_name ? trade.profiles.full_name : "";
+    const email = trade.profiles && trade.profiles.email ? trade.profiles.email : "";
+    const pair = trade.pair || "";
+    const search = searchTerm ? searchTerm.toLowerCase() : "";
+    return (
+      fullName.toLowerCase().includes(search) ||
+      email.toLowerCase().includes(search) ||
+      pair.toLowerCase().includes(search)
+    );
+  }).filter(trade => trade.status === activeTab);
 
   const stats = {
     openTrades: {
+      // Only count 'open' positions
       count: trades.filter(t => t.status === 'open').length,
       volume: trades.filter(t => t.status === 'open')
         .reduce((sum, t) => sum + t.lots, 0)
     },
-    pendingTrades: {
-      count: trades.filter(t => t.status === 'pending').length
-    },
     closedTrades: {
       count: trades.filter(t => t.status === 'closed').length,
       pnl: trades.filter(t => t.status === 'closed')
-        .reduce((sum, t) => sum + (t.pnl || 0), 0)
+        .reduce((sum, t) => sum + (t.pnl || 0), 0),
+      volume: trades.filter(t => t.status === 'closed')
+        .reduce((sum, t) => sum + t.lots, 0)
     }
   };
 
@@ -371,9 +383,54 @@ const TradesPage = () => {
     }
   };
 
-  const filteredUserSummaries = userSummaries.filter(user =>
-    user.email.toLowerCase().includes(userSearchTerm.toLowerCase())
-  );
+  // Sort user summaries by most recent trade date (descending)
+  // Only include users with at least one trade and non-zero total_pnl
+  const filteredUserSummaries = userSummaries
+    .filter(user =>
+      user.trades_count > 0 && user.total_pnl !== 0 &&
+      ((user.email ?? "") + (user.first_name ?? "") + (user.last_name ?? "")).toLowerCase().includes(userSearchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      // Users with a last_trade_date come first, sorted descending
+      if (a.last_trade_date && b.last_trade_date) {
+        return new Date(b.last_trade_date).getTime() - new Date(a.last_trade_date).getTime();
+      }
+      if (a.last_trade_date) return -1;
+      if (b.last_trade_date) return 1;
+      return 0;
+    });
+
+  // Group trades by user for All Trades Accordion
+  const groupedTrades = sortedTrades.reduce((acc, trade) => {
+    const userKey = trade.user_id;
+    if (!acc[userKey]) {
+      acc[userKey] = {
+        user: trade.profiles,
+        user_id: trade.user_id,
+        trades: [],
+      };
+    }
+    acc[userKey].trades.push(trade);
+    return acc;
+  }, {} as Record<string, { user: { full_name: string; email: string }, user_id: string, trades: Trade[] }>);
+
+  const groupedTradesArr = Object.values(groupedTrades);
+
+  // Pagination for grouped trades (All Trades)
+  const groupedTradesTotalPages = Math.ceil(groupedTradesArr.length / 10);
+  const paginatedGroupedTrades = groupedTradesArr.slice((allTradesPage - 1) * 10, allTradesPage * 10);
+
+  // Pagination for user summaries (User Trades)
+  const userSummariesTotalPages = Math.ceil(filteredUserSummaries.length / 10);
+  const paginatedUserSummaries = filteredUserSummaries.slice((userTablePage - 1) * 10, userTablePage * 10);
+
+  const formatPnL = (pnl: number | undefined) => {
+    if (pnl === undefined || pnl === null) return '0.00';
+    const abs = Math.abs(pnl);
+    if (abs >= 1_000_000) return (pnl / 1_000_000).toFixed(2) + 'M';
+    if (abs >= 1_000) return (pnl / 1_000).toFixed(2) + 'K';
+    return pnl.toFixed(2);
+  };
 
   return (
     <AdminLayout>
@@ -382,61 +439,44 @@ const TradesPage = () => {
         description="Monitor and manage all trading positions"
       />
 
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <StatCard
-          title="Open Positions"
-          value={`${stats.openTrades.count}`}
-          description={`Volume: ${stats.openTrades.volume.toFixed(2)} lots`}
-        />
-        <StatCard
-          title="Pending Orders"
-          value={stats.pendingTrades.count.toString()}
-        />
-        <StatCard
-          title="Closed Trades"
-          value={stats.closedTrades.count.toString()}
-        />
-        <StatCard
-          title="Total P&L"
-          value={`$${stats.closedTrades.pnl.toLocaleString()}`}
-          valueClassName={stats.closedTrades.pnl >= 0 ? "text-green-500" : "text-red-500"}
-        />
-      </div>
-
-      <div className="bg-background border rounded-lg shadow-sm">
-        <div className="p-4 space-y-4 border-b">
-          <Tabs value={viewTab} onValueChange={(value: 'all' | 'users') => setViewTab(value)}>
-            <TabsList className="mb-4">
-            <TabsTrigger value="users">User Trades</TabsTrigger>
-            <TabsTrigger value="all">All Trades</TabsTrigger>
+      <div className="bg-background border border-border rounded-lg shadow-sm">
+        <div className="p-4 space-y-4 border-b border-border">
+          <Tabs value={viewTab} onValueChange={(value: 'all' | 'users') => {
+            setViewTab(value);
+            setAllTradesPage(1);
+            setUserTablePage(1);
+          }}>
+            <TabsList className="mb-4 flex flex-row gap-2 w-full sm:flex-row">
+              <TabsTrigger value="users" className="flex-1">User Trades</TabsTrigger>
+              <TabsTrigger value="all" className="flex-1">All Trades</TabsTrigger>
             </TabsList>
           </Tabs>
 
+          {/* All Trades Table/Card Responsive Layout */}
           {viewTab === 'all' ? (
             <>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
                 <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search trades..."
-                    className="pl-8 w-full sm:w-[300px]"
+                    className="pl-8 w-full sm:w-[300px] placeholder:text-muted-foreground"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 w-full sm:w-auto">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-[400px]">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="open">Open</TabsTrigger>
-                      <TabsTrigger value="pending">Pending</TabsTrigger>
-                      <TabsTrigger value="closed">Closed</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 flex flex-row gap-2">
+                      <TabsTrigger value="open" className="flex-1">Open</TabsTrigger>
+                      <TabsTrigger value="closed" className="flex-1">Closed</TabsTrigger>
                     </TabsList>
                   </Tabs>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto">
                         Sort By <ChevronDown className="ml-2 h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -463,100 +503,195 @@ const TradesPage = () => {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[200px]">ID</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Trader</TableHead>
-                      <TableHead>Pair</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Volume</TableHead>
-                      <TableHead>Open Price</TableHead>
-                      {activeTab === 'closed' && <TableHead>Close Price</TableHead>}
-                      <TableHead>Leverage</TableHead>
-                      {activeTab === 'closed' && <TableHead>P&L</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="h-24 text-center">
-                          Loading...
-                        </TableCell>
-                      </TableRow>
-                    ) : sortedTrades.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="h-24 text-center">
-                          No trades found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      sortedTrades.map((trade) => (
-                        <TableRow key={trade.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs">{trade.id}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(trade.id);
-                                  toast({
-                                    description: "ID copied to clipboard",
-                                  });
-                                }}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {new Date(trade.created_at).toLocaleString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            <div
-                              className="cursor-pointer hover:text-primary transition-colors"
-                              onClick={() => handleUserClick(trade)}
-                            >
-                              <div className="font-medium">
-                                {trade.profiles.full_name}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {trade.profiles.email}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{trade.pair}</TableCell>
-                          <TableCell>
-                            <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
-                              {trade.type.toUpperCase()}
+              {/* Accordion Grouped by User */}
+              <div className="hidden sm:block overflow-x-auto w-full">
+                <Accordion type="multiple">
+                  {paginatedGroupedTrades.length === 0 ? (
+                    <div className="text-center py-8">No trades found</div>
+                  ) : (
+                    paginatedGroupedTrades.map((group) => (
+                      <AccordionItem key={group.user_id} value={group.user_id}>
+                        <AccordionTrigger>
+                          <div className="flex items-center gap-4">
+                            <span className="font-medium">{group.user.full_name}</span>
+                            <span className="text-sm text-muted-foreground">{group.user.email}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">({group.trades.length} trades)</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="border-t border-border">
+                          <Table>
+                            <TableHeader className="border-b border-border">
+                              <TableRow>
+                                <TableHead className="w-[200px]">ID</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Pair</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Volume</TableHead>
+                                <TableHead>Open Price</TableHead>
+                                {activeTab === 'closed' && <TableHead>Close Price</TableHead>}
+                                <TableHead>Leverage</TableHead>
+                                {activeTab === 'closed' && <TableHead>P&L</TableHead>}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {group.trades.map((trade) => (
+                                <TableRow key={trade.id}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs">{trade.id}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(trade.id);
+                                          toast({
+                                            description: "ID copied to clipboard",
+                                          });
+                                        }}
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    {new Date(trade.created_at).toLocaleString('en-US', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </TableCell>
+                                  <TableCell>{trade.pair}</TableCell>
+                                  <TableCell>
+                                    <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                                      {trade.type.toUpperCase()}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>{trade.lots}</TableCell>
+                                  <TableCell>${trade.open_price}</TableCell>
+                                  {activeTab === 'closed' && (
+                                    <TableCell>${trade.close_price}</TableCell>
+                                  )}
+                                  <TableCell>{trade.leverage}x</TableCell>
+                                  {activeTab === 'closed' && (
+                                    <TableCell className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                      ${formatPnL(trade.pnl)}
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))
+                  )}
+                </Accordion>
+                {/* Pagination for All Trades */}
+                {groupedTradesTotalPages > 1 && (
+                  <div className="flex justify-center mt-4 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={allTradesPage === 1}
+                      onClick={() => setAllTradesPage(allTradesPage - 1)}
+                    >
+                      Prev
+                    </Button>
+                    <span className="px-2 py-1 text-sm">
+                      Page {allTradesPage} of {groupedTradesTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={allTradesPage === groupedTradesTotalPages}
+                      onClick={() => setAllTradesPage(allTradesPage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Cards (no grouping, just paginated) */}
+              <div className="block sm:hidden space-y-3">
+                {loading ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : sortedTrades.length === 0 ? (
+                  <div className="text-center py-8">No trades found</div>
+                ) : (
+                  sortedTrades
+                    .slice((allTradesPage - 1) * 10, allTradesPage * 10)
+                    .map((trade) => (
+                      <Card key={trade.id} className="p-4 flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-mono text-xs">{trade.id}</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => {
+                              navigator.clipboard.writeText(trade.id);
+                              toast({ description: "ID copied to clipboard" });
+                            }}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{formatDate(trade.created_at)}</div>
+                        <div
+                          className="cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => handleUserClick(trade)}
+                        >
+                          <div className="font-medium">{trade.profiles.full_name}</div>
+                          <div className="text-sm text-muted-foreground">{trade.profiles.email}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-sm">
+                          <span className="font-semibold">{trade.pair}</span>
+                          <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                            {trade.type.toUpperCase()}
+                          </span>
+                          <span>Vol: {trade.lots}</span>
+                          <span>Lev: {trade.leverage}x</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-sm">
+                          <span>Open: ${trade.open_price}</span>
+                          {activeTab === 'closed' && <span>Close: ${trade.close_price}</span>}
+                          {activeTab === 'closed' && (
+                            <span className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                              P&L: ${formatPnL(trade.pnl)}
                             </span>
-                          </TableCell>
-                          <TableCell>{trade.lots}</TableCell>
-                          <TableCell>${trade.open_price}</TableCell>
-                          {activeTab === 'closed' && (
-                            <TableCell>${trade.close_price}</TableCell>
                           )}
-                          <TableCell>{trade.leverage}x</TableCell>
-                          {activeTab === 'closed' && (
-                            <TableCell className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                              ${trade.pnl?.toFixed(2) || '0.00'}
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                        </div>
+                      </Card>
+                    ))
+                )}
+                {/* Pagination for mobile */}
+                {Math.ceil(sortedTrades.length / 10) > 1 && (
+                  <div className="flex justify-center mt-4 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={allTradesPage === 1}
+                      onClick={() => setAllTradesPage(allTradesPage - 1)}
+                    >
+                      Prev
+                    </Button>
+                    <span className="px-2 py-1 text-sm">
+                      Page {allTradesPage} of {Math.ceil(sortedTrades.length / 10)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={allTradesPage === Math.ceil(sortedTrades.length / 10)}
+                      onClick={() => setAllTradesPage(allTradesPage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -565,27 +700,27 @@ const TradesPage = () => {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by email..."
-                  className="pl-8"
+                  className="pl-8 placeholder:text-muted-foreground"
                   value={userSearchTerm}
                   onChange={(e) => setUserSearchTerm(e.target.value)}
                 />
               </div>
 
-              <div className="overflow-x-auto">
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto w-full">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="border-b border-border">
                     <TableRow>
                       <TableHead>ID</TableHead>
                       <TableHead>Trader</TableHead>
                       <TableHead>Balance</TableHead>
                       <TableHead>Trades Count</TableHead>
                       <TableHead>P&L</TableHead>
-                      <TableHead>Default Leverage</TableHead>
                       <TableHead>Last Trade</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredUserSummaries.map((user) => (
+                    {paginatedUserSummaries.map((user) => (
                       <TableRow key={user.id} className="cursor-pointer hover:bg-accent/50" onClick={() => handleUserClick({ 
                         user_id: user.id, 
                         profiles: { 
@@ -601,9 +736,8 @@ const TradesPage = () => {
                         <TableCell className="font-medium">${user.withdrawal_wallet.toFixed(2)}</TableCell>
                         <TableCell>{user.trades_count}</TableCell>
                         <TableCell className={user.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                          ${user.total_pnl.toFixed(2)}
+                          ${formatPnL(user.total_pnl)}
                         </TableCell>
-                        <TableCell>{user.default_leverage}x</TableCell>
                         <TableCell>
                           {user.last_trade_date ? formatDate(user.last_trade_date) : '-'}
                         </TableCell>
@@ -611,6 +745,90 @@ const TradesPage = () => {
                     ))}
                   </TableBody>
                 </Table>
+                {/* Pagination for User Trades */}
+                {userSummariesTotalPages > 1 && (
+                  <div className="flex justify-center mt-4 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userTablePage === 1}
+                      onClick={() => setUserTablePage(userTablePage - 1)}
+                    >
+                      Prev
+                    </Button>
+                    <span className="px-2 py-1 text-sm">
+                      Page {userTablePage} of {userSummariesTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userTablePage === userSummariesTotalPages}
+                      onClick={() => setUserTablePage(userTablePage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {/* Mobile Cards */}
+              <div className="block sm:hidden space-y-3">
+                {paginatedUserSummaries.length === 0 ? (
+                  <div className="text-center py-8">No users found</div>
+                ) : (
+                  paginatedUserSummaries.map((user) => (
+                    <Card
+                      key={user.id}
+                      className="p-4 flex flex-col gap-2 cursor-pointer hover:bg-accent/50"
+                      onClick={() => handleUserClick({
+                        user_id: user.id,
+                        profiles: {
+                          full_name: user.full_name,
+                          email: user.email
+                        }
+                      } as Trade)}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-mono text-xs">{user.id}</span>
+                        <span className="font-medium">{user.first_name} {user.last_name}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span>Balance: <span className="font-medium">${user.withdrawal_wallet.toFixed(2)}</span></span>
+                        <span>Trades: {user.trades_count}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className={user.total_pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                          P&L: ${formatPnL(user.total_pnl)}
+                        </span>
+                        <span>Last: {user.last_trade_date ? formatDate(user.last_trade_date) : '-'}</span>
+                      </div>
+                    </Card>
+                  ))
+                )}
+                {/* Pagination for mobile */}
+                {userSummariesTotalPages > 1 && (
+                  <div className="flex justify-center mt-4 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userTablePage === 1}
+                      onClick={() => setUserTablePage(userTablePage - 1)}
+                    >
+                      Prev
+                    </Button>
+                    <span className="px-2 py-1 text-sm">
+                      Page {userTablePage} of {userSummariesTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={userTablePage === userSummariesTotalPages}
+                      onClick={() => setUserTablePage(userTablePage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -623,7 +841,8 @@ const TradesPage = () => {
             <DialogTitle>Trading History - {selectedUser?.name}</DialogTitle>
           </DialogHeader>
           
-          <div className="grid grid-cols-4 gap-4 my-4">
+          {/* Always 2x2 grid for stats, even on mobile */}
+          <div className="grid grid-cols-2 gap-4 my-4">
             <Card className="p-4">
               <div className="text-sm text-muted-foreground">Total Trades</div>
               <div className="text-2xl font-semibold">
@@ -631,15 +850,15 @@ const TradesPage = () => {
               </div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Total Volume</div>
+              <div className="text-sm text-muted-foreground">Total Lots</div>
               <div className="text-2xl font-semibold">
-                {calculateStats(filteredUserTrades).totalVolume.toFixed(2)} lots
+                {calculateStats(filteredUserTrades).totalVolume.toFixed(2)}
               </div>
             </Card>
             <Card className="p-4">
               <div className="text-sm text-muted-foreground">Total P&L</div>
               <div className={`text-2xl font-semibold ${calculateStats(filteredUserTrades).totalPnL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                ${calculateStats(filteredUserTrades).totalPnL.toFixed(2)}
+                ${formatPnL(calculateStats(filteredUserTrades).totalPnL)}
               </div>
             </Card>
             <Card className="p-4">
@@ -650,19 +869,23 @@ const TradesPage = () => {
             </Card>
           </div>
 
+          {/* Tabs: Only show "Open" if there are open trades */}
           <Tabs value={userTradeTab} onValueChange={(value: any) => setUserTradeTab(value)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4">
+            <TabsList className={`grid w-full ${userTrades.some(t => t.status === 'open') ? 'grid-cols-3' : 'grid-cols-2'} mb-4`}>
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="open">Open</TabsTrigger>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
+              {userTrades.some(t => t.status === 'open') && (
+                <TabsTrigger value="open">Open</TabsTrigger>
+              )}
               <TabsTrigger value="closed">Closed</TabsTrigger>
             </TabsList>
           </Tabs>
 
+          {/* Responsive container for user trades: table on desktop, cards on mobile */}
           <ScrollArea className="max-h-[400px]">
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="border-b border-border">
                   <TableRow>
                     <TableHead className="min-w-[180px]">Date</TableHead>
                     <TableHead className="min-w-[100px]">Pair</TableHead>
@@ -707,7 +930,7 @@ const TradesPage = () => {
                       <TableCell>${trade.close_price || '-'}</TableCell>
                       <TableCell>{trade.status.toUpperCase()}</TableCell>
                       <TableCell className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
-                        ${trade.pnl?.toFixed(2) || '0.00'}
+                        ${formatPnL(trade.pnl)}
                       </TableCell>
                       {userTradeTab === 'closed' && (
                         <TableCell>
@@ -725,6 +948,49 @@ const TradesPage = () => {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+            {/* Mobile Cards */}
+            <div className="block sm:hidden space-y-3">
+              {sortedUserTrades.length === 0 ? (
+                <div className="text-center py-8">No trades found</div>
+              ) : (
+                sortedUserTrades.map((trade) => (
+                  <Card key={trade.id} className="p-4 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-xs">{trade.id}</span>
+                      {userTradeTab === 'closed' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                          onClick={() => handleDeleteTrade(trade.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{formatDate(trade.created_at)}</div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span className="font-semibold">{formatPair(trade.pair)}</span>
+                      <span className={trade.type === 'buy' ? 'text-green-500' : 'text-red-500'}>
+                        {trade.type.toUpperCase()}
+                      </span>
+                      <span>Vol: {trade.lots}</span>
+                      <span>Lev: {trade.leverage}x</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span>Open: ${trade.open_price}</span>
+                      <span>Close: ${trade.close_price || '-'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span>Status: {trade.status.toUpperCase()}</span>
+                      <span className={trade.pnl && trade.pnl >= 0 ? 'text-green-500' : 'text-red-500'}>
+                        P&L: ${formatPnL(trade.pnl)}
+                      </span>
+                    </div>
+                  </Card>
+                ))
+              )}
             </div>
           </ScrollArea>
         </DialogContent>

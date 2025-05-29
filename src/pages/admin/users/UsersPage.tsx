@@ -19,7 +19,7 @@ import {
   TableBody, 
   TableCell, 
   TableHead, 
-  TableHeader, 
+  TableHeader,
   TableRow 
 } from "@/components/ui/table";
 import { 
@@ -191,6 +191,7 @@ const UsersPage = () => {
     fetchUsers();
   }, []);
 
+  // In fetchUsers, always use the latest KYC status from the kyc table if available
   const fetchUsers = async () => {
     try {
       // Get all users with their basic info
@@ -212,6 +213,22 @@ const UsersPage = () => {
         return;
       }
 
+      // Fetch latest KYC status for all users in one query
+      const { data: kycRows } = await supabase
+        .from('kyc')
+        .select('id,user_id,status,created_at')
+        .order('created_at', { ascending: false });
+
+      // Build a map of userId -> latest kyc status
+      const latestKycStatusMap = new Map<string, string>();
+      if (Array.isArray(kycRows)) {
+        for (const row of kycRows) {
+          if (!latestKycStatusMap.has(row.user_id)) {
+            latestKycStatusMap.set(row.user_id, row.status);
+          }
+        }
+      }
+
       // Get users who have active plan subscriptions
       const { data: subscriptions } = await supabase
         .from('plans_subscriptions')
@@ -224,7 +241,18 @@ const UsersPage = () => {
       );
 
       setUsersWithPlans(usersWithSubscriptions);
-      setUsers(profiles || []);
+
+      // Merge latest KYC status into profiles
+      const mergedProfiles = (profiles || []).map((profile: User) => ({
+        ...profile,
+        kyc_status: (
+          (latestKycStatusMap.get(profile.id) as User['kyc_status']) ||
+          (profile.kyc_status as User['kyc_status']) ||
+          'pending'
+        )
+      }));
+
+      setUsers(mergedProfiles);
     } catch (error) {
       console.error('Error in fetchUsers:', error);
     }
@@ -288,29 +316,75 @@ const UsersPage = () => {
     }
   };
 
+  // Fix: Use .maybeSingle() only for select, not for update, and handle 0 rows for update
   const handleKycStatus = async (userId: string, status: 'completed' | 'rejected') => {
     try {
-      // Update profile KYC status - this will trigger the notification
-      const { error: profileError } = await supabase
+      if (!userId) throw new Error("No userId provided to handleKycStatus");
+
+      // 1. Update the user's profile KYC status
+      const { error: profileError, count: profileCount } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: status,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select()
+        .then(res => ({ ...res, count: Array.isArray(res.data) ? res.data.length : 0 }));
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        throw new Error("Profile update error: " + profileError.message);
+      }
+      if (!profileCount) {
+        throw new Error(`Profile update did not affect any rows for userId: ${userId}`);
+      }
+
+      // 2. Update the latest KYC record for this user in the kyc table
+      const { data: latestKyc, error: kycFetchError } = await supabase
+        .from('kyc')
+        .select('id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (kycFetchError) {
+        throw new Error("KYC fetch error: " + kycFetchError.message);
+      }
+      if (!latestKyc?.id) {
+        throw new Error("No KYC record found for user.");
+      }
+
+      const { error: kycUpdateError, data: kycUpdateData } = await supabase
+        .from('kyc')
+        .update({
+          status: status,
+          updated_at: new Date().toISOString(),
+          ...(status === 'rejected' ? { rejection_reason: 'Rejected by admin' } : { rejection_reason: null })
+        })
+        .eq('id', latestKyc.id)
+        .select();
+
+      if (kycUpdateError) {
+        throw new Error("KYC update error: " + kycUpdateError.message);
+      }
+      if (!kycUpdateData || !Array.isArray(kycUpdateData) || kycUpdateData.length === 0) {
+        throw new Error("KYC update did not affect any rows.");
+      }
+
       toast({
         title: "Success",
         description: `KYC ${status === 'completed' ? 'approved' : 'rejected'} successfully`,
       });
 
       fetchUsers();
-    } catch (error) {
+      setShowProfileDialog(false);
+      setSelectedUserProfile(null);
+    } catch (error: any) {
       console.error('Error updating KYC status:', error);
       toast({
         title: "Error",
-        description: "Failed to update KYC status",
+        description: error?.message || "Failed to update KYC status",
         variant: "destructive",
       });
     }
@@ -424,11 +498,13 @@ const UsersPage = () => {
       const formattedTransactions = allTransactions?.map(tx => {
         let description = tx.description;
         let status = tx.status;
-        
-        // Standardize status text
-        if (status === 'approved') status = 'Completed';
-        if (status === 'rejected') status = 'Failed';
-        
+
+        // Standardize status text for display (only for transactions, not KYC)
+        if (status === 'completed') status = 'Completed';
+        if (status === 'rejected') status = 'Rejected';
+        if (status === 'pending') status = 'Pending';
+        if (status === 'processing') status = 'Processing';
+
         // Use transaction description directly
         if (!description) {
           switch (tx.type) {
@@ -445,7 +521,7 @@ const UsersPage = () => {
               description = tx.type.replace(/_/g, ' ');
           }
         }
-        
+
         return {
           id: tx.id,
           type: tx.type,
@@ -500,8 +576,9 @@ const UsersPage = () => {
         ...withdrawalsAsTransactions
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      // Modified KYC fetching to get only most recent record
-      const { data: kycData } = await supabase
+      // --- FIX: Fetch latest KYC record and use its status/details ---
+      // Fetch latest KYC record for this user (should always be array, not .single())
+      const { data: kycArr, error: kycError } = await supabase
         .from('kyc')
         .select(`
           id,
@@ -524,8 +601,9 @@ const UsersPage = () => {
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
+
+      const kycData = Array.isArray(kycArr) && kycArr.length > 0 ? kycArr[0] : undefined;
 
       // Initialize document URLs object
       let documentUrls = { document_front: '', document_back: '' };
@@ -601,8 +679,15 @@ const UsersPage = () => {
 
       const total_plans_amount = userPlans?.reduce((sum, plan) => sum + (plan.amount || 0), 0) || 0;
 
+      // Use the latest KYC status from the kyc table if available, otherwise fallback to profiles.kyc_status
+      const kycStatus =
+        kycData && kycData.status
+          ? kycData.status
+          : (users.find(u => u.id === userId)?.kyc_status ?? 'pending');
+
       const userProfile: UserProfileData = {
         ...(users.find(u => u.id === userId) as User),
+        kyc_status: kycStatus,
         total_referrals,
         total_commissions,
         total_deposits,
@@ -652,8 +737,8 @@ const UsersPage = () => {
 
       if (error) throw error;
 
-      setUsers(users.map(user => 
-        user.id === userId ? {...user, role: isAdmin ? 'admin' : 'user'} : user
+      setUsers(users.map((user: User): User => 
+        user.id === userId ? { ...user, role: isAdmin ? 'admin' : 'user' } : user
       ));
 
       toast({
@@ -684,12 +769,13 @@ const UsersPage = () => {
         description="Manage and monitor user accounts"
       />
 
-      <div className="mb-6">
+      {/* Remove the stats card */}
+      {/* <div className="mb-6">
         <StatCard
           title="Registered Users"
           value={totalUsers.toString()}
         />
-      </div>
+      </div> */}
 
       <div className="bg-background border rounded-lg shadow-sm">
         <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b">
@@ -835,7 +921,6 @@ const UsersPage = () => {
                               <p>Approve KYC</p>
                             </TooltipContent>
                           </Tooltip>
-                          
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

@@ -17,19 +17,44 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // Always check admin status on mount and on user change
   useEffect(() => {
-    if (currentUser) return;
-    const fetchUser = async () => {
+    const fetchUserAndCheck = async () => {
+      setIsLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
+
+      if (user) {
+        // Check if user has admin role
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && profile?.role === 'admin') {
+          setIsAdminAuthenticated(true);
+        } else {
+          setIsAdminAuthenticated(false);
+        }
+      } else {
+        setIsAdminAuthenticated(false);
+      }
+      setIsLoading(false);
     };
-    fetchUser();
-  }, [currentUser]);
+
+    fetchUserAndCheck();
+  }, []);
 
   const checkAdminStatus = async () => {
+    setIsLoading(true);
     try {
-      if (!currentUser) {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+
+      if (!user) {
         setIsAdminAuthenticated(false);
+        setIsLoading(false);
         return;
       }
 
@@ -37,14 +62,13 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', currentUser.id)
+        .eq('id', user.id)
         .single();
 
       if (error) throw error;
 
       setIsAdminAuthenticated(profile?.role === 'admin');
     } catch (error) {
-      console.error('Error checking admin status:', error);
       setIsAdminAuthenticated(false);
     } finally {
       setIsLoading(false);
@@ -52,6 +76,7 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loginAdmin = async (email: string, password: string) => {
+    setIsLoading(true);
     try {
       // First sign in the user
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -76,6 +101,8 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
       if (profile?.role !== 'admin') {
         // Sign out if not admin
         await supabase.auth.signOut();
+        setIsAdminAuthenticated(false);
+        setIsLoading(false);
         throw new Error('Not authorized to access admin panel');
       }
 
@@ -83,6 +110,8 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       setIsAdminAuthenticated(false);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,17 +119,23 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut();
       setIsAdminAuthenticated(false);
+      setCurrentUser(null);
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
+  // Listen for auth state changes and check admin status
   useEffect(() => {
-    checkAdminStatus();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAdminStatus();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setCurrentUser(session.user);
+        checkAdminStatus();
+      } else {
+        setCurrentUser(null);
+        setIsAdminAuthenticated(false);
+        setIsLoading(false);
+      }
     });
 
     return () => {
@@ -134,8 +169,14 @@ export const RequireAdminAuth = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && !isAdminAuthenticated) {
-      navigate('/auth/login');
+    // Only redirect if on a protected /admin route (not /admin/login)
+    if (
+      !isLoading &&
+      !isAdminAuthenticated &&
+      window.location.pathname.startsWith('/admin') &&
+      window.location.pathname !== '/admin/login'
+    ) {
+      navigate('/admin/login', { replace: true });
     }
   }, [isAdminAuthenticated, isLoading, navigate]);
 

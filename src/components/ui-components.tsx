@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
-  value: string | number;
+  value: React.ReactNode; // changed from string | number
   description?: string;
   icon?: React.ReactNode;
   trend?: {
