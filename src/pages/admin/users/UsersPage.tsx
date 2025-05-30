@@ -322,7 +322,7 @@ const UsersPage = () => {
       if (!userId) throw new Error("No userId provided to handleKycStatus");
 
       // 1. Update the user's profile KYC status
-      const { error: profileError, count: profileCount } = await supabase
+      const { data: updatedProfile, error: profileError } = await supabase
         .from('profiles')
         .update({ 
           kyc_status: status,
@@ -330,12 +330,12 @@ const UsersPage = () => {
         })
         .eq('id', userId)
         .select()
-        .then(res => ({ ...res, count: Array.isArray(res.data) ? res.data.length : 0 }));
+        .maybeSingle();
 
       if (profileError) {
         throw new Error("Profile update error: " + profileError.message);
       }
-      if (!profileCount) {
+      if (!updatedProfile) {
         throw new Error(`Profile update did not affect any rows for userId: ${userId}`);
       }
 
@@ -405,9 +405,10 @@ const UsersPage = () => {
         })
         .eq('id', selectedUser.id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (balanceError) throw balanceError;
+      if (!data) throw new Error("No user found or updated.");
 
       // Update local state with the returned data
       setUsers(prevUsers => 

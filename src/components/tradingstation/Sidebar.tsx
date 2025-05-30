@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MagnifyingGlass, Coins, Globe, X } from "@phosphor-icons/react";
+import { 
+  MagnifyingGlass, Coins, Globe, X,
+  Calendar as CalendarIcon,
+  Wallet as DepositIcon,
+  ArrowCircleDown as WithdrawIcon,
+  Robot as AutoTradingIcon,
+  Sliders as InstrumentsIcon
+} from "@phosphor-icons/react";
 
 interface PriceData {
   price: string;
@@ -233,18 +240,123 @@ const Sidebar = ({
     // eslint-disable-next-line
   }, [filteredPairs, selectedPair]);
 
+  // State for TradingView Calendar Dialog
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (calendarOpen && calendarRef.current) {
+      // Remove any previous widget
+      calendarRef.current.innerHTML = "";
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+      script.async = true;
+      script.innerHTML = JSON.stringify({
+        width: "100%",
+        height: "100%",
+        colorTheme: "dark",
+        isTransparent: false,
+        locale: "en",
+        importanceFilter: "-1,0,1"
+      });
+      calendarRef.current.appendChild(script);
+    }
+  }, [calendarOpen]);
+
   return (
     <>
-      {/* Hamburger Menu Container - Only show on desktop */}
+      {/* TradingView Calendar Dialog */}
+      {calendarOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          style={{ backdropFilter: "blur(2px)" }}
+          onClick={() => setCalendarOpen(false)}
+        >
+          <div
+            className="bg-background rounded-lg shadow-lg relative w-full max-w-2xl h-[80vh] flex flex-col"
+            style={{ minWidth: 340, maxWidth: 600 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              className="absolute top-2 right-2 text-xl text-muted-foreground hover:text-destructive"
+              onClick={() => setCalendarOpen(false)}
+              title="Close"
+              style={{ zIndex: 10 }}
+            >
+              <X />
+            </button>
+            <div className="flex-1 overflow-hidden p-2">
+              {/* TradingView Widget BEGIN */}
+              <div
+                ref={calendarRef}
+                className="tradingview-widget-container"
+                style={{ height: "100%" }}
+              />
+              {/* TradingView Widget END */}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Sidebar Corner Buttons - Only show on desktop */}
       {!isMobile && (
-        <div className="fixed top-[48px] left-0 h-[calc(100vh-48px)] w-[48px] bg-background border-r border-border/30 flex flex-col items-center justify-start py-2 shadow-sm">
+        <div className="fixed top-[48px] left-0 h-[calc(100vh-48px)] w-[48px] bg-background border-r border-border/30 flex flex-col items-center justify-start py-2 shadow-sm z-20 gap-1">
+          {/* Instruments Button (replaces menu icon) */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 flex items-center justify-center rounded-md"
+            className={`h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary
+              ${!isCollapsed ? "bg-primary/10 text-primary" : ""}
+            `}
             onClick={toggleCollapse}
+            title="Instruments"
           >
-            <span className="text-lg">{isCollapsed ? "☰" : "✕"}</span>
+            <InstrumentsIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
+            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Station</span>
+          </Button>
+          {/* Deposit */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            onClick={() => window.location.assign('/cashier')}
+            title="Deposit"
+          >
+            <DepositIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
+            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Funds</span>
+          </Button>
+          {/* Withdraw */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            onClick={() => window.location.assign('/cashier?payouts=1')}
+            title="Withdraw"
+          >
+            <WithdrawIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
+            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Payouts</span>
+          </Button>
+          {/* Calendar */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            onClick={() => setCalendarOpen(true)}
+            title="Calendar"
+          >
+            <CalendarIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
+            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Calendar</span>
+          </Button>
+          {/* Auto Trading */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex flex-col items-center justify-center rounded-md group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+            onClick={() => window.location.assign('/plans')}
+            title="Auto Trading"
+          >
+            <AutoTradingIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
+            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Auto</span>
           </Button>
         </div>
       )}
@@ -253,14 +365,14 @@ const Sidebar = ({
       {showContent && (
         <div className={`
           ${isMobile 
-            ? "w-full h-full pb-14 bg-background"
+            ? "fixed top-[48px] left-0 w-full h-[calc(100vh-48px)] pb-14 bg-background z-30"
             : "fixed top-[48px] left-[48px] h-[calc(100vh-48px)] w-[320px] bg-background border-r border-border/20 shadow-md"
           } 
           flex flex-col p-3 transition-all duration-300 overflow-y-auto
         `}>
           {/* Header - Compact */}
           <div className="flex justify-between items-center mb-2">
-            <h1 className="text-xl font-semibold tracking-tight">
+            <h1 className="text-xl font-semibold">
               {isMobile ? "Markets" : "Trading Station"}
             </h1>
           </div>

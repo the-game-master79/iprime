@@ -115,7 +115,7 @@ const Navbar = ({
                 : getForexImageForSymbol(pair.symbol)
             }
             alt={pair.symbol}
-            className="h-5 w-5 rounded-full border border-border/30 bg-white object-contain"
+            className="h-5 w-5 rounded-full border border-border/30 object-contain"
             style={{ boxShadow: "0 1px 3px 0 rgba(0,0,0,0.07)" }}
           />
           <span
