@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const benefits = [
 	"Advanced AI-powered trading analytics",
@@ -12,6 +13,7 @@ const benefits = [
 ];
 
 export const CtaPage = () => {
+	const { user } = useAuth();
 	return (
 		<section className="relative overflow-hidden">
 			{/* Gradient Backgrounds */}
@@ -19,31 +21,34 @@ export const CtaPage = () => {
 
 			<div className="container max-w-7xl relative">
 				<div className="mx-auto max-w-2xl py-24 sm:py-32 lg:py-40">
-					<div className="hidden sm:mb-8 sm:flex sm:justify-center">
-						<div className="relative rounded-full px-3 py-1 text-sm leading-6 text-muted-foreground ring-1 ring-border/10 hover:ring-border/20">
-							New features available.{" "}
-							<Link to="/features" className="font-semibold text-primary">
-								<span className="absolute inset-0" aria-hidden="true" />
-								Explore New Trading Features{" "}
-								<span aria-hidden="true">&rarr;</span>
-							</Link>
-						</div>
-					</div>
 					<div className="text-center">
 						<h1 className="text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
 							Experience Next-Gen Trading
 						</h1>
 						<div className="mt-10 flex items-center justify-center gap-x-6">
-							<Link to="/auth/login">
-								<Button
-									size="lg"
-									className="px-8 gap-2 bg-primary hover:bg-primary/90 text-white relative overflow-hidden group"
-								>
-									<span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
-									Create Trading Account
-									<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-								</Button>
-							</Link>
+							{user ? (
+								<Link to="/platform">
+									<Button
+										size="lg"
+										className="px-8 gap-2 bg-primary hover:bg-primary/90 text-white relative overflow-hidden group"
+									>
+										<span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
+										Access Platform
+										<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+									</Button>
+								</Link>
+							) : (
+								<Link to="/auth/login">
+									<Button
+										size="lg"
+										className="px-8 gap-2 bg-primary hover:bg-primary/90 text-white relative overflow-hidden group"
+									>
+										<span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
+										Login
+										<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+									</Button>
+								</Link>
+							)}
 							<a
 								href="#"
 								className="text-sm font-semibold leading-6 text-primary"

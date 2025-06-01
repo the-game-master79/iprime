@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowCircleRight, CaretDown, Moon, Sun } from "@phosphor-icons/react";
@@ -16,6 +17,15 @@ export const Navbar = () => {
   const location = useLocation();
   const { user } = useAuth();
   const { setTheme, theme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 0);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -27,7 +37,14 @@ export const Navbar = () => {
 
   return (
     <header className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-[1200px]">
-      <div className="mx-2 md:mx-auto backdrop-blur-sm bg-background/95 border border-border rounded-2xl px-2 py-2">
+      <div
+        className={cn(
+          "mx-2 md:mx-auto rounded-2xl px-2 py-2",
+          scrolled
+            ? "backdrop-blur-sm bg-background/95 border border-border"
+            : "bg-transparent border-transparent"
+        )}
+      >
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img

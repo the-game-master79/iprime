@@ -49,7 +49,33 @@ const Index = () => {
 
   return (
     <PageTransition>
-      <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden">
+      <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden relative">
+        {/* Dots and grid background overlay */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0"
+        >
+          <svg
+            width="100%"
+            height="100%"
+            className="absolute inset-0 w-full h-full"
+            style={{ minHeight: '100vh' }}
+          >
+            {/* Dots */}
+            <defs>
+              <pattern id="dot-pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                <circle cx="1.5" cy="1.5" r="1.5" fill="#d4d4d8" opacity="0.12" />
+              </pattern>
+              {/* Grid lines */}
+              <pattern id="grid-pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                <rect x="0" y="0" width="32" height="32" fill="none" stroke="#d4d4d8" strokeWidth="0.5" opacity="0.08" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dot-pattern)" />
+            <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+          </svg>
+        </div>
+
         {/* Magic Gradient Orb - Updated for dark mode */}
         <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse-slower" />
@@ -65,7 +91,8 @@ const Index = () => {
               icon: <Lightning className="h-5 w-5 text-primary" />,
               text: "20X More Profits | Advanced AI Trading"
             }}
-            title="Experience the Future of Trading with CloudForex"
+            title="Institutional Power."
+            subtitle="Retail Access."
             description="AI-Powered Trading Platform with Lightning-Fast Execution."
             action={{
               text: "Start Trading",

@@ -65,11 +65,12 @@ const InvestingPage = () => {
         <main className="relative z-10">
           <Hero 
             badge={{
-              icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />,
+              icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />, 
               text: "Investment Plans"
             }}
-            title="Smart Investment Solutions for Your Future"
-            description="Discover our professionally managed investment plans offering consistent returns through algorithmic trading and advanced market analysis."
+            title="Simple trading, powerful returns."
+            subtitle="Confidence to grow."
+            description="Discover our professionally managed auto-trading plans offering consistent returns through algorithmic trading and advanced market analysis."
             action={{
               text: "Start Investing",
               href: "/auth/login"

@@ -20,11 +20,12 @@ const CompanyPage = () => {
         <main className="relative z-10">
           <Hero 
             badge={{
-              icon: <Building className="h-5 w-5 animate-pulse text-primary" />,
+              icon: <Building className="h-5 w-5 animate-pulse text-primary" />, 
               text: "About Us"
             }}
-            title="Leading the Future of Trading"
-            description="Empowering traders worldwide with cutting-edge technology and unparalleled support."
+            title="About CloudForex"
+            subtitle="Empowering Traders Worldwide."
+            description="Learn about our mission, journey, and values that drive us to empower traders worldwide."
             action={{
               text: "Start Trading",
               href: "/auth/login"
