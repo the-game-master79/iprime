@@ -378,7 +378,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       ? "You can only close forex trades when the market is open."
                       : hasMultiplePositions ? "Close All Positions" : "Close Position"
                   }
-                  disabled={isForexTrade(g.trades[0])}
+                  // FIX: Only disable if forex and market is closed
+                  disabled={isForexTrade(g.trades[0]) && !isForexMarketOpen}
                 >
                   <X size={16} />
                 </Button>
@@ -1240,7 +1241,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                 size="sm"
                                                 onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
                                                 className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                disabled={isForex}
+                                                // FIX: Only disable if forex and market is closed
+                                                disabled={isForex && !isForexMarketOpen}
                                                 title={
                                                   isForex
                                                     ? "You can only close forex trades when the market is open."
@@ -1368,6 +1370,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                   className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
                                                   title="Close Position"
                                                   style={{ minWidth: 28, minHeight: 28 }}
+                                                  // FIX: Only disable if forex and market is closed
                                                   disabled={isForexTrade(trade) && !isForexMarketOpen}
                                                 >
                                                   <X size={14} />
@@ -1589,7 +1592,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                 size="sm"
                                                 onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
                                                 className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                disabled={isForex}
+                                                // FIX: Only disable if forex and market is closed
+                                                disabled={isForex && !isForexMarketOpen}
                                                 title={
                                                   isForex
                                                     ? "You can only close forex trades when the market is open."
@@ -1717,6 +1721,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                   className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
                                                   title="Close Position"
                                                   style={{ minWidth: 28, minHeight: 28 }}
+                                                  // FIX: Only disable if forex and market is closed
                                                   disabled={isForexTrade(trade) && !isForexMarketOpen}
                                                 >
                                                   <X size={14} />
