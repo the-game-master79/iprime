@@ -24,8 +24,8 @@ interface HeroProps {
 
 export const Hero = ({ badge, badges, description, action, title, subtitle }: HeroProps) => {
   const { user } = useAuth();
-  // Random image for the iPhone mockup
-  const mockupImg = "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=600&q=80";
+  // Use local webp hero image instead of Unsplash and iPhone mockup
+  const mockupImg = "/cloudforex-hero.webp";
   return (
     <section className="relative w-full pt-32 pb-20 overflow-hidden">
       {/* Cinematic background gradients and light rays */}
@@ -129,26 +129,12 @@ export const Hero = ({ badge, badges, description, action, title, subtitle }: He
         </div>
         {/* Right: Mock iPhone */}
         <div className="flex-1 flex justify-center md:justify-end items-center mt-12 md:mt-0">
-          <div className="relative w-[220px] h-[440px] md:w-[320px] md:h-[640px] rounded-[3rem] border-[8px] border-black/90 bg-zinc-100 shadow-2xl overflow-hidden flex flex-col items-center justify-end">
-            {/* Speaker and camera (Dynamic Island) */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
-              <div className="relative w-28 h-7 bg-black rounded-full mb-2 flex items-center justify-center">
-                {/* Camera inside dynamic island */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-zinc-900 rounded-full border-[2px] border-black/20 shadow-inner" />
-              </div>
-            </div>
-            {/* Mock screen with random image */}
-            <div className="w-full h-full flex flex-col items-center justify-center px-0 py-0">
-              <img
-                src={mockupImg}
-                alt="App preview"
-                className="w-full h-full object-cover rounded-[2rem] select-none pointer-events-none"
-                draggable={false}
-              />
-            </div>
-            {/* Home indicator */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-16 h-1.5 bg-black/20 rounded-full" />
-          </div>
+          <img
+            src={mockupImg}
+            alt="CloudForex forex trading platform app preview"
+            className="w-full max-w-[320px] h-auto rounded-3xl shadow-2xl select-none pointer-events-none"
+            draggable={false}
+          />
         </div>
       </div>
     </section>
