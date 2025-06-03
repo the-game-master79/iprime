@@ -4,12 +4,12 @@ import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const benefits = [
-	"Advanced AI-powered trading analytics",
-	"Lightning-fast trade execution",
-	"24/7 expert support team",
-	"Secure and regulated platform",
-	"Competitive trading conditions",
-	"Multi-asset trading platform",
+	"Smarter trading with advanced AI analytics on our forex trading platform.",
+	"Lightning-fast order execution for cryptocurrency trading and investments.",
+	"Expert support available 24/7 on our secure trading and investment platform.",
+	"A secure, regulated cloud trading platform you can trust.",
+	"Competitive trading conditions and exclusive trading bonus offers.",
+	"Trade multiple assets from one account—your exness, binomo, and quotex alternative.",
 ];
 
 export const CtaPage = () => {
@@ -22,9 +22,9 @@ export const CtaPage = () => {
 			<div className="container max-w-7xl relative">
 				<div className="mx-auto max-w-2xl py-24 sm:py-32 lg:py-40">
 					<div className="text-center">
-						<h1 className="text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
+						<h2 className="text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
 							Experience Next-Gen Trading
-						</h1>
+						</h2>
 						<div className="mt-10 flex items-center justify-center gap-x-6">
 							{user ? (
 								<Link to="/platform">
@@ -57,7 +57,7 @@ export const CtaPage = () => {
 									window.dispatchEvent(new CustomEvent("open-contact-dialog"));
 								}}
 							>
-								Contact Institutional Trading Team{" "}
+								Contact Institutional Trading Team
 								<span aria-hidden="true">→</span>
 							</a>
 						</div>

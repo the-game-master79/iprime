@@ -3,45 +3,51 @@ import { Brain, Cpu, Globe, ShieldStar, Users, Gift, Fire } from "@phosphor-icon
 const features = [
 	{
 		icon: Brain,
-		title: "Powered by GenSpark 2.0",
+		title: "Powered by GenSpark 2.0 AI Trading Engine",
 		color: "from-blue-500 to-blue-600",
 		hoverGradient: "from-blue-400/10 via-blue-400/5 to-transparent",
 		iconColor: "text-blue-500",
+		description: "Our advanced AI trading engine delivers smarter, faster decisions for forex trading, cryptocurrency trading, and investments."
 	},
 	{
 		icon: Cpu,
-		title: "Upto 18X CPU Power",
+		title: "Up to 18X CPU Power for Cloud Trading Platform",
 		color: "from-green-500 to-green-600",
 		hoverGradient: "from-green-400/10 via-green-400/5 to-transparent",
 		iconColor: "text-green-500",
+		description: "Experience lightning-fast order execution on our secure cloud trading platform."
 	},
 	{
 		icon: Globe,
-		title: "Access to Global Markets",
+		title: "Access to Global Markets & Cryptocurrency Trading",
 		color: "from-purple-500 to-purple-600",
 		hoverGradient: "from-purple-400/10 via-purple-400/5 to-transparent",
 		iconColor: "text-purple-500",
+		description: "Trade forex, crypto, and more—all from one AI-powered investment platform."
 	},
 	{
 		icon: Gift,
-		title: "Exclusive Rewards & Bonuses",
+		title: "Exclusive Trading Bonus & Rewards",
 		color: "from-amber-500 to-amber-600",
 		hoverGradient: "from-amber-400/10 via-amber-400/5 to-transparent",
 		iconColor: "text-amber-500",
+		description: "Earn special trading bonuses and rewards as you trade and grow."
 	},
 	{
 		icon: ShieldStar,
-		title: "TLS & WAF Security",
+		title: "TLS & WAF Security for Secure Trading",
 		color: "from-rose-500 to-rose-600",
 		hoverGradient: "from-rose-400/10 via-rose-400/5 to-transparent",
 		iconColor: "text-rose-500",
+		description: "Your data and funds are protected by top-tier security technology on our secure trading platform."
 	},
 	{
 		icon: Users,
-		title: "24/7 Support",
+		title: "24/7 Support & Unlimited Expert Assistance",
 		color: "from-cyan-500 to-cyan-600",
 		hoverGradient: "from-cyan-400/10 via-cyan-400/5 to-transparent",
 		iconColor: "text-cyan-500",
+		description: "Get help from our expert team whenever you need it—day or night. A true exness, binomo, and quotex alternative."
 	},
 ];
 
@@ -77,6 +83,7 @@ export const Features = () => {
 									<feature.icon className="relative z-10 h-8 w-8 text-white drop-shadow-lg" weight="fill" />
 								</div>
 								<h3 className="font-bold text-lg text-center text-foreground drop-shadow-sm tracking-tight">{feature.title}</h3>
+								<p className="text-sm text-muted-foreground text-center">{feature.description}</p>
 							</div>
 						</div>
 					))}

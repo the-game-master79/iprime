@@ -1,4 +1,4 @@
-import { Fire, Gift } from "@phosphor-icons/react";
+import { Fire } from "@phosphor-icons/react";
 import { OrbitingCircles } from "@/components/magicui/orbiting-circles";
 
 export const HowItWorks = () => {
@@ -12,9 +12,9 @@ export const HowItWorks = () => {
               Getting Started
             </div>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold">How It Works</h2>
+          <h2 className="text-3xl md:text-4xl font-bold">How Our AI Forex Trading Platform Works</h2>
           <p className="text-muted-foreground">
-            Start your investment journey with CloudForex in three simple steps
+            Getting started with our AI-powered forex trading platform and cryptocurrency trading system is simple. Just follow these three easy steps to begin your investment journey on the leading cloud trading platform.
           </p>
         </div>
 
@@ -27,7 +27,7 @@ export const HowItWorks = () => {
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Fund Your Account</h3>
                 <p className="text-sm text-muted-foreground">
-                  Start by depositing funds into your account using our secure payment methods. Choose from multiple deposit options.
+                  Add money to your account quickly and securely. Choose from a variety of trusted payment methods on our secure trading and investment platform.
                 </p>
               </div>
               
@@ -37,9 +37,12 @@ export const HowItWorks = () => {
                   {/* Center logo */}
                   <div className="absolute z-10 w-[100px] h-[100px] rounded-full border border-border/30 flex items-center justify-center bg-card shadow-lg backdrop-blur-sm">
                     <img 
-                      src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cflogo.svg"
+                      src="/cflogo.svg"
                       alt="CloudForex Logo"
                       className="w-14 h-14"
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                     />
                   </div>
 
@@ -50,10 +53,10 @@ export const HowItWorks = () => {
                     speed={0.8}
                     className="bg-card/80 shadow-lg p-2"
                   >
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//usdt.svg" alt="USDT" className="w-6 h-6" />
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//eth.svg" alt="ETH" className="w-6 h-6" />
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//eur-gbp.svg" alt="EUR/GBP" className="w-6 h-6" />
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//bnb.svg" alt="BNB" className="w-6 h-6" />
+                    <img src="/usdt.svg" alt="USDT" className="w-6 h-6" loading="lazy" decoding="async" fetchPriority="low" />
+                    <img src="/eth.svg" alt="ETH" className="w-6 h-6" loading="lazy" decoding="async" fetchPriority="low" />
+                    <img src="/eur-gbp.svg" alt="EUR/GBP" className="w-6 h-6" loading="lazy" decoding="async" fetchPriority="low" />
+                    <img src="/bnb.svg" alt="BNB" className="w-6 h-6" loading="lazy" decoding="async" fetchPriority="low" />
                   </OrbitingCircles>
 
                   {/* Inner orbit */}
@@ -64,9 +67,9 @@ export const HowItWorks = () => {
                     reverse
                     className="bg-card/80 shadow-lg p-2"
                   >
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//btc.svg" alt="BTC" className="w-5 h-5" />
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//sol.svg" alt="SOL" className="w-5 h-5" />
-                    <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//eur-usd.svg" alt="EUR/USD" className="w-5 h-5" />
+                    <img src="/btc.svg" alt="BTC" className="w-5 h-5" loading="lazy" decoding="async" fetchPriority="low" />
+                    <img src="/sol.svg" alt="SOL" className="w-5 h-5" loading="lazy" decoding="async" fetchPriority="low" />
+                    <img src="/eur-usd.svg" alt="EUR/USD" className="w-5 h-5" loading="lazy" decoding="async" fetchPriority="low" />
                   </OrbitingCircles>
                 </div>
               </div>
@@ -156,7 +159,7 @@ export const HowItWorks = () => {
                           <div className="flex items-center justify-between p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <Gift className="w-4 h-4 text-primary" />
+                                <Fire className="w-4 h-4 text-primary" />
                               </div>
                               <div className="text-sm font-medium text-foreground">Premium Package</div>
                             </div>

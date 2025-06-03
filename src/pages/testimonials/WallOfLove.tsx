@@ -4,67 +4,60 @@ import { Fire } from "@phosphor-icons/react";
 
 const testimonials = [
 	{
-		name: "Sarah Mitchell",
-		role: "Professional Trader",
-		image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
+		name: "Priya Sharma",
+		role: "Equity Analyst, Mumbai",
+		image: null,
 		content:
-			"The AI-powered analytics have completely transformed how I approach trading. The platform's speed and reliability are unmatched.",
+			"CloudForex's AI trading analytics have made my forex and cryptocurrency trading so much easier. The platform is intuitive and the support team is always there for me. I love the trading bonus and the secure trading environment.",
 	},
 	{
-		name: "James Wilson",
-		role: "Investment Analyst",
-		image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e",
+		name: "Arjun Patel",
+		role: "Crypto Trader, Delhi",
+		image: null,
 		content:
-			"CloudForex's 24/7 support team is exceptional. They've helped me optimize my trading strategy and maximize returns.",
+			"I switched from Binomo and Quotex to CloudForex and haven't looked back. The AI-powered forex trading platform is fast, reliable, and the best exness alternative I've found.",
 	},
 	{
-		name: "Emma Thompson",
-		role: "Retail Investor",
-		image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
+		name: "Emily Chen",
+		role: "Retail Investor, Singapore",
+		image: null,
 		content:
-			"As a beginner, I appreciate how user-friendly the platform is. The educational resources have helped me grow my portfolio significantly.",
+			"As a beginner, I was nervous about investing. CloudForex's learning resources and AI trading features gave me the confidence to start. Now, I trade both crypto and forex with ease.",
 	},
 	{
-		name: "Michael Chen",
-		role: "Day Trader",
-		image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
+		name: "Ravi Kumar",
+		role: "Day Trader, Bangalore",
+		image: null,
 		content:
-			"The execution speed is incredible. I've never experienced such fast order processing before switching to CloudForex.",
+			"Order execution is lightning-fast and the platform is super secure. I appreciate the transparency and the real human support, which is rare in other investment platforms.",
 	},
 	{
 		name: "Sofia Rodriguez",
-		role: "Forex Specialist",
-		image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2",
+		role: "Forex Specialist, Madrid",
+		image: null,
 		content:
-			"The advanced charting tools and technical indicators have given me a competitive edge in the market.",
+			"The charting tools and AI-powered indicators are top-notch. I feel more confident in my trades and love the trading bonuses.",
 	},
 	{
 		name: "David Park",
-		role: "Portfolio Manager",
-		image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
+		role: "Portfolio Manager, Seoul",
+		image: null,
 		content:
-			"CloudForex's risk management features help me maintain a disciplined trading approach. Excellent platform!",
+			"CloudForex is a true cloud trading platform. The risk management features help me stay disciplined, and the platform is a solid alternative to Binomo and Quotex.",
 	},
 	{
-		name: "Anna Kowalski",
-		role: "Crypto Trader",
-		image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
+		name: "Ananya Singh",
+		role: "Crypto Enthusiast, Pune",
+		image: null,
 		content:
-			"The seamless integration of crypto and forex markets makes diversification effortless. Love the platform!",
+			"I love how easy it is to diversify between crypto and forex. The AI trading engine is a game changer and the platform feels very secure.",
 	},
 	{
 		name: "Thomas Weber",
-		role: "Financial Analyst",
-		image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7",
+		role: "Financial Analyst, Berlin",
+		image: null,
 		content:
-			"The AI predictions have been remarkably accurate. It's like having a professional analyst by your side.",
-	},
-	{
-		name: "Lisa Johnson",
-		role: "Swing Trader",
-		image: "https://images.unsplash.com/photo-1580489944761-15a19d654956",
-		content:
-			"The mobile app is fantastic. I can manage my trades on the go without compromising on features.",
+			"The AI predictions are impressively accurate. It's like having a professional analyst by your side. CloudForex is my go-to for cryptocurrency trading and investment.",
 	},
 ];
 
@@ -80,7 +73,7 @@ const WallOfLove = () => {
 								<Fire className="w-4 h-4 mr-1" weight="fill" />
 								Client Testimonials
 							</div>
-							<h1 className="text-4xl font-bold">Wall of Love</h1>
+							<h2 className="text-4xl font-bold">Wall of Love</h2>
 							<p className="text-muted-foreground">
 								See what our users have to say about their experience with CloudForex
 							</p>
@@ -95,7 +88,11 @@ const WallOfLove = () => {
 								>
 									<div className="flex items-center gap-4 mb-4">
 										<img
-											src={`${testimonial.image}?auto=format&fit=crop&w=100&h=100`}
+											src={
+												testimonial.image
+													? testimonial.image
+													: "/profile-placeholder.svg"
+											}
 											alt={testimonial.name}
 											className="w-12 h-12 rounded-full object-cover"
 										/>

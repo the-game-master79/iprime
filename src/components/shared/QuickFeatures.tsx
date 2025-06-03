@@ -1,12 +1,12 @@
-import { Timer, CaretDown, Users, CurrencyDollar, Shield, Buildings } from "@phosphor-icons/react";
 import { Fire } from "@phosphor-icons/react";
+import { Timer, CaretDown, Users, CurrencyDollar, Shield, Buildings } from "@phosphor-icons/react";
 
 export const QuickFeatures = () => {
   const features = [
     {
       icon: Timer,
       title: "Lightning-Fast Withdrawals",
-      description: "Get your funds in seconds",
+      description: "Withdraw your funds instantly from our AI-powered forex trading platform and cryptocurrency trading system. No waiting, no hassle.",
       color: "from-blue-500/20 to-blue-400/5",
       iconBg: "bg-blue-500/20",
       iconColor: "text-blue-500"
@@ -14,7 +14,7 @@ export const QuickFeatures = () => {
     {
       icon: CaretDown,
       title: "Ultra-Low Spreads",
-      description: "Trade from just 0.1 pips",
+      description: "Trade forex and crypto with ultra-low spreads on our secure trading and investment platform.",
       color: "from-green-500/20 to-green-400/5",
       iconBg: "bg-green-500/20",
       iconColor: "text-green-500"
@@ -22,7 +22,7 @@ export const QuickFeatures = () => {
     {
       icon: Users,
       title: "24/7 Human Support",
-      description: "Real experts, anytime",
+      description: "Get real help from AI trading and cloud trading platform experts, day or night.",
       color: "from-purple-500/20 to-purple-400/5",
       iconBg: "bg-purple-500/20",
       iconColor: "text-purple-500"
@@ -30,7 +30,7 @@ export const QuickFeatures = () => {
     {
       icon: CurrencyDollar,
       title: "Zero Commission Trading",
-      description: "Keep 100% of your profits",
+      description: "Keep every dollar you earn. Our AI trading platform never charges commission on your trades.",
       color: "from-amber-500/20 to-amber-400/5",
       iconBg: "bg-amber-500/20",
       iconColor: "text-amber-500"
@@ -38,7 +38,7 @@ export const QuickFeatures = () => {
     {
       icon: Shield,
       title: "Advanced Security",
-      description: "TSL & 2FA multi-layer protection",
+      description: "Your assets are protected with multi-layer security, including TSL and 2FA, on our secure trading platform.",
       color: "from-rose-500/20 to-rose-400/5",
       iconBg: "bg-rose-500/20",
       iconColor: "text-rose-500"
@@ -46,7 +46,7 @@ export const QuickFeatures = () => {
     {
       icon: Buildings,
       title: "Fully Regulated",
-      description: "FINRA, FCA & CySEC compliant",
+      description: "Trade with confidence on a cloud trading platform compliant with FINRA, FCA, and CySEC. A true exness, binomo, and quotex alternative.",
       color: "from-cyan-500/20 to-cyan-400/5",
       iconBg: "bg-cyan-500/20",
       iconColor: "text-cyan-500"
