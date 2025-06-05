@@ -87,7 +87,7 @@ const Index = () => {
           <Suspense fallback={<div className="min-h-[200px]" />}> <CtaPage /> </Suspense>
           <Footer />
           <Dialog open={showContact} onOpenChange={setShowContact}>
-            <DialogContent className="bg-card text-foreground shadow-md backdrop-blur-sm backdrop-filter backdrop-opacity-90 border border-border/50 max-w-md">
+            <DialogContent className="bg-background text-foreground shadow-md backdrop-blur-sm backdrop-filter backdrop-opacity-90 border border-border/50 max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-2xl text-center">Contact Us</DialogTitle>
               </DialogHeader>
