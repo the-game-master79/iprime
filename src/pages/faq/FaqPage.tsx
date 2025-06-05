@@ -1,77 +1,115 @@
 import { PageTransition } from "@/components/ui-components";
-import { Navbar } from "@/components/shared/Navbar";
-import { Footer } from "@/components/shared/Footer";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Brain, ChartLineUp, CurrencyCircleDollar, GlobeSimple, LockKey, Users } from "@phosphor-icons/react";
+import { Brain, ChartLineUp, CurrencyCircleDollar, GlobeSimple, LockKey, Users, Question } from "@phosphor-icons/react";
 
 const faqCategories = [
 	{
 		icon: Brain,
-		title: "Platform Features & AI Trading",
+		title: "Deposits",
 		questions: [
 			{
-				q: "What makes CloudForex different from other trading platforms?",
-				a: "CloudForex is an AI-powered forex trading platform and cryptocurrency trading system. We use advanced AI algorithms to provide real-time market insights, predictive analytics, and automated trading features for secure trading and investments.",
+				q: "How do I deposit funds?",
+				a: "To deposit funds, log in to your CloudForex dashboard and click on \"Cashier\" in the dashboard. Choose your preferred payment method—UPI, or cryptocurrency (USDT, BTC, ETH, etc.)—and follow the instructions. ✅ All deposits are processed securely with real-time tracking.",
 			},
 			{
-				q: "Can I access the platform from anywhere?",
-				a: "Yes! CloudForex is a cloud trading platform that is web-based and mobile-friendly, so you can trade forex, crypto, and more from anywhere, anytime.",
+				q: "Are there any deposit fees or hidden charges?",
+				a: "No. CloudForex does not charge any deposit fees. You keep 100% of your funds. However, third-party providers (like crypto networks or banks) may apply a small transaction fee.",
+			},
+			{
+				q: "What are the minimum and maximum deposit limits?",
+				a: "The minimum deposit on CloudForex is just $10, depending on your currency. There is no maximum deposit limit for verified accounts.💡 We support high-volume deposits for advanced traders and institutions.",
+			},
+			{
+				q: "How long do deposits take to reflect in my account?",
+				a: "Most deposits are instant, especially with crypto, UPI, and card payments. Non-crypto deposits may take up to 2 hours. ⏱ CloudForex processes deposits 24/7 with smart auto-verification.",
 			},
 		],
 	},
 	{
 		icon: LockKey,
-		title: "Security & Safe Investment Platform",
+		title: "Payouts",
 		questions: [
 			{
-				q: "How secure is my investment with CloudForex?",
-				a: "We use strong encryption, regular security checks, and secure storage for your assets. Your funds are protected by multiple layers of security on our secure trading platform.",
+				q: "How fast are payouts processed on CloudForex?",
+				a: "CloudForex offers on-demand payouts, processed within minutes—24/7, including weekends and holidays. Whether you're withdrawing in crypto or fiat, our system ensures lightning-fast execution. ⏱ No more waiting days to access your earnings.",
 			},
 			{
-				q: "What security measures are in place to protect my account?",
-				a: "We use two-factor authentication, IP monitoring, and fraud detection to keep your account safe on our AI trading platform.",
+				q: "Are there any fees for receiving payouts?",
+				a: "No. CloudForex does not charge any payout or withdrawal fees. You receive the full amount, with zero commissions or hidden charges. ✅ Your money, fully yours.",
+			},
+			{
+				q: "What payout methods are available on CloudForex?",
+				a: "You can request payouts via USDT (TRC20/ERC20/BEP20) and USDC (TRC20/ERC20/BEP20/Solana), you can choose the method that suits you best—globally or locally. 🌍 Fast, flexible, and borderless withdrawals.",
+			},
+			{
+				q: "Are there any minimum payout thresholds or limits?",
+				a: "Yes, payouts must exceed the minimum withdrawal threshold (e.g., $10 depending on method). There is no upper limit for verified accounts.💡 Check your dashboard for specific payout thresholds per method.",
 			},
 		],
 	},
 	{
 		icon: CurrencyCircleDollar,
-		title: "Deposits, Withdrawals & Trading Bonus",
+		title: "Trading",
 		questions: [
 			{
-				q: "What are the minimum deposit requirements?",
-				a: "You can start trading with as little as $10. Our investment platform is accessible to everyone and offers trading bonuses for new users.",
+				q: "What assets can I trade on CloudForex?",
+				a: "CloudForex offers 20+ high liquidity instruments including all major pairs and cryptocurrencies (like BTC, ETH, BNB) and metals. 🌐 Trade global markets—all in one platform.",
 			},
 			{
-				q: "How long do withdrawals take to process?",
-				a: "Most withdrawals are processed within 24 hours, depending on your payment method, on our AI forex trading platform.",
+				q: "Does CloudForex support automated trading?",
+				a: "We have our own AI powered trading engine, AlphaQuant, which provides advanced analytics, predictive signals, and automated strategies. You can also use third-party trading bots. 🤖 Automate your trades for optimal results.",
+			},
+			{
+				q: "Is there a demo account available?",
+				a: "Yes, you can practice trading with a free demo account before investing real funds. 🎓 Start simple, scale to expert—on your terms.",
+			},
+			{
+				q: "What is the minimum trade size?",
+				a: "The minimum trade size is 0.01 lots for forex and varies for other instruments. 💰 Trade small, scale big—with flexible lot sizes.",
 			},
 		],
 	},
 	{
 		icon: Users,
-		title: "Support & Alternatives to Exness, Binomo, Quotex",
+		title: "Support",
 		questions: [
 			{
-				q: "What kind of support do you offer?",
-				a: "We offer 24/7 support by live chat, email, and phone. Our team is always ready to help you on our cloud trading platform, a true exness alternative, binomo alternative, and quotex alternative.",
+				q: "Is CloudForex support available 24/7?",
+				a: "Yes, CloudForex offers round-the-clock human support, available 24/7 including weekends and holidays. 💬 We’re always here—no matter your time zone.",
 			},
 			{
-				q: "How can I contact the support team?",
-				a: "You can contact us through your dashboard, by email at hello@cloudforex.com, or by live chat.",
+				q: "How can I contact CloudForex support?",
+				a: "You can reach our team via live chat within the website or email. We prioritize instant connection with real human agents, not bots. 📞 Support that actually responds.",
+			},
+			{
+				q: "Is support available in multiple languages?",
+				a: "Yes, our support team can assist you in several major languages. Please specify your preferred language when contacting us. 🗣️ Trade globally, get help locally—in your language.",
+			},
+			{
+				q: "Is CloudForex support handled by real people?",
+				a: "Yes—no AI or scripted responses. Our support team is made up of real trading experts, ready to help with deposits, withdrawals, trades, and technical issues. 🧠 Real help. Real humans. Real fast.",
 			},
 		],
 	},
 	{
 		icon: ChartLineUp,
-		title: "Trading & Investment",
+		title: "AlphaQuant",
 		questions: [
 			{
-				q: "What trading instruments are available?",
-				a: "We offer a wide range of trading instruments including forex pairs, cryptocurrencies, commodities, and indices. All instruments come with competitive spreads and leverage options.",
+				q: "What is AlphaQuant?",
+				a: "AlphaQuant is our proprietary AI engine that delivers advanced analytics, predictive signals, and automated trading strategies for optimal results. ⚡ Just connect, select your preferences, and let it trade for you.",
 			},
 			{
-				q: "Do you provide trading signals or analysis?",
-				a: "Yes, our AI-powered platform provides real-time trading signals, market analysis, and predictive insights to help inform your trading decisions.",
+				q: "Do I need to configure anything to start using AlphaQuant?",
+				a: "No manual configuration is needed. AlphaQuant is a plug-and-play system—just connect your account, and it instantly begins executing smart trades based on live market conditions. 🧠 No strategies to upload. No VPS. No headaches.",
+			},
+			{
+				q: "How do I access trading analytics?",
+				a: "AlphaQuant activates within minutes after linking your account. Trades begin automatically as soon as a signal matches your risk level and strategy preferences. ⏱ From login to live trades in under 5 minutes.",
+			},
+			{
+				q: "Can I track or stop AlphaQuant’s trades anytime?",
+				a: "Yes. You have full visibility and control over every trade AlphaQuant executes. You can pause, stop, or override trades instantly through your dashboard. 🛑 Automated—but still 100% in your control.",
 			},
 		],
 	},
@@ -81,11 +119,19 @@ const faqCategories = [
 		questions: [
 			{
 				q: "What documents do I need for verification?",
-				a: "For account verification, you'll need a valid government-issued ID (passport/driver's license), proof of address (utility bill/bank statement), and in some cases, additional documents based on your jurisdiction.",
+				a: "For account verification, you'll need a valid government-issued ID (passport/driver's license), proof of address (utility bill/bank statement), and in some cases, additional documents based on your jurisdiction. 📸 Fast verification with support for over 150+ countries.",
 			},
 			{
 				q: "How long does verification take?",
-				a: "Standard verification is typically completed within 24-48 hours. We use automated verification systems to speed up the process while maintaining security.",
+				a: "Most KYC verifications are completed within 5–15 minutes using our AI-powered ID check system. If manual review is needed, it may take up to 24 hours. ✅ Instant onboarding for most users.",
+			},
+			{
+				q: "Can I update my personal information after registration?",
+				a: "Yes, you can update your personal details from your account settings. Some changes may require additional verification.",
+			},
+			{
+				q: "What should I do if my verification is rejected?",
+				a: "If your verification is rejected, please check the requirements and resubmit clear, valid documents or contact support for assistance.",
 			},
 		],
 	},
@@ -94,38 +140,45 @@ const faqCategories = [
 const FaqPage = () => {
 	return (
 		<PageTransition>
-			<div className="min-h-screen">
-				<Navbar />
-				<main className="py-24 px-4">
+			<div className="min-h-screen relative overflow-hidden">
+				{/* Removed Decorative background pattern */}
+				<main className="py-8 px-4 relative z-10">
 					<div className="container mx-auto max-w-[1200px]">
-						<div className="text-center max-w-2xl mx-auto mb-16">
-							<h2 className="text-4xl font-bold mb-4">Frequently Asked Questions</h2>
-							<p className="text-muted-foreground">
-								Find answers to common questions about our platform, services, and features.
-							</p>
+						<div className="flex flex-col items-start text-left gap-3 max-w-2xl mb-12 mt-12">
+							<h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full">
+								FAQs: All your <br />questions answered
+							</h2>
 						</div>
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-10">
 							{faqCategories.map((category, idx) => (
-								<div key={idx} className="space-y-4">
-									<div className="flex items-center gap-3 mb-6">
-										<div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
-											<category.icon className="w-5 h-5 text-primary" weight="duotone" />
-										</div>
-										<h2 className="text-xl font-semibold">{category.title}</h2>
-									</div>
-									<Accordion type="single" collapsible className="space-y-2">
+								<div
+									key={idx}
+									className="space-y-4 rounded-2xl border border-border/30 p-7 transition-transform hover:-translate-y-1 bg-background/90 dark:bg-background/80"
+								>
+									{/* Removed category icon */}
+									<h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
+										{category.title === "AlphaQuant" ? (
+											<>
+												<span className="text-black">Alpha</span>
+												<span className="text-card">Quant</span>
+											</>
+										) : (
+											category.title
+										)}
+									</h2>
+									<Accordion type="single" collapsible className="space-y-3">
 										{category.questions.map((qa, qIdx) => (
 											<AccordionItem
 												key={qIdx}
 												value={`${idx}-${qIdx}`}
-												className="border border-border/50 rounded-lg bg-card px-4"
+												className="border border-border/30 rounded-xl bg-background/80 dark:bg-background/60 px-5 transition-all"
 											>
-												<AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
-													<div className="font-medium">{qa.q}</div>
+												<AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180 transition-colors font-medium text-lg">
+													{/* Removed question badge */}
+													<span>{qa.q}</span>
 												</AccordionTrigger>
-												<AccordionContent className="pb-4 pt-1">
-													<div className="text-muted-foreground text-sm">{qa.a}</div>
+												<AccordionContent className="pb-4 pt-2 transition-all duration-300">
+													<div className="text-muted-foreground text-base leading-relaxed">{qa.a}</div>
 												</AccordionContent>
 											</AccordionItem>
 										))}
@@ -135,6 +188,8 @@ const FaqPage = () => {
 						</div>
 					</div>
 				</main>
+				{/* Optionally add footer here */}
+				{/* <Footer /> */}
 			</div>
 		</PageTransition>
 	);

@@ -2,80 +2,121 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
+import { SealCheck } from "@phosphor-icons/react";
 
-const benefits = [
-	"Smarter trading with advanced AI analytics on our forex trading platform.",
-	"Lightning-fast order execution for cryptocurrency trading and investments.",
-	"Expert support available 24/7 on our secure trading and investment platform.",
-	"A secure, regulated cloud trading platform you can trust.",
-	"Competitive trading conditions and exclusive trading bonus offers.",
-	"Trade multiple assets from one account—your exness, binomo, and quotex alternative.",
+const sealChecks = [
+	"Smarter Trading. Faster Profits.",
+	"AI Analytics. Instant Execution.",
+	"24/7 Expert Support. Always.",
+	"Regulated. Secure. Trusted.",
+	"Tight Spreads. No Fees.",
+	"All Assets. One Platform.",
+	"Trade Forex. Crypto. Instantly.",
+	"Real Platform. Real Profits.",
+	"Next-Gen Cloud Trading.",
+	"Exness? Binomo? Try Better.",
 ];
 
 export const CtaPage = () => {
 	const { user } = useAuth();
 	return (
-		<section className="relative overflow-hidden">
-			{/* Gradient Backgrounds */}
-			<div className="absolute inset-0 bg-grid-white/[0.02] -z-10" />
-
-			<div className="container max-w-7xl relative">
-				<div className="mx-auto max-w-2xl py-24 sm:py-32 lg:py-40">
+		<section className="relative min-h-[400px] overflow-hidden ">
+			<div className="container max-w-7xl relative min-h-[400px]">
+				{/* Magic UI Interactive Grid Pattern Background */}
+				<InteractiveGridPattern
+					squares={[40, 40]}
+					className={cn(
+						"absolute inset-0 -z-10 pointer-events-none",
+						"[mask-image:radial-gradient(900px_circle_at_center,white,transparent)]",
+						"inset-x-0 inset-y-[-40%] h-[300%] skew-y-12"
+					)}
+				/>
+				<div className="mx-auto max-w-2xl py-24 sm:py-12 lg:py-16">
 					<div className="text-center">
-						<h2 className="text-4xl font-bold tracking-tight sm:text-6xl bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
-							Experience Next-Gen Trading
+						<div className="flex justify-center my-12">
+							<img
+								src="/cloudtrade3d.png"
+								alt="CloudTrade 3D"
+								className="w-72 h-72 object-contain"
+							/>
+						</div>
+						<h2 className="text-4xl font-bold tracking-tight sm:text-6xl text-foreground">
+							Your last stop for most trusted moderator
 						</h2>
-						<div className="mt-10 flex items-center justify-center gap-x-6">
+						{/* Hero-style button */}
+						<div className="flex flex-col items-center gap-6 mt-10 w-full">
 							{user ? (
-								<Link to="/platform">
-									<Button
-										size="lg"
-										className="px-8 gap-2 bg-primary hover:bg-primary/90 text-white relative overflow-hidden group"
-									>
-										<span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
-										Access Platform
-										<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-									</Button>
-								</Link>
+								<>
+									{/* Mobile button */}
+									<Link to="/platform" className="block md:hidden w-full">
+										<Button
+											size="sm"
+											className="gap-2 px-6 bg-card text-card-foreground hover:bg-card/95 text-base transition-all h-14 rounded-md w-full"
+										>
+											Access Platform
+										</Button>
+									</Link>
+									{/* Desktop button */}
+									<Link to="/platform" className="hidden md:inline-block">
+										<Button
+											size="lg"
+											className="gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md"
+										>
+											Access Platform
+										</Button>
+									</Link>
+								</>
 							) : (
-								<Link to="/auth/login">
-									<Button
-										size="lg"
-										className="px-8 gap-2 bg-primary hover:bg-primary/90 text-white relative overflow-hidden group"
-									>
-										<span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:animate-shimmer" />
-										Login
-										<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-									</Button>
-								</Link>
+								<>
+									{/* Register button */}
+									<Link to="/auth/login" className="block w-full md:w-auto">
+										<Button
+											size="lg"
+											className="gap-4 px-12 py-8 h-14 text-lg md:text-2xl font-extrabold bg-card text-card-foreground hover:bg-card/95 transition-all rounded-md w-full md:w-auto"
+										>
+											<span className="hidden md:inline">Get your Free Account</span>
+											<span className="inline md:hidden">Register</span>
+										</Button>
+									</Link>
+								</>
 							)}
-							<a
-								href="#"
-								className="text-sm font-semibold leading-6 text-primary"
-								onClick={(e) => {
-									e.preventDefault();
-									window.dispatchEvent(new CustomEvent("open-contact-dialog"));
+						</div>
+						{/* Marquee SealCheck row with side blur */}
+						<div className="relative w-full mt-8">
+							<div className="absolute left-0 top-0 h-full w-16 z-10 pointer-events-none"
+								style={{
+									background: "linear-gradient(to right, var(--background, #fff), transparent)",
+									filter: "blur(12px)",
 								}}
-							>
-								Contact Institutional Trading Team
-								<span aria-hidden="true">→</span>
-							</a>
+							/>
+							<div className="absolute right-0 top-0 h-full w-16 z-10 pointer-events-none"
+								style={{
+									background: "linear-gradient(to left, var(--background, #fff), transparent)",
+									filter: "blur(12px)",
+								}}
+							/>
+							<div className="overflow-hidden w-full">
+								<div className="flex animate-[marquee_10s_linear_infinite] whitespace-nowrap gap-4">
+									{sealChecks.map((text, idx) => (
+										<div key={idx} className="flex items-center gap-2 px-4 py-2">
+											<SealCheck size={24} className="text-foreground" weight="fill" />
+											<span className="text-foreground text-base font-medium">{text}</span>
+										</div>
+									))}
+									{/* Duplicate for seamless loop */}
+									{sealChecks.map((text, idx) => (
+										<div key={`dup-${idx}`} className="flex items-center gap-2 px-4 py-2">
+											<SealCheck size={24} className="text-foreground" weight="fill" />
+											<span className="text-foreground text-base font-medium">{text}</span>
+										</div>
+									))}
+								</div>
+							</div>
 						</div>
 					</div>
-
-					{/* Benefits Grid */}
-					<div className="mx-auto mt-8 max-w-2xl grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
-						{benefits.map((benefit, index) => (
-							<div key={index} className="flex items-center gap-x-3">
-								<div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-primary/10">
-									<Check className="h-4 w-4 text-primary" />
-								</div>
-								<span className="text-sm text-muted-foreground">
-									{benefit}
-								</span>
-							</div>
-						))}
-					</div>
+					{/* Benefits Grid removed */}
 				</div>
 			</div>
 		</section>

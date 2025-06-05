@@ -15,7 +15,7 @@ export const Footer = () => {
                   : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
               }
               alt="CloudForex Logo"
-              className="h-8 w-auto"
+              className="h-6 w-auto"
             />
           </div>
           <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center">

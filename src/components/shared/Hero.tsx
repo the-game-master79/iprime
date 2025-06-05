@@ -1,7 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Cpu, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Rabbit as RabbitIcon } from "@phosphor-icons/react";
+import { useMemo } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowCircleRight, Moon, Sun, SealCheck } from "@phosphor-icons/react";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 interface HeroProps {
   badge: {
@@ -22,119 +29,246 @@ interface HeroProps {
   lottie?: React.ReactNode;
 }
 
-export const Hero = ({ badge, badges, description, action, title, subtitle }: HeroProps) => {
+export const Hero = ({
+  badge = { icon: <ArrowRight className="h-4 w-4" />, text: "Fast Onboarding" },
+  badges = [],
+  title = "Institutional Liquidity.",
+  subtitle,
+  description = "Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.",
+  action,
+  lottie,
+}: Partial<HeroProps> = {}) => {
   const { user } = useAuth();
+
+  // Navbar logic
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { setTheme, theme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 0);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+  };
+
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
+  // Generate a weekly-random number between 2000 and 6000, same for all users each week
+  const weeklyNumber = useMemo(() => {
+    const now = new Date();
+    // Get the ISO week number
+    const getWeek = (d: Date) => {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+      return Math.ceil((((d as any) - (yearStart as any)) / 86400000 + 1)/7);
+    };
+    const week = getWeek(now);
+    const year = now.getUTCFullYear();
+    // Deterministic seed based on year and week
+    const seed = year * 100 + week;
+    // Simple LCG for deterministic pseudo-random
+    let x = Math.sin(seed) * 10000;
+    let num = Math.floor((x - Math.floor(x)) * 4000) + 2000;
+    return num;
+  }, []);
+
   // Use local webp hero image instead of Unsplash and iPhone mockup
   const mockupImg = "/cloudforex-hero.webp";
   return (
-    <section className="relative w-full pt-32 pb-20 overflow-hidden">
+    <section className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
+      {/* Navbar at the top */}
+      <header className="w-full py-3 absolute top-0 left-0 z-20 mt-4">
+        <div className="max-w-[1200px] mx-auto px-4">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-6">
+                <Link to="/" className="flex items-center gap-2">
+                <img
+                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                  alt="CloudForex Logo"
+                  className="h-6 w-auto"
+                />
+                </Link>
+              <nav className="hidden md:flex items-center gap-3">
+                {[
+                  { path: "/trading", label: "Trading" },
+                  { path: "/alphaquant", label: "AlphaQuant" },
+                  { path: "/partners", label: "Partners" },
+                  { path: "/company", label: "Company" },
+                ].map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => handleNavigation(item.path)}
+                    className={cn(
+                      "text-base font-normal px-3 py-2 transition-colors", // changed to text-base and font-normal
+                      "text-white",
+                      isActive(item.path) && "underline underline-offset-4"
+                    )}
+                    style={{ border: "none", borderRadius: 0, background: "none" }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Theme toggle button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="flex items-center justify-center text-white"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" && <Sun className="h-5 w-5" weight="bold" />}
+                {theme !== "dark" && <Moon className="h-5 w-5" weight="bold" />}
+              </Button>
+              <Link to={user ? "/platform" : "/auth/login"}>
+                <Button variant="default" className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
+                  {/* Desktop: Access Platform, Mobile: Dashboard */}
+                  {user ? (
+                    <>
+                      <span className="hidden md:inline">Access Platform</span>
+                      <span className="inline md:hidden">Dashboard</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="hidden md:inline">Register</span>
+                      <span className="inline md:hidden">Register</span>
+                    </>
+                  )}
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
       {/* Cinematic background gradients and light rays */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute w-[900px] h-[900px] -top-[350px] -left-[300px] bg-gradient-to-br from-primary/30 via-primary/0 to-transparent blur-[120px] opacity-70 animate-pulse-slow" />
-        <div className="absolute w-[700px] h-[700px] -bottom-[250px] -right-[200px] bg-gradient-to-tr from-emerald-400/20 to-primary/0 blur-[100px] opacity-60" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-transparent pointer-events-none" />
         <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[120vw] h-40 bg-gradient-to-b from-white/60 via-white/0 to-transparent blur-2xl opacity-40" />
       </div>
-      <div className="relative z-10 w-full max-w-[1200px] mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-8">
-        {/* Left: Content */}
-        <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
-          {/* Feature Badges */}
-          <div className="flex flex-nowrap gap-2 justify-center md:justify-start mb-2 w-full overflow-x-auto">
-            <div className="inline-flex items-center rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-              {badge.icon}
-              <span className="ml-1">{badge.text}</span>
-            </div>
-            <div className="inline-flex items-center rounded-full bg-orange-500/15 px-3 py-1 text-xs font-semibold text-orange-400">
-              <Cpu className="h-4 w-4" />
-              <span className="ml-1">18X CPU Power</span>
-            </div>
-            <div className="inline-flex items-center rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-400">
-              <Users className="h-4 w-4" />
-              <span className="ml-1">50,000+ Active Users</span>
-            </div>
-            {badges?.map((extraBadge, i) => (
-              <div 
-                key={i}
-                className="inline-flex items-center rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-400"
-              >
-                {extraBadge.icon}
-                <span className="ml-1">{extraBadge.text}</span>
-              </div>
-            ))}
-          </div>
+      <div className="relative z-10 w-full max-w-[1200px] mx-auto px-4 flex flex-col items-center md:items-start md:text-left">
+        {/* Content */}
+        <div className="flex-1 flex flex-col items-start md:items-start md:text-left">
           {/* Cinematic, powerful header */}
-          <div className="w-full flex flex-col items-center md:items-start text-center md:text-left">
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-br from-primary via-foreground to-foreground/80 drop-shadow-2xl mb-3 animate-fade-in-up">
-              {title}
+          <div className="w-full flex flex-col items-start md:items-start md:text-left">
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-tight text-white mb-3 animate-fade-in-up">
+              Institutional Liquidity.<br />
+              Retail Control.<br />
+              Global Access.
             </h1>
-            {subtitle && (
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight text-foreground/90 mb-6 animate-fade-in-up delay-100">
-                {subtitle}
-              </h2>
-            )}
-            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto md:mx-0 font-medium mb-2 animate-fade-in-up delay-200">
-              {description}
+            <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-medium mb-16 animate-fade-in-up delay-200">
+              Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.
             </p>
           </div>
           {/* Show Login or Access Platform based on user authentication */}
-          <div className="block pt-4">
+          <div className="block pt-8 w-full">
             {user ? (
               <>
                 {/* Mobile button */}
-                <Link to="/platform" className="block md:hidden">
+                <Link to="/platform" className="block md:hidden w-full">
                   <Button
                     size="sm"
-                    className="gap-2 rounded-xl px-6 bg-primary hover:bg-primary/90 text-primary-foreground text-base shadow-lg transition-all"
+                    className="gap-2 px-6 bg-card text-card-foreground hover:bg-card/95 text-base transition-all h-14 rounded-md w-full"
                   >
                     Access Platform
-                    <ArrowRight className="h-5 w-5" />
                   </Button>
                 </Link>
                 {/* Desktop button */}
                 <Link to="/platform" className="hidden md:inline-block">
                   <Button
                     size="lg"
-                    className="gap-2 rounded-xl px-7 hover:bg-primary/90 text-primary-foreground text-lg shadow-lg transition-all"
+                    className="gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md"
                   >
                     Access Platform
-                    <ArrowRight className="h-6 w-6" />
                   </Button>
                 </Link>
+                {/* SealCheck icons row always directly below the button */}
+                <div className="w-full flex flex-row flex-wrap items-center justify-center gap-4 mt-6" style={{ maxWidth: 340 }}>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                  </div>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                  </div>
+                </div>
               </>
             ) : (
-              <>
-                {/* Mobile button */}
-                <Link to="/auth/login" className="block md:hidden">
-                  <Button
-                    size="sm"
-                    className="gap-2 rounded-xl px-6 hover:bg-primary/90 text-primary-foreground text-base shadow-lg transition-all"
-                  >
-                    Login
-                    <ArrowRight className="h-5 w-5" />
-                  </Button>
-                </Link>
-                {/* Desktop button */}
-                <Link to="/auth/login" className="hidden md:inline-block">
-                  <Button
-                    size="lg"
-                    className="gap-2 rounded-xl px-7 hover:bg-primary/90 text-primary-foreground text-lg shadow-lg transition-all"
-                  >
-                    Login
-                    <ArrowRight className="h-6 w-6" />
-                  </Button>
-                </Link>
-              </>
+              <div className="flex flex-col items-start gap-0 w-full">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-start md:justify-start gap-6 w-full">
+                  <Link to="/auth/login" className="block w-full md:w-auto">
+                    <Button
+                      size="lg"
+                      className="gap-4 px-12 py-8 h-14 text-lg md:text-2xl font-extrabold bg-card text-card-foreground hover:bg-card/95 transition-all rounded-md w-full md:w-auto"
+                    >
+                      <span className="hidden md:inline">Get your Free Account</span>
+                      <span className="inline md:hidden">Register</span>
+                    </Button>
+                  </Link>
+                  {/* Stats: always next to the button on desktop */}
+                  <div className="hidden md:flex flex-row items-center gap-4 justify-start w-full md:w-auto mt-6 md:mt-0">
+                    <RabbitIcon size={40} weight="bold" className="text-white" />
+                    <div className="flex flex-col items-start">
+                      <span className="text-base md:text-lg font-bold text-white leading-tight">
+                        {weeklyNumber.toLocaleString()} traders joined 
+                      </span>
+                      <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
+                        cloudtrade in the last 7 days
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {/* Mobile: SealCheck row first, then stats row */}
+                <div className="flex flex-row flex-wrap items-center justify-center gap-4 mt-4 md:hidden" style={{ maxWidth: 340 }}>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                  </div>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                  </div>
+                </div>
+                <div className="flex md:hidden flex-row items-center gap-4 justify-start w-full mt-6">
+                  <RabbitIcon size={40} weight="bold" className="text-white" />
+                  <div className="flex flex-col items-start">
+                    <span className="text-base md:text-lg font-bold text-white leading-tight">
+                      {weeklyNumber.toLocaleString()} traders joined 
+                    </span>
+                    <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
+                      cloudtrade in the last 7 days
+                    </span>
+                  </div>
+                </div>
+                {/* Desktop: SealCheck row below button as before */}
+                <div className="hidden md:flex flex-row flex-wrap items-center justify-center gap-4" style={{ maxWidth: 340, marginTop: 24 }}>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                  </div>
+                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
+                    <SealCheck size={24} className="text-white" weight="fill" />
+                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                  </div>
+                </div>
+              </div>
             )}
+            {/* ...existing code... */}
           </div>
-        </div>
-        {/* Right: Mock iPhone */}
-        <div className="flex-1 flex justify-center md:justify-end items-center mt-12 md:mt-0">
-          <img
-            src={mockupImg}
-            alt="CloudForex forex trading platform app preview"
-            className="w-full max-w-[320px] h-auto rounded-3xl shadow-2xl select-none pointer-events-none"
-            draggable={false}
-          />
         </div>
       </div>
     </section>

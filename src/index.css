@@ -13,10 +13,11 @@
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 212 29% 84%;
-    --card: 210 20% 98%;
-    --muted: 210 16% 93%;
+    --card: 39 100% 50%; /* #FFA500 */
+    --card-foreground: 0 0% 0%; /* black for contrast */
+    --muted: 212 29% 84%;
     --muted-foreground: 215 16% 47%;
-    --border: 212, 29%, 84%;
+    --border: 210 16% 85%;
     --input: 210 16% 85%;
     --ring: 221 83% 53%;
     --shadow: 0 0% 0% / 0.04;
@@ -33,12 +34,13 @@
   [data-theme="light"] {
     --background: 0 0% 100%;
     --foreground: 224 71% 4%;
-    --primary: 216 100% 58%;
+    --primary: 216 100% 58%; /* #2B7FFF in HSL for light mode */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 212 29% 84%;
-    --card: 210 20% 98%;
-    --muted:212 29% 84%;
+    --card: 39 100% 50%; /* #FFA500 */
+    --card-foreground: 0 0% 0%; /* black for contrast */
+    --muted: 212 29% 84%;
     --muted-foreground: 215 16% 47%;
     --border: 210 16% 85%;
     --input: 210 16% 85%;
@@ -57,11 +59,12 @@
   [data-theme="dark"] {
     --background: 224 71% 4%;
     --foreground: 0 0% 98%;
-    --primary: 199 100% 48%;
+    --primary: 213 100% 60%; /* #2B7FFF in HSL for dark mode as well */
     --primary-foreground: 240 6% 10%;
     --secondary: 216 31% 17%;
     --secondary-foreground: 215 28% 27%;
-    --card: 240 6% 15%;
+    --card: 39 100% 50%; /* #FFA500 */
+    --card-foreground: 0 0% 0%; /* black for contrast */
     --muted: 240 6% 15%;
     --muted-foreground: 215 16% 67%;
     --border: 240 6% 25%;
@@ -212,6 +215,14 @@
       opacity: 0.6;
       transform: scale(1.05) rotate(180deg);
     }
+  }
+
+  @keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 22s linear infinite;
   }
 
   .animate-pulse-gradient {

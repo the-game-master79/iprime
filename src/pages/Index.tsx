@@ -8,9 +8,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Envelope, Lightning } from "@phosphor-icons/react";
-import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
+import { ClEngine } from "@/components/shared/ClEngine";
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 
 // Lazy load non-critical components
@@ -27,6 +27,12 @@ const Index = () => {
   
   // Add scroll animation hook
   useScrollAnimation();
+
+  // Force light theme for this page
+  useEffect(() => {
+    document.documentElement.classList.remove("dark");
+    document.documentElement.classList.add("light");
+  }, []);
 
   // Listen for open-contact-dialog event
   useEffect(() => {
@@ -51,43 +57,9 @@ const Index = () => {
   return (
     <PageTransition>
       <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden relative">
-        {/* Dots and grid background overlay */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0"
-        >
-          {/* Defer SVG background rendering for FCP */}
-          <Suspense fallback={null}>
-            <svg
-              width="100%"
-              height="100%"
-              className="absolute inset-0 w-full h-full"
-              style={{ minHeight: '100vh' }}
-            >
-              {/* Dots */}
-              <defs>
-                <pattern id="dot-pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <circle cx="1.5" cy="1.5" r="1.5" fill="#d4d4d8" opacity="0.12" />
-                </pattern>
-                {/* Grid lines */}
-                <pattern id="grid-pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <rect x="0" y="0" width="32" height="32" fill="none" stroke="#d4d4d8" strokeWidth="0.5" opacity="0.08" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#dot-pattern)" />
-              <rect width="100%" height="100%" fill="url(#grid-pattern)" />
-            </svg>
-          </Suspense>
-        </div>
-        {/* Magic Gradient Orb - defer for FCP */}
-        <Suspense fallback={null}>
-          <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
-            <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse-slower" />
-            <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-r from-pink-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse-slowest" />
-          </div>
-        </Suspense>
+        {/* Removed Dots and grid background overlay */}
+        {/* Removed Magic Gradient Orb */}
         <main className="relative z-10">
-          <Navbar />
           <Hero 
             badge={{
               icon: <Lightning className="h-5 w-5 text-primary" />, 
@@ -101,12 +73,14 @@ const Index = () => {
               href: "/auth/login"
             }}
             lottie={
-              <img src="/ai-forex-trading-platform.svg" alt="AI forex trading platform" width={320} height={320} loading="eager" decoding="async" fetchPriority="high" />
+              <img src="/ai-forex-trading-platform.svg" alt="AI forex trading platform" width={320} height={320} loading="eager" decoding="async" />
             }
           />
+          
           {/* Lazy load below-the-fold sections */}
           <Suspense fallback={<div className="min-h-[200px]" />}> <QuickFeatures /> </Suspense>
           <Suspense fallback={<div className="min-h-[200px]" />}> <HowItWorks /> </Suspense>
+          <ClEngine />
           <Suspense fallback={<div className="min-h-[200px]" />}> <Features /> </Suspense>
           <Suspense fallback={<div className="min-h-[200px]" />}> <FaqPage /> </Suspense>
           <Suspense fallback={<div className="min-h-[200px]" />}> <WallOfLove /> </Suspense>
