@@ -1,5 +1,4 @@
 import { PageTransition } from "@/components/ui-components";
-import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
 import { Building, Trophy, Target, Users, Rocket, ShieldCheck } from "@phosphor-icons/react";
@@ -14,8 +13,6 @@ const CompanyPage = () => {
           <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl animate-pulse-slower" />
           <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-r from-pink-500/10 to-orange-500/10 rounded-full blur-3xl animate-pulse-slowest" />
         </div>
-
-        <Navbar />
 
         <main className="relative z-10">
           <Hero 
