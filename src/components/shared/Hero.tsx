@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowCircleRight, Moon, Sun, SealCheck } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
+import { Navbar } from "@/components/shared/Navbar"; // <-- Add this import
 
 interface HeroProps {
   badge: {
@@ -30,13 +31,8 @@ interface HeroProps {
 }
 
 export const Hero = ({
-  badge = { icon: <ArrowRight className="h-4 w-4" />, text: "Fast Onboarding" },
-  badges = [],
   title = "Institutional Liquidity.",
-  subtitle,
-  description = "Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.",
-  action,
-  lottie,
+  subtitle = "Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.",
 }: Partial<HeroProps> = {}) => {
   const { user } = useAuth();
 
@@ -53,14 +49,6 @@ export const Hero = ({
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const handleNavigation = (path: string) => {
-    navigate(path);
-  };
-
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
 
   // Generate a weekly-random number between 2000 and 6000, same for all users each week
   const weeklyNumber = useMemo(() => {
@@ -87,72 +75,7 @@ export const Hero = ({
   const mockupImg = "/cloudforex-hero.webp";
   return (
     <section className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
-      {/* Navbar at the top */}
-      <header className="w-full py-3 absolute top-0 left-0 z-20 mt-4">
-        <div className="max-w-[1200px] mx-auto px-4">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-6">
-                <Link to="/" className="flex items-center gap-2">
-                <img
-                  src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                  alt="CloudForex Logo"
-                  className="h-6 w-auto"
-                />
-                </Link>
-              <nav className="hidden md:flex items-center gap-3">
-                {[
-                  { path: "/trading", label: "Trading" },
-                  { path: "/alphaquant", label: "AlphaQuant" },
-                  { path: "/partners", label: "Partners" },
-                  { path: "/company", label: "Company" },
-                ].map((item) => (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigation(item.path)}
-                    className={cn(
-                      "text-base font-normal px-3 py-2 transition-colors", // changed to text-base and font-normal
-                      "text-white",
-                      isActive(item.path) && "underline underline-offset-4"
-                    )}
-                    style={{ border: "none", borderRadius: 0, background: "none" }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Theme toggle button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="flex items-center justify-center text-white"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                aria-label="Toggle theme"
-              >
-                {theme === "dark" && <Sun className="h-5 w-5" weight="bold" />}
-                {theme !== "dark" && <Moon className="h-5 w-5" weight="bold" />}
-              </Button>
-              <Link to={user ? "/platform" : "/auth/login"}>
-                <Button variant="default" className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
-                  {/* Desktop: Access Platform, Mobile: Dashboard */}
-                  {user ? (
-                    <>
-                      <span className="hidden md:inline">Access Platform</span>
-                      <span className="inline md:hidden">Dashboard</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="hidden md:inline">Register</span>
-                      <span className="inline md:hidden">Register</span>
-                    </>
-                  )}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar /> {/* <-- Use the shared Navbar at the top */}
       {/* Cinematic background gradients and light rays */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute w-[900px] h-[900px] -top-[350px] -left-[300px] bg-gradient-to-br from-primary/30 via-primary/0 to-transparent blur-[120px] opacity-70 animate-pulse-slow" />
@@ -165,13 +88,13 @@ export const Hero = ({
           {/* Cinematic, powerful header */}
           <div className="w-full flex flex-col items-start md:items-start md:text-left">
             <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-tight text-white mb-3 animate-fade-in-up">
-              Institutional Liquidity.<br />
-              Retail Control.<br />
-              Global Access.
+              {title}
             </h1>
-            <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-medium mb-16 animate-fade-in-up delay-200">
-              Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.
-            </p>
+            {subtitle && (
+              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-medium mb-16 animate-fade-in-up delay-200">
+                {subtitle}
+              </p>
+            )}
           </div>
           {/* Show Login or Access Platform based on user authentication */}
           <div className="block pt-8 w-full">

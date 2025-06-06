@@ -30,7 +30,7 @@ const CompanyPage = () => {
           />
 
           {/* Mission Section */}
-          <section className="py-16 md:py-24">
+          <section className="py-16">
             <div className="container max-w-[1200px] mx-auto px-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
@@ -38,8 +38,8 @@ const CompanyPage = () => {
                     <Target className="w-4 h-4 mr-2" weight="fill" />
                     Our Mission
                   </div>
-                  <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Revolutionizing Financial Markets</h2>
-                  <p className="text-muted-foreground">
+                  <h2 className="text-4xl md:text-5xl font-bold text-foreground">Revolutionizing Financial Markets</h2>
+                  <p className="text-lg text-muted-foreground">
                     Our mission is to democratize financial markets by providing traders of all levels with professional-grade tools and resources. We believe in transparency, innovation, and putting our users first.
                   </p>
                 </div>
@@ -50,10 +50,10 @@ const CompanyPage = () => {
                     { number: "99.9%", label: "Uptime" },
                     { number: "24/7", label: "Support" },
                   ].map((stat, i) => (
-                    <Card key={i} className="border-border/20 bg-card/40 backdrop-blur-sm hover:bg-card/60 transition-colors">
-                      <CardContent className="p-6">
+                    <Card key={i} className="bg-white dark:bg-card p-6 rounded-2xl shadow-lg">
+                      <CardContent className="p-0">
                         <div className="text-2xl sm:text-3xl font-bold text-foreground">{stat.number}</div>
-                        <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
+                        <div className="text-base text-muted-foreground mt-1">{stat.label}</div>
                       </CardContent>
                     </Card>
                   ))}
@@ -70,7 +70,7 @@ const CompanyPage = () => {
                   <Rocket className="w-4 h-4 mr-2" weight="fill" />
                   Our Journey
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-foreground">From Vision to Reality</h2>
+                <h2 className="text-4xl md:text-5xl font-bold text-foreground">From Vision to Reality</h2>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                   Founded in 2022, CloudForex has grown from a small startup to a leading force in online trading. 
                   Our journey has been marked by continuous innovation, technological advancement, and an unwavering 
@@ -78,25 +78,25 @@ const CompanyPage = () => {
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
-                <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
                   <h3 className="text-xl font-semibold mb-3">Global Presence</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     With traders from over 100 countries, we've built a truly global community. Our platform supports 
                     multiple languages and provides 24/7 localized support to ensure every trader gets the assistance 
                     they need, when they need it.
                   </p>
                 </div>
-                <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
                   <h3 className="text-xl font-semibold mb-3">Technological Innovation</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     Our investment in cutting-edge technology sets us apart. From AI-powered trading signals to 
                     ultra-low latency execution, we're constantly pushing the boundaries of what's possible in 
                     online trading.
                   </p>
                 </div>
-                <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
                   <h3 className="text-xl font-semibold mb-3">Security First</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     We implement bank-grade security measures and maintain strict regulatory compliance to ensure 
                     our traders' funds and data are always protected. Our platform undergoes regular security 
                     audits and penetration testing.
@@ -114,7 +114,7 @@ const CompanyPage = () => {
                   <ShieldCheck className="w-4 h-4 mr-2" weight="fill" />
                   Our Values
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-foreground">What We Stand For</h2>
+                <h2 className="text-4xl md:text-5xl font-bold text-foreground">What We Stand For</h2>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                   Our values shape everything we do, from product development to customer service. They're the 
                   foundation of our company culture and guide our decision-making process.
@@ -139,19 +139,12 @@ const CompanyPage = () => {
                     description: "Building a strong, supportive community of traders who learn and grow together."
                   }
                 ].map((value, i) => (
-                  <div key={i} className="relative bg-card/40 backdrop-blur-sm p-2 rounded-2xl border border-border/20">
-                    <div className="h-full w-full border border-border/20 rounded-xl p-6">
-                      <div className="space-y-4">
-                        {/* Gradient Background Container */}
-                        <div className="w-full h-24 rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] relative before:absolute before:inset-0 before:rounded-xl before:border before:border-white/10 before:bg-gradient-to-br before:from-white/5 before:to-transparent">
-                          <div className="relative w-16 h-16 rounded-xl bg-background/80 backdrop-blur flex items-center justify-center shadow-lg shadow-primary/5">
-                            <div className="text-primary">{value.icon}</div>
-                          </div>
-                        </div>
-                        <h3 className="font-semibold text-xl text-center text-foreground">{value.title}</h3>
-                        <p className="text-muted-foreground text-center">{value.description}</p>
-                      </div>
+                  <div key={i} className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg flex flex-col items-center text-center">
+                    <div className="mb-4 flex items-center justify-center w-16 h-16 rounded-xl bg-primary/10">
+                      <span className="text-primary">{value.icon}</span>
                     </div>
+                    <h3 className="font-semibold text-xl text-foreground">{value.title}</h3>
+                    <p className="text-base text-muted-foreground">{value.description}</p>
                   </div>
                 ))}
               </div>
@@ -159,56 +152,56 @@ const CompanyPage = () => {
           </section>
         </main>
 
-          {/* Why Choose Us Section */}
-          <section className="py-16 bg-accent/5">
-            <div className="container max-w-[1200px] mx-auto px-4">
-              <div className="text-center mb-12">
-                <div className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-4">
-                  <Trophy className="w-4 h-4 mr-2" weight="fill" />
-                  Why Choose Us
-                </div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-foreground">The CloudForex Advantage</h2>
-                <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                  We combine advanced technology with exceptional service to provide our traders with an 
-                  unmatched trading experience. Here's what sets us apart:
-                </p>
+        {/* Why Choose Us Section */}
+        <section className="py-16 bg-accent/5">
+          <div className="container max-w-[1200px] mx-auto px-4">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-4">
+                <Trophy className="w-4 h-4 mr-2" weight="fill" />
+                Why Choose Us
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
-                    <h3 className="text-xl font-semibold mb-3">Advanced Trading Tools</h3>
-                    <p className="text-muted-foreground">
-                      Access professional-grade charting, real-time market analysis, and AI-powered trading signals. 
-                      Our platform provides everything you need to make informed trading decisions.
-                    </p>
-                  </div>
-                  <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
-                    <h3 className="text-xl font-semibold mb-3">Educational Resources</h3>
-                    <p className="text-muted-foreground">
-                      Comprehensive learning materials, webinars, and one-on-one mentoring sessions help traders 
-                      at all levels improve their skills and understanding of the markets.
-                    </p>
-                  </div>
+              <h2 className="text-4xl md:text-5xl font-bold text-foreground">The CloudForex Advantage</h2>
+              <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+                We combine advanced technology with exceptional service to provide our traders with an 
+                unmatched trading experience. Here's what sets us apart:
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
+                  <h3 className="text-xl font-semibold mb-3">Advanced Trading Tools</h3>
+                  <p className="text-base text-muted-foreground">
+                    Access professional-grade charting, real-time market analysis, and AI-powered trading signals. 
+                    Our platform provides everything you need to make informed trading decisions.
+                  </p>
                 </div>
-                <div className="space-y-6">
-                  <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
-                    <h3 className="text-xl font-semibold mb-3">Competitive Pricing</h3>
-                    <p className="text-muted-foreground">
-                      Enjoy tight spreads, low commissions, and transparent fee structures. We believe in providing 
-                      the best possible trading conditions to help maximize your potential returns.
-                    </p>
-                  </div>
-                  <div className="bg-card/40 backdrop-blur-sm p-6 rounded-2xl border border-border/20">
-                    <h3 className="text-xl font-semibold mb-3">Dedicated Support</h3>
-                    <p className="text-muted-foreground">
-                      Our experienced support team is available 24/7 to assist you with any questions or concerns. 
-                      We pride ourselves on providing fast, professional, and personalized support.
-                    </p>
-                  </div>
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
+                  <h3 className="text-xl font-semibold mb-3">Educational Resources</h3>
+                  <p className="text-base text-muted-foreground">
+                    Comprehensive learning materials, webinars, and one-on-one mentoring sessions help traders 
+                    at all levels improve their skills and understanding of the markets.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
+                  <h3 className="text-xl font-semibold mb-3">Competitive Pricing</h3>
+                  <p className="text-base text-muted-foreground">
+                    Enjoy tight spreads, low commissions, and transparent fee structures. We believe in providing 
+                    the best possible trading conditions to help maximize your potential returns.
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
+                  <h3 className="text-xl font-semibold mb-3">Dedicated Support</h3>
+                  <p className="text-base text-muted-foreground">
+                    Our experienced support team is available 24/7 to assist you with any questions or concerns. 
+                    We pride ourselves on providing fast, professional, and personalized support.
+                  </p>
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
         <Footer />
       </div>

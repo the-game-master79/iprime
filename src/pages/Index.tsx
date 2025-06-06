@@ -61,20 +61,18 @@ const Index = () => {
         {/* Removed Magic Gradient Orb */}
         <main className="relative z-10">
           <Hero 
-            badge={{
-              icon: <Lightning className="h-5 w-5 text-primary" />, 
-              text: "20X More Profits | Advanced AI Trading"
-            }}
-            title="Institutional Power."
-            subtitle="Retail Access."
-            description="Experience the next generation of trading. Our AI-powered forex trading platform delivers lightning-fast execution, advanced analytics, and institutional-grade tools—now available for everyone."
+            title={
+              <>
+                Institutional Liquidity.<br />
+                Retail Control.<br />
+                Global Access.
+              </>
+            }
+            subtitle="Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform."
             action={{
               text: "Start Trading",
               href: "/auth/login"
             }}
-            lottie={
-              <img src="/ai-forex-trading-platform.svg" alt="AI forex trading platform" width={320} height={320} loading="eager" decoding="async" />
-            }
           />
           
           {/* Lazy load below-the-fold sections */}
