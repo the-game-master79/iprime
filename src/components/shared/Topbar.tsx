@@ -1,38 +1,129 @@
-import { CaretLeft, Wallet as WalletIcon, User, Sun, Moon, UserCircle } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { cn } from "@/lib/utils";
-import { useTheme } from "@/hooks/use-theme";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Bell, UserCircle, GearSix, SignOut, Wallet, CaretLeft } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/hooks/use-theme";
+import { toast } from "@/components/ui/use-toast";
 
-interface TopbarProps {
+interface Notice {
+  id: string;
   title: string;
-  variant?: 'default' | 'minimal' | 'transparent' | 'ai';  // Add 'ai' variant
-  hideBalance?: boolean;
-  hideBackButton?: boolean;
-  className?: string;
-  backButtonAction?: () => void;
-  plansCount?: number;
+  content: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  created_at: string;
+  amount?: number;
 }
 
-export const Topbar = ({ 
-  title, 
-  variant = 'default',
-  hideBalance = false,
-  hideBackButton = false,
-  className,
-  backButtonAction,
-  plansCount = 0,
-  currentUser: propCurrentUser
-}: TopbarProps & { currentUser?: any }) => {
+const CURRENCIES = [
+  "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY", "INR", "SGD",
+  "NZD", "ZAR", "BRL", "HKD", "KRW"
+];
+
+const LANGUAGES = [
+  { code: "en", label: "English", native: "English" },
+  { code: "es", label: "Spanish", native: "Español" },
+  { code: "fr", label: "French", native: "Français" },
+  { code: "de", label: "German", native: "Deutsch" },
+  { code: "zh", label: "Chinese", native: "中文" },
+  { code: "ja", label: "Japanese", native: "日本語" },
+  { code: "ru", label: "Russian", native: "Русский" },
+  { code: "ar", label: "Arabic", native: "العربية" },
+  { code: "pt", label: "Portuguese", native: "Português" },
+  { code: "hi", label: "Hindi", native: "हिन्दी" },
+  { code: "tr", label: "Turkish", native: "Türkçe" },
+  { code: "it", label: "Italian", native: "Italiano" },
+  { code: "ko", label: "Korean", native: "한국어" },
+  { code: "nl", label: "Dutch", native: "Nederlands" },
+  { code: "pl", label: "Polish", native: "Polski" }
+];
+
+// SettingsDialog component
+function SettingsDialog({ open, onOpenChange, theme, setTheme, currency, setCurrency, language, setLanguage }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  theme: string;
+  setTheme: (theme: string) => void;
+  currency: string;
+  setCurrency: (currency: string) => void;
+  language: string;
+  setLanguage: (lang: string) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm bg-background text-foreground border-border">
+        <DialogHeader>
+          <DialogTitle>Settings</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-between">
+            <span>
+              {theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            </span>
+            <Switch
+              checked={theme === "dark"}
+              onCheckedChange={checked => setTheme(checked ? "dark" : "light")}
+            />
+          </div>
+          {/* Currency Selector */}
+          <div>
+            <label className="block text-sm mb-1">Currency</label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent className="max-h-48 text-foreground">
+                {CURRENCIES.map(cur => (
+                  <SelectItem key={cur} value={cur} className="text-foreground">{cur}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Language Selector */}
+          <div>
+            <label className="block text-sm mb-1">Language</label>
+            <Select value={language} onValueChange={setLanguage}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent className="max-h-48 text-foreground">
+                {LANGUAGES.map(lang => (
+                  <SelectItem key={lang.code} value={lang.code} className="text-foreground">{lang.native}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {/* No DialogFooter */}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export const Topbar = ({
+  currentUser: propCurrentUser,
+  title,
+}: {
+  currentUser?: any;
+  title?: string;
+} = {}) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
-  const [balance, setBalance] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(propCurrentUser || null);
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const [hasActivePlan, setHasActivePlan] = useState<boolean>(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currency, setCurrency] = useState("USD");
+  const [language, setLanguage] = useState("en");
 
   useEffect(() => {
     if (propCurrentUser) {
@@ -47,219 +138,285 @@ export const Topbar = ({
   }, [propCurrentUser]);
 
   useEffect(() => {
-    fetchUserBalance();
+    if (currentUser) {
+      fetchNotices();
+      fetchAvailableBalance();
+      fetchActivePlans();
+    }
   }, [currentUser]);
 
-  const fetchUserBalance = async () => {
+  const fetchNotices = async () => {
     try {
       if (!currentUser) return;
+
       const { data, error } = await supabase
+        .from('notices')
+        .select('*')
+        .or(`user_id.eq.${currentUser.id},user_id.is.null`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotices(data || []);
+      setUnreadCount(data?.filter(n => !n.read_at).length || 0);
+    } catch (error) {
+      console.error('Error fetching notices:', error);
+    }
+  };
+
+  // Fetch platform available balance (withdrawal_wallet + sum of all subscribed plans)
+  const fetchAvailableBalance = async () => {
+    try {
+      if (!currentUser) return;
+
+      // Fetch withdrawal_wallet
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('withdrawal_wallet')
         .eq('id', currentUser.id)
         .single();
 
-      if (error) throw error;
-      setBalance(data?.withdrawal_wallet || 0);
+      if (profileError) throw profileError;
+      const withdrawalWallet = profileData?.withdrawal_wallet || 0;
+
+      // Fetch sum of all subscribed plans (status: approved)
+      const { data: plansData, error: plansError } = await supabase
+        .from('plans_subscriptions')
+        .select('amount')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'approved');
+
+      if (plansError) throw plansError;
+      const plansSum = (plansData || []).reduce((sum: number, plan: any) => sum + (Number(plan.amount) || 0), 0);
+
+      setAvailableBalance(Number(withdrawalWallet) + Number(plansSum));
     } catch (error) {
-      console.error('Error fetching balance:', error);
+      setAvailableBalance(0);
     }
   };
 
-  const handleBalanceClick = () => {
-    if (window.location.pathname === '/cashier') {
-      window.location.reload();
-    } else {
-      navigate('/cashier');
+  // Fetch if user has at least 1 active plan
+  const fetchActivePlans = async () => {
+    try {
+      if (!currentUser) return;
+      const { data, error } = await supabase
+        .from('plans_subscriptions')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'approved')
+        .limit(1);
+      if (error) throw error;
+      setHasActivePlan((data?.length || 0) > 0);
+    } catch (error) {
+      setHasActivePlan(false);
     }
   };
 
-  const renderDefaultContent = () => (
-    <>
-      <div className="flex items-center gap-4">
-        {!hideBackButton && (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="flex items-center gap-2 text-white hover:bg-[#3D3D3D]"
-            onClick={backButtonAction || (() => window.history.back())}
-          >
-            <CaretLeft className="h-4 w-4" />
-          </Button>
-        )}
-        <div 
-          className="cursor-pointer"
-          onClick={() => navigate('/platform')}
-        >
-          <img 
-            src={
-              theme === "dark"
-                ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
-            }
-            alt="CloudForex" 
-            className="h-8 w-auto"
-          />
-        </div>
-      </div>
+  const handleMarkAllAsRead = async () => {
+    try {
+      if (!currentUser) return;
 
-      <div className="flex items-center gap-4">
-        {!hideBalance && (
-          <div onClick={handleBalanceClick} className="flex items-center gap-2 rounded-full bg-[#3D3D3D] px-4 py-1.5 shadow-sm transition-colors hover:bg-[#3D3D3D]/80 cursor-pointer">
-            <WalletIcon className="h-4 w-4 text-white" weight="fill" />
-            <span className="text-sm font-medium text-white">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </div>
-        )}
+      await supabase
+        .from('notices')
+        .update({ read_at: new Date().toISOString() })
+        .is('read_at', null);
 
-        <Button 
-          variant="ghost" 
-          size="icon"
-          className="rounded-lg bg-[#3D3D3D] hover:bg-[#3D3D3D]/80"
-          onClick={() => navigate('/profile')}
-        >
-          <User className="h-5 w-5 text-white" weight="fill" />
-        </Button>
-      </div>
-    </>
-  );
+      fetchNotices();
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  // Logout handler
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  // AQ Button click handler
+  const handleAQClick = () => {
+    navigate("/plans");
+  };
 
   return (
     <>
-      <header className={cn(
-        "sticky top-0 z-50 w-full bg-secondary",
-        variant === 'default' && "",
-        variant === 'minimal' && "bg-transparent",
-        variant === 'transparent' && "absolute bg-transparent",
-        variant === 'ai' && "border-none",
-        className
-      )}>
-        <div className="mx-auto flex h-14 max-w-[1000px] items-center px-4">
-          <div className="flex flex-1 items-center justify-between gap-4">
-            <div className="flex items-center gap-2 sm:gap-4">
-              {!hideBackButton && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 text-foreground hover:bg-secondary-foreground"
-                  onClick={backButtonAction || (() => window.history.back())}
-                >
-                  <CaretLeft className="h-4 w-4" />
-                </Button>
-              )}
-              <div 
-                className="cursor-pointer"
-                onClick={() => navigate('/platform')}
-              >
-                <img 
-                  src={
-                    theme === "dark"
-                      ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                      : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
-                  }
-                  alt="CloudForex" 
-                  className="h-6 sm:h-8 w-auto"
-                />
-              </div>
-            </div>
-
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        theme={theme}
+        setTheme={setTheme}
+        currency={currency}
+        setCurrency={setCurrency}
+        language={language}
+        setLanguage={setLanguage}
+      />
+      <header className="flex flex-col bg-secondary w-full px-4 md:px-8 py-4">
+        <div className="max-w-[1200px] mx-auto w-full">
+          <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
-              {!hideBalance && (
-                <div
-                  onClick={handleBalanceClick}
-                  className="flex items-center gap-2 rounded-full bg-secondary-foreground px-2 py-1.5 shadow-sm cursor-pointer min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Go to Cashier"
-                >
-                  <WalletIcon className="h-5 w-5 text-primary" weight="fill" />
-                  <span className="text-sm font-medium text-foreground">
-                    {balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              )}
-
-              {/* Theme toggle button */}
+              {/* Back Button */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-lg bg-secondary-foreground text-primary hover:bg-secondary min-h-[44px] min-w-[44px]"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                aria-label="Toggle theme"
+                className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground mr-1"
+                onClick={() => navigate('/platform')}
+                aria-label="Back"
               >
-                {theme === "dark" ? (
-                  <Sun className="h-5 w-5 text-yellow-400" weight="bold" />
-                ) : (
-                  <Moon className="h-5 w-5 text-blue-500" weight="bold" />
-                )}
+                <CaretLeft className="h-5 w-5 text-foreground" weight="bold" />
               </Button>
-
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="rounded-lg bg-secondary hover:bg-secondary-foreground min-h-[44px] min-w-[44px]"
-              onClick={() => navigate('/profile')}
-              aria-label="Go to Profile"
-            >
-              <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
-                <AvatarFallback className="bg-primary rounded-lg">
-                  <UserCircle weight="bold" className="h-6 w-6 text-primary-foreground" />
-                </AvatarFallback>
-              </Avatar>
-            </Button>
+              {/* Logo: show icon only on mobile, full logo on md+ */}
+              <img
+                src={
+                  theme === "dark"
+                    ? "/ct-logo-dark.svg"
+                    : "/ct-logo-light.svg"
+                }
+                alt="CloudForex"
+                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
+                onClick={() => window.location.reload()}
+              />
+              <img
+                src={
+                  theme === "dark"
+                    ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                    : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                }
+                alt="CloudForex"
+                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
+                onClick={() => window.location.reload()}
+              />
             </div>
-          </div>
-        </div>
-      </header>
-      
-      <div className="bg-secondary">
-        <div className="mx-auto max-w-[1000px] px-4 py-4">
-          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {variant === 'ai' && (
-                <img
-                  src={
-                    theme === "dark"
-                      ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-dark.svg"
-                      : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//ai-light.svg"
-                  }
-                  alt="AI Trading"
-                  className="h-6 w-12"
-                />
-              )}
-              <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
-            </div>
-
-            {variant === 'ai' && (
-              <div className={cn(
-                "px-3 py-1.5 rounded-full text-sm flex items-center gap-2",
-                plansCount > 0 
-                  ? "bg-green-500/20 text-green-500" 
-                  : "bg-red-500/20 text-red-500"
-              )}>
-                <div className="relative flex h-3 w-3">
-                  {/* Outer glow */}
-                  <span className={cn(
-                    "animate-[ping_2s_ease-in-out_infinite] absolute inline-flex h-full w-full rounded-full opacity-30",
-                    plansCount > 0 ? "bg-green-500" : "bg-red-500"
-                  )}></span>
-                  {/* Middle glow */}
-                  <span className={cn(
-                    "animate-[ping_2s_ease-in-out_infinite_0.3s] absolute inline-flex h-[80%] w-[80%] rounded-full opacity-50 top-[10%] left-[10%]",
-                    plansCount > 0 ? "bg-green-500" : "bg-red-500"
-                  )}></span>
-                  {/* Core dot */}
-                  <span className={cn(
-                    "relative inline-flex rounded-full h-full w-full shadow-[0_0_12px_0_rgba(0,255,0,0.6)]",
-                    plansCount > 0 ? "bg-success" : "bg-error",
-                    plansCount > 0 ? "shadow-success" : "shadow-error"
-                  )}></span>
-                </div>
-                {plansCount > 0 ? "AI Agent is Working" : "AI Agent Offline"}
+              {/* Available Balance */}
+              <div className="hidden md:flex flex-col items-end mr-2">
+                <span className="text-xs text-muted-foreground">Available Balance</span>
+                <span className="font-regular text-lg text-foreground">
+                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                  <span className="font-bold">USD</span>
+                </span>
               </div>
-            )}
+              {/* Mobile: Balance badge with wallet icon */}
+              <div className="flex md:hidden items-center">
+                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground text-foreground">
+                  <Wallet className="w-4 h-4 mr-1" weight="bold" />
+                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </Badge>
+              </div>
+              {/* AQ Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-10 w-10 rounded-lg relative hover:bg-secondary-foreground ${
+                  hasActivePlan ? "bg-success" : "bg-destructive"
+                }`}
+                onClick={handleAQClick}
+                aria-label="AlphaQuant"
+              >
+                <span className={`font-bold text-sm ${
+                  hasActivePlan ? "text-white" : "text-white"
+                }`}>AQ</span>
+              </Button>
+              {/* Notifications */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground"
+                  >
+                    <Bell className="h-5 w-5 text-foreground" weight="bold" />
+                    {unreadCount > 0 && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -right-1 -top-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary text-primary-foreground"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[380px] bg-card text-card-foreground border-border">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                    <DropdownMenuLabel className="text-foreground">Notifications</DropdownMenuLabel>
+                    {notices.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs hover:text-primary"
+                        onClick={handleMarkAllAsRead}
+                      >
+                        Mark all as read
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-[300px] overflow-auto">
+                    {notices.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                        No notifications
+                      </div>
+                    ) : (
+                      notices.map((notice) => (
+                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default hover:bg-accent">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-foreground">{notice.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {notice.content.replace(
+                                /\$?([\d,.]+)(\.\d+)?/g,
+                                (match, whole, decimal) => {
+                                  const num = parseFloat(match.replace(/[$,]/g, ''));
+                                  return isNaN(num) ? match : `$${num.toFixed(2)}`;
+                                }
+                              )}
+                            </p>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-lg bg-secondary hover:bg-secondary-foreground rounded-lg"
+                  >
+                    <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
+                      <AvatarFallback className="bg-primary rounded-lg">
+                        <UserCircle weight="bold" className="h-6 w-6 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40 bg-background text-foreground border-border">
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <UserCircle className="mr-2 h-4 w-4" weight="bold" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                    <GearSix className="mr-2 h-4 w-4" weight="bold" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="bg-destructive text-white" onClick={handleLogout}>
+                    <SignOut className="mr-2 h-4 w-4" weight="bold" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
-      </div>
+        {/* Title row */}
+        {title && (
+          <div className="w-full mt-2">
+            <div className="max-w-[1200px] mx-auto">
+              <span className="font-semibold text-2xl text-foreground block">{title}</span>
+            </div>
+          </div>
+        )}
+      </header>
     </>
   );
 };
