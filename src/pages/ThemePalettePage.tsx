@@ -24,6 +24,7 @@ const paletteVars = [
 	"--error-foreground",
 	"--success",
 	"--success-foreground",
+	"--button",
 	// Add more if you define more in index.css
 ];
 

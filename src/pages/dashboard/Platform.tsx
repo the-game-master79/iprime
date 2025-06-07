@@ -6,52 +6,30 @@ declare global {
 }
 
 import React, { useState, useEffect } from "react";
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { DashboardTopbar } from "@/components/shared/DashboardTopbar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-
-// UI Components
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TransactionTable } from "@/components/transactionTable/TransactionTable";
-import { RankTable } from "@/components/rankTable/RankTable";
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BalanceCard } from "@/components/shared/BalanceCard";
+import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
+import { AffiliateRankCard } from "@/components/shared/AffiliateRankCard";
+import { DashboardActionButtons } from "@/components/shared/DashboardActionButtons";
+import { PlatformMarkets } from "@/components/shared/PlatformMarkets";
+import { ReferralLinkCard } from "@/components/shared/ReferralLinkCard";
+import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import LoadingSpinner from "@/components/ui/loading-spinner";
-
-// Icons
-import { 
-  Copy,
-  QrCode,
-  ShareNetwork,
-  XCircle,
-  Wallet,
-  ArrowDown,
-  ChartLine,
-  Trophy,
-  Target,
-  Users,
-} from "@phosphor-icons/react";
-
-// Utilities
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import QRCode from "qrcode";
-import { cn } from "@/lib/utils";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
-import { usePwaInstall } from "@/hooks/use-pwa-install";
-import { useTheme } from "@/hooks/use-theme"; // Use your custom theme hook
-import { isForexTradingTime } from "@/lib/utils"; // Add this import
-
-// Types
+import { useTheme } from "@/hooks/use-theme";
+import { isForexTradingTime } from "@/lib/utils";
 import type { 
   Rank, 
   BusinessRankState,
   UserProfile, 
   Transaction
-} from "@/types/dashboard"; // You'll need to create this types file
+} from "@/types/dashboard";
 
 // Define Trade interface locally since it's not exported from "@/types/dashboard"
 interface Trade {
@@ -70,40 +48,7 @@ interface Trade {
 }
 
 // Constants
-const REFRESH_INTERVAL = 30000;
-const MIN_DISPLAY_AMOUNT = 0.01;
-
-// Add this helper function before the component
-const isRankEligible = (currentRank: string, targetRank: string, ranks: Rank[]) => {
-  const sortedRanks = [...ranks].sort((a, b) => a.business_amount - b.business_amount);
-  const currentRankIndex = sortedRanks.findIndex(r => r.title === currentRank);
-  const targetRankIndex = sortedRanks.findIndex(r => r.title === targetRank);
-  return targetRankIndex <= currentRankIndex;
-};
-
-// Add this utility function after the imports
-const getBalanceTextSize = (amount: number): string => {
-  if (amount >= 1000000000) return 'text-3xl sm:text-4xl'; // Billions
-  if (amount >= 1000000) return 'text-4xl sm:text-5xl';    // Millions
-  return 'text-5xl sm:text-6xl';                           // Default
-};
-
-interface Promotion {
-  id: string;
-  title: string;
-  image_url: string;
-  link: string;
-  status: 'active' | 'inactive';
-  created_at: string;
-}
-
-interface DashboardContentProps {
-  loading: boolean;
-}
-
-const ShimmerEffect = ({ className }: { className?: string }) => (
-  <div className={cn("animate-pulse bg-muted/50 rounded-lg", className)} />
-);
+const ITEMS_PER_PAGE = 10;
 
 // Add this utility function before the DashboardContent component
 const getPriceDecimals = (symbol: string) => {
@@ -198,10 +143,9 @@ function formatDateLabel(dateKey: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
+const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const { profile, loading: profileLoading } = useUserProfile();
   const { isMobile } = useBreakpoints();
-  const { canInstall, install } = usePwaInstall();
   const { theme, setTheme } = useTheme();
   const { user: authUser } = useAuth(); // <-- get user from context
 
@@ -227,8 +171,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [referralLink, setReferralLink] = useState("");
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
-  const [showQrCode, setShowQrCode] = useState(false);
   const [activePlans, setActivePlans] = useState({ count: 0, amount: 0 });
   const [withdrawalBalance, setWithdrawalBalance] = useState(0);
   const [investmentReturns, setInvestmentReturns] = useState(0);
@@ -265,19 +207,15 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+
   // Add these state variables with the other states
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
-  const ITEMS_PER_PAGE = 10;
 
   // Add this state near other state declarations
   const [directCount, setDirectCount] = useState(0);
-
-  // Add this state with other states
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [showDirectsDialog, setShowDirectsDialog] = useState(false);
 
   // Add ranksLoading state for loading indicator in ranks tab
   const [ranksLoading, setRanksLoading] = useState(false);
@@ -560,6 +498,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Bonus Claimed!",
         description: `You've successfully claimed the bonus for ${rank}`,
+        position: isMobile ? "bottom" : undefined,
       });
 
       // Refresh states
@@ -585,7 +524,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Error",
         description: error.message || "Failed to claim bonus",
-        variant: "destructive"
+        variant: "destructive",
+        position: isMobile ? "bottom" : undefined,
       });
     } finally {
       setIsClaimingBonus(false);
@@ -609,6 +549,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         title: "Success", 
         description: `${rank.title} rank bonus of $${rank.bonus.toLocaleString()} has been added to your withdrawal wallet!`,
         variant: "default",
+        position: isMobile ? "bottom" : undefined,
       });
 
       setClaimedRanks(prev => [...prev, rank.title]);
@@ -625,20 +566,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Error",
         description: error.message || "Failed to claim bonus",
-        variant: "destructive"
+        variant: "destructive",
+        position: isMobile ? "bottom" : undefined,
       });
     } finally {
       setClaimingRank(null);
     }
-  };
-
-  const formatJoinedTime = (date: Date) => {
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-    if (diffInHours === 0) return '1 hour ago';
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    return `${Math.floor(diffInHours / 24)} days ago`;
   };
 
   // Event handlers
@@ -648,30 +581,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Referral Link Copied!",
         description: "Share this Link in your network",
+        position: isMobile ? "bottom" : undefined,
       });
     } catch (err) {
       toast({
         title: "Copy Failed",
         description: "Could not copy to clipboard. Please copy manually.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleShowQrCode = async () => {
-    try {
-      // NOTE: window.location.origin is safe here because this is a trusted dashboard context.
-      // For transactional QR codes, use a server-signed URL.
-      const referralUrl = `${window.location.origin}/auth/login?ref=${userProfile?.referral_code}&tab=register`;
-      const qrDataUrl = await QRCode.toDataURL(referralUrl);
-      setQrCodeUrl(qrDataUrl);
-      setShowQrCode(true);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate QR code",
-        variant: "destructive"
+        variant: "destructive",
+        position: isMobile ? "bottom" : undefined,
       });
     }
   };
@@ -753,23 +670,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     }
   };
 
-  // Fetch promotions from Supabase
-  const fetchPromotions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('promotions')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setPromotions(data || []);
-    } catch (error) {
-      setPromotions([]);
-      console.error('Error fetching promotions:', error);
-    }
-  };
-
   // Effects
   useEffect(() => {
     let mounted = true;
@@ -784,8 +684,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         fetchCommissions(currentUser),
         fetchBusinessStats(currentUser),
         fetchWithdrawalStats(currentUser),
-        fetchClaimedRanks(currentUser),
-        fetchPromotions()
+        fetchClaimedRanks(currentUser)
       ]);
       setIsLoading(false);
     };
@@ -839,12 +738,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       toast({
         title: "Copied",
         description: "Transaction ID copied to clipboard",
+        position: isMobile ? "bottom" : undefined,
       });
     } catch (err) {
       toast({
         title: "Copy Failed",
         description: "Could not copy to clipboard. Please copy manually.",
-        variant: "destructive"
+        variant: "destructive",
+        position: isMobile ? "bottom" : undefined,
       });
     }
   };
@@ -854,15 +755,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     navigate('/tradingstation');
   };
 
-  const handleDirectsClick = () => {
-    setShowDirectsDialog(true);
-  };
-
-  // Add a theme toggle handler
-  const handleThemeToggle = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
-
   // Fetch trading pairs for crypto and forex
   useEffect(() => {
     const fetchTradingPairs = async () => {
@@ -870,7 +762,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
         // Fetch all crypto pairs
         const { data: cryptoPairs, error: cryptoError } = await supabase
           .from('trading_pairs')
-          .select('symbol, image_url, type')
+          .select('symbol, image_url, type, name')
           .eq('type', 'crypto');
 
         // Fetch all forex pairs
@@ -969,21 +861,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
     fetchTransactions(currentUser, nextPage);
   }
 
-  // Utility to trim referral link for display
-  const getTrimmedReferralLink = (link: string) => {
-    if (!link) return "";
-    // Show ...ref=abc123 (last 10 chars after 'ref='), keep protocol and domain
-    const refMatch = link.match(/ref=([a-zA-Z0-9]+)/);
-    if (link.length <= 38) return link;
-    if (refMatch) {
-      const refCode = refMatch[1];
-      const base = link.split('?')[0];
-      return `${base}/...ref=${refCode}`;
-    }
-    // fallback: trim middle
-    return link.slice(0, 18) + "..." + link.slice(-10);
-  };
-
   return (
     <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
       {/* DashboardTopbar with Theme Toggle */}
@@ -992,7 +869,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
       </div>
 
       <main className="py-8">
-        <div className="container mx-auto px-4 max-w-[1000px]">
+        <div className="container mx-auto px-4 max-w-[1200px]">
           {loading || isLoading ? (
             // Replace spinner with skeletons
             <DashboardSkeleton />
@@ -1001,48 +878,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
               {/* Referral Card with Promotions Button */}
               <div className="space-y-4">
                 {/* Referral Link Container */}
-                <div className="bg-secondary rounded-2xl p-4 border border-border">
-                  <div className="flex flex-col gap-4">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShareNetwork className="h-5 w-5 text-primary" weight="fill" />
-                        <span className="text-sm font-medium text-muted-foreground">Your Referral Link</span>
-                      </div>
-                      {/* Removed badge type from here */}
-                    </div>
-                    {/* Referral Link Input */}
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          readOnly
-                          // Show trimmed visually, but keep full value for copy/QR
-                          value={getTrimmedReferralLink(referralLink)}
-                          title={referralLink}
-                          className="w-full pr-[120px] pl-4 font-mono text-foreground text-sm bg-secondary-foreground h-12 border border-border"
-                        />
-                        <div className="absolute right-1 top-1 h-10 flex items-center gap-1">
-                          <Button 
-                            size="icon" 
-                            variant="ghost"
-                            onClick={handleCopyLink}
-                            className="h-8 w-8 rounded-lg hover:bg-white/5"
-                          >
-                            <Copy className="h-4 w-4 text-foreground" weight="regular" />
-                          </Button>
-                          <Button 
-                            size="icon" 
-                            variant="ghost"
-                            onClick={handleShowQrCode}
-                            className="h-8 w-8 rounded-lg hover:bg-white/5"
-                          >
-                            <QrCode className="h-4 w-4 text-foreground" weight="regular" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* <div className="bg-secondary rounded-2xl p-4 border border-border">
+                  ...referral link code...
+                </div> */}
+                <ReferralLinkCard
+                  referralLink={referralLink}
+                  onCopyLink={handleCopyLink}
+                />
               </div>
 
               {/* Balance Container */}
@@ -1076,46 +918,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                     {/* Always show Affiliate Rank Card, even if zero */}
                     <div className="bg-secondary rounded-2xl p-6">
                       <div className="h-full flex flex-col justify-between">
-                        {/* Top: Affiliate Status */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Affiliate Status</span>
-                          </div>
-                          <div className="space-y-1">
-                            <h3 className="text-3xl font-medium">
-                              {businessStats.currentRank || 'New Member'}
-                            </h3>
-                          </div>
+                        {/* Top: Show only the rank, no icon or "Affiliate Status" text */}
+                        <div className="space-y-1 mb-2">
+                          <h3 className="text-3xl font-medium">
+                            {businessStats.currentRank || 'New Member'}
+                          </h3>
                         </div>
                         
-                        {/* Business Volume & Directs Row */}
-                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                          {/* Business Volume Container */}
-                          <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
-                            <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
-                            <span className="text-lg font-semibold text-foreground">
-                              {businessStats.totalVolume.toLocaleString()} USD
-                            </span>
-                          </div>
-                          {/* Directs Container with dialog trigger */}
-                          <div
-                            className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
-                            onClick={handleDirectsClick}
-                            title="View Direct Referral Status"
-                          >
-                            <span className="text-xs text-muted-foreground mb-1">Directs</span>
-                            <span className={cn(
-                              "text-lg font-semibold",
-                              directCount >= 2 ? "text-[#20BF55]" : 
-                              directCount === 1 ? "text-[#FFA500]" : 
-                              "text-[#FF005C]"
-                            )}>
-                              {directCount}/2
-                            </span>
-                          </div>
-                        </div>
-
                         {/* Progress to Next Rank - Moved to bottom */}
                         {businessStats.nextRank && (
                           <div className="space-y-2 mt-auto pt-4">
@@ -1140,665 +949,65 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ loading }) => {
                   </>
                 ) : (
                   <>
-                    {/* Combined Balance Card */}
-                    <div className="md:col-span-2 bg-secondary border border-border rounded-2xl p-6">
-                      <div className="flex flex-col gap-6">
-                        {/* Balances Section */}
-                        <div className="flex flex-col md:flex-row gap-6">
-                          {/* Available Balance */}
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Wallet className="h-5 w-5 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">Available Balance</span>
-                            </div>
-                            <div className="space-y-1">
-                              <h3 className="text-3xl font-medium">
-                                {withdrawalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                              </h3>
-                              {userProfile?.multiplier_bonus > 0 && (
-                                <p className="text-sm text-muted-foreground">
-                                  Including bonus: {(userProfile.multiplier_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* AI Trading Balance */}
-                          <div className="flex-1">
-                            {/* Add hover effect: scale and shadow */}
-                            <div
-                              className="rounded-lg bg-secondary-foreground p-4 transition-transform duration-200 hover:scale-[1.03] hover:shadow-lg group cursor-pointer"
-                              tabIndex={0}
-                              title="View AI Trading Plans"
-                              onClick={() => navigate('/plans')}
-                              onKeyDown={e => { if (e.key === 'Enter') navigate('/plans'); }}
-                              style={{ outline: "none" }}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  {/* AI Trading Box with "AI" text, no fill, only stroke */}
-                                  <div
-                                    className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg group-hover:bg-primary/10 transition-colors"
-                                  >
-                                      <span
-                                        className="text-xs font-bold uppercase text-foreground"
-                                        style={{
-                                          color: "currentColor", // fill color (inside)
-                                          letterSpacing: "0.05em"
-                                        }}
-                                      >
-                                        AUTO
-                                      </span>
-                                  </div>
-                                  <span className="text-sm text-foreground">Trading</span>
-                                </div>
-                                <span className="text-xs bg-background/20 text-foreground px-2 py-1 rounded-full">
-                                  {activePlans.count} {activePlans.count === 1 ? 'Plan' : 'Plans'}
-                                </span>
-                              </div>
-                              <h3 className="text-3xl font-medium">
-                                {totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                              </h3>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons Row - horizontal row for mobile, grid for desktop */}
-                        <div className="flex flex-row gap-3 md:grid md:grid-cols-4 md:gap-3 mt-2" key={theme}>
-                          {/* Common container buttons with icon/logo only, label below */}
-                          <div className="flex flex-col items-center h-full w-full">
-                            <Button 
-                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-primary"
-                              onClick={() => navigate('/tradingstation')}
-                            >
-                              <ChartLine className="h-10 w-10 text-foreground" weight="duotone" />
-                            </Button>
-                            <span className="mt-2 text-sm font-medium text-foreground">Trade</span>
-                          </div>
-                          <div className="flex flex-col items-center h-full w-full">
-                            <Button 
-                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                              onClick={() => navigate('/cashier')}
-                            >
-                              <ArrowDown className="h-10 w-10 text-foreground" weight="duotone" />
-                            </Button>
-                            <span className="mt-2 text-sm font-medium text-foreground">Cashier</span>
-                          </div>
-                          <div className="flex flex-col items-center h-full w-full">
-                            <Button
-                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                              onClick={() => navigate('/affiliate')}
-                            >
-                              <Users className="h-10 w-10 text-foreground" weight="duotone" />
-                            </Button>
-                            <span className="mt-2 text-sm font-medium text-foreground">Affiliates</span>
-                          </div>
-                          <div className="flex flex-col items-center h-full w-full">
-                            <Button 
-                              className="h-14 w-full flex items-center justify-center rounded-xl gap-0 text-white font-regular border-0 bg-secondary-foreground"
-                              onClick={() => navigate('/plans')}
-                            >
-                              {/* AI Trading Button Icon */}
-                              <div
-                                className="flex items-center justify-center h-6 w-12 border-2 border-foreground rounded-lg"
-                              >
-                                  <span
-                                    className="text-xs font-bold uppercase !text-foreground"
-                                    style={{
-                                      color: "currentColor",
-                                      letterSpacing: "0.05em"
-                                    }}
-                                  >
-                                    AUTO
-                                  </span>
-                              </div>
-                            </Button>
-                            <span className="mt-2 text-sm font-medium text-foreground">Trading</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Affiliate Rank Card */}
-                    <div className="bg-secondary rounded-2xl p-6">
-                      <div className="h-full flex flex-col justify-between">
-                        {/* Top: Affiliate Status */}
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Affiliate Status</span>
-                          </div>
-                          <div className="space-y-1">
-                            <h3 className="text-3xl font-medium">
-                              {businessStats.currentRank || 'New Member'}
-                            </h3>
-                          </div>
-                        </div>
-                        
-                        {/* Business Volume & Directs Row */}
-                        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                          {/* Business Volume Container */}
-                          <div className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border">
-                            <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
-                            <span className="text-lg font-semibold text-foreground">
-                              {businessStats.totalVolume.toLocaleString()} USD
-                            </span>
-                          </div>
-                          {/* Directs Container with dialog trigger */}
-                          <div
-                            className="flex-1 bg-secondary-foreground/30 rounded-xl p-4 flex flex-col items-center justify-center border border-border cursor-pointer"
-                            onClick={handleDirectsClick}
-                            title="View Direct Referral Status"
-                          >
-                            <span className="text-xs text-muted-foreground mb-1">Directs</span>
-                            <span className={cn(
-                              "text-lg font-semibold",
-                              directCount >= 2 ? "text-[#20BF55]" : 
-                              directCount === 1 ? "text-[#FFA500]" : 
-                              "text-[#FF005C]"
-                            )}>
-                              {directCount}/2
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Progress to Next Rank - Moved to bottom */}
-                        {businessStats.nextRank && (
-                          <div className="space-y-2 mt-auto pt-4">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
-                              <span>
-                                {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary transition-all duration-500"
-                                style={{ 
-                                  width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    {/* Use shared components for cards */}
+                    <BalanceCard
+                      withdrawalBalance={withdrawalBalance}
+                      userProfile={userProfile}
+                    />
+                    <AlphaQuantCard
+                      totalInvested={totalInvested}
+                      activePlans={activePlans}
+                      onClick={() => navigate('/plans')}
+                    />
+                    <AffiliateRankCard
+                      businessStats={businessStats}
+                    />
                   </>
                 )}
               </div>
-
+              {/* Action Buttons Row */}
+              <DashboardActionButtons
+                theme={theme}
+                navigate={navigate}
+                directCount={directCount}
+                businessStats={businessStats}
+                // handleDirectsClick removed, handled internally
+              />
               {/* Redesigned Markets Section as Table */}
-              <div className="w-full mt-2">
-                <div className="rounded-2xl border border-border p-0 shadow-lg overflow-x-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                    {/* Crypto Markets Table */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 px-6 pt-6 pb-2">
-                        <span className="font-semibold text-lg tracking-tight">Crypto Markets</span>
-                        <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                          Live
-                        </span>
-                      </div>
-                      <table className="min-w-full text-left">
-                        <thead className="bg-secondary">
-                          <tr className="border-b border-border text-xs text-muted-foreground">
-                            <th className="py-2 px-6 font-semibold">Symbol</th>
-                            <th className="py-2 px-2 font-semibold">Bid</th>
-                            <th className="py-2 px-2 font-semibold">Ask</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-background">
-                          {cryptoData.length === 0 ? (
-                            <tr>
-                              <td colSpan={3} className="py-4 px-6 text-muted-foreground text-sm">
-                                No crypto pairs found.
-                              </td>
-                            </tr>
-                          ) : (
-                            cryptoData.map((pair) => {
-                              const symbol = pair.symbol.toUpperCase();
-                              const priceObj = marketPrices[symbol];
-                              const decimals = getPriceDecimals(symbol);
-                              return (
-                                <tr
-                                  key={pair.symbol}
-                                  className="border-b border-border hover:bg-muted/10 transition cursor-pointer"
-                                  onClick={() => navigate('/tradingstation')}
-                                >
-                                  <td className="py-2 px-6 flex items-center gap-2 font-mono font-bold text-base">
-                                    {pair.image_url && (
-                                      <img
-                                        src={pair.image_url}
-                                        alt={pair.symbol}
-                                        className="w-7 h-7 object-contain"
-                                      />
-                                    )}
-                                    {pair.symbol}
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <span
-                                      className={getPriceChangeClass(priceObj?.isPriceUp)}
-                                      key={priceObj?.bid}
-                                    >
-                                      {renderPriceWithBigDigits(priceObj?.bid, decimals)}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <span
-                                      className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
-                                      key={priceObj?.ask}
-                                    >
-                                      {renderPriceWithBigDigits(priceObj?.ask, decimals)}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    {/* Forex Markets Table */}
-                    <div className="flex-1 border-l border-border">
-                      <div className="flex items-center gap-2 px-6 pt-6 pb-2">
-                        <span className="font-semibold text-lg tracking-tight">Forex Markets</span>
-                        <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold
-                          ${forexMarketOpen ? "bg-primary/10 text-primary" : "bg-error/20 text-error"}`}>
-                          {forexMarketOpen ? "Live" : "Closed"}
-                        </span>
-                      </div>
-                      <table className="min-w-full text-left">
-                        <thead className="bg-secondary">
-                          <tr className="border-b border-border text-xs text-muted-foreground">
-                            <th className="py-2 px-6 font-semibold">Symbol</th>
-                            <th className="py-2 px-2 font-semibold">Bid</th>
-                            <th className="py-2 px-2 font-semibold">Ask</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-background">
-                          {forexData.length === 0 ? (
-                            <tr>
-                              <td colSpan={3} className="py-4 px-6 text-muted-foreground text-sm">
-                                No forex pairs found.
-                              </td>
-                            </tr>
-                          ) : (
-                            forexData.map((pair) => {
-                              const symbol = pair.symbol.toUpperCase();
-                              const priceObj = marketPrices[symbol];
-                              const decimals = getPriceDecimals(symbol);
-                              return (
-                                <tr
-                                  key={pair.symbol}
-                                  className="border-b border-border hover:bg-muted/10 transition cursor-pointer"
-                                  onClick={() => navigate('/tradingstation')}
-                                >
-                                  <td className="py-2 px-6 flex items-center gap-2 font-mono font-bold text-base">
-                                    {pair.image_url && (
-                                      <img
-                                        src={pair.image_url}
-                                        alt={pair.symbol}
-                                        className="w-7 h-7 object-contain"
-                                      />
-                                    )}
-                                    {pair.symbol}
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <span
-                                      className={
-                                        !forexMarketOpen
-                                          ? "text-destructive font-semibold"
-                                          : getPriceChangeClass(priceObj?.isPriceUp)
-                                      }
-                                      key={priceObj?.bid}
-                                    >
-                                      {renderPriceWithBigDigits(
-                                        priceObj?.bid,
-                                        decimals,
-                                        !forexMarketOpen
-                                      )}
-                                    </span>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <span
-                                      className={
-                                        !forexMarketOpen
-                                          ? "text-destructive font-semibold"
-                                          : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
-                                      }
-                                      key={priceObj?.ask}
-                                    >
-                                      {renderPriceWithBigDigits(
-                                        priceObj?.ask,
-                                        decimals,
-                                        !forexMarketOpen
-                                      )}
-                                    </span>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <PlatformMarkets
+                cryptoData={cryptoData}
+                forexData={forexData}
+                marketPrices={marketPrices}
+                getPriceDecimals={getPriceDecimals}
+                getPriceChangeClass={getPriceChangeClass}
+                renderPriceWithBigDigits={renderPriceWithBigDigits}
+                forexMarketOpen={forexMarketOpen}
+                navigate={navigate}
+              />
 
-              {/* Tabs Section */}
-              <div>
-                <Tabs defaultValue="transactions" className="w-full">
-                  <TabsList>
-                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    <TabsTrigger value="ranks">Ranks</TabsTrigger>
-                    <TabsTrigger value="closed_trades">Closed Trades</TabsTrigger>
-                  </TabsList>
-                  <TabsContent 
-                    value="transactions" 
-                    className="space-y-3 w-full"
-                  >
-                    {transactionsLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      </div>
-                    ) : transactions.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <Target 
-                          className="h-16 w-16 mb-4 text-white/20"
-                          weight="thin"
-                        />
-                        <p className="text-base">No transactions found</p>
-                        <p className="text-sm text-white/50 mt-1">Your transaction history will appear here</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <TransactionTable 
-                          transactions={transactions} 
-                          onCopyId={handleCopyId}
-                        />
-                        
-                        {hasMore && (
-                          <div className="py-4 text-center">
-                            <Button
-                              variant="outline"
-                              onClick={handleLoadMore}
-                              disabled={isLoadingMore}
-                              className="w-full sm:w-auto"
-                            >
-                              {isLoadingMore ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2" />
-                                  Loading...
-                                </>
-                              ) : (
-                                'Load More'
-                              )}
-                            </Button>
-                          </div>
-                        )}
-
-                        {!hasMore && transactions.length > 0 && (
-                          <div className="py-4 text-center text-sm text-white">
-                            End of your Transactions
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="ranks" className="space-y-4 w-full">
-                    {ranksLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      </div>
-                    ) : (
-                      <RankTable
-                        ranks={ranks}
-                        businessVolume={businessStats.totalVolume}
-                        currentRank={businessStats.currentRank}
-                        claimedRanks={claimedRanks}
-                        claimingRank={claimingRank}
-                        onClaimBonus={handleClaimRankBonus}
-                      />
-                    )}
-                  </TabsContent>
-
-                  {/* Closed Trades Tab */}
-                  <TabsContent value="closed_trades" className="space-y-4 w-full">
-                    {closedTradesLoading ? (
-                      <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      </div>
-                    ) : closedTrades.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <Target 
-                          className="h-16 w-16 mb-4 text-white/20"
-                          weight="thin"
-                        />
-                        <p className="text-base">No closed trades found</p>
-                        <p className="text-sm text-white/50 mt-1">Your closed trades will appear here</p>
-                      </div>
-                    ) : (
-                      <div>
-                        {/* Total PNL for all closed trades */}
-                        <div className="mb-4 flex items-center gap-2">
-                          <span className="font-semibold text-lg">Total PNL:</span>
-                          <span className={`font-bold text-lg ${closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0) >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            {closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0) >= 0 ? "+" : ""}
-                            ${closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0).toFixed(2)}
-                          </span>
-                        </div>
-                        {/* Grouped by date */}
-                        <div className="space-y-6">
-                          {groupTradesByDate(closedTrades).map(({ dateKey, trades }) => {
-                            const dayPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
-                            return (
-                              <div key={dateKey}>
-                                <div className="flex items-center gap-4 mb-2">
-                                  <span className="font-semibold text-base">{formatDateLabel(dateKey)}</span>
-                                  <span className={`font-bold text-base ${dayPnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                    {dayPnl >= 0 ? "+" : ""}${dayPnl.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  {trades.map((trade) => {
-                                    const decimals =
-                                      trade.pair === "XAUUSD" ? 2 :
-                                      trade.pair.endsWith("JPY") ? 3 :
-                                      trade.pair.endsWith("USDT") && ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "BNBUSDT"].includes(trade.pair) ? 2 :
-                                      trade.pair === "DOGEUSDT" ? 5 :
-                                      trade.pair === "ADAUSDT" || trade.pair === "TRXUSDT" ? 4 :
-                                      trade.pair === "DOTUSDT" ? 3 :
-                                      !trade.pair.endsWith("USDT") ? 5 : 2;
-
-                                    const isProfitable = trade.pnl >= 0;
-                                    const closedAt = trade.closed_at || trade.updated_at || trade.created_at;
-                                    return (
-                                      <div
-                                        key={trade.id}
-                                        className="p-4 rounded-xl border border-border bg-muted/10 shadow-sm flex flex-col gap-2"
-                                      >
-                                        <div className="flex items-center gap-3 mb-2">
-                                          <span className="font-semibold text-base">{trade.pair}</span>
-                                          <span
-                                            className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                              trade.type?.toLowerCase() === "buy"
-                                                ? "bg-primary/80 text-white"
-                                                : "bg-destructive/80 text-white"
-                                            }`}
-                                          >
-                                            {trade.type?.toUpperCase()}
-                                          </span>
-                                          <span className="px-2 py-1 rounded-full bg-muted text-foreground text-xs font-medium">
-                                            {Number(trade.lots).toFixed(2)} lot{Number(trade.lots) !== 1 ? 's' : ''}
-                                          </span>
-                                          <span className={`ml-auto font-bold ${isProfitable ? "text-green-500" : "text-red-500"}`}>
-                                            {isProfitable ? "+" : ""}${trade.pnl?.toFixed(2)}
-                                          </span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 items-center text-xs">
-                                          <span className="bg-primary/10 text-primary px-2 py-1 rounded">
-                                            O: {Number(trade.open_price).toFixed(decimals)}
-                                          </span>
-                                          <span className="bg-secondary text-foreground px-2 py-1 rounded">
-                                            C: {Number(trade.close_price).toFixed(decimals)}
-                                          </span>
-                                          <span className="bg-muted text-foreground px-2 py-1 rounded">
-                                            LX: {trade.leverage}x
-                                          </span>
-                                          <span className="text-muted-foreground ml-auto">
-                                            {closedAt ? new Date(closedAt).toLocaleString("en-US", {
-                                              day: "2-digit",
-                                              month: "short",
-                                              hour: "numeric",
-                                              minute: "numeric",
-                                              hour12: true,
-                                            }) : "-"}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </div>
+              {/* Replace Tabs section with new component */}
+              <DashboardTabs
+                transactions={transactions}
+                transactionsLoading={transactionsLoading}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                handleLoadMore={handleLoadMore}
+                handleCopyId={handleCopyId}
+                ranks={ranks}
+                ranksLoading={ranksLoading}
+                businessStats={businessStats}
+                claimedRanks={claimedRanks}
+                claimingRank={claimingRank}
+                onClaimRankBonus={handleClaimRankBonus}
+                closedTrades={closedTrades}
+                closedTradesLoading={closedTradesLoading}
+                groupTradesByDate={groupTradesByDate}
+                formatDateLabel={formatDateLabel}
+              />
             </div>
           )}
         </div>
       </main>
-
-      {/* QR Code Dialog */}
-      <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
-        <DialogContent className="bg-secondary border-0">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold tracking-tight text-foreground">Share Referral Code</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Scan this QR code to share your referral link
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center p-4 space-y-4">
-            {qrCodeUrl && (
-              <div className="bg-foreground p-4 rounded-lg">
-                <img src={qrCodeUrl} alt="Referral QR Code" className="w-64 h-64" />
-              </div>
-            )}
-            <div className="w-full">
-              <div className="relative">
-                <Input
-                  readOnly
-                  value={referralLink}
-                  className="pr-24 bg-secondary-foreground text-foreground border-0"
-                />
-                <Button
-                  size="sm"
-                  onClick={handleCopyLink}
-                  className="absolute right-1 top-2 h-7 bg-primary"
-                >
-                  Copy Link
-                </Button>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              className="w-full" 
-              variant="secondary"
-              onClick={() => setShowQrCode(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <AlertDialog open={showDirectsDialog} onOpenChange={setShowDirectsDialog}>
-        <AlertDialogContent className="bg-gradient-to-br from-secondary via-background to-secondary-foreground border-0 shadow-2xl rounded-2xl p-0 overflow-hidden max-w-[380px]">
-          <div className="flex flex-col items-center justify-center px-6 py-8 relative">
-            <Button
-              variant="ghost"
-              className="absolute right-4 top-4 h-8 w-8 p-0 rounded-full hover:bg-white/10"
-              onClick={() => setShowDirectsDialog(false)}
-            >
-              <XCircle className="h-5 w-5 text-muted-foreground" />
-            </Button>
-            <div className="w-full flex flex-col items-center">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="text-2xl font-bold text-center mb-2 tracking-tight">
-                  Direct Referral Status
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  <div className="flex flex-col items-center gap-6">
-                    <div className="relative flex items-center justify-center mb-2">
-                      <div className={cn(
-                        "rounded-full flex items-center justify-center transition-all duration-300",
-                        directCount >= 2
-                          ? "bg-gradient-to-br from-[#20BF55] to-[#01BAEF] shadow-[0_0_32px_0_rgba(32,191,85,0.3)]"
-                          : directCount === 1
-                          ? "bg-gradient-to-br from-[#FFA500] to-[#FF005C] shadow-[0_0_32px_0_rgba(255,165,0,0.2)]"
-                          : "bg-gradient-to-br from-[#FF005C] to-[#FFA500] shadow-[0_0_32px_0_rgba(255,0,92,0.2)]"
-                      )} style={{ width: 110, height: 110 }}>
-                        <span className={cn(
-                          "text-5xl font-extrabold tracking-tight",
-                          directCount >= 2 ? "text-white" :
-                          directCount === 1 ? "text-white" :
-                          "text-white"
-                        )}>
-                          {directCount}/2
-                        </span>
-                      </div>
-                      {/* Animated check or warning icon */}
-                      <div className="absolute -bottom-3 right-0">
-                        {directCount >= 2 ? (
-                          <svg className="h-8 w-8 text-[#20BF55] animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <circle cx="12" cy="12" r="11" stroke="#20BF55" strokeWidth="2" fill="#fff" />
-                            <path stroke="#20BF55" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M8 12l2.5 2.5L16 9" />
-                          </svg>
-                        ) : (
-                          <svg className="h-8 w-8 text-[#FFA500] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <circle cx="12" cy="12" r="11" stroke="#FFA500" strokeWidth="2" fill="#fff" />
-                            <path stroke="#FFA500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-center text-base font-medium">
-                      {directCount >= 2 ? (
-                        <span>
-                          <span className="text-[#20BF55] font-bold">Congratulations!</span> <br />
-                          You have achieved the required direct referrals.<br />
-                          You can now earn <span className="font-bold text-[#20BF55]">commissions and bonuses</span>.
-                        </span>
-                      ) : (
-                        <span>
-                          <span className={cn(
-                            "font-bold",
-                            directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
-                          )}>
-                            {2 - directCount} more direct referral{2 - directCount > 1 ? 's' : ''}
-                          </span> needed to start earning <span className={cn(
-                            "font-bold",
-                            directCount === 1 ? "text-[#FFA500]" : "text-[#FF005C]"
-                          )}>commissions and bonuses</span>.<br />
-                          <span className="text-muted-foreground text-xs block mt-2">
-                            Invite friends to join and activate their plans.
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-            </div>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

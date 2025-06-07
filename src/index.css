@@ -29,6 +29,7 @@
     --error-foreground: 344 100% 46%;
     --success: 150 96% 45%;
     --success-foreground: 142 100% 33%;
+    --button: 210 32% 91%; /* slate-200 #e2e8f0 */
   }
 
   [data-theme="light"] {
@@ -36,8 +37,8 @@
     --foreground: 224 71% 4%;
     --primary: 216 100% 58%; /* #2B7FFF in HSL for light mode */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 212 29% 84%;
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 213 29% 84%;
     --card: 39 100% 50%; /* #FFA500 */
     --card-foreground: 0 0% 0%; /* black for contrast */
     --muted: 212 29% 84%;
@@ -54,6 +55,7 @@
     --error-foreground: 344 100% 46%;
     --success: 150 96% 45%;
     --success-foreground: 142 100% 33%;
+    --button: 210 32% 91% /* slate-200 #e2e8f0 */
   }
 
   [data-theme="dark"] {
@@ -79,6 +81,7 @@
     --error-foreground: 344 100% 46%;
     --success: 146 63% 50%;
     --success-foreground: 0 0% 0%;
+    --button: 210 20% 94%; /* slate-200 #e2e8f0 */
     color-scheme: dark;
     background-color: hsl(var(--background));
   }
@@ -90,7 +93,7 @@
       --color-primary: 210 100% 60%;
       --color-primary-fg: 240 6% 10%;
       --color-secondary: 240 6% 15%;
-      --color-secondary-fg: 210 20% 98%;
+      --color-secondary-fg: 213 29% 98%;
       --color-card: 240 6% 15%;
       --color-muted: 240 6% 15%;
       --color-muted-fg: 215 16% 67%;

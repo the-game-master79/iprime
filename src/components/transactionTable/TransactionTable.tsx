@@ -146,14 +146,14 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
     return (
       <div 
         key={transaction.id} 
-        className="bg-secondary text-foreground p-4 rounded-xl border border-border"
+        className="text-foreground p-4 rounded-xl border border-border"
       >
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between">
             {/* Left side - Date and Amount */}
             <div className="space-y-1">
               <span className="text-sm text-foreground">{formattedDate}</span>
-              <h2 className={`text-xl font-semibold ${getAmountColor(transaction.status, isPositive)}`}>
+              <h2 className={`text-3xl font-bold ${getAmountColor(transaction.status, isPositive)}`}>
                 {isPositive ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()} USD
               </h2>
               {/* Wallet Address display and copy */}
@@ -176,7 +176,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
             {/* Right side - ID and Copy button */}
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-foreground font-mono">{truncatedId}</span>
+                <span className="text-base text-foreground font-medium">{truncatedId}</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -189,8 +189,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
               <Badge 
                 variant="outline" 
                 className={cn(
-                  "px-3 py-1",
-                  badgeColors.border,
+                  "px-4 py-0.5 text-base font-medium shadow-none border-0",
                   badgeColors.bg,
                   badgeColors.text
                 )}
@@ -218,25 +217,27 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
               {/* Regular transactions */}
               {other.map(renderTransaction)}
 
-              {/* Rewards Accordion */}
-              {rewards.length > 0 && (
-                <Accordion type="single" collapsible className="bg-secondary text-foreground rounded-xl border border-border">
+              {/* Rewards - group in accordion if more than 1, else render directly */}
+              {rewards.length > 1 ? (
+                <Accordion type="single" collapsible className="border border-border rounded-xl">
                   <AccordionItem value={`rewards-${dateKey}`} className="border-0">
-                    <AccordionTrigger className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-regular text-foreground">{rewards.length} Reward Transaction{rewards.length > 1 ? 's' : ''}</span>
-                        <span className="text-sm text-foreground/40">
-                          {format(new Date(dateKey), 'd MMM')}
-                        </span>
-                      </div>
+                    <AccordionTrigger className="px-4 py-3 flex items-center gap-2">
+                      <span className="text-base font-medium">
+                        {rewards.length} Reward Transactions
+                      </span>
+                      <span className="text-sm text-foreground/40">
+                        {format(new Date(dateKey), 'd MMM')}
+                      </span>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className="px-4 pb-4 space-y-2">
+                      <div className="px-2 pb-4 space-y-2">
                         {rewards.map(renderTransaction)}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
+              ) : (
+                rewards.map(renderTransaction)
               )}
             </div>
           ))}

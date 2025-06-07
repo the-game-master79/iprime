@@ -57,25 +57,30 @@ export function RankTable({
     return "border-border bg-secondary hover:bg-secondary-foreground";
   };
 
+  // Add a color map for each rank
+  const rankColorMap: Record<string, { bg: string; icon: string }> = {
+    "New Member":      { bg: "bg-gray-200",         icon: "text-gray-500" },
+    "Amber":           { bg: "bg-amber-100",        icon: "text-amber-500" },
+    "Jade":            { bg: "bg-green-100",        icon: "text-green-600" },
+    "Pearl":           { bg: "bg-sky-100",          icon: "text-sky-400" },
+    "Sapphire":        { bg: "bg-blue-100",         icon: "text-blue-500" },
+    "Topaz":           { bg: "bg-yellow-100",       icon: "text-yellow-500" },
+    "Ruby":            { bg: "bg-rose-100",         icon: "text-rose-500" },
+    "Emerald":         { bg: "bg-emerald-100",      icon: "text-emerald-500" },
+    "Diamond":         { bg: "bg-cyan-100",         icon: "text-cyan-500" },
+    "Platinum":        { bg: "bg-slate-200",        icon: "text-slate-500" },
+    "Gold":            { bg: "bg-yellow-200",       icon: "text-yellow-600" },
+    "Legend":          { bg: "bg-purple-100",       icon: "text-purple-500" },
+    "Ultra Legend":    { bg: "bg-indigo-100",       icon: "text-indigo-500" },
+    "The King":        { bg: "bg-orange-100",       icon: "text-orange-500" },
+    "Mastermind":      { bg: "bg-pink-100",         icon: "text-pink-500" },
+    "Kohinoor":        { bg: "bg-fuchsia-100",      icon: "text-fuchsia-600" },
+  };
+
   const getTrophyStyles = (rank: Rank) => {
-    const nextRankTitle = getNextUnachievedRank();
-    
-    if (rank.title === nextRankTitle) {
-      return {
-        bg: "bg-primary/20",
-        icon: "text-primary"
-      };
-    }
-    if (businessVolume >= rank.business_amount) {
-      return {
-        bg: "bg-success/20",
-        icon: "text-success"
-      };
-    }
-    return {
-      bg: "bg-secondary-foreground",
-      icon: "text-foreground"
-    };
+    // Use the color map for each rank
+    const color = rankColorMap[rank.title] || { bg: "bg-secondary-foreground", icon: "text-foreground" };
+    return color;
   };
 
   const getProgressBarColor = (rank: Rank) => {
@@ -104,17 +109,18 @@ export function RankTable({
           const progressBarColor = getProgressBarColor(rank);
           
           if (rank.title === 'New Member') {
+            const trophyStyles = getTrophyStyles(rank);
             return (
               <div
                 key={rank.id}
-                className="relative rounded-lg border bg-secondary p-4 transition-colors"
+                className="relative rounded-lg border-2 border-border bg-secondary p-4 transition-colors"
               >
                 <div className="flex items-start gap-4">
                   <div className={cn(
                     "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-                    "bg-secondary-foreground"
+                    trophyStyles.bg
                   )}>
-                    <Trophy className="h-6 w-6 text-foreground" />
+                    <Trophy className={cn("h-6 w-6", trophyStyles.icon)} />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold flex items-center gap-2">
@@ -134,7 +140,7 @@ export function RankTable({
             <div
               key={rank.id}
               className={cn(
-                "relative rounded-lg border p-4 transition-colors",
+                "relative rounded-lg border-2 border-border p-4 transition-colors",
                 getRankStyles(rank)
               )}
             >
@@ -143,13 +149,13 @@ export function RankTable({
                   <div
                     className={cn(
                       "flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full",
-                      trophyStyles.bg
+                      getTrophyStyles(rank).bg
                     )}
                   >
                     <Trophy
                       className={cn(
                         "h-5 w-5 sm:h-6 sm:w-6",
-                        trophyStyles.icon
+                        getTrophyStyles(rank).icon
                       )}
                     />
                   </div>
@@ -169,22 +175,25 @@ export function RankTable({
                       <div className="text-sm text-muted-foreground">
                         Target Volume: ${rank.business_amount.toLocaleString()}
                       </div>
-                      <div className="flex items-center gap-2 max-w-[200px] sm:max-w-none">
-                        <div className="h-1.5 sm:h-2 flex-1 rounded-full bg-secondary-foreground">
-                          <div
-                            className={cn(
-                              "h-1.5 sm:h-2 rounded-full transition-all",
-                              progressBarColor
-                            )}
-                            style={{
-                              width: `${Math.min(100, (businessVolume / rank.business_amount) * 100)}%`,
-                            }}
-                          />
+                      {/* Only show progress bar if businessVolume > 0 */}
+                      {businessVolume > 0 && (
+                        <div className="flex items-center gap-2 max-w-[200px] sm:max-w-none">
+                          <div className="h-1.5 sm:h-2 flex-1 rounded-full bg-secondary-foreground">
+                            <div
+                              className={cn(
+                                "h-1.5 sm:h-2 rounded-full transition-all",
+                                progressBarColor
+                              )}
+                              style={{
+                                width: `${Math.min(100, (businessVolume / rank.business_amount) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="text-[10px] sm:text-xs tabular-nums text-muted-foreground shrink-0">
+                            {Math.min(100, Math.round((businessVolume / rank.business_amount) * 100))}%
+                          </span>
                         </div>
-                        <span className="text-[10px] sm:text-xs tabular-nums text-muted-foreground shrink-0">
-                          {Math.min(100, Math.round((businessVolume / rank.business_amount) * 100))}%
-                        </span>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
