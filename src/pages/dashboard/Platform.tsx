@@ -207,7 +207,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-
   // Add these state variables with the other states
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -498,7 +497,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       toast({
         title: "Bonus Claimed!",
         description: `You've successfully claimed the bonus for ${rank}`,
-        position: isMobile ? "bottom" : undefined,
       });
 
       // Refresh states
@@ -524,8 +522,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       toast({
         title: "Error",
         description: error.message || "Failed to claim bonus",
-        variant: "destructive",
-        position: isMobile ? "bottom" : undefined,
+        variant: "destructive"
       });
     } finally {
       setIsClaimingBonus(false);
@@ -549,7 +546,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
         title: "Success", 
         description: `${rank.title} rank bonus of $${rank.bonus.toLocaleString()} has been added to your withdrawal wallet!`,
         variant: "default",
-        position: isMobile ? "bottom" : undefined,
       });
 
       setClaimedRanks(prev => [...prev, rank.title]);
@@ -566,8 +562,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       toast({
         title: "Error",
         description: error.message || "Failed to claim bonus",
-        variant: "destructive",
-        position: isMobile ? "bottom" : undefined,
+        variant: "destructive"
       });
     } finally {
       setClaimingRank(null);
@@ -581,14 +576,12 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       toast({
         title: "Referral Link Copied!",
         description: "Share this Link in your network",
-        position: isMobile ? "bottom" : undefined,
       });
     } catch (err) {
       toast({
         title: "Copy Failed",
         description: "Could not copy to clipboard. Please copy manually.",
-        variant: "destructive",
-        position: isMobile ? "bottom" : undefined,
+        variant: "destructive"
       });
     }
   };
@@ -738,14 +731,12 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       toast({
         title: "Copied",
         description: "Transaction ID copied to clipboard",
-        position: isMobile ? "bottom" : undefined,
       });
     } catch (err) {
       toast({
         title: "Copy Failed",
         description: "Could not copy to clipboard. Please copy manually.",
-        variant: "destructive",
-        position: isMobile ? "bottom" : undefined,
+        variant: "destructive"
       });
     }
   };
