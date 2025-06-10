@@ -153,18 +153,18 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
             {/* Left side - Date and Amount */}
             <div className="space-y-1">
               <span className="text-sm text-foreground">{formattedDate}</span>
-              <h2 className={`text-3xl font-bold ${getAmountColor(transaction.status, isPositive)}`}>
+              <h2 className={`text-lg font-semibold ${getAmountColor(transaction.status, isPositive)}`}>
                 {isPositive ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()} USD
               </h2>
               {/* Wallet Address display and copy */}
               {transaction.wallet_address && (
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-white/60 font-mono break-all">{transaction.wallet_address}</span>
+                  <span className="text-xs text-foreground/60 font-mono break-all">{transaction.wallet_address}</span>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => onCopyId(transaction.wallet_address!)}
-                    className="h-5 w-5 hover:bg-white/10"
+                    className="h-5 w-5 hover:bg-foreground/10"
                     title="Copy wallet address"
                   >
                     <Copy className="h-3 w-3 text-foreground" weight="regular" />
@@ -181,7 +181,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
                   variant="ghost"
                   size="icon"
                   onClick={() => onCopyId(transaction.id)}
-                  className="h-6 w-6 hover:bg-white/10"
+                  className="h-6 w-6 hover:bg-foreground/10"
                 >
                   <Copy className="h-3 w-3 text-foreground" weight="regular" />
                 </Button>
@@ -189,7 +189,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
               <Badge 
                 variant="outline" 
                 className={cn(
-                  "px-4 py-0.5 text-base font-medium shadow-none border-0",
+                  "px-2 py-0.5 text-xs font-medium shadow-none border-0",
                   badgeColors.bg,
                   badgeColors.text
                 )}
@@ -209,7 +209,7 @@ export function TransactionTable({ transactions, onCopyId }: TransactionTablePro
         <div key={year} className="space-y-4">
           {!allSameYear && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-white/60">{year}</span>
+              <span className="text-sm text-foreground/60">{year}</span>
             </div>
           )}
           {Object.entries(dateGroups).map(([dateKey, { rewards, other }]) => (

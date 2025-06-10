@@ -15,9 +15,9 @@ export const AlphaQuantCard: React.FC<{
     <div className="flex-1 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-md text-white font-medium">AlphaQuant</span>
-        <span className="ml-2 px-2 py-0.5 rounded-full bg-white text-foreground text-xs font-semibold border border-border">
+        <span className="ml-2 px-2 py-0.5 rounded-full bg-white text-black text-xs font-semibold border border-0">
           {activePlans.count === 0
-            ? "Activate Quant"
+            ? "Quant Inactive"
             : `${activePlans.count} ${activePlans.count === 1 ? "Active Plan" : "Active Plans"}`}
         </span>
       </div>

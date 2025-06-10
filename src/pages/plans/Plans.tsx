@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Topbar } from "@/components/shared/Topbar"; // Added Topbar import
 import { BalanceCard } from "@/components/shared/BalanceCards"; // Add this import
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast"; // <-- add this import
 import {
@@ -444,7 +444,7 @@ const Plans = () => {
     <>
       <div className="min-h-screen bg-background">
         <Topbar 
-          title="Trading" 
+          title="AlphaQuant" 
           variant="ai" 
           plansCount={subscribedPlans.length}
         />
@@ -581,15 +581,17 @@ const Plans = () => {
           </Tabs>
         </div>
 
-        <AlertDialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Subscription</AlertDialogTitle>
-              <AlertDialogDescription>
+        <Dialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
+          <DialogContent className="bg-secondary text-foreground border-border border">
+            <DialogHeader>
+              <DialogTitle>Confirm Subscription</DialogTitle>
+              <DialogDescription>
                 <div className="space-y-4">
-                  <div>Please confirm your subscription to {planToSubscribe?.name}</div>
-                  
-                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
+                  <div>
+                    Please confirm your subscription to{" "}
+                    <span className="font-semibold text-foreground">{planToSubscribe?.name}</span>
+                  </div>
+                  <div className="rounded-lg border border-border bg-secondary-foreground border border-border text-foreground p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Current Balance:</span>
                       <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
@@ -598,34 +600,43 @@ const Plans = () => {
                       <span>Investment Amount:</span>
                       <span>-${planToSubscribe?.investment.toLocaleString()} USD</span>
                     </div>
-                    <Separator className="my-2" />
+                    <Separator className="my-2 border-border border" />
                     <div className="flex justify-between font-medium">
                       <span>Remaining Balance:</span>
-                      <span>${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD</span>
+                      <span>
+                        ${((userProfile?.withdrawal_wallet || 0) - (planToSubscribe?.investment || 0)).toLocaleString()} USD
+                      </span>
                     </div>
                   </div>
                 </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={subscribing}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmSubscription} disabled={subscribing}>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => handleDialogClose(false)}
+                disabled={subscribing}
+                className="rounded-md"
+              >
+                Cancel
+              </Button>
+              <Button className="rounded-md" onClick={handleConfirmSubscription} disabled={subscribing}>
                 {subscribing ? "Subscribing..." : "Confirm"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Cancel Confirmation Dialog */}
-        <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Cancel Plan</AlertDialogTitle>
-              <AlertDialogDescription>
+        <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <DialogContent className="bg-secondary text-foreground">
+            <DialogHeader>
+              <DialogTitle>Cancel Plan</DialogTitle>
+              <DialogDescription>
                 <div className="space-y-4">
                   <p>Are you sure you want to cancel this plan? This action cannot be undone.</p>
                   
-                  <div className="mt-4 p-4 rounded-lg border bg-muted/50 space-y-2">
+                  <div className="mt-4 p-4 rounded-lg border bg-secondary text-foreground border border-border space-y-2">
                     <div className="flex justify-between">
                       <span>Plan Name:</span>
                       <span className="font-medium">{planToCancel?.name}</span>
@@ -645,11 +656,11 @@ const Plans = () => {
                       const { forexFee, adminFee, refundAmount } = getRefundDetails(planToCancel.investment);
                       return (
                         <>
-                          <div className="flex justify-between text-destructive/80">
+                          <div className="flex justify-between text-error">
                             <span>Pre-closure Fee (10%):</span>
                             <span>-{forexFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
-                          <div className="flex justify-between text-destructive/80">
+                          <div className="flex justify-between text-error">
                             <span>Admin Fee (5%):</span>
                             <span>-{adminFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
@@ -663,16 +674,16 @@ const Plans = () => {
                     })()}
                   </div>
                 </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={cancelling}>Keep Plan</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCancelConfirm} className="bg-destructive hover:bg-destructive/90" disabled={cancelling}>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" className="rounded-md" onClick={() => setShowCancelDialog(false)} disabled={cancelling}>Keep Plan</Button>
+              <Button onClick={handleCancelConfirm} className="bg-error hover:bg-error rounded-md text-white" disabled={cancelling}>
                 {cancelling ? "Cancelling..." : "Cancel Plan"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </>

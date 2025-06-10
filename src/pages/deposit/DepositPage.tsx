@@ -14,14 +14,13 @@ import { Label } from "@/components/ui/label"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransactionTable } from "@/components/transactionTable/TransactionTable";
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 import { BalanceCard } from "@/components/shared/BalanceCards";
 import { KycVariant } from "@/components/shared/KycVariants";
@@ -681,27 +680,29 @@ export default function CashierPage() {
   const fetchKycStatus = async () => {
     try {
       if (!currentUser) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('kyc_status')
-        .eq('id', currentUser.id)
-        .single();
-      // Fix: always expect array for kyc, handle empty result
-      const { data: kycArr } = await supabase
+      // Fetch the latest KYC record for the user from the kyc table
+      const { data: kycArr, error } = await supabase
         .from('kyc')
-        .select('updated_at')
+        .select('status, updated_at')
         .eq('user_id', currentUser.id)
         .order('updated_at', { ascending: false })
         .limit(1);
 
       let kycDateValue: Date | undefined = undefined;
-      if (Array.isArray(kycArr) && kycArr.length > 0 && kycArr[0]?.updated_at) {
-        kycDateValue = new Date(kycArr[0].updated_at);
+      let kycStatusValue: 'pending' | 'processing' | 'completed' | 'rejected' | 'required' = 'pending';
+      if (Array.isArray(kycArr) && kycArr.length > 0) {
+        kycStatusValue = kycArr[0]?.status || 'pending';
+        if (kycArr[0]?.updated_at) {
+          kycDateValue = new Date(kycArr[0].updated_at);
+        }
       }
-
-      setKycStatus(profile?.kyc_status || 'pending');
+      setKycStatus(kycStatusValue);
       setKycDate(kycDateValue);
-    } catch (error) {}
+    } catch (error) {
+      // fallback to pending
+      setKycStatus('pending');
+      setKycDate(undefined);
+    }
   };
   const fetchWithdrawalTransactions = async () => {
     try {
@@ -965,7 +966,7 @@ export default function CashierPage() {
           </Button>
         }
       />
-      <div className="container mx-auto max-w-[1000px] px-4 py-6 space-y-6">
+      <div className="container mx-auto max-w-[1200px] px-4 py-6 space-y-6">
         <div className="flex items-center justify-between mb-6">
           <Tabs defaultValue="add-funds" className="w-full">
             <div className="flex items-center justify-between w-full">
@@ -986,8 +987,8 @@ export default function CashierPage() {
             </div>
 
             <TabsContent value="add-funds">
-              <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
-                <div className="space-y-6 max-w-[400px]"> {/* Set max width for deposit form */}
+              <div className="grid gap-6 lg:grid-cols-2"> {/* Two columns on desktop, one on mobile */}
+                <div className="space-y-6 max-w-[400px]"> {/* Deposit form */}
                   {/* Remove Card and CardContent wrappers for deposit form */}
                   <form>
                     <div className="space-y-4">
@@ -1133,7 +1134,7 @@ export default function CashierPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 bg-[#1E1E1E] border-0 hover:bg-[#252525]"
+                                    className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 bg-foreground border-0 hover:bg-foreground/80 rounded-md"
                                     type="button"
                                     onClick={() => handleCopyAddress(availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address || '')}
                                   >
@@ -1150,7 +1151,7 @@ export default function CashierPage() {
                     <div className="mt-6 flex flex-col gap-3">
                       <Button 
                         type="submit"
-                        className="w-full bg-primary text-white"
+                        className="w-full bg-primary text-white rounded-md hover:bg-primary/90 focus:ring-2 focus:ring-primary/50 focus:outline-none"
                         size="lg"
                         disabled={!amount || !cryptoType || !!amountError}
                         onClick={async (e) => {
@@ -1216,132 +1217,81 @@ export default function CashierPage() {
                     </div>
                   )}
                 </div>
-                {/* System Info - Hidden on Mobile */}
-                <div className="hidden md:block">
-                  <Card className="border-none bg-secondary h-fit">
-                    <CardContent className="p-6 space-y-4">
-                      <h3 className="font-semibold text-foreground mb-4">System Information</h3>
-                      
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Average Payment Time</span>
-                          <span className="text-sm text-foreground">5 Mins</span>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Fees</span>
-                          <span className="text-sm text-foreground">0 USD</span>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">System Status</span>
-                          <span className="text-sm text-success">100% Uptime</span>
-                        </div>
-                        
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Blockchain Status</span>
-                          <span className="text-sm text-success">87.32% Uptime</span>
-                        </div>
+                <div className="mt-0 lg:mt-0"> {/* Deposit History on right for desktop, below for mobile */}
+                  {/* Deposit History Header and Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-2xl font-semibold text-foreground">Deposit History</h2>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          id="history-filter"
+                          value={historySortField}
+                          onValueChange={setHistorySortField}
+                        >
+                          <SelectTrigger className="w-[120px] bg-secondary border-none text-foreground">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="amount">Amount</SelectItem>
+                            <SelectItem value="status">Status</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
+                          className="text-foreground bg-secondary hover:bg-secondary/80"
+                          title="Toggle sort direction"
+                        >
+                          {historySortDirection === "asc" ? (
+                            <span className="text-foreground">&uarr;</span>
+                          ) : (
+                            <span className="text-foreground">&darr;</span>
+                          )}
+                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-              {/* Remove Card and CardContent wrappers for deposit history */}
-              <div className="mt-8">
-                {/* Deposit History Header and Filter */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-2xl font-semibold text-foreground">Deposit History</h2>
-                    <div className="flex items-center gap-2">
-                      <Select
-                        id="history-filter"
-                        value={historySortField}
-                        onValueChange={setHistorySortField}
-                      >
-                        <SelectTrigger className="w-[120px] bg-secondary border-none text-foreground">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="date">Date</SelectItem>
-                          <SelectItem value="amount">Amount</SelectItem>
-                          <SelectItem value="status">Status</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
-                        className="text-foreground bg-secondary hover:bg-secondary/80"
-                        title="Toggle sort direction"
-                      >
-                        {historySortDirection === "asc" ? (
-                          <span className="text-foreground">&uarr;</span>
-                        ) : (
-                          <span className="text-foreground">&darr;</span>
-                        )}
-                      </Button>
                     </div>
                   </div>
-                </div>
-                <div className="border-b border-foreground/10 mb-2" />
-                {/* Filtered and sorted table */}
-                {isLoading ? (
-                  <div className="text-center py-6">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
-                  </div>
-                ) : filteredAndSortedDeposits.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
-                    <Receipt size={40} weight="duotone" className="mb-2 text-primary/80" />
-                    <div className="text-lg font-semibold">No Deposits Yet</div>
-                    <div className="text-sm max-w-xs text-center">
-                      You haven't made any deposits yet.<br />
-                      Start by adding funds to your account.
+                  <div className="border-b border-foreground/10 mb-2" />
+                  {/* Filtered and sorted table */}
+                  {isLoading ? (
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
                     </div>
-                  </div>
-                ) : (
-                  <TransactionTable 
-                    transactions={filteredAndSortedDeposits}
-                    onCopyId={handleCopyId}
-                  />
-                )}
+                  ) : filteredAndSortedDeposits.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
+                      <Receipt size={40} weight="duotone" className="mb-2 text-primary/80" />
+                      <div className="text-lg font-semibold">No Deposits Yet</div>
+                      <div className="text-sm max-w-xs text-center">
+                        You haven't made any deposits yet.<br />
+                        Start by adding funds to your account.
+                      </div>
+                    </div>
+                  ) : (
+                    <TransactionTable 
+                      transactions={filteredAndSortedDeposits}
+                      onCopyId={handleCopyId}
+                    />
+                  )}
+                </div>
               </div>
             </TabsContent>
             {/* The rest of your code remains unchanged */}
             <TabsContent value="withdraw" className="w-full">
               {/* Withdrawals Implementation */}
               <div className="w-full min-h-screen bg-background">
-                <div className="container max-w-[1000px] mx-auto py-6 px-4 md:px-6">
-                  {/* Balance Cards Grid */}
-                  <div className="grid gap-4 mb-8">
-                    <BalanceCard 
-                      label="Available for Payout"
-                      amount={userBalance}
-                      variant="default"
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <BalanceCard
-                        label="Processing"
-                        amount={withdrawPending}
-                        variant="processing"
-                      />
-                      <BalanceCard
-                        label="Success" 
-                        amount={withdrawSuccess}
-                        variant="success"
-                      />
-                    </div>
-                  </div>
+                <div className="container max-w-[1200px] mx-auto">
                   {/* KYC Status */}
                   <div className="max-w-lg mx-auto mb-8">
                     {kycStatus !== 'completed' && (
                       <KycVariant status={kycStatus as any} date={kycDate} />
                     )}
                   </div>
-                  {/* Withdraw Form */}
-                  <div className="flex flex-col gap-8">
-                    <div className="w-full max-w-[400px] mx-auto"> {/* Set max width for withdraw form */}
+                  {/* Withdraw Form and Payout History side by side on desktop, stacked on mobile */}
+                  <div className="grid gap-8 lg:grid-cols-2">
+                    <div className="w-full max-w-[400px]"> {/* Withdraw form */}
                       {kycStatus === 'completed' ? (
                         <form onSubmit={handleWithdrawSubmit} className="space-y-6">
                           <div className="space-y-4">
@@ -1431,7 +1381,7 @@ export default function CashierPage() {
                                   value={withdrawForm.amount}
                                   onChange={handleWithdrawAmountChange}
                                 />
-                                <span className="absolute right-3 top-2.5 text-white">USD</span>
+                                <span className="absolute right-3 top-2.5 text-foreground">USD</span>
                               </div>
                               {withdrawAmountError && (
                                 <p className="text-sm text-red-500">{withdrawAmountError}</p>
@@ -1443,14 +1393,14 @@ export default function CashierPage() {
                               )}
                             </div>
                           </div>
-                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={withdrawIsSubmitting || !canSubmit}>
+                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 rounded-md" disabled={withdrawIsSubmitting || !canSubmit}>
                             {withdrawIsSubmitting ? "Processing..." : "Request Payout"}
                           </Button>
                         </form>
                       ) : null}
                     </div>
-                    {/* Payout History Table */}
-                    <div className="w-full">
+                    <div className="w-full"> {/* Payout History on right for desktop, below for mobile */}
+                      {/* Payout History Header and Filter */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                         <h2 className="text-xl font-semibold text-foreground">Payout History</h2>
                         <div className="flex items-center gap-2">
@@ -1511,15 +1461,11 @@ export default function CashierPage() {
       </div>
 
       {/* Promo Code Dialog */}
-      <AlertDialog open={showPromoDialog} onOpenChange={setShowPromoDialog}>
-        <AlertDialogContent className="max-w-full w-[95vw] sm:w-[400px] p-4 sm:p-6">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-lg sm:text-2xl font-bold">Enter Promo Code</AlertDialogTitle>
-            <AlertDialogDescription className="text-base sm:text-lg">
-              Enter your promo code to get special bonuses on your deposit.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
+      <Dialog open={showPromoDialog} onOpenChange={setShowPromoDialog}>
+        <DialogContent className="max-w-full w-[95vw] sm:w-[400px] p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-2xl font-bold">Enter Promo Code</DialogTitle>
+          </DialogHeader>
           <div className="flex gap-2 py-4">
             <Input
               placeholder="Enter code"
@@ -1527,23 +1473,11 @@ export default function CashierPage() {
               onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
               className="uppercase placeholder:text-foreground"
             />
-            <Button 
-              variant="outline"
-              disabled={!promoInput || isApplyingPromo}
-              onClick={() => {
-                handleApplyPromoCode();
-                if (!isApplyingPromo) setShowPromoDialog(false);
-              }}
-            >
-              Apply
-            </Button>
           </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <DialogFooter>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

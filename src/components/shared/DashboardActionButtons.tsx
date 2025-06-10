@@ -32,7 +32,7 @@ export const DashboardActionButtons: React.FC<{
         </div>
         <div className="flex flex-col items-center h-full w-full">
           <button
-            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white font-regular border-border border bg-[hsl(var(--button))] hover:bg-black/10"
+            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white bg-secondary font-regular border-border border bg-[hsl(var(--button))] hover:bg-black/10"
             onClick={() => navigate('/tradingstation')}
           >
             <Lightning className="h-5 w-5 text-foreground" weight="bold" />
@@ -41,7 +41,7 @@ export const DashboardActionButtons: React.FC<{
         </div>
         <div className="flex flex-col items-center h-full w-full">
           <button
-            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white font-regular border-border border bg-[hsl(var(--button))] hover:bg-black/10"
+            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white bg-secondary font-regular border-border border bg-[hsl(var(--button))] hover:bg-black/10"
             onClick={() => navigate('/affiliate')}
           >
             <ShareNetwork className="h-5 w-5 text-foreground" weight="bold" />
@@ -50,11 +50,11 @@ export const DashboardActionButtons: React.FC<{
         </div>
         <div className="flex flex-col items-center h-full w-full">
           <button
-            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white font-regular bg-[hsl(var(--button))] border border-border hover:bg-black/10"
+            className="h-14 w-full flex items-center justify-center rounded-xl gap-2 text-white bg-secondary font-regular bg-[hsl(var(--button))] border border-border hover:bg-black/10"
             onClick={() => navigate('/plans')}
           >
             <span className="text-base font-semibold">
-              <span className="text-black">My Alpha</span>
+              <span className="text-foreground">My Alpha</span>
               <span className="text-card">Quant</span>
             </span>
           </button>

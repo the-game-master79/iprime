@@ -100,6 +100,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
     }
   }, [activeTradeTab, openTrades]);
 
+  // Add this state at the top-level of the component, not inside any function or render
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const toggleGroupExpand = (key: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   // Function to render the trades in an expanded way
   const renderExpandableTrades = (trades: any[]) => {
     // Group trades by pair and type
@@ -212,7 +221,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
         localPrices[g.pair]?.price !== undefined
           ? parseFloat(localPrices[g.pair].price)
           : parseFloat(firstTrade.open_price);
-      const isExpanded = false;
+      // Use expandedGroups state for expansion
+      const isExpanded = expandedGroups[g.key] || false;
       const hasMultiplePositions = g.trades.length > 1;
       
       // Create a hedging tracker for this group - will keep state of how many lots
@@ -230,7 +240,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
           <tr className={`group border-t border-border/50 ${isExpanded ? 'bg-accent/10' : ''}`}>
             <td className="px-4 py-2">
               <button
-                onClick={g.trades.length > 1 ? () => {} : undefined}
+                onClick={g.trades.length > 1 ? () => toggleGroupExpand(g.key) : undefined}
                 className={`flex items-center gap-2 w-full text-left ${g.trades.length > 1 ? "cursor-pointer" : "cursor-default"}`}
               >
                 {/* Remove the left-side expand arrow */}
@@ -253,6 +263,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                       className="ml-auto h-6 w-6 p-0 rounded-full opacity-70 hover:opacity-100 flex items-center justify-center bg-secondary text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
+                        toggleGroupExpand(g.key);
                       }}
                       title={isExpanded ? "Collapse" : "Expand"}
                     >
@@ -485,7 +496,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   {(() => {
                     let individualPnL = 0;
                     const openPrice = parseFloat(trade.open_price);
-                    const currentPriceValue = parseFloat(currentPrice);
+                    // FIX: currentPrice is already a number
+                    const currentPriceValue = currentPrice;
                     
                     let pipSize = 0.0001;
                     let lotSize = 100000;
@@ -730,6 +742,102 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   // --- Calculate sidebar width dynamically for marginLeft ---
   const sidebarWidth = isCollapsed ? 48 : 368;
 
+  // Add pairNameMap for display names
+  const pairNameMap: Record<string, string> = {
+    "XAUUSD": "Gold",
+    "BTCUSDT": "Bitcoin",
+    "ETHUSDT": "Ethereum",
+    "SOLUSDT": "Solana",
+    "LINKUSDT": "Chainlink",
+    "BNBUSDT": "Binance Coin",
+    "DOGEUSDT": "Dogecoin",
+    "ADAUSDT": "Cardano",
+    "TRXUSDT": "TRON",
+    "DOTUSDT": "Polkadot",
+    // ...add more as needed...
+  };
+
+  // --- MOBILE PAIRS CARDS RENDERING ---
+  // Helper to detect mobile (simple window width check)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+
+  // Mobile version: render open trades as cards like DashboardTabs closed trades
+  const renderMobilePairs = (trades: any[]) => {
+    if (!trades || trades.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <span className="h-16 w-16 mb-4 text-white/20">📉</span>
+          <p className="text-base">No open trades found</p>
+          <p className="text-sm text-white/50 mt-1">Your open trades will appear here</p>
+        </div>
+      );
+    }
+    // Group by pair and type for mobile, or just flat list if needed
+    return (
+      <div className="space-y-4">
+        {trades.map((trade: any) => {
+          const decimals =
+            trade.pair === "XAUUSD" ? 2 :
+            trade.pair.endsWith("JPY") ? 3 :
+            trade.pair.endsWith("USDT") && ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "BNBUSDT"].includes(trade.pair) ? 2 :
+            trade.pair === "DOGEUSDT" ? 5 :
+            trade.pair === "ADAUSDT" || trade.pair === "TRXUSDT" ? 4 :
+            trade.pair === "DOTUSDT" ? 3 :
+            !trade.pair.endsWith("USDT") ? 5 : 2;
+          const isProfitable = trade.pnl >= 0;
+          const openAt = trade.created_at;
+          const currentPrice = localPrices[trade.pair]?.price !== undefined
+            ? parseFloat(localPrices[trade.pair].price)
+            : parseFloat(trade.open_price);
+          return (
+            <div
+              key={trade.id}
+              className="p-4 rounded-xl border border-border bg-muted/10 shadow-sm flex flex-col"
+            >
+              <div className="flex items-center gap-3 mb-2">
+                {/* Buy/Sell circle indicator */}
+                <span
+                  className={`h-3 w-3 rounded-full ${
+                    trade.type?.toLowerCase() === "buy"
+                      ? "bg-primary"
+                      : "bg-error"
+                  }`}
+                  title={trade.type?.toUpperCase()}
+                />
+                {/* Display name instead of symbol */}
+                <span className="font-bold text-base">
+                  {pairNameMap[trade.pair] || trade.pair}
+                </span>
+                <span className={`ml-auto font-bold ${isProfitable ? "text-success" : "text-error"}`}>
+                  {isProfitable ? "+" : ""}
+                  {trade.pnl?.toFixed(2)} USD
+                </span>
+              </div>
+              {/* Lots/open price line and close price in same row */}
+              <div className="flex items-center justify-between">
+                <span className="font-medium">
+                  <span
+                    className={
+                      trade.type?.toLowerCase() === "buy"
+                        ? "text-primary font-medium"
+                        : "text-error font-medium"
+                    }
+                  >
+                    {`${trade.type?.charAt(0).toUpperCase() + trade.type?.slice(1).toLowerCase()} ${Number(trade.lots).toFixed(2)} Lot`}
+                  </span>
+                  {` at ${Number(trade.open_price).toFixed(decimals)}`}
+                </span>
+                <span className="text-md text-foreground font-medium ml-2">
+                  {Number(currentPrice).toFixed(decimals)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div
       className={`${fullPage 
@@ -810,7 +918,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
               variant="ghost"
               size="icon"
               className="ml-2 h-8 w-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              onClick={() => setActivityCollapsed((v) => !v)}
+              onClick={() => setActivityCollapsed(!activityCollapsed)}
               aria-label={activityCollapsed ? "Expand" : "Collapse"}
               tabIndex={0}
             >
@@ -860,7 +968,7 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => openTrades.forEach(trade => handleCloseTrade(trade))}
-                className="h-9 px-3 gap-1 text-xs bg-destructive text-white hover:bg-destructive/90"
+                className="h-9 px-3 gap-1 text-xs bg-error text-white hover:bg-error/90 rounded-md"
                 disabled={
                   openTrades.some(isForexTrade) && !isForexMarketOpen
                 }
@@ -1213,11 +1321,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                   const isExpanded = mobileExpandedGroups[g.key] || false;
                                   // Is this group hedged at all?
                                   const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
+                                  const typeColor = g.type === "buy" ? "bg-primary" : "bg-destructive";
+                                  const typeLabel = g.type.charAt(0).toUpperCase() + g.type.slice(1).toLowerCase();
                                   return (
                                     <div key={`open-group-${g.key}-${idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
-                                      {/* First row: Icon, Pair name and PnL with close button */}
-                                      <div className="flex justify-between items-center mb-3">
+                                      {/* First row: colored circle, logo, pair name, PnL, close button */}
+                                      <div className="flex justify-between items-center mb-2">
                                         <div className="flex items-center gap-3">
+                                          {/* Colored circle for buy/sell */}
+                                          <span className={`h-3 w-3 rounded-full mr-2 ${typeColor}`} title={g.type.toUpperCase()} />
                                           <img
                                             src={
                                               g.pair.endsWith("USDT")
@@ -1241,7 +1353,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                 size="sm"
                                                 onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
                                                 className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                // FIX: Only disable if forex and market is closed
                                                 disabled={isForex && !isForexMarketOpen}
                                                 title={
                                                   isForex
@@ -1255,44 +1366,27 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                           })()}
                                         </div>
                                       </div>
-                                      {/* Second row: Type badge, lots badge, prices, and expand arrow */}
-                                      <div className="flex flex-wrap gap-2 items-center">
-                                        <span
-                                          className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
-                                            g.type === "buy"
-                                              ? "bg-primary/80"
-                                              : "bg-destructive/80"
-                                          }`}
-                                        >
-                                          {g.type.toUpperCase()}
-                                        </span>
-                                        {/* Show Hedged badge for group if hedged */}
-                                        {isHedged && (
-                                          <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold transition-all ml-1 hover:bg-primary/20">
-                                            Hedged
-                                          </span>
-                                        )}
-                                        <span className="px-2 py-1 rounded-md bg-secondary text-foreground text-xs font-semibold">
-                                          {g.totalLots.toFixed(2)} lot{g.totalLots !== 1 ? 's' : ''}
-                                        </span>
-                                        <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium flex items-center gap-1">
-                                          O: {Number(g.openPrice).toFixed(g.decimals)}
-                                          {/* Arrow button for expand/collapse if multiple trades */}
-                                          {g.trades.length > 1 && (
-                                            <button
-                                              type="button"
-                                              className="ml-1 rounded-full p-1 hover:bg-muted/20 transition"
-                                              onClick={() => toggleMobileGroupExpand(g.key)}
-                                              aria-label={isExpanded ? "Collapse" : "Expand"}
-                                            >
-                                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            </button>
-                                          )}
-                                        </span>
-                                        <div className="flex-grow"></div>
-                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium">
+                                      {/* Second row: full sentence for trade summary and live price right-aligned below PnL */}
+                                      <div className="flex items-center mb-1 ml-8">
+                                        <div className="text-sm text-foreground/80 flex-1">
+                                          {`${typeLabel} ${g.totalLots.toFixed(2)} Lot${g.totalLots !== 1 ? 's' : ''} at ${Number(g.openPrice).toFixed(g.decimals)}`}
+                                        </div>
+                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium ml-auto">
                                           {Number(g.currentPrice).toFixed(g.decimals)}
                                         </span>
+                                      </div>
+                                      {/* Third row: expand/collapse if multiple trades */}
+                                      <div className="flex items-center ml-8 gap-2">
+                                        {g.trades.length > 1 && (
+                                          <button
+                                            type="button"
+                                            className="rounded-full p-1 hover:bg-muted/20 transition"
+                                            onClick={() => toggleMobileGroupExpand(g.key)}
+                                            aria-label={isExpanded ? "Collapse" : "Expand"}
+                                          >
+                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                          </button>
+                                        )}
                                       </div>
                                       {/* Expanded individual trades for mobile */}
                                       {isExpanded && (
@@ -1338,39 +1432,29 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                             }
                                             const decimals = getPriceDecimals(trade.pair);
                                             const isProfitable = livePnL >= 0;
-
-                                            // --- HEDGED BADGE LOGIC FOR MOBILE ---
-                                            // Use precomputed hedged status
                                             const isTradeHedged = groupHedgedStatus[g.key]?.[tIdx] ?? false;
-
                                             return (
-                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-3 py-3 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 44 }}>
-                                                <span className="text-xs text-muted-foreground min-w-[90px]">
-                                                  ID: {trade.id.substring(0, 8)}...
-                                                </span>
-                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[48px] text-center">
-                                                  {Number(trade.lots).toFixed(2)}
-                                                </span>
-                                                {/* Show H badge for hedged positions */}
+                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-2 py-2 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 40 }}>
+                                                {/* (H) badge if hedged */}
                                                 {isTradeHedged && (
-                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold ml-1 hover:bg-primary/20 min-w-[28px] text-center">
-                                                    H
-                                                  </span>
+                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold mr-1">H</span>
                                                 )}
-                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[60px] text-center">
-                                                  {Number(openPrice).toFixed(decimals)}
+                                                {/* Lot and price sentence */}
+                                                <span className="text-sm text-foreground/90">
+                                                  {`${Number(trade.lots).toFixed(2)} Lot at ${Number(openPrice).toFixed(decimals)}`}
                                                 </span>
-                                                <span className={`font-mono text-xs ${isProfitable ? "text-success" : "text-destructive"} min-w-[60px] text-center`}>
-                                                  ${livePnL.toFixed(2)}
+                                                {/* PnL right aligned */}
+                                                <span className={`ml-auto font-mono text-sm ${isProfitable ? "text-success" : "text-destructive"}`}
+                                                  style={{ minWidth: 70, textAlign: 'right' }}>
+                                                  {livePnL >= 0 ? '+' : ''}${livePnL.toFixed(2)}
                                                 </span>
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"
                                                   onClick={() => handleCloseTrade(trade)}
-                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500 ml-2"
                                                   title="Close Position"
                                                   style={{ minWidth: 28, minHeight: 28 }}
-                                                  // FIX: Only disable if forex and market is closed
                                                   disabled={isForexTrade(trade) && !isForexMarketOpen}
                                                 >
                                                   <X size={14} />
@@ -1564,11 +1648,15 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                   const isExpanded = mobileExpandedGroups[g.key] || false;
                                   // Is this group hedged at all?
                                   const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
+                                  const typeColor = g.type === "buy" ? "bg-primary" : "bg-destructive";
+                                  const typeLabel = g.type.charAt(0).toUpperCase() + g.type.slice(1).toLowerCase();
                                   return (
                                     <div key={`open-group-${g.key}-${idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
-                                      {/* First row: Icon, Pair name and PnL with close button */}
-                                      <div className="flex justify-between items-center mb-3">
+                                      {/* First row: colored circle, logo, pair name, PnL, close button */}
+                                      <div className="flex justify-between items-center mb-2">
                                         <div className="flex items-center gap-3">
+                                          {/* Colored circle for buy/sell */}
+                                          <span className={`h-3 w-3 rounded-full mr-2 ${typeColor}`} title={g.type.toUpperCase()} />
                                           <img
                                             src={
                                               g.pair.endsWith("USDT")
@@ -1592,7 +1680,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                                 size="sm"
                                                 onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
                                                 className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                // FIX: Only disable if forex and market is closed
                                                 disabled={isForex && !isForexMarketOpen}
                                                 title={
                                                   isForex
@@ -1606,44 +1693,27 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                           })()}
                                         </div>
                                       </div>
-                                      {/* Second row: Type badge, lots badge, prices, and expand arrow */}
-                                      <div className="flex flex-wrap gap-2 items-center">
-                                        <span
-                                          className={`px-2 py-1 rounded-md text-white text-xs font-semibold ${
-                                            g.type === "buy"
-                                              ? "bg-primary/80"
-                                              : "bg-destructive/80"
-                                          }`}
-                                        >
-                                          {g.type.toUpperCase()}
-                                        </span>
-                                        {/* Show Hedged badge for group if hedged */}
-                                        {isHedged && (
-                                          <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold transition-all ml-1 hover:bg-primary/20">
-                                            Hedged
-                                          </span>
-                                        )}
-                                        <span className="px-2 py-1 rounded-md bg-secondary text-foreground text-xs font-semibold">
-                                          {g.totalLots.toFixed(2)} lot{g.totalLots !== 1 ? 's' : ''}
-                                        </span>
-                                        <span className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium flex items-center gap-1">
-                                          O: {Number(g.openPrice).toFixed(g.decimals)}
-                                          {/* Arrow button for expand/collapse if multiple trades */}
-                                          {g.trades.length > 1 && (
-                                            <button
-                                              type="button"
-                                              className="ml-1 rounded-full p-1 hover:bg-muted/20 transition"
-                                              onClick={() => toggleMobileGroupExpand(g.key)}
-                                              aria-label={isExpanded ? "Collapse" : "Expand"}
-                                            >
-                                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            </button>
-                                          )}
-                                        </span>
-                                        <div className="flex-grow"></div>
-                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium">
+                                      {/* Second row: full sentence for trade summary and live price right-aligned below PnL */}
+                                      <div className="flex items-center mb-1 ml-8">
+                                        <div className="text-sm text-foreground/80 flex-1">
+                                          {`${typeLabel} ${g.totalLots.toFixed(2)} Lot${g.totalLots !== 1 ? 's' : ''} at ${Number(g.openPrice).toFixed(g.decimals)}`}
+                                        </div>
+                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium ml-auto">
                                           {Number(g.currentPrice).toFixed(g.decimals)}
                                         </span>
+                                      </div>
+                                      {/* Third row: expand/collapse if multiple trades */}
+                                      <div className="flex items-center ml-8 gap-2">
+                                        {g.trades.length > 1 && (
+                                          <button
+                                            type="button"
+                                            className="rounded-full p-1 hover:bg-muted/20 transition"
+                                            onClick={() => toggleMobileGroupExpand(g.key)}
+                                            aria-label={isExpanded ? "Collapse" : "Expand"}
+                                          >
+                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                          </button>
+                                        )}
                                       </div>
                                       {/* Expanded individual trades for mobile */}
                                       {isExpanded && (
@@ -1689,39 +1759,29 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                                             }
                                             const decimals = getPriceDecimals(trade.pair);
                                             const isProfitable = livePnL >= 0;
-
-                                            // --- HEDGED BADGE LOGIC FOR MOBILE ---
-                                            // Use precomputed hedged status
                                             const isTradeHedged = groupHedgedStatus[g.key]?.[tIdx] ?? false;
-
                                             return (
-                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-3 py-3 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 44 }}>
-                                                <span className="text-xs text-muted-foreground min-w-[90px]">
-                                                  ID: {trade.id.substring(0, 8)}...
-                                                </span>
-                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[48px] text-center">
-                                                  {Number(trade.lots).toFixed(2)}
-                                                </span>
-                                                {/* Show H badge for hedged positions */}
+                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-2 py-2 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 40 }}>
+                                                {/* (H) badge if hedged */}
                                                 {isTradeHedged && (
-                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold ml-1 hover:bg-primary/20 min-w-[28px] text-center">
-                                                    H
-                                                  </span>
+                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold mr-1">H</span>
                                                 )}
-                                                <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold min-w-[60px] text-center">
-                                                  {Number(openPrice).toFixed(decimals)}
+                                                {/* Lot and price sentence */}
+                                                <span className="text-sm text-foreground/90">
+                                                  {`${Number(trade.lots).toFixed(2)} Lot at ${Number(openPrice).toFixed(decimals)}`}
                                                 </span>
-                                                <span className={`font-mono text-xs ${isProfitable ? "text-success" : "text-destructive"} min-w-[60px] text-center`}>
-                                                  ${livePnL.toFixed(2)}
+                                                {/* PnL right aligned */}
+                                                <span className={`ml-auto font-mono text-sm ${isProfitable ? "text-success" : "text-destructive"}`}
+                                                  style={{ minWidth: 70, textAlign: 'right' }}>
+                                                  {livePnL >= 0 ? '+' : ''}${livePnL.toFixed(2)}
                                                 </span>
                                                 <Button
                                                   variant="ghost"
                                                   size="sm"
                                                   onClick={() => handleCloseTrade(trade)}
-                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
+                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500 ml-2"
                                                   title="Close Position"
                                                   style={{ minWidth: 28, minHeight: 28 }}
-                                                  // FIX: Only disable if forex and market is closed
                                                   disabled={isForexTrade(trade) && !isForexMarketOpen}
                                                 >
                                                   <X size={14} />

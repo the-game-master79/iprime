@@ -89,7 +89,7 @@ export const BalanceCard = ({
       </div>
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">{cardLabel}</p>
-        <h3 className={cn("text-2xl font-bold", valueClassName)}>
+        <h3 className={cn("text-2xl font-bold text-foreground", valueClassName)}>
           {`${(amount || 0).toLocaleString()}${showUsdSuffix ? ' USD' : ''}`}
         </h3>
       </div>

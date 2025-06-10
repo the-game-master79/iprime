@@ -165,11 +165,11 @@ const Navbar = ({
         >
           <img
             src={theme === "dark"
-              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cf-dark.svg"
-              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/cf-light.svg"
+              ? "/cf-dark.svg"
+              : "/cf-light.svg"
             }
             alt="CloudForex Logo"
-            className="h-7"
+            className="h-5"
             style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.07))" }}
           />
         </button>

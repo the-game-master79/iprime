@@ -277,8 +277,8 @@ export const Topbar = ({
               <img
                 src={
                   theme === "dark"
-                    ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                    : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                    ? "/cf-dark.svg"
+                    : "/cf-light.svg"
                 }
                 alt="CloudForex"
                 className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"

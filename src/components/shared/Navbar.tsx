@@ -44,7 +44,7 @@ export const Navbar = () => {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
               <img
-                src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
+                src="/cf-dark.svg"
                 alt="CloudForex Logo"
                 className="h-6 w-auto"
               />

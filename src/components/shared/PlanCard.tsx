@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Lock, ArrowRight } from "lucide-react";
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useEffect, useState, useMemo } from "react";
 import { useTradingPairs } from "@/hooks/useTradingPairs";
 // If the TradingPair type exists elsewhere, update the import path accordingly, for example:
@@ -103,7 +103,7 @@ export function PlanCard({
             </Badge>
             <div className="space-y-1">              
               <div className="flex items-baseline gap-2">
-                <h2 className="text-3xl font-bold tracking-tight">
+                <h2 className="text-3xl font-bold tracking-tight text-foreground">
                   {Number(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} USD
                 </h2>
                 <span className="text-lg text-primary font-medium">
@@ -157,7 +157,7 @@ export function PlanCard({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium">{progress?.toFixed(2)}%</span>
+                <span className="font-medium text-foreground">{progress?.toFixed(2)}%</span>
               </div>
               <Progress 
                 value={progress} 
@@ -179,28 +179,28 @@ export function PlanCard({
           <div className="flex items-center gap-3">
             <Button 
               onClick={onInvest}
-              className="flex-1 bg-primary hover:bg-primary/90"
+              className="flex-1 bg-primary hover:bg-primary/90 rounded-md"
             >
               Invest Now <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+            <Dialog>
+              <DialogTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5 rounded-md text-foreground"
                 >
                   Details
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-xl flex items-center gap-2">
+              </DialogTrigger>
+              <DialogContent className="bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-lg border-primary/20">
+                <DialogHeader>
+                  <DialogTitle className="text-xl flex items-center gap-2">
                     <div className={`p-2 rounded-lg bg-primary/10`}>
                       <Lock className="h-4 w-4 text-primary" />
                     </div>
                     {name}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
+                  </DialogTitle>
+                  <DialogDescription>
                     <div className="space-y-6 pt-2">
                       <div className="space-y-2">
                         <div className="flex items-baseline justify-between">
@@ -223,7 +223,7 @@ export function PlanCard({
                         </div>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-3 bg-secondary-foreground/50 rounded-lg p-4 border border-primary/10">
                         <h4 className="font-medium">Benefits & Features</h4>
                         <ul className="space-y-2">
                           {benefits.map((benefit, index) => (
@@ -235,43 +235,43 @@ export function PlanCard({
                         </ul>
                       </div>
                     </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="border-primary/20 hover:border-primary/40">
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" className="border-primary/20 hover:border-primary/40 rounded-md" onClick={() => {}}>
                     Close
-                  </AlertDialogCancel>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         ) : (
           <div className="flex items-center gap-3">              
             <Button
               variant="destructive"
-              className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white"
+              className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white rounded-md"
               onClick={onCancel}
             >
               Cancel Plan
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+            <Dialog>
+              <DialogTrigger asChild>
                 <Button 
                   variant="outline" 
-                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5 rounded-md text-foreground"
                 >
                   Details
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent className="bg-gradient-to-br from-card/95 to-card/90 backdrop-blur-lg border-primary/20">
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-xl flex items-center gap-2">
+              </DialogTrigger>
+              <DialogContent className="bg-gradient-to-br from-secondary/95 to-secondary/90 backdrop-blur-lg border-primary/20">
+                <DialogHeader>
+                  <DialogTitle className="text-xl flex items-center gap-2">
                     <div className={`p-2 rounded-lg bg-primary/10`}>
                       <Clock className="h-4 w-4 text-primary" />
                     </div>
                     {name}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
+                  </DialogTitle>
+                  <DialogDescription>
                     <div className="space-y-6 pt-2">
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between">
@@ -298,7 +298,7 @@ export function PlanCard({
                         </div>
                       </div>
 
-                      <div className="space-y-2 bg-card/50 rounded-lg p-4 border border-primary/10">              <div className="flex items-center justify-between text-sm">
+                      <div className="space-y-2 bg-secondary-foreground/50 rounded-lg p-4 border border-primary/10">              <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Progress</span>
                 <span className="font-medium">{progress?.toFixed(2)}%</span>
               </div>
@@ -313,13 +313,13 @@ export function PlanCard({
                       </div>
 
                       {variant === 'active' && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 bg-secondary-foreground/50 rounded-lg p-4 border border-primary/10">
                           <h4 className="font-medium">Trading Pairs</h4>
                           <div className="grid grid-cols-3 gap-3">
                             {randomPairs.map((pair) => (
                               <div 
                                 key={pair.id} 
-                                className="flex items-center gap-2 p-2 rounded-lg bg-card/50 border border-primary/10"
+                                className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50 border border-primary/10"
                               >
                                 <img
                                   src={pair.image_url}
@@ -341,15 +341,15 @@ export function PlanCard({
                         </div>
                       )}
                     </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="border-primary/20 hover:border-primary/40">
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" className="border-primary/20 hover:border-primary/40 rounded-md" onClick={() => {}}>
                     Close
-                  </AlertDialogCancel>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>
