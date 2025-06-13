@@ -403,46 +403,43 @@ const Affiliate = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <Topbar title="Affiliate Dashboard" subtitle="Build your network and earn passive income" />
+      <Topbar title="Affiliate Dashboard" />
 
       {/* Stats Overview */}
       <div className="container max-w-[1000px] mx-auto px-4 mb-6 mt-6">
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
           <BalanceCard 
-            label="Network Size"
+            label={`Your team`}
             amount={teamData.length}
             variant="referrals"
             valueClassName="font-mono"
-            subtitle={`${teamData.filter(m => m.level === 1).length} direct affiliates`}
+            className="rounded-md bg-secondary text-foreground"
           />
-
           <BalanceCard 
-            label="Total Earnings"
+            label="Earnings"
             amount={totalCommissions}
             variant="commission"
-            subtitle="Lifetime commissions"
+            className="rounded-md bg-secondary text-foreground"
           />
-
           <BalanceCard 
-            label="Network Volume"
+            label={`Volume`}
             amount={totalBusiness}
             variant="business"
-            subtitle={`${userBusiness} personal volume`}
+            className="rounded-md bg-secondary text-foreground"
           />
-
           <BalanceCard 
-            label="Direct Referrals"
+            label={`Directs`}
             amount={directReferralsCount}
             variant="direct"
-            subtitle={directReferralsCount >= 2 ? "Eligible for all tiers" : "Need 2+ for full benefits"}
+            className="rounded-md bg-secondary text-foreground"
           />
         </div>
       </div>
 
       {/* Affiliate Performance Summary - Now visible on all domains */}
       <div className="container max-w-[1000px] mx-auto px-4 mb-8">
-        <Card className="bg-secondary border border-green-600/20">
-          <CardContent className="p-6">
+        <Card className="bg-secondary border border-green-600/20 rounded-md">
+          <CardContent className="p-6 text-foreground">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-foreground mb-1">Your Affiliate Performance</h3>
@@ -453,10 +450,10 @@ const Affiliate = () => {
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Badge variant={directReferralsCount >= 2 ? "success" : "outline"} className="px-3 py-1">
+                <Badge variant={directReferralsCount >= 2 ? "success" : "outline"} className="px-3 py-1 rounded-md">
                   {directReferralsCount >= 2 ? "Fully Qualified" : "Qualification In Progress"}
                 </Badge>
-                <Badge variant="outline" className="px-3 py-1">
+                <Badge variant="outline" className="px-3 py-1 rounded-md bg-background">
                   Level {teamData.length > 0 ? Math.max(...teamData.map(m => m.level)) : 0} Deep
                 </Badge>
               </div>
@@ -472,6 +469,7 @@ const Affiliate = () => {
           <Button
             variant="outline"
             asChild
+            className="rounded-md text-foreground"
           >
             <a
               href="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf_final.pdf"
@@ -486,15 +484,15 @@ const Affiliate = () => {
           {/* Commission Rates Dialog */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" id="commission-structure">Commission Structure</Button>
+              <Button variant="outline" id="commission-structure" className="rounded-md text-foreground">Commission Structure</Button>
             </DialogTrigger>
-            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-md border-0">
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
                     <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#3b82f6" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                   </span>
-                  <DialogTitle className="text-2xl font-bold text-blue-700">Multi-Level Commission Structure</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold text-blue-700">Commission Structure</DialogTitle>
                 </div>
               </DialogHeader>
               <div className="space-y-2 py-2">
@@ -502,30 +500,36 @@ const Affiliate = () => {
                   <div className="text-secondary-foreground text-sm">No commission structure available.</div>
                 ) : (
                   <>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Our industry-leading multi-level commission structure allows you to earn from your direct referrals and their network, creating true passive income potential.
-                    </p>
-                    {commissionStructure.map((level) => {
-                      // Count users in this level
-                      const count = teamData.filter(m => m.level === level.level).length;
-                      return (
-                        <div key={level.level} className="flex justify-between items-center p-3 rounded-md hover:bg-secondary-foreground transition-colors">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-foreground">Level {level.level}</span>
-                            <span className="text-xs text-muted-foreground">{level.description}</span>
-                            <Badge className="ml-2" variant="secondary">
-                              {count} user{count !== 1 ? "s" : ""}
-                            </Badge>
+                    {/* Removed subtitle description for dialog */}
+                    <div className="space-y-1">
+                      {commissionStructure.map((level) => {
+                        // Count users in this level
+                        const count = teamData.filter(m => m.level === level.level).length;
+                        return (
+                          <div
+                            key={level.level}
+                            className="flex justify-between items-center px-2 py-2 sm:p-3 rounded-md hover:bg-secondary-foreground transition-colors text-xs sm:text-sm"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-foreground">Level {level.level}</span>
+                              <Badge className="ml-2 bg-background" variant="secondary">
+                                {count} user{count !== 1 ? "s" : ""}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <div className="flex items-center gap-2">
+                                {level.level === 1 && (
+                                  <Badge className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full ml-1" variant="outline">
+                                    Direct
+                                  </Badge>
+                                )}
+                                <span className="font-medium text-green-600">{level.percentage}%</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end">
-                            <span className="font-medium text-green-600">{level.percentage}%</span>
-                            {level.level === 1 && (
-                              <span className="text-xs text-green-700">Direct Referrals</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                     <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                       <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-1">Example Earning Potential</h4>
                       <p className="text-xs text-muted-foreground">
@@ -542,15 +546,15 @@ const Affiliate = () => {
           {/* Rank Benefits Dialog */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">Rank Benefits</Button>
+              <Button variant="outline" className="rounded-md text-foreground">Rank Benefits</Button>
             </DialogTrigger>
-            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0">
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-md border-0">
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-green-100 p-2">
                     <svg width="28" height="28" fill="none" viewBox="0 0 24 24"><path fill="#22c55e" d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                   </span>
-                  <DialogTitle className="text-2xl font-bold text-green-700">Rank & Achievement Benefits</DialogTitle>
+                  <DialogTitle className="text-2xl font-bold text-green-700">Rank Benefits</DialogTitle>
                 </div>
               </DialogHeader>
               <div className="py-2">
@@ -558,9 +562,6 @@ const Affiliate = () => {
                   <div className="text-secondary-foreground text-sm">No rank benefits available at the moment.</div>
                 ) : (
                   <>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      As your network grows and generates more business volume, you'll unlock higher ranks with exclusive one-time bonuses and ongoing benefits.
-                    </p>
                     <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                       {ranks
                         .slice((rankPage - 1) * ranksPerPage, rankPage * ranksPerPage)
@@ -595,27 +596,35 @@ const Affiliate = () => {
                     </div>
                     {/* Progress Timeline */}
                     <div className="mt-6 relative">
-                      <div className="h-2 bg-secondary-foreground rounded-full overflow-hidden">
-                        {ranks.length > 0 && (
-                          <div 
-                            className="h-full bg-gradient-to-r from-green-500 to-blue-500" 
-                            style={{ 
-                              width: `${Math.min(100, (totalBusiness / ranks[ranks.length - 1].business_amount) * 100)}%` 
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div className="flex justify-between mt-2">
-                        <span className="text-xs text-muted-foreground">0 USD</span>
-                        <span className="text-xs text-muted-foreground">
-                          {ranks.length > 0 && ranks[ranks.length - 1].business_amount.toLocaleString()} USD
-                        </span>
-                      </div>
-                      <div className="text-center mt-1">
-                        <span className="text-xs font-medium text-green-600">
-                          Your current volume: {totalBusiness.toLocaleString()} USD
-                        </span>
-                      </div>
+                      {(() => {
+                        // Find the next rank to achieve (business_amount > totalBusiness)
+                        let nextRank = ranks.find(r => totalBusiness < r.business_amount);
+                        // If all achieved, use the highest rank
+                        if (!nextRank && ranks.length > 0) nextRank = ranks[ranks.length - 1];
+                        const targetAmount = nextRank ? nextRank.business_amount : 1;
+                        const progress = Math.min(100, (totalBusiness / targetAmount) * 100);
+                        return (
+                          <>
+                            <div className="h-2 bg-secondary-foreground rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-green-500 to-blue-500" 
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between mt-2">
+                              <span className="text-xs text-muted-foreground">0 USD</span>
+                              <span className="text-xs text-muted-foreground">
+                                {nextRank ? nextRank.business_amount.toLocaleString() : ''} USD
+                              </span>
+                            </div>
+                            <div className="text-center mt-1">
+                              <span className="text-xs font-medium text-green-600">
+                                Your current volume: {totalBusiness.toLocaleString()} USD
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </>
                 )}
@@ -625,7 +634,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-foreground border-foreground"
+                      className="text-foreground border-foreground rounded-md border border-border"
                       disabled={rankPage === 1}
                       onClick={() => setRankPage(p => Math.max(1, p - 1))}
                     >
@@ -637,7 +646,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-foreground border-foreground"
+                      className="text-foreground border-foreground rounded-md border border-border"
                       disabled={rankPage === Math.ceil(ranks.length / ranksPerPage) || ranks.length === 0}
                       onClick={() => setRankPage(p => Math.min(Math.ceil(ranks.length / ranksPerPage), p + 1))}
                     >
@@ -652,11 +661,9 @@ const Affiliate = () => {
           {/* Referral Benefits Dialog */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">Referral Incentives</Button>
+              <Button variant="outline" className="rounded-md text-foreground">Referral Incentives</Button>
             </DialogTrigger>
-            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-2xl border-0"
-              closeIconClassName="text-foreground"
-            >
+            <DialogContent className="bg-secondary text-foreground max-w-2xl shadow-2xl rounded-md border-0 max-h-[70vh] overflow-y-auto">
               <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="inline-flex items-center justify-center rounded-full bg-blue-100 p-2">
@@ -666,12 +673,9 @@ const Affiliate = () => {
                 </div>
               </DialogHeader>
               <div className="py-2">
-                <p className="text-sm text-muted-foreground mb-3">
-                  In addition to our regular commission structure, we offer special incentives for achieving specific referral milestones.
-                </p>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 gap-y-4 pb-4">
                   {/* Card for each referral incentive with enhanced design */}
-                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-3 sm:p-4 flex flex-col gap-2 shadow-sm text-xs sm:text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         5 Referrals
@@ -702,7 +706,7 @@ const Affiliate = () => {
                     </div>
                   </div>
                   
-                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-3 sm:p-4 flex flex-col gap-2 shadow-sm text-xs sm:text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         20 Referrals
@@ -733,7 +737,7 @@ const Affiliate = () => {
                     </div>
                   </div>
                   
-                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-3 sm:p-4 flex flex-col gap-2 shadow-sm text-xs sm:text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         50 Referrals
@@ -764,7 +768,7 @@ const Affiliate = () => {
                     </div>
                   </div>
                   
-                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="rounded-xl bg-gradient-to-br from-secondary-foreground to-secondary-foreground/80 text-foreground border border-secondary-foreground/10 p-3 sm:p-4 flex flex-col gap-2 shadow-sm text-xs sm:text-sm">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
                         100+ Referrals
@@ -797,12 +801,14 @@ const Affiliate = () => {
                 </div>
                 <div className="mt-5 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-1">How to Qualify</h4>
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                    <li>Each direct referral must subscribe to at least one active plan</li>
-                    <li>Referrals are counted based on unique users, not number of plans</li>
-                    <li>Contact support to claim your reward once you reach a milestone</li>
-                    <li>Additional volume-based rewards may be available - see Rank Benefits</li>
-                  </ul>
+                  <div className="text-sm text-muted-foreground">
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Each direct referral must subscribe to at least one active plan</li>
+                      <li>Referrals are counted based on unique users, not number of plans</li>
+                      <li>Contact support to claim your reward once you reach a milestone</li>
+                      <li>Additional volume-based rewards may be available - see Rank Benefits</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -811,11 +817,10 @@ const Affiliate = () => {
           {/* Rounder Bonus Dialog */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">Rounder Bonus</Button>
+              <Button variant="outline" className="rounded-md text-foreground">Rounder Bonus</Button>
             </DialogTrigger>
             <DialogContent
-              className="bg-secondary text-foreground max-w-md w-full shadow-2xl rounded-xl border-0 dark:bg-[#18181b] dark:text-foreground px-2 py-3 sm:px-4 sm:py-6"
-              closeIconClassName="text-foreground"
+              className="bg-secondary text-foreground max-w-md w-full shadow-2xl rounded-md border-0 dark:bg-[#18181b] dark:text-foreground px-2 py-3 sm:px-4 sm:py-6 max-h-[70vh] overflow-y-auto"
             >
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-1">
@@ -831,7 +836,6 @@ const Affiliate = () => {
                 <span className="font-semibold text-green-700 dark:text-green-400">Qualify for our exclusive Rounder Bonus Program</span> by building a substantial network and maintaining consistent business volume.<br />
                 <span className="text-muted-foreground">Receive monthly salary-like payments based on your network performance.</span>
               </div>
-              
               {/* Enhanced explanation of how Rounder Bonus works */}
               <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 mb-3 text-sm">
                 <h4 className="font-medium text-green-700 dark:text-green-400 mb-1">How It Works</h4>
@@ -845,11 +849,10 @@ const Affiliate = () => {
                   <li>Advance through tiers to increase your monthly bonus payment</li>
                 </ul>
               </div>
-              
-              {/* Charts always side by side */}
-              <div className="flex flex-row gap-4 items-center justify-center mt-3">
+              {/* Charts always side by side, but stack on mobile */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-center mt-3">
                 {/* Team Members Pie */}
-                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px] w-full">
                   <Pie
                     data={{
                       labels: ["Your Team", "Remaining"],
@@ -896,7 +899,7 @@ const Affiliate = () => {
                   </div>
                 </div>
                 {/* Business Volume Pie */}
-                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px]">
+                <div className="flex flex-col items-center bg-secondary-foreground/80 dark:bg-zinc-800 rounded-lg shadow p-2 min-w-[120px] max-w-[140px] w-full">
                   <Pie
                     data={{
                       labels: ["Your Volume", "Remaining"],
@@ -995,132 +998,96 @@ const Affiliate = () => {
         <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
           {/* Left Sidebar - Only visible on desktop */}
           <div className="hidden lg:block space-y-4 sm:space-y-6">
-            <Card className="bg-secondary">
+            <Card className="bg-secondary rounded-md">
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle>Share with your Network</CardTitle>
+                <CardTitle className="text-foreground">Share with your Network</CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="space-y-2">
-                  <Label>Referral Code</Label>
+                  <Label className="text-foreground">Referral Code</Label>
                   <div className="flex gap-2">
-                    <Input value={referralCode} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
-                    <Button className="border border-border" variant="outline" size="icon" onClick={() => {
+                    <Input value={referralCode} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground rounded-md" />
+                    <Button className="border border-border rounded-md bg-secondary text-foreground hover:text-foreground" variant="outline" size="icon" onClick={() => {
                       navigator.clipboard.writeText(referralCode);
                       toast({ title: "Copied!", description: "Referral code copied" });
                     }}>
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className={`text-xs ${
-                    directReferralsCount >= 2 
-                      ? 'text-green-600' 
-                      : 'text-amber-600'
-                  }`}>
-                    Direct Referrals: {directReferralsCount}/2
-                  </p>
-                </div>                  <div className="space-y-2">
-                    <Label>Referral Link</Label>
-                    <div className="flex gap-2">
-                      <Input value={referralLink} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
-                      <Button className="border border-border"  variant="outline" size="icon" onClick={copyReferralLink}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <p className={`text-xs ${directReferralsCount >= 2 ? 'text-green-600' : 'text-amber-600'}`}>Direct Referrals: {directReferralsCount}/2</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-foreground">Referral Link</Label>
+                  <div className="flex gap-2">
+                    <Input value={referralLink} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground rounded-md" />
+                    <Button className="border border-border rounded-md bg-secondary text-foreground hover:text-foreground"  variant="outline" size="icon" onClick={copyReferralLink}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
                   </div>
-
-                  {/* Enhanced sharing options */}
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <Label className="mb-2 block">Share via:</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none"
-                        onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
-                      >
-                        WhatsApp
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none"
-                        onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
-                      >
-                        Twitter
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-[#0077B5] text-white hover:bg-[#0077B5]/90 border-none"
-                        onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank')}
-                      >
-                        LinkedIn
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-[#4267B2] text-white hover:bg-[#4267B2]/90 border-none"
-                        onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`, '_blank')}
-                      >
-                        Facebook
-                      </Button>
-                    </div>
+                </div>
+                {/* Enhanced sharing options */}
+                <div className="mt-4 pt-4 border-t border-border">
+                  <Label className="mb-2 block text-foreground">Share via:</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none rounded-md"
+                      onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
+                    >
+                      WhatsApp
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none rounded-md"
+                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
+                    >
+                      Twitter
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-[#0077B5] text-white hover:bg-[#0077B5]/90 border-none rounded-md"
+                      onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank')}
+                    >
+                      LinkedIn
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-[#4267B2] text-white hover:bg-[#4267B2]/90 border-none rounded-md"
+                      onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`, '_blank')}
+                    >
+                      Facebook
+                    </Button>
                   </div>
-
-                  {currentReferrer && (
-                    <div className="p-3 rounded-lg bg-green-600/20 border border-green-800 text-sm">
-                      <span>Referred by:</span>
-                       <div><span className="font-bold text-lg">{currentReferrer}</span></div>
-                    </div>
-                  )}
+                </div>
+                {currentReferrer && (
+                  <div className="p-3 rounded-md bg-green-600/20 border border-green-800 text-sm text-foreground">
+                    <span>Referred by:</span>
+                    <div><span className="font-bold text-lg">{currentReferrer}</span></div>
+                  </div>
+                )}
               </CardContent>
-            </Card>
-
-            {/* Move Commission Rates below share card in desktop */}
-            <Card className="bg-secondary">
-              <Accordion type="single" collapsible>
-                <AccordionItem value="commission-rates">
-                  <AccordionTrigger className="px-4 sm:px-6">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-base sm:text-lg">Commission Rates</CardTitle>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="px-4 sm:px-6 pb-4 space-y-2">
-                      {commissionStructure.map((level) => (
-                        <div 
-                          key={level.level} 
-                          className="flex justify-between items-center p-2 rounded-md hover:bg-secondary-foreground transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Level {level.level}</span>
-                            <span className="text-xs text-muted-foreground">{level.description}</span>
-                          </div>
-                          <span className="font-medium text-green-600">{level.percentage}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
             </Card>
           </div>
 
           {/* Mobile Share Section */}
           <div className="lg:hidden space-y-4">
-            <Card className="bg-secondary">
+            <Card className="bg-secondary rounded-md">
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle>Share</CardTitle>
+                <CardTitle className="text-foreground">Share</CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="space-y-2">
-                  <Label>Referral Code</Label>
+                  <Label className="text-foreground">Referral Code</Label>
                   <div className="flex gap-2">
-                    <Input value={referralCode} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
+                    <Input value={referralCode} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground rounded-md" />
                     <Button
                       variant="outline"
                       size="icon"
-                      className="min-h-[44px] min-w-[44px] border border-border"
+                      className="min-h-[44px] min-w-[44px] border border-border rounded-md bg-secondary text-foreground hover:text-foreground"
                       onClick={() => {
                         navigator.clipboard.writeText(referralCode);
                         toast({ title: "Copied!", description: "Referral code copied" });
@@ -1128,23 +1095,17 @@ const Affiliate = () => {
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
-                  <p className={`text-xs ${
-                    directReferralsCount >= 2 
-                      ? 'text-green-600' 
-                      : 'text-amber-600'
-                  }`}>
-                    Direct Referrals: {directReferralsCount}/2
-                  </p>
+                  <p className={`text-xs ${directReferralsCount >= 2 ? 'text-green-600' : 'text-amber-600'}`}>Direct Referrals: {directReferralsCount}/2</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Referral Link</Label>
+                  <Label className="text-foreground">Referral Link</Label>
                   <div className="flex gap-2">
-                    <Input value={referralLink} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground" />
+                    <Input value={referralLink} readOnly className="font-mono text-foreground text-sm bg-secondary-foreground rounded-md" />
                     <Button
                       variant="outline"
                       size="icon"
-                      className="min-h-[44px] min-w-[44px] border border-border"
+                      className="min-h-[44px] min-w-[44px] border border-border rounded-md bg-secondary text-foreground hover:text-foreground"
                       onClick={copyReferralLink}>
                       <Copy className="h-4 w-4" />
                     </Button>
@@ -1153,12 +1114,12 @@ const Affiliate = () => {
 
                 {/* Enhanced sharing options for mobile */}
                 <div className="mt-4 pt-4 border-t border-border">
-                  <Label className="mb-2 block">Share via:</Label>
+                  <Label className="mb-2 block text-foreground">Share via:</Label>
                   <div className="flex flex-wrap gap-2">
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none"
+                      className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none rounded-md"
                       onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       WhatsApp
@@ -1166,7 +1127,7 @@ const Affiliate = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none"
+                      className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none rounded-md"
                       onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       Twitter
@@ -1174,7 +1135,7 @@ const Affiliate = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-[#0077B5] text-white hover:bg-[#0077B5]/90 border-none"
+                      className="bg-[#0077B5] text-white hover:bg-[#0077B5]/90 border-none rounded-md"
                       onClick={() => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       LinkedIn
@@ -1182,7 +1143,7 @@ const Affiliate = () => {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-[#4267B2] text-white hover:bg-[#4267B2]/90 border-none"
+                      className="bg-[#4267B2] text-white hover:bg-[#4267B2]/90 border-none rounded-md"
                       onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       Facebook
@@ -1191,7 +1152,7 @@ const Affiliate = () => {
                 </div>
 
                 {currentReferrer && (
-                  <div className="p-3 rounded-lg bg-green-600/20 border border-green-800 text-sm">
+                  <div className="p-3 rounded-md bg-green-600/20 border border-green-800 text-sm text-foreground">
                     <span>Referred by:</span>
                     <div><span className="font-bold text-lg">{currentReferrer}</span></div>
                   </div>
@@ -1203,13 +1164,12 @@ const Affiliate = () => {
           {/* Main Content Area */}
           <div className="space-y-4 sm:space-y-6 w-full pb-10">
             {/* Network Structure */}
-            <Card className="bg-secondary">
+            <Card className="bg-secondary rounded-md">
               <CardHeader className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Network Structure</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">Your complete affiliate team overview</p>
+                      <CardTitle className="text-foreground">Network Structure</CardTitle>
                     </div>
                     {teamData.length > 0 && (
                       <Select
@@ -1296,14 +1256,14 @@ const Affiliate = () => {
                   <>
                     {/* Network Analytics - New Section */}
                     <div className="grid gap-4 md:grid-cols-2 mb-6">
-                      <Card className="bg-secondary-foreground/10 border-0">
+                      <Card className="bg-secondary-foreground border-0">
                         <CardContent className="p-4">
                           <div className="space-y-3">
                             <h3 className="font-medium text-foreground">Network Metrics</h3>
                             <div className="grid grid-cols-2 gap-3">
                               <div className="p-3 bg-secondary-foreground/20 rounded-lg">
                                 <div className="text-xs text-muted-foreground">Total Depth</div>
-                                <div className="text-xl font-medium">
+                                <div className="text-xl font-medium text-foreground">
                                   {teamData.length > 0 ? Math.max(...teamData.map(m => m.level)) : 0} Levels
                                 </div>
                               </div>
@@ -1311,7 +1271,7 @@ const Affiliate = () => {
                                 <div className="text-xs text-muted-foreground">
                                   {legendType === "investments" ? "Active Members" : "Qualified Members"}
                                 </div>
-                                <div className="text-xl font-medium">
+                                <div className="text-xl font-medium text-foreground">
                                   {legendType === "investments" 
                                     ? `${teamData.filter(m => m.totalSubscriptions > 0).length} / ${teamData.length}`
                                     : `${teamData.filter(m => m.directCount >= 2).length} / ${teamData.length}`}
@@ -1319,13 +1279,13 @@ const Affiliate = () => {
                               </div>
                               <div className="p-3 bg-secondary-foreground/20 rounded-lg">
                                 <div className="text-xs text-muted-foreground">With Active Plans</div>
-                                <div className="text-xl font-medium">
+                                <div className="text-xl font-medium text-foreground">
                                   {teamData.filter(m => m.totalSubscriptions > 0).length}
                                 </div>
                               </div>
                               <div className="p-3 bg-secondary-foreground/20 rounded-lg">
                                 <div className="text-xs text-muted-foreground">Average Plan Value</div>
-                                <div className="text-xl font-medium">
+                                <div className="text-xl font-medium text-foreground">
                                   ${Math.round(teamData.reduce((sum, m) => sum + m.totalInvested, 0) / Math.max(1, teamData.filter(m => m.totalInvested > 0).length)).toLocaleString()}
                                 </div>
                               </div>
@@ -1334,7 +1294,7 @@ const Affiliate = () => {
                         </CardContent>
                       </Card>
                       
-                      <Card className="bg-secondary-foreground/10 border-0">
+                      <Card className="bg-secondary-foreground border-0">
                         <CardContent className="p-4">
                           <div className="space-y-2">
                             <h3 className="font-medium text-foreground">Distribution by Level</h3>
@@ -1343,11 +1303,11 @@ const Affiliate = () => {
                               const percentage = Math.round((count / teamData.length) * 100);
                               return (
                                 <div key={level} className="space-y-1">
-                                  <div className="flex justify-between items-center text-xs">
+                                  <div className="flex justify-between items-center text-xs text-muted-foreground">
                                     <span>Level {level}</span>
                                     <span>{count} ({percentage}%)</span>
                                   </div>
-                                  <div className="h-2 bg-secondary-foreground/20 rounded-full overflow-hidden">
+                                  <div className="h-2 bg-secondary-foreground rounded-sm overflow-hidden">
                                     <div 
                                       className={`h-full ${level === 1 ? 'bg-green-500' : level === 2 ? 'bg-blue-500' : level === 3 ? 'bg-purple-500' : 'bg-amber-500'}`}
                                       style={{ width: `${percentage}%` }}
@@ -1368,11 +1328,11 @@ const Affiliate = () => {
                         <AccordionItem 
                           value={`level-${level}`} 
                           key={level} 
-                          className="border-none bg-background dark:bg-secondary/10 rounded-xl mb-2"
+                          className="border-none bg-secondary-foreground rounded-xl mb-2"
                         >
                           <AccordionTrigger className="px-4 sm:px-6 py-3 hover:no-underline rounded-t-xl">
                             <div>
-                              <p className="font-medium text-sm text-left">Level {level}</p>
+                              <p className="font-medium text-sm text-left text-foreground">Level {level}</p>
                               <p className="text-xs text-muted-foreground">
                                 {teamData.filter(m => m.level === level).length} members
                               </p>
@@ -1402,7 +1362,7 @@ const Affiliate = () => {
                                     <div className="flex justify-between items-start gap-4">
                                       <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                          <p className="font-medium">{member.name}</p>
+                                          <p className="font-medium text-foreground">{member.name}</p>
                                           <div className={cn(
                                             "w-2 h-2 rounded-full",
                                             legendType === "investments" 
@@ -1422,18 +1382,23 @@ const Affiliate = () => {
                                         >
                                           {member.referralCode}
                                         </Badge>
-                                        <p className={cn(
-                                          "text-xs",
-                                          member.directCount === 0 ? "text-red-600" :
-                                          member.directCount === 1 ? "text-amber-600" :
-                                          "text-green-600"
-                                        )}>
-                                          Direct Referrals: {member.directCount}/2
-                                        </p>
+                                        <Badge
+                                          className={cn(
+                                            "text-xs px-2 py-1 rounded-full",
+                                            member.directCount === 0
+                                              ? "bg-red-100 text-red-700"
+                                              : member.directCount === 1
+                                              ? "bg-amber-100 text-amber-700"
+                                              : "bg-green-100 text-green-700"
+                                          )}
+                                          variant="outline"
+                                        >
+                                          Directs: {member.directCount}/2
+                                        </Badge>
                                       </div>
                                       <div className="text-right space-y-1">
-                                        <div className="text-sm font-medium">
-                                          Business Volume: ${(member.totalInvested || 0).toLocaleString()}
+                                        <div className="text-sm font-medium text-foreground">
+                                          BV: ${(member.totalInvested || 0).toLocaleString()}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                           Plans: {member.totalSubscriptions || 0}
@@ -1459,27 +1424,24 @@ const Affiliate = () => {
       {/* FAQ Section */}
       <div className="container max-w-[1000px] mx-auto px-4 mb-12 mt-8">
         <div className="text-center max-w-2xl mx-auto mb-8">
-          <h1 className="text-2xl font-bold mb-4">Frequently Asked Questions</h1>
-          <p className="text-muted-foreground">
-            Find answers to common questions about our affiliate program.
-          </p>
+          <h1 className="text-2xl font-bold mb-4 text-foreground">Frequently Asked Questions</h1>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Affiliate Program Basics */}
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 256 256">
+              <div className="w-10 h-10 rounded-xl bg-secondary border border-border/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-foreground" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M216,48H40A16,16,0,0,0,24,64V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V64A16,16,0,0,0,216,48Zm0,16V88H40V64Zm0,128H40V104H216v88Zm-16-24a8,8,0,0,1-8,8H152a8,8,0,0,1,0-16h40A8,8,0,0,1,200,168Zm0-32a8,8,0,0,1-8,8H152a8,8,0,0,1,0-16h40A8,8,0,0,1,200,136ZM72,160a24,24,0,1,1,24,24A24,24,0,0,1,72,160Z"></path>
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold">Affiliate Program Basics</h2>
+              <h2 className="text-xl font-semibold text-foreground">Affiliate Program Basics</h2>
             </div>
             <Accordion type="single" collapsible className="space-y-2">
               <AccordionItem 
                 value="how-it-works"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">How does the affiliate program work?</div>
@@ -1493,7 +1455,7 @@ const Affiliate = () => {
               
               <AccordionItem 
                 value="qualification"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">How do I qualify for all commission tiers?</div>
@@ -1510,17 +1472,17 @@ const Affiliate = () => {
           {/* Commissions & Payments */}
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 256 256">
+              <div className="w-10 h-10 rounded-xl bg-secondary border border-border/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-foreground" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm44-68a28,28,0,0,1-28,28H100a8,8,0,0,1-8-8V116a8,8,0,0,1,8-8h44a28,28,0,0,1,28,28,28,28,0,0,1-13.31,23.79A27.93,27.93,0,0,1,172,148Zm-28-12a12,12,0,1,0,0-24H108v24Zm0,16H108v24h36a12,12,0,0,0,0-24Z"></path>
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold">Commissions & Payments</h2>
+              <h2 className="text-xl font-semibold text-foreground">Commissions & Payments</h2>
             </div>
             <Accordion type="single" collapsible className="space-y-2">
               <AccordionItem 
                 value="commission-payment"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">When and how are commissions paid?</div>
@@ -1534,7 +1496,7 @@ const Affiliate = () => {
               
               <AccordionItem 
                 value="maximizing-earnings"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">How can I maximize my affiliate earnings?</div>
@@ -1551,17 +1513,17 @@ const Affiliate = () => {
           {/* Rewards & Bonuses */}
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 256 256">
+                           <div className="w-10 h-10 rounded-xl bg-secondary border border-border/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-foreground" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M232,96a16,16,0,0,0-16-16H211.4l-11.27-45.11A16,16,0,0,0,184.77,24H71.23A16,16,0,0,0,55.87,34.89L44.6,80H40A16,16,0,0,0,24,96v16a40,40,0,0,0,40,40h1.38a88,88,0,0,0,125.24,0H192a40,40,0,0,0,40-40ZM71.23,40h113.54l11.27,45.11,0,.18c0,.23,0,.47,0,.71v26a72.08,72.08,0,0,1-72,72h-32a72.08,72.08,0,0,1-72-72V86c0-.24,0-.48,0-.71s0-.12,0-.18ZM216,112a24,24,0,0,1-24,24h-1.59a87.89,87.89,0,0,0,1.59-16V96h24ZM40,136a24,24,0,0,1-24-24V96H64v24a87.89,87.89,0,0,0,1.59,16H64A24,24,0,0,1,40,136ZM128,152a12,12,0,1,1,12-12A12,12,0,0,1,128,152Z"></path>
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold">Rewards & Bonuses</h2>
+              <h2 className="text-xl font-semibold text-foreground">Rewards & Bonuses</h2>
             </div>
             <Accordion type="single" collapsible className="space-y-2">
               <AccordionItem 
                 value="rounder-bonus"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">What is the Rounder Bonus Program?</div>
@@ -1575,7 +1537,7 @@ const Affiliate = () => {
               
               <AccordionItem 
                 value="rank-achievements"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">How do rank achievements work?</div>
@@ -1592,17 +1554,17 @@ const Affiliate = () => {
           {/* Resources & Support */}
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
-                <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 256 256">
+              <div className="w-10 h-10 rounded-xl bg-secondary border border-border/50 flex items-center justify-center">
+                <svg className="w-5 h-5 text-foreground" fill="currentColor" viewBox="0 0 256 256">
                   <path d="M213.66,202.34a8,8,0,0,1-11.32,11.32L156,167.31V216a8,8,0,0,1-16,0V167.31l-46.34,46.35a8,8,0,0,1-11.32-11.32L128.69,156H80a8,8,0,0,1,0-16h48.69L82.34,93.66a8,8,0,0,1,11.32-11.32L140,128.69V80a8,8,0,0,1,16,0v48.69l46.34-46.35a8,8,0,0,1,11.32,11.32L167.31,140H216a8,8,0,0,1,0,16H167.31Z"></path>
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold">Resources & Support</h2>
+              <h2 className="text-xl font-semibold text-foreground">Resources & Support</h2>
             </div>
             <Accordion type="single" collapsible className="space-y-2">
               <AccordionItem 
                 value="marketing-materials"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">What marketing materials are available?</div>
@@ -1616,7 +1578,7 @@ const Affiliate = () => {
               
               <AccordionItem 
                 value="marketing-tips"
-                className="border border-border/50 rounded-lg bg-card px-4"
+                className="border border-border/50 rounded-lg bg-secondary px-4"
               >
                 <AccordionTrigger className="py-4 text-left hover:no-underline [&[data-state=open]>svg]:rotate-180">
                   <div className="font-medium">How do I effectively promote my affiliate link?</div>

@@ -392,10 +392,10 @@ const Login = () => {
                         <img
                           src={
                             theme === "dark"
-                              ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                              : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                              ? "/ct-logo-dark.svg"
+                              : "/ct-logo-light.svg"
                           }
-                          alt="cloudforex"
+                          alt="CloudTrade"
                           className="w-auto h-12 object-contain"
                         />
                       ) : (

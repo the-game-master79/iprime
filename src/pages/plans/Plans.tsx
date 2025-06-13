@@ -471,7 +471,7 @@ const Plans = () => {
                   <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
                 </div>
               </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is Auto-Trading?</h3>
+              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is AlphaQuant?</h3>
               <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
                 It’s a GEN-AI system that trades on your behalf, maximizing profits while you relax.
               </p>

@@ -307,7 +307,7 @@ export const Topbar = ({
                 size="icon"
                 className={`h-10 w-10 rounded-lg relative hover:bg-secondary-foreground ${
                   hasActivePlan ? "bg-success" : "bg-destructive"
-                }`}
+                } hidden md:inline-flex`}
                 onClick={handleAQClick}
                 aria-label="AlphaQuant"
               >
@@ -321,7 +321,7 @@ export const Topbar = ({
                   <Button 
                     variant="ghost" 
                     size="icon"
-                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground"
+                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground hidden md:inline-flex"
                   >
                     <Bell className="h-5 w-5 text-foreground" weight="bold" />
                     {unreadCount > 0 && (

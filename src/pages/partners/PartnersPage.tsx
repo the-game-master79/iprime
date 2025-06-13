@@ -63,7 +63,7 @@ const PartnersPage = () => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-white dark:bg-card p-8 rounded-2xl shadow-lg">
+                <div className="bg-secondary dark:bg-secondary p-8 rounded-2xl shadow-lg">
                   <h3 className="text-2xl font-bold mb-4 text-primary">Commission Structure</h3>
                   <div className="space-y-4">
                     <div className="p-4 rounded-xl bg-primary/5">

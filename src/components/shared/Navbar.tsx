@@ -12,7 +12,17 @@ export const Navbar = () => {
   const { setTheme, theme } = useTheme();
 
   const handleNavigation = (path: string) => {
-    if (!user) {
+    // List of routes that require authentication
+    const protectedRoutes = [
+      "/platform",
+      "/plans",
+      "/affiliate",
+      "/profile",
+      "/cashier",
+      "/promotions",
+    ];
+    // If the route is protected and user is not logged in, redirect to login
+    if (protectedRoutes.some((r) => path.startsWith(r)) && !user) {
       navigate("/auth/login");
       return;
     }
@@ -21,16 +31,8 @@ export const Navbar = () => {
       window.open("/tradingstation", "_blank");
       return;
     }
-    if (
-      path === "/tradingstation" ||
-      path === "/auth/login" ||
-      path === "/alphaquant" ||
-      path === "/partners" ||
-      path === "/company"
-    ) {
-      navigate(path);
-    }
-    // Do nothing if path is /trading
+    // All other routes (public) can be navigated to directly
+    navigate(path);
   };
 
   const isActive = (path: string) => {

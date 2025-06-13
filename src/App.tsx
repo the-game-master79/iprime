@@ -84,24 +84,28 @@ const RouteGroup = () => {
 
   if (path.startsWith("/admin")) {
     return (
-      <Routes>
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/users" element={<UsersPage />} />
-        <Route path="/admin/payments" element={<PaymentsPage />} />
-        <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
-        <Route path="/admin/deposits" element={<AdminDepositsPage />} />
-        <Route path="/admin/plans" element={<AdminPlans />} />
-        <Route path="/admin/plans-subscription" element={<PlansSubscriptionPage />} />
-        <Route path="/admin/affiliates" element={<AffiliatesPage />} />
-        <Route path="/admin/notices" element={<AdminNoticesPage />} />
-        <Route path="/admin/support" element={<SupportManagePage />} />
-        <Route path="/admin/promotions" element={<AdminPromotionsPage />} />
-        <Route path="/admin/promocodes" element={<PromocodesPage />} />
-        <Route path="/admin/pairs" element={<AdminPairs />} />
-        <Route path="/admin/trades" element={<TradesPage />} />
-        <Route path="/admin/live-rates" element={<LiveRatesPage />} />
-      </Routes>
+      <Suspense fallback={<Spinner />}>
+        <AdminAuthProvider>
+          <Routes>
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/payments" element={<PaymentsPage />} />
+            <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
+            <Route path="/admin/deposits" element={<AdminDepositsPage />} />
+            <Route path="/admin/plans" element={<AdminPlans />} />
+            <Route path="/admin/plans-subscription" element={<PlansSubscriptionPage />} />
+            <Route path="/admin/affiliates" element={<AffiliatesPage />} />
+            <Route path="/admin/notices" element={<AdminNoticesPage />} />
+            <Route path="/admin/support" element={<SupportManagePage />} />
+            <Route path="/admin/promotions" element={<AdminPromotionsPage />} />
+            <Route path="/admin/promocodes" element={<PromocodesPage />} />
+            <Route path="/admin/pairs" element={<AdminPairs />} />
+            <Route path="/admin/trades" element={<TradesPage />} />
+            <Route path="/admin/live-rates" element={<LiveRatesPage />} />
+          </Routes>
+        </AdminAuthProvider>
+      </Suspense>
     );
   }
 
@@ -113,19 +117,26 @@ const RouteGroup = () => {
     path.startsWith("/plans")
   ) {
     return (
-      <Routes>
-        <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
-        <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
-        <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
-        <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
-        <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
-        <Route path="/profile" element={<AuthGuard requireAuth><Profile /></AuthGuard>} />
-        <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
-        <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
-      </Routes>
+      <Suspense fallback={<Spinner />}>
+        <TooltipProvider>
+          <UserProfileProvider>
+            <Routes>
+              <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
+              <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
+              <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
+              <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
+              <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
+              <Route path="/profile" element={<AuthGuard requireAuth><Profile /></AuthGuard>} />
+              <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
+              <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
+            </Routes>
+          </UserProfileProvider>
+        </TooltipProvider>
+      </Suspense>
     );
   }
 
+  // Public routes (landing pages)
   return (
     <Routes>
       <Route path="/" element={<Index />} />
@@ -152,18 +163,10 @@ const App = () => {
       <HelmetProvider>
         <QueryClientProvider client={queryClient}>
           <Router>
-            <Suspense fallback={<Spinner />}>
-              <AuthProvider>
-                <AdminAuthProvider>
-                  <TooltipProvider>
-                    <UserProfileProvider>
-                      <RouteGroup />
-                      <Toaster />
-                    </UserProfileProvider>
-                  </TooltipProvider>
-                </AdminAuthProvider>
-              </AuthProvider>
-            </Suspense>
+            <AuthProvider>
+              <RouteGroup />
+              <Toaster />
+            </AuthProvider>
           </Router>
         </QueryClientProvider>
       </HelmetProvider>
