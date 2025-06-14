@@ -36,7 +36,8 @@ interface PriceData {
 }
 
 const TradingStation = () => {
-  const { profile, loading } = useUserProfile();
+  // Fix: handle null context from useUserProfile
+  const { profile, loading } = useUserProfile() || {};
   
   const [searchQuery, setSearchQuery] = useState("");
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
