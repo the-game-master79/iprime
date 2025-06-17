@@ -795,9 +795,9 @@ const Profile = () => {
               </div>
             ) : (
               <Tabs defaultValue={defaultTab} className="w-full">
-                <TabsList className="w-fit mb-8 h-12 rounded-xl p-1 bg-secondary">
-                  <TabsTrigger value="personal" className="rounded-lg h-10 px-6 text-foreground">Personal Info</TabsTrigger>
-                  <TabsTrigger value="kyc" className="rounded-lg h-10 px-6 text-foreground">KYC Verification</TabsTrigger>
+                <TabsList className="w-fit mb-8 h-12 rounded-xl p-1 bg-secondary text-secondary-foreground">
+                  <TabsTrigger value="personal" className="rounded-lg h-10 px-6 bg-secondary text-foreground data-[state=active]:bg-secondary-foreground data-[state=active]:text-foreground">Personal Info</TabsTrigger>
+                  <TabsTrigger value="kyc" className="rounded-lg h-10 px-6 bg-secondary text-foreground data-[state=active]:bg-secondary-foreground data-[state=active]:text-foreground">KYC Verification</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="space-y-6">
@@ -1018,7 +1018,7 @@ const Profile = () => {
                         <Button 
                           type="submit" 
                           disabled={isUpdatingPersonal || !userData.phone || !userData.address || !userData.city || !userData.country || !userData.fullName} 
-                          className="mt-6 bg-primary text-white min-h-[44px] min-w-[44px]"
+                          className="mt-6 bg-primary text-white min-h-[44px] min-w-[44px] rounded-md"
                         >
                           {isUpdatingPersonal ? "Processing..." : (
                             <>
@@ -1090,7 +1090,7 @@ const Profile = () => {
                           <Button 
                             onClick={handleReferralSubmit}
                             disabled={!referralCode || !referrerName || isSubmittingReferral}
-                            className="bg-primary text-white min-h-[44px] min-w-[44px]"
+                            className="bg-primary text-white min-h-[44px] min-w-[44px] rounded-md"
                           >
                             {isSubmittingReferral ? "Adding..." : "Add Referral"}
                           </Button>
@@ -1434,7 +1434,7 @@ const Profile = () => {
                         <Button 
                           onClick={handleSubmitKYC} 
                           disabled={isSubmittingKYC || !selectedFiles.front || !selectedFiles.back}
-                          className={`w-full ${userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary text-white'}`}
+                          className={`w-full ${userData.kycStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary text-white'} rounded-md`}
                         >
                           {isSubmittingKYC ? (
                             <>Processing...</>
@@ -1455,7 +1455,7 @@ const Profile = () => {
         <div className="container mx-auto max-w-[1000px] py-6 border-t border-secondary mt-8 flex flex-row gap-4 items-center justify-between">
           <Button
             variant="secondary"
-            className="flex items-center gap-2 order-2 sm:order-1"
+            className="flex items-center gap-2 order-2 sm:order-1 rounded-md"
             onClick={() => {
               // Always open chat in a mobile-sized window
               const width = 420;
@@ -1477,7 +1477,7 @@ const Profile = () => {
           <Button 
             variant="destructive" 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-white order-1 sm:order-2"
+            className="flex items-center gap-2 text-white order-1 sm:order-2 rounded-md"
           >
             <LogOutIcon className="h-4 w-4 text-white" weight="regular"/>
             Logout

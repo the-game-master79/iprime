@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { DashboardTopbar } from "@/components/shared/DashboardTopbar";
 import { PageTransition } from "@/components/ui-components";
 import { Confetti } from "@phosphor-icons/react";
 
@@ -33,7 +32,6 @@ const Promotions = () => {
   return (
     <PageTransition>
       <div className="min-h-[100dvh] bg-[#000000]">
-        <DashboardTopbar />
         
         <main className="py-12 px-4 md:py-16">
           <div className="container mx-auto max-w-[1000px]">
