@@ -63,8 +63,8 @@
     --foreground: 0 0% 98%;
     --primary: 213 100% 60%; /* #2B7FFF in HSL for dark mode as well */
     --primary-foreground: 240 6% 10%;
-    --secondary: 218, 36%, 18%;
-    --secondary-foreground: 215, 28%, 27%;
+    --secondary: 240 6% 10%;
+    --secondary-foreground: 240 4% 16%;
     --card: 39 100% 50%; /* #FFA500 */
     --card-foreground: 0 0% 0%; /* black for contrast */
     --muted: 240 6% 15%;
