@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { useTheme } from "@/hooks/use-theme";
 import { isForexTradingTime } from "@/lib/utils";
+import { usePwaInstall } from '@/hooks/use-pwa-install';
 import type { 
   Rank, 
   BusinessRankState,
@@ -148,6 +149,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const { isMobile } = useBreakpoints();
   const { theme, setTheme } = useTheme();
   const { user: authUser } = useAuth(); // <-- get user from context
+  const { canInstall, install } = usePwaInstall();
 
   // Replace useState/useEffect for currentUser with this:
   const [currentUser, setCurrentUser] = useState<any>(authUser);
@@ -866,6 +868,20 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
             <DashboardSkeleton />
           ) : (
             <div className="space-y-4">
+              {/* PWA Install/Download App Section for mobile users - moved inside main container above referral link */}
+              {isMobile && canInstall && (
+                <div className="flex flex-col items-center bg-background rounded-2xl shadow-lg p-6 w-full border border-primary/20">
+                  <div className="w-full text-left mb-4">
+                    <h2 className="text-2xl font-bold text-foreground mb-1">Get the CloudForex App</h2>
+                    <p className="text-base text-muted-foreground mb-0">For the best experience, install our app on your mobile device.</p>
+                  </div>
+                  <div className="w-full flex justify-center">
+                    <Button onClick={install} className="bg-primary text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:scale-105 transition">
+                      Install App
+                    </Button>
+                  </div>
+                </div>
+              )}
               {/* Referral Card with Promotions Button */}
               <div className="space-y-4">
                 {/* Referral Link Container */}

@@ -174,103 +174,102 @@ export const Topbar = ({
         language={language}
         setLanguage={setLanguage}
       />
-      <header
-        className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-full max-w-[1200px] rounded-2xl bg-secondary/80 backdrop-blur-md shadow-xl border border-border flex flex-col px-4 md:px-8 py-3 transition-all"
-        style={{
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-          background: theme === 'dark'
-            ? 'rgba(24, 24, 27, 0.85)'
-            : 'rgba(255, 255, 255, 0.85)'
-        }}
-      >
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-2">
-            {/* Back Button (conditionally rendered) */}
-            {!hideBackButton && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-lg relative bg-secondary-foreground/10 hover:bg-secondary-foreground/20 mr-1"
-                onClick={() => navigate('/platform')}
-                aria-label="Back"
-              >
-                <CaretLeft className="h-5 w-5 text-foreground" weight="bold" />
-              </Button>
-            )}
-            {/* Logo: show icon only on mobile, full logo on md+ */}
-            <img
-              src={
-                theme === "dark"
-                  ? "/ct-logo-dark.svg"
-                  : "/ct-logo-light.svg"
-              }
-              alt="CloudForex"
-              className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
-              onClick={() => window.location.reload()}
-            />
-            <img
-              src={
-                theme === "dark"
-                  ? "/cf-dark.svg"
-                  : "/cf-light.svg"
-              }
-              alt="CloudForex"
-              className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
-              onClick={() => window.location.reload()}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Available Balance */}
-            <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-xs text-muted-foreground">Available Balance</span>
-              <span className="font-regular text-lg text-foreground">
-                {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                <span className="font-bold">USD</span>
-              </span>
-            </div>
-            {/* Mobile: Balance badge with wallet icon */}
-            <div className="flex md:hidden items-center">
-              <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground/10 text-foreground">
-                <Wallet className="w-4 h-4 mr-1" weight="bold" />
-                {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-              </Badge>
-            </div>
-            {/* Profile Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+      <div className="w-full flex justify-center px-2 md:px-0 pt-4 pb-2">
+        <header
+          className="sticky top-0 z-50 w-full max-w-[1200px] rounded-2xl bg-secondary/80 backdrop-blur-md shadow-xl border border-border flex flex-col px-4 md:px-8 py-3 transition-all"
+          style={{
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+            background: theme === 'dark'
+              ? 'rgba(24, 24, 27, 0.85)'
+              : 'rgba(255, 255, 255, 0.85)'
+          }}
+        >
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              {/* Back Button (conditionally rendered) */}
+              {!hideBackButton && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="bg-secondary/30 hover:bg-secondary-foreground/20 rounded-lg"
+                  className="h-10 w-10 rounded-lg relative bg-secondary-foreground/10 hover:bg-secondary-foreground/20 mr-1"
+                  onClick={() => navigate('/platform')}
+                  aria-label="Back"
                 >
-                  <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
-                    <AvatarFallback className="bg-primary rounded-lg">
-                      <UserCircle weight="bold" className="h-6 w-6 text-white" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <CaretLeft className="h-5 w-5 text-foreground" weight="bold" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 bg-background text-foreground border-border">
-                <DropdownMenuItem onClick={() => navigate('/profile')}>
-                  <UserCircle className="mr-2 h-4 w-4" weight="bold" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-                  <GearSix className="mr-2 h-4 w-4" weight="bold" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuItem className="bg-destructive text-white" onClick={() => { (async () => { await supabase.auth.signOut(); navigate("/login"); })(); }}>
-                  <SignOut className="mr-2 h-4 w-4" weight="bold" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+              {/* Logo: show icon only on mobile, full logo on md+ */}
+              <img
+                src={
+                  theme === "dark"
+                    ? "/ct-logo-dark.svg"
+                    : "/ct-logo-light.svg"
+                }
+                alt="CloudForex"
+                className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
+                onClick={() => window.location.reload()}
+              />
+              <img
+                src={
+                  theme === "dark"
+                    ? "/cf-dark.svg"
+                    : "/cf-light.svg"
+                }
+                alt="CloudForex"
+                className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
+                onClick={() => window.location.reload()}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Available Balance */}
+              <div className="hidden md:flex flex-col items-end mr-2">
+                <span className="text-xs text-muted-foreground">Available Balance</span>
+                <span className="font-regular text-lg text-foreground">
+                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                  <span className="font-bold">USD</span>
+                </span>
+              </div>
+              {/* Mobile: Balance badge with wallet icon */}
+              <div className="flex md:hidden items-center">
+                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground/10 text-foreground">
+                  <Wallet className="w-4 h-4 mr-1" weight="bold" />
+                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </Badge>
+              </div>
+              {/* Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="bg-secondary/30 hover:bg-secondary-foreground/20 rounded-lg"
+                  >
+                    <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
+                      <AvatarFallback className="bg-primary rounded-lg">
+                        <UserCircle weight="bold" className="h-6 w-6 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40 bg-background text-foreground border-border">
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <UserCircle className="mr-2 h-4 w-4" weight="bold" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                    <GearSix className="mr-2 h-4 w-4" weight="bold" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="bg-destructive text-white" onClick={() => { (async () => { await supabase.auth.signOut(); navigate("/login"); })(); }}>
+                    <SignOut className="mr-2 h-4 w-4" weight="bold" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </div>
-      </header>
-      {/* Spacer for floating topbar - ensure this is always present and visible */}
-      <div className="h-[110px] md:h-[110px] w-full" style={{ minHeight: 84 }} />
-      {/* Title below the topbar spacer */}
+        </header>
+      </div>
       {title && (
         <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 mt-2">
           <span className="font-semibold text-4xl text-foreground block text-left">{title}</span>
