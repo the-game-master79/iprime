@@ -9,7 +9,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
-import { DashboardTopbar } from "@/components/shared/DashboardTopbar";
+import { Topbar } from "@/components/shared/Topbar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { BalanceCard } from "@/components/shared/BalanceCard";
 import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
@@ -856,7 +856,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
       {/* DashboardTopbar with Theme Toggle */}
       <div className="relative">
-        <DashboardTopbar />
+        <Topbar hideBackButton />
       </div>
 
       <main className="py-8">

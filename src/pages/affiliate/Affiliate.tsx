@@ -406,7 +406,7 @@ const Affiliate = () => {
       <Topbar title="Affiliate Dashboard" />
 
       {/* Stats Overview */}
-      <div className="container max-w-[1000px] mx-auto px-4 mb-6 mt-6">
+      <div className="container max-w-[1200px] mx-auto px-4 mb-6 mt-6">
         <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
           <BalanceCard 
             label={`Your team`}
@@ -437,7 +437,7 @@ const Affiliate = () => {
       </div>
 
       {/* Affiliate Performance Summary - Now visible on all domains */}
-      <div className="container max-w-[1000px] mx-auto px-4 mb-8">
+      <div className="container max-w-[1200px] mx-auto px-4 mb-8">
         <Card className="bg-secondary border border-green-600/20 rounded-md">
           <CardContent className="p-6 text-foreground">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -463,7 +463,7 @@ const Affiliate = () => {
       </div>
 
       {/* --- Dialog Buttons Section --- */}
-      <div className="container max-w-[1000px] mx-auto px-4 mb-8">
+      <div className="container max-w-[1200px] mx-auto px-4 mb-8">
         <div className="flex flex-wrap gap-4 items-center mb-4">
           {/* Marketing Resources Button (direct download) */}
           <Button
@@ -994,7 +994,7 @@ const Affiliate = () => {
       {/* --- End Dialog Buttons Section --- */}
 
       {/* Main Content */}
-      <div className="container max-w-[1000px] mx-auto px-4">
+      <div className="container max-w-[1200px] mx-auto px-4">
         <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
           {/* Left Sidebar - Only visible on desktop */}
           <div className="hidden lg:block space-y-4 sm:space-y-6">
@@ -1422,7 +1422,7 @@ const Affiliate = () => {
       </div>
 
       {/* FAQ Section */}
-      <div className="container max-w-[1000px] mx-auto px-4 mb-12 mt-8">
+      <div className="container max-w-[1200px] mx-auto px-4 mb-12 mt-8">
         <div className="text-center max-w-2xl mx-auto mb-8">
           <h1 className="text-2xl font-bold mb-4 text-foreground">Frequently Asked Questions</h1>
         </div>
@@ -1503,7 +1503,7 @@ const Affiliate = () => {
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-1">
                   <div className="text-muted-foreground text-sm">
-                    To maximize your earnings: 1) Focus on quality referrals who are likely to subscribe to plans, 2) Educate your referrals about the benefits of our platform, 3) Aim to qualify for all commission tiers by getting at least 2 direct referrals, 4) Build depth in your network by encouraging your referrals to become affiliates themselves, 5) Leverage the marketing materials we provide, 6) Regularly engage with your network to maintain activity, and 7) Set goals to reach higher ranks and unlock bonuses.
+                    To maximize your earnings: 1) Focus on quality referrals who are likely to subscribe to plans, 2) Educate your referrals about the benefits of our platform, 3) Aim to qualify for all commission tiers by getting at least 2 direct referrals, 4) Build depth in your network by encouraging your referrals to become affiliates themselves, 5) leverage the marketing materials we provide, 6) Regularly engage with your network to maintain activity, and 7) Set goals to reach higher ranks and unlock bonuses.
                   </div>
                 </AccordionContent>
               </AccordionItem>
