@@ -3,7 +3,7 @@ import { toast } from "@/components/ui/use-toast";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 
 // Import supabase client from the utility file
-import { supabase } from "@/lib/supabase-client";
+import { supabase } from "@/lib/supabase";
 
 // Import our custom components
 import Navbar from "@/components/tradingstation/Navbar";
@@ -1798,7 +1798,7 @@ const TradingStation = () => {
                 freeMargin={freeMargin}
                 marginLevel={marginLevel}
                 onResizeStart={onResizeStart}
-                               openTrades={openTrades}
+                openTrades={openTrades}
                 pendingTrades={pendingTrades}
                 localPrices={localPrices}
                 handleCloseTrade={handleCloseTrade}
