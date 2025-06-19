@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 // Use Vite/CRA env vars for browser compatibility
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
@@ -15,9 +15,6 @@ export const ClEngine = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Only create a single Supabase client instance per component lifecycle
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     supabase
       .from("trading_pairs")
       .select("id,symbol,image_url")
@@ -28,7 +25,6 @@ export const ClEngine = () => {
           setPairs(shuffled);
         }
       });
-
     // Cleanup: no need to do anything for supabase client
     // eslint-disable-next-line
   }, []);

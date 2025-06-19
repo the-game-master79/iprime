@@ -448,7 +448,7 @@ const Plans = () => {
           variant="ai" 
           plansCount={subscribedPlans.length}
         />
-        <div className="container mx-auto max-w-[1200px] py-6 px-4">
+        <div className="container mx-auto max-w-[1000px] py-6 px-4">
           {/* Balance cards section */}
           <div className="grid gap-4 md:grid-cols-2 mb-8">
             <BalanceCard 

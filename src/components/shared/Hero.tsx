@@ -91,7 +91,7 @@ export const Hero = ({
               {title}
             </h1>
             {subtitle && (
-              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-medium mb-16 animate-fade-in-up delay-200">
+              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-regular mb-16 animate-fade-in-up delay-200">
                 {subtitle}
               </p>
             )}

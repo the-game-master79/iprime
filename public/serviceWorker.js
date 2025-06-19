@@ -48,8 +48,16 @@ self.addEventListener('fetch', (event) => {
     caches.open(CACHE_NAME).then(cache => {
       return fetch(event.request)
         .then(response => {
-          // Update cache with new response
-          cache.put(event.request, response.clone());
+          // Only cache full, successful responses (not partial 206)
+          if (
+            response &&
+            response.ok &&
+            response.type === 'basic' &&
+            response.status !== 206 &&
+            !response.redirected
+          ) {
+            cache.put(event.request, response.clone());
+          }
           return response;
         })
         .catch(() => {

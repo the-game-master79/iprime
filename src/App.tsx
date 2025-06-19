@@ -55,6 +55,10 @@ const AuthGuard = lazy(() => import("@/components/AuthGuard").then(mod => ({ def
 // New AlphaQuant Page
 const AlphaQuantPage = lazy(() => import("@/pages/alphaquant/AlphaQuantPage"));
 
+// Blog Pages
+const BlogList = lazy(() => import("@/pages/blogs/BlogList"));
+const BlogPost = lazy(() => import("@/pages/blogs/BlogPost"));
+
 // Optional: hook if you need it
 // import { useCacheFlush } from '@/hooks/use-cache-flush';
 
@@ -150,6 +154,8 @@ const RouteGroup = () => {
       <Route path="/tradingstation" element={<TradingStation />} />
       <Route path="/theme-palette" element={<ThemePalettePage />} />
       <Route path="/alphaquant" element={<AlphaQuantPage />} />
+      <Route path="/blogs" element={<BlogList />} />
+      <Route path="/blogs/:slug" element={<BlogPost />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

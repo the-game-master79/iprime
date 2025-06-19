@@ -4,12 +4,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Bell, UserCircle, GearSix, SignOut, Wallet, CaretLeft } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/hooks/use-theme";
+
+interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  created_at: string;
+  amount?: number;
+}
 
 const CURRENCIES = [
   "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "CNY", "INR", "SGD",
@@ -91,6 +100,7 @@ function SettingsDialog({ open, onOpenChange, theme, setTheme, currency, setCurr
             </Select>
           </div>
         </div>
+        {/* No DialogFooter */}
       </DialogContent>
     </Dialog>
   );
@@ -99,16 +109,19 @@ function SettingsDialog({ open, onOpenChange, theme, setTheme, currency, setCurr
 export const Topbar = ({
   currentUser: propCurrentUser,
   title,
-  hideBackButton = false,
+  platform = false,
 }: {
   currentUser?: any;
   title?: string;
-  hideBackButton?: boolean;
+  platform?: boolean;
 } = {}) => {
   const navigate = useNavigate();
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState<any>(propCurrentUser || null);
   const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const [hasActivePlan, setHasActivePlan] = useState<boolean>(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currency, setCurrency] = useState("USD");
   const [language, setLanguage] = useState("en");
@@ -127,9 +140,29 @@ export const Topbar = ({
 
   useEffect(() => {
     if (currentUser) {
+      fetchNotices();
       fetchAvailableBalance();
+      fetchActivePlans();
     }
   }, [currentUser]);
+
+  const fetchNotices = async () => {
+    try {
+      if (!currentUser) return;
+
+      const { data, error } = await supabase
+        .from('notices')
+        .select('*')
+        .or(`user_id.eq.${currentUser.id},user_id.is.null`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setNotices(data || []);
+      setUnreadCount(data?.filter(n => !n.read_at).length || 0);
+    } catch (error) {
+      console.error('Error fetching notices:', error);
+    }
+  };
 
   // Fetch platform available balance (withdrawal_wallet + sum of all subscribed plans)
   const fetchAvailableBalance = async () => {
@@ -162,6 +195,44 @@ export const Topbar = ({
     }
   };
 
+  // Fetch if user has at least 1 active plan
+  const fetchActivePlans = async () => {
+    try {
+      if (!currentUser) return;
+      const { data, error } = await supabase
+        .from('plans_subscriptions')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'approved')
+        .limit(1);
+      if (error) throw error;
+      setHasActivePlan((data?.length || 0) > 0);
+    } catch (error) {
+      setHasActivePlan(false);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      if (!currentUser) return;
+
+      await supabase
+        .from('notices')
+        .update({ read_at: new Date().toISOString() })
+        .is('read_at', null);
+
+      fetchNotices();
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  // Logout handler
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
   return (
     <>
       <SettingsDialog
@@ -174,24 +245,16 @@ export const Topbar = ({
         language={language}
         setLanguage={setLanguage}
       />
-      <div className="w-full flex justify-center px-2 md:px-0 pt-4 pb-2">
-        <header
-          className="sticky top-0 z-50 w-full max-w-[1200px] rounded-2xl bg-secondary/80 backdrop-blur-md shadow-xl border border-border flex flex-col px-4 md:px-8 py-3 transition-all"
-          style={{
-            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-            background: theme === 'dark'
-              ? 'rgba(24, 24, 27, 0.85)'
-              : 'rgba(255, 255, 255, 0.85)'
-          }}
-        >
+      <header className="flex flex-col bg-secondary w-full px-4 md:px-8 py-4">
+        <div className="max-w-[1200px] mx-auto w-full">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
-              {/* Back Button (conditionally rendered) */}
-              {!hideBackButton && (
+              {/* Back Button */}
+              {!platform && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-lg relative bg-secondary-foreground/10 hover:bg-secondary-foreground/20 mr-1"
+                  className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground mr-1"
                   onClick={() => navigate('/platform')}
                   aria-label="Back"
                 >
@@ -206,7 +269,7 @@ export const Topbar = ({
                     : "/ct-logo-light.svg"
                 }
                 alt="CloudForex"
-                className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
+                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
                 onClick={() => window.location.reload()}
               />
               <img
@@ -216,7 +279,7 @@ export const Topbar = ({
                     : "/cf-light.svg"
                 }
                 alt="CloudForex"
-                className="h-7 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
+                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
                 onClick={() => window.location.reload()}
               />
             </div>
@@ -231,18 +294,78 @@ export const Topbar = ({
               </div>
               {/* Mobile: Balance badge with wallet icon */}
               <div className="flex md:hidden items-center">
-                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground/10 text-foreground">
+                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground text-foreground">
                   <Wallet className="w-4 h-4 mr-1" weight="bold" />
                   {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                 </Badge>
               </div>
+              {/* Notifications */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground hidden md:inline-flex"
+                  >
+                    <Bell className="h-5 w-5 text-foreground" weight="bold" />
+                    {unreadCount > 0 && (
+                      <Badge 
+                        variant="default" 
+                        className="absolute -right-1 -top-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary text-primary-foreground"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[380px] bg-background text-card-foreground border-border">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                    <DropdownMenuLabel className="text-foreground">Notifications</DropdownMenuLabel>
+                    {notices.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs hover:text-primary"
+                        onClick={handleMarkAllAsRead}
+                      >
+                        Mark all as read
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-[300px] overflow-auto">
+                    {notices.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                        No notifications
+                      </div>
+                    ) : (
+                      notices.map((notice) => (
+                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default hover:bg-accent">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium text-foreground">{notice.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {notice.content.replace(
+                                /\$?([\d,.]+)(\.\d+)?/g,
+                                (match, whole, decimal) => {
+                                  const num = parseFloat(match.replace(/[$,]/g, ''));
+                                  return isNaN(num) ? match : `$${num.toFixed(2)}`;
+                                }
+                              )}
+                            </p>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
               {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="bg-secondary/30 hover:bg-secondary-foreground/20 rounded-lg"
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-lg bg-secondary hover:bg-secondary-foreground"
                   >
                     <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
                       <AvatarFallback className="bg-primary rounded-lg">
@@ -260,7 +383,7 @@ export const Topbar = ({
                     <GearSix className="mr-2 h-4 w-4" weight="bold" />
                     Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="bg-destructive text-white" onClick={() => { (async () => { await supabase.auth.signOut(); navigate("/login"); })(); }}>
+                  <DropdownMenuItem className="bg-destructive text-white" onClick={handleLogout}>
                     <SignOut className="mr-2 h-4 w-4" weight="bold" />
                     Logout
                   </DropdownMenuItem>
@@ -268,13 +391,16 @@ export const Topbar = ({
               </DropdownMenu>
             </div>
           </div>
-        </header>
-      </div>
-      {title && (
-        <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 mt-2">
-          <span className="font-semibold text-4xl text-foreground block text-left">{title}</span>
         </div>
-      )}
+        {/* Title row */}
+        {title && !platform && (
+          <div className="w-full mt-2">
+            <div className="max-w-[1200px] mx-auto">
+              <span className="font-semibold text-2xl text-foreground block">{title}</span>
+            </div>
+          </div>
+        )}
+      </header>
     </>
   );
 };

@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from "react";
-import PairDetailsDialog from "@/components/shared/PairDetailsDialog";
-import { Badge } from "@/components/ui/badge";
 
 export const PlatformMarkets: React.FC<{
   cryptoData: { symbol: string; image_url: string; name?: string }[];
@@ -61,8 +59,6 @@ export const PlatformMarkets: React.FC<{
   };
 
   const [countdown, setCountdown] = useState<string>("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedPair, setSelectedPair] = useState<any>(null);
 
   useEffect(() => {
     if (!forexMarketOpen) {
@@ -137,7 +133,7 @@ export const PlatformMarkets: React.FC<{
                   <div
                     key={pair.symbol}
                     className="flex items-center gap-4 py-3 px-2 hover:bg-muted/10 transition cursor-pointer"
-                    onClick={() => { setSelectedPair(pair); setDialogOpen(true); }}
+                    onClick={() => navigate('/tradingstation')}
                   >
                     {pair.image_url && (
                       <img
@@ -147,7 +143,7 @@ export const PlatformMarkets: React.FC<{
                       />
                     )}
                     <div className="flex flex-col min-w-[60px]">
-                      <span className="font-bold text-base">{displaySymbol}</span>
+                      <span className="font-medium font-bold text-base">{displaySymbol}</span>
                       {/* Show name below symbol */}
                       {pair.name && (
                         <span className="text-xs text-muted-foreground">{pair.name}</span>
@@ -155,18 +151,28 @@ export const PlatformMarkets: React.FC<{
                     </div>
                     <div className="ml-auto flex items-center gap-4">
                       <span className="flex items-center gap-2">
-                        <span className={getPriceChangeClass(priceObj?.isPriceUp)}>
+                        <span
+                          className={getPriceChangeClass(priceObj?.isPriceUp)}
+                        >
                           B:
                         </span>
-                        <span className={getPriceChangeClass(priceObj?.isPriceUp)} key={priceObj?.bid}>
+                        <span
+                          className={getPriceChangeClass(priceObj?.isPriceUp)}
+                          key={priceObj?.bid}
+                        >
                           {renderPriceWithBigDigits(priceObj?.bid, decimals)}
                         </span>
                       </span>
                       <span className="flex items-center gap-2">
-                        <span className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}>
+                        <span
+                          className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
+                        >
                           A:
                         </span>
-                        <span className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)} key={priceObj?.ask}>
+                        <span
+                          className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
+                          key={priceObj?.ask}
+                        >
                           {renderPriceWithBigDigits(priceObj?.ask, decimals)}
                         </span>
                       </span>
@@ -210,7 +216,7 @@ export const PlatformMarkets: React.FC<{
                       <div
                         key={pair.symbol}
                         className="flex items-center gap-4 py-3 px-2 hover:bg-muted/10 transition cursor-pointer"
-                        onClick={() => { setSelectedPair(pair); setDialogOpen(true); }}
+                        onClick={() => navigate('/tradingstation')}
                       >
                         {pair.image_url && (
                           <img
@@ -220,7 +226,7 @@ export const PlatformMarkets: React.FC<{
                           />
                         )}
                         <div className="flex flex-col min-w-[60px]">
-                          <span className="font-bold text-base">{pair.symbol}</span>
+                          <span className="font-medium font-bold text-base">{pair.symbol}</span>
                           {/* Show name below symbol */}
                           {pair.name && (
                             <span className="text-xs text-muted-foreground">{pair.name}</span>
@@ -228,19 +234,53 @@ export const PlatformMarkets: React.FC<{
                         </div>
                         <div className="ml-auto flex items-center gap-4">
                           <span className="flex items-center gap-2">
-                            <span className={!forexMarketOpen ? "text-destructive font-semibold" : getPriceChangeClass(priceObj?.isPriceUp)}>
+                            <span
+                              className={
+                                !forexMarketOpen
+                                  ? "text-destructive font-semibold"
+                                  : getPriceChangeClass(priceObj?.isPriceUp)
+                              }
+                            >
                               B:
                             </span>
-                            <span className={!forexMarketOpen ? "text-destructive font-semibold" : getPriceChangeClass(priceObj?.isPriceUp)} key={priceObj?.bid}>
-                              {renderPriceWithBigDigits(priceObj?.bid, decimals, !forexMarketOpen)}
+                            <span
+                              className={
+                                !forexMarketOpen
+                                  ? "text-destructive font-semibold"
+                                  : getPriceChangeClass(priceObj?.isPriceUp)
+                              }
+                              key={priceObj?.bid}
+                            >
+                              {renderPriceWithBigDigits(
+                                priceObj?.bid,
+                                decimals,
+                                !forexMarketOpen
+                              )}
                             </span>
                           </span>
                           <span className="flex items-center gap-2">
-                            <span className={!forexMarketOpen ? "text-destructive font-semibold" : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}>
+                            <span
+                              className={
+                                !forexMarketOpen
+                                  ? "text-destructive font-semibold"
+                                  : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
+                              }
+                            >
                               A:
                             </span>
-                            <span className={!forexMarketOpen ? "text-destructive font-semibold" : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)} key={priceObj?.ask}>
-                              {renderPriceWithBigDigits(priceObj?.ask, decimals, !forexMarketOpen)}
+                            <span
+                              className={
+                                !forexMarketOpen
+                                  ? "text-destructive font-semibold"
+                                  : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
+                              }
+                              key={priceObj?.ask}
+                            >
+                              {renderPriceWithBigDigits(
+                                priceObj?.ask,
+                                decimals,
+                                !forexMarketOpen
+                              )}
                             </span>
                           </span>
                         </div>
@@ -253,11 +293,6 @@ export const PlatformMarkets: React.FC<{
           )}
         </div>
       </div>
-      <PairDetailsDialog 
-        open={dialogOpen} 
-        onOpenChange={setDialogOpen} 
-        pair={selectedPair && { ...selectedPair, type: forexData.some(f => f.symbol === selectedPair.symbol) ? 'forex' : 'crypto' }} 
-      />
     </div>
   );
 };

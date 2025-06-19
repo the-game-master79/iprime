@@ -5,7 +5,7 @@ import { Sun, Moon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 
-export const Navbar = () => {
+export const Navbar = ({ variant }: { variant?: "blogs" }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,6 +39,10 @@ export const Navbar = () => {
     return location.pathname === path;
   };
 
+  // Detect if variant is blogs or if current path is /blogs or /blogs/:slug
+  const isBlogsVariant =
+    variant === "blogs" || location.pathname.startsWith("/blogs");
+
   return (
     <header className="w-full py-3 absolute top-0 left-0 z-20 mt-4">
       <div className="max-w-[1200px] mx-auto px-4">
@@ -46,17 +50,24 @@ export const Navbar = () => {
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
               <img
-                src="/cf-dark.svg"
+                src={
+                  isBlogsVariant
+                    ? theme === "dark"
+                      ? "/cf-dark.svg"
+                      : "/cf-light.svg"
+                    : "/cf-dark.svg"
+                }
                 alt="CloudForex Logo"
                 className="h-6 w-auto"
               />
             </Link>
             <nav className="hidden md:flex items-center gap-3">
               {[
-                { path: "/trading", label: "Trading" }, // Change path to "/trading"
+                { path: "/trading", label: "Trading" },
                 { path: "/alphaquant", label: "AlphaQuant" },
                 { path: "/partners", label: "Partners" },
                 { path: "/company", label: "Company" },
+                { path: "/blogs", label: "Blogs" },
               ].map((item) =>
                 item.path === "/trading" ? (
                   <a
@@ -66,7 +77,7 @@ export const Navbar = () => {
                     rel="noopener noreferrer"
                     className={cn(
                       "text-base font-normal px-3 py-2 transition-colors",
-                      "text-white"
+                      isBlogsVariant ? "text-foreground" : "text-white"
                     )}
                     style={{ border: "none", borderRadius: 0, background: "none" }}
                   >
@@ -78,14 +89,28 @@ export const Navbar = () => {
                     onClick={() => handleNavigation(item.path)}
                     className={cn(
                       "text-base font-normal px-3 py-2 transition-colors",
-                      isActive(item.path) ? "" : "text-white"
+                      isActive(item.path)
+                        ? isBlogsVariant
+                          ? "text-foreground"
+                          : ""
+                        : isBlogsVariant
+                        ? "text-foreground"
+                        : "text-white"
                     )}
                     style={{ border: "none", borderRadius: 0, background: "none" }}
                   >
                     {isActive(item.path) ? (
                       <>
-                        <span style={{ color: "#000" }}>Alpha</span>
-                        <span style={{ color: "#FF9900" }}>Quant</span>
+                        <span style={{ color: isBlogsVariant ? "inherit" : "#000" }}>
+                          Alpha
+                        </span>
+                        <span
+                          style={{
+                            color: isBlogsVariant ? "inherit" : "#FF9900",
+                          }}
+                        >
+                          Quant
+                        </span>
                       </>
                     ) : (
                       "AlphaQuant"
@@ -97,7 +122,7 @@ export const Navbar = () => {
                     onClick={() => handleNavigation(item.path)}
                     className={cn(
                       "text-base font-normal px-3 py-2 transition-colors",
-                      "text-white",
+                      isBlogsVariant ? "text-foreground" : "text-white",
                       isActive(item.path) && "underline underline-offset-4"
                     )}
                     style={{ border: "none", borderRadius: 0, background: "none" }}
@@ -113,7 +138,10 @@ export const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="flex items-center justify-center text-white"
+              className={cn(
+                "flex items-center justify-center",
+                isBlogsVariant ? "text-foreground" : "text-white"
+              )}
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               aria-label="Toggle theme"
             >
@@ -121,7 +149,7 @@ export const Navbar = () => {
               {theme !== "dark" && <Moon className="h-5 w-5" weight="bold" />}
             </Button>
             <Link to={user ? "/platform" : "/auth/login"}>
-              <Button variant="default" className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
+              <Button className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
                 {user ? (
                   <>
                     <span className="hidden md:inline">Access Platform</span>

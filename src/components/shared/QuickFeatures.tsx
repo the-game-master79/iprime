@@ -4,7 +4,7 @@ export const QuickFeatures = () => {
   const features = [
     {
       icon: Timer,
-      title: "On-demand payouts",
+      title: "On-Demand Payouts",
       description: "Get your funds instantly. No delays, no hassle—currency and crypto withdrawals processed 24/7 within minutes.*",
       color: "from-amber-500 to-amber-400",
       iconBg: "bg-gradient-to-br from-amber-500 to-amber-400",
@@ -28,16 +28,16 @@ export const QuickFeatures = () => {
     },
     {
       icon: CurrencyDollar,
-      title: "No charges or fees",
-      description: "Whether you're a day trader, scalper, or long-term investor, you get to keep every dollar of your profit.",
+      title: "No Charges or Fees",
+      description: "Scalper, day trader, or long-term investor — your gains are yours alone. No hidden fees, no charges, no commissions.",
       color: "from-lime-800 to-lime-700",
       iconBg: "bg-gradient-to-br from-lime-800 to-lime-700",
       iconColor: "text-white"
     },
     {
       icon: Shield,
-      title: "Bank-grade security",
-      description: "Your assets are safe with multi-layer protection: SSL, TSL, WAF, 2XO, Cold Wallets, Audits, 256-Bit encryption and more.",
+      title: "Bank-Grade Security",
+      description: "Your assets are safe with multi-layer protection such as: SSL, TSL, WAF, 2XO, Cold Wallets, Audits, 256-Bit encryption and more.",
       color: "from-blue-500 to-blue-600",
       iconBg: "bg-gradient-to-br from-blue-500 to-blue-600",
       iconColor: "text-white"
