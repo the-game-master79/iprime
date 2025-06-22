@@ -9,7 +9,7 @@ import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { AuthGuard } from "@/components/AuthGuard";
 import { generateReferralCode, cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
-import { Sun, Moon } from "@phosphor-icons/react"; // Add for icon consistency
+import { Sun, Moon, SealCheckIcon } from "@phosphor-icons/react"; // Add for icon consistency
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 
@@ -46,6 +46,9 @@ const Login = () => {
   // Error states for email and password
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // New state to track if the user has been referred
+  const [referredBy, setReferredBy] = useState<string | null>(null);
 
   const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
 
@@ -338,22 +341,6 @@ const Login = () => {
     <AuthGuard authPage>
       <PageTransition>
         <div className="flex min-h-screen flex-col items-center justify-center relative overflow-hidden">
-          {/* Theme toggle at top right */}
-          <div className="absolute top-4 right-4 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-lg bg-secondary-foreground text-primary hover:bg-secondary"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-5 w-5 text-yellow-400" weight="bold" />
-              ) : (
-                <Moon className="h-5 w-5 text-blue-500" weight="bold" />
-              )}
-            </Button>
-          </div>
           {/* Background Elements */}
           <div className="absolute inset-0 pointer-events-none select-none">
             {/* Improved gradients */}
@@ -372,22 +359,8 @@ const Login = () => {
                 <div className="flex flex-col items-center space-y-4 w-full">
                   {/* Card background for the form */}
                   <div className="w-full bg-secondary shadow-lg rounded-xl p-8">
-                    {/* Badge at the top of the form */}
-                    <div className="flex justify-center mb-4">
-                      <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border border-border">
-                        Please verify original URL:{" "}
-                        <a
-                          href="https://arthaa.club"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline text-primary hover:text-primary/80"
-                        >
-                          https://arthaa.club
-                        </a>
-                      </span>
-                    </div>
-                    {/* Logo inside the form, at the top */}
-                    <div className="flex justify-center mb-6">
+                    {/* Logo inside the form, at the top, left aligned */}
+                    <div className="flex mb-6">
                       {themeReady ? (
                         <img
                           src={
@@ -411,218 +384,146 @@ const Login = () => {
                       }}
                     >
                       <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium mb-1.5 block text-foreground">Your Email</label>
+                        <div className="relative">
                           <Input
-                            id="email"
-                            name="email"
-                            placeholder="Email"
-                            type="email"
+                          id="email"
+                          name="email"
+                          label="Your Email"
+                          type="email"
+                          autoCapitalize="none"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          required
+                          pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                          title="Please enter a valid email address"
+                          className="bg-background border border-border text-foreground placeholder:text-muted-foreground"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          onBlur={async e => {
+                            const value = e.target.value.trim();
+                            if (!value) {
+                            setEmailError("Email is required.");
+                            setCurrentUserReferralCode(null);
+                            setReferredBy(null);
+                            } else if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(value)) {
+                            setEmailError("Please enter a valid email address.");
+                            setCurrentUserReferralCode(null);
+                            setReferredBy(null);
+                            } else {
+                            setEmailError(null);
+                            // Fetch referral_code and referred_by for entered email
+                            const { data, error } = await supabase
+                              .from("profiles")
+                              .select("referral_code, referred_by")
+                              .eq("email", value)
+                              .single();
+                            if (!error && data?.referral_code) {
+                              setCurrentUserReferralCode(data.referral_code);
+                            } else {
+                              setCurrentUserReferralCode(null);
+                            }
+                            if (!error && data?.referred_by) {
+                              setReferredBy(data.referred_by);
+                            } else {
+                              setReferredBy(null);
+                            }
+                            }
+                          }}
+                          error={emailError || undefined}
+                          helperText={
+                            currentUserReferralCode
+                            ? (
+                              <span className="text-success-foreground">
+                                User is Active. Code: <b>{currentUserReferralCode}</b>
+                              </span>
+                              )
+                            : undefined
+                          }
+                          />
+                        </div>
+                        <div className="relative">
+                          <Input
+                            id="password"
+                            name="password"
+                            label="Password"
+                            type={showPassword ? "text" : "password"}
                             autoCapitalize="none"
                             autoComplete="off"
                             autoCorrect="off"
                             required
-                            pattern="^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-                            title="Please enter a valid email address"
-                            className="bg-background border border-border text-foreground placeholder:text-muted-foreground"
-                            onBlur={async (e) => {
-                              const email = e.target.value;
-                              if (!email) {
-                                setCurrentUserReferralCode(null);
-                                return;
-                              }
-                              // Fetch referral_code for entered email
-                              const { data, error } = await supabase
-                                .from("profiles")
-                                .select("referral_code")
-                                .eq("email", email)
-                                .single();
-                              if (!error && data?.referral_code) {
-                                setCurrentUserReferralCode(data.referral_code);
-                              } else {
-                                setCurrentUserReferralCode(null);
-                              }
-                            }}
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                          />
-                          {/* Inline email error */}
-                          {emailError && (
-                            <div className="text-xs text-red-500 mt-1">{emailError}</div>
-                          )}
-                          {/* Show user's referral code if available */}
-                          {currentUserReferralCode && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Your referral code: <span className="font-semibold text-foreground">{currentUserReferralCode}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <label className="text-sm font-medium mb-1.5 block text-foreground">Your Password</label>
-                          <Input
-                            id="password"
-                            name="password"
-                            type={showPassword ? "text" : "password"}
-                            placeholder="*********"
-                            required
-                            maxLength={60}
-                            autoComplete="off"
-                            pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
-                            title="Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and be at least 8 characters long"
-                            className="bg-background border border-border text-foreground placeholder:text-muted-foreground"
+                            minLength={8}
+                            className="bg-background border border-border text-foreground placeholder:text-muted-foreground pr-12"
                             value={passwordValue}
                             onChange={e => {
                               setPasswordValue(e.target.value);
+                              setPasswordError(null);
                               setPasswordStrength(calculatePasswordStrength(e.target.value));
                             }}
+                            error={passwordError || undefined}
+                            helperText={
+                              passwordValue && (
+                                <span className={
+                                  passwordStrength >= 4
+                                    ? "text-green-600"
+                                    : passwordStrength >= 2
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                                }>
+                                  Password strength: {passwordStrength >= 4 ? "Strong" : passwordStrength >= 2 ? "Medium" : "Weak"}
+                                </span>
+                              )
+                            }
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="absolute right-0 top-[26px] h-10 px-3 py-2 hover:bg-secondary/80"
-                            onClick={() => setShowPassword(!showPassword)}
+                            tabIndex={-1}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                            onClick={() => setShowPassword((v) => !v)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                           >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                          {/* Inline password error */}
-                          {passwordError && (
-                            <div className="text-xs text-red-500 mt-1">{passwordError}</div>
-                          )}
-                          {/* Password strength progress bar */}
-                          <div className="mt-2 flex items-center">
-                            <Progress
-                              value={
-                                passwordStrength === 0.5
-                                  ? 10
-                                  : passwordStrength === 5
-                                  ? 100
-                                  : (passwordStrength / 5) * 100
-                              }
-                              className={cn(
-                                "h-2 w-full rounded-lg",
-                                passwordStrength === 0.5
-                                  ? "bg-red-100"
-                                  : passwordStrength <= 2
-                                  ? "bg-red-100"
-                                  : passwordStrength === 3
-                                  ? "bg-yellow-100"
-                                  : passwordStrength === 4
-                                  ? "bg-green-100"
-                                  : "bg-emerald-100"
-                              )}
-                            />
-                            <span
-                              className={cn(
-                                "ml-3 text-xs font-medium",
-                                passwordStrength === 0.5
-                                  ? "text-red-700"
-                                  : passwordStrength <= 2
-                                  ? "text-red-500"
-                                  : passwordStrength === 3
-                                  ? "text-yellow-500"
-                                  : passwordStrength === 4
-                                  ? "text-green-500"
-                                  : "text-emerald-600"
-                              )}
-                            >
-                              {passwordStrength === 0.5
-                                ? "Very Weak"
-                                : passwordStrength <= 2
-                                ? "Weak"
-                                : passwordStrength === 3
-                                ? "Medium"
-                                : passwordStrength === 4
-                                ? "Strong"
-                                : passwordStrength === 5
-                                ? "Strongest"
-                                : ""}
-                            </span>
-                          </div>
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
                         </div>
-                        {/* Referral Code Accordion */}
-                        <Accordion
-                          type="single"
-                          collapsible
-                          defaultValue={referralCode ? "referral" : undefined}
-                        >
-                          <AccordionItem value="referral">
-                            <AccordionTrigger className="text-sm font-medium text-foreground px-0 py-2 hover:underline">
-                              {referralCode
-                                ? (
-                                  <span>
-                                    Referral code (added)
-                                    <span className="inline-block align-middle ml-1 text-green-500">
-                                      {/* Check mark SVG */}
-                                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                                        <path d="M5 10.5L9 14L15 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                      </svg>
-                                    </span>
-                                  </span>
-                                )
-                                : "Referral code (optional)"
+                        {/* Referral Code Verification Input */}
+                        {referredBy ? (
+                          <div className="bg-secondary rounded-lg px-4 py-3 border-border border text-success flex flex-col items-start gap-1">
+                            <div className="flex items-center gap-2">
+                              <SealCheckIcon className="h-5 w-5 text-success" weight="fill" />
+                              <span className="font-medium text-xs">Referred by</span>
+                            </div>
+                            <span className="ml-7 font-medium text-foreground break-all">{referredBy}</span>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Input
+                              id="referral"
+                              name="referral"
+                              label="Referral Code (optional)"
+                              type="text"
+                              autoCapitalize="characters"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              maxLength={8}
+                              pattern="[A-Z0-9]{8}"
+                              className="bg-background border border-border text-foreground placeholder:text-muted-foreground pr-12"
+                              value={referralCode}
+                              onChange={e => {
+                                setReferralCode(e.target.value.toUpperCase());
+                                setReferralError(null);
+                              }}
+                              error={referralError || undefined}
+                              helperText={
+                                referralLoading ? (
+                                  <span className="text-muted-foreground">Checking code...</span>
+                                ) : referralEmail ? (
+                                  <span className="text-green-600">Valid code from: <b>{referralEmail}</b></span>
+                                ) : referralError ? (
+                                  <span className="text-red-600">{referralError}</span>
+                                ) : undefined
                               }
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <Input
-                                id="referral"
-                                name="referral"
-                                placeholder="Referral code"
-                                value={referralCode}
-                                maxLength={8}
-                                inputMode="text"
-                                autoCapitalize="characters"
-                                autoCorrect="off"
-                                pattern="^[A-Z0-9]{0,8}$"
-                                className="bg-background border border-border text-foreground placeholder:text-muted-foreground mt-2 uppercase"
-                                onChange={(e) => {
-                                  // Only allow alphanumeric, max 8 chars, uppercase
-                                  let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-                                  if (val.length > 8) val = val.slice(0, 8);
-                                  setReferralCode(val);
-                                }}
-                              />
-                              {/* Show referral validation result */}
-                              {referralLoading && (
-                                <div className="text-xs text-muted-foreground mt-1">Validating referral code...</div>
-                              )}
-                              {/* Only show referred by if no error and not self-referral */}
-                              {referralEmail && !referralLoading && !referralError && (
-                                <div className="text-xs text-green-600 mt-1">
-                                  Referred by: <span className="font-medium">{referralEmail}</span>
-                                </div>
-                              )}
-                              {referralError && !referralLoading && (
-                                <div className="text-xs text-red-500 mt-1">{referralError}</div>
-                              )}
-                              {/* Show input restriction info */}
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Referral code must be 8 uppercase letters or numbers.
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
-                        </Accordion>
-                        {/* hCaptcha widget */}
-                        {/* Disabled for now */}
-                        {/* 
-                        {!isLocalhost && (
-                          <div className="mb-2">
-                            <HCaptcha
-                              sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY}
-                              onVerify={token => setCaptchaToken(token)}
-                              onExpire={() => setCaptchaToken(null)}
-                              onError={() => setCaptchaError("CAPTCHA error, please retry.")}
                             />
-                            {captchaError && (
-                              <p className="text-xs text-destructive mt-1">{captchaError}</p>
-                            )}
                           </div>
                         )}
-                        */}
                         <Button
                           type="submit"
                           className="w-full bg-primary text-white hover:bg-primary/90 h-12 text-base mt-2 mb-2 rounded-lg"

@@ -245,7 +245,7 @@ export const Topbar = ({
         language={language}
         setLanguage={setLanguage}
       />
-      <header className="flex flex-col bg-secondary w-full px-4 md:px-8 py-4">
+      <header className="flex flex-col bg-background w-full px-4 md:px-8 py-4">
         <div className="max-w-[1200px] mx-auto w-full">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ export const Topbar = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground mr-1"
+                  className="h-10 w-10 rounded-lg relative bg-secondary hover:bg-secondary-foreground mr-1"
                   onClick={() => navigate('/platform')}
                   aria-label="Back"
                 >
@@ -265,8 +265,8 @@ export const Topbar = ({
               <img
                 src={
                   theme === "dark"
-                    ? "/ct-logo-dark.svg"
-                    : "/ct-logo-light.svg"
+                    ? "/arthaa-logo-dark.svg"
+                    : "/arthaa-logo-light.svg"
                 }
                 alt="Arthaa"
                 className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
@@ -294,7 +294,7 @@ export const Topbar = ({
               </div>
               {/* Mobile: Balance badge with wallet icon */}
               <div className="flex md:hidden items-center">
-                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary-foreground text-foreground">
+                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary text-foreground">
                   <Wallet className="w-4 h-4 mr-1" weight="bold" />
                   {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                 </Badge>
@@ -305,7 +305,7 @@ export const Topbar = ({
                   <Button 
                     variant="ghost" 
                     size="icon"
-                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground hidden md:inline-flex"
+                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground inline-flex"
                   >
                     <Bell className="h-5 w-5 text-foreground" weight="bold" />
                     {unreadCount > 0 && (

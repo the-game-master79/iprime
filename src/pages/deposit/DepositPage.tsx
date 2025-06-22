@@ -1066,15 +1066,13 @@ export default function CashierPage() {
                       </div>
 
                       {/* Amount Input */}
-                      <div className="space-y-2">
-                        <Label htmlFor="amount" className="text-foreground">Enter the amount you're depositing</Label>
                         <div className="relative">
                           <Input
                             id="amount"
                             type="number"
                             min="0"
-                            placeholder="Enter amount"
                             value={amount}
+                            label="Amount"
                             onChange={handleAmountChange}
                             className="pr-16 bg-secondary border-none text-foreground placeholder:text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -1085,7 +1083,6 @@ export default function CashierPage() {
                         {amountError && (
                           <p className="text-sm text-destructive">{amountError}</p>
                         )}
-                      </div>
 
                       {/* Deposit Details Section */}
                       {cryptoType && amount && !amountError && (
