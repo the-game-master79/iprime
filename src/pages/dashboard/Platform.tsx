@@ -12,9 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { Topbar } from "@/components/shared/Topbar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { BalanceCard } from "@/components/shared/BalanceCard";
-import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
+import { AlphaQuantCard, getTotalInvestmentReturns } from "@/components/shared/AlphaQuantCard";
 import { AffiliateRankCard } from "@/components/shared/AffiliateRankCard";
-import { DashboardActionButtons } from "@/components/shared/DashboardActionButtons";
 import { PlatformMarkets } from "@/components/shared/PlatformMarkets";
 import { ReferralLinkCard } from "@/components/shared/ReferralLinkCard";
 import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
@@ -30,6 +29,8 @@ import type {
   UserProfile, 
   Transaction
 } from "@/types/dashboard";
+import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
+import { TopDashboardLists } from "@/components/dashboard/TopDashboardLists";
 
 // Define Trade interface locally since it's not exported from "@/types/dashboard"
 interface Trade {
@@ -853,152 +854,132 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
-      {/* DashboardTopbar with Theme Toggle */}
-      <div className="relative">
-        <Topbar platform />
-      </div>
+    <div className="min-h-[100dvh] bg-background text-foreground transition-colors flex flex-col">
+      {/* Topbar full width at the top */}
+      <Topbar platform />
+      <div className="flex flex-1">
+        {/* Sidebar below Topbar */}
+        <PlatformSidebar />
+        <div className="flex-1 flex flex-col">
+          <main className="py-8">
+            <div className="container mx-auto px-4 max-w-[1200px]">
+              {loading || isLoading ? (
+                // Replace spinner with skeletons
+                <DashboardSkeleton />
+              ) : (
+                <div className="space-y-4">
+                  {/* Referral Card with Promotions Button */}
+                  <div className="space-y-4">
+                    {/* Referral Link Container */}
+                    {/* <div className="bg-secondary rounded-2xl p-4 border border-border">
+                      ...referral link code...
+                    </div> */}
+                    <ReferralLinkCard
+                      referralLink={referralLink}
+                      onCopyLink={handleCopyLink}
+                    />
+                  </div>
 
-      <main className="py-8">
-        <div className="container mx-auto px-4 max-w-[1200px]">
-          {loading || isLoading ? (
-            // Replace spinner with skeletons
-            <DashboardSkeleton />
-          ) : (
-            <div className="space-y-4">
-              {/* Referral Card with Promotions Button */}
-              <div className="space-y-4">
-                {/* Referral Link Container */}
-                {/* <div className="bg-secondary rounded-2xl p-4 border border-border">
-                  ...referral link code...
-                </div> */}
-                <ReferralLinkCard
-                  referralLink={referralLink}
-                  onCopyLink={handleCopyLink}
-                />
-              </div>
-
-              {/* Balance Container */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Show Invest First Container if both balances are zero */}
-                {withdrawalBalance === 0 && totalInvested === 0 ? (
-                  <>
-                    <div className="md:col-span-2">
-                      <div className="flex flex-col items-center justify-center bg-gradient-to-br from-primary/90 via-blue-400/80 to-secondary-foreground/80 border-2 border-primary/60 rounded-2xl p-10 shadow-xl text-center relative overflow-hidden">
-                        {/* Decorative background shapes */}
-                        <div className="absolute -top-10 -left-10 w-40 h-40 bg-primary/10 rounded-full blur-2xl z-0" />
-                        <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl z-0" />
-                        <svg width="72" height="72" fill="none" viewBox="0 0 64 64" className="mb-4 z-10">
-                          <circle cx="32" cy="32" r="32" fill="#F3F4F6"/>
-                          <path d="M32 18v28M18 32h28" stroke="#6366F1" strokeWidth="3" strokeLinecap="round"/>
-                        </svg>
-                        <h2 className="text-3xl font-extrabold mb-2 text-foreground z-10 drop-shadow-lg">No Investments Yet</h2>
-                        <p className="text-base text-secondary mb-6 z-10">
-                          Start your journey by investing in an <span className="font-semibold text-primary">AI Trading Plan</span>.<br />
-                          Your available balance and trading balance will appear here after your first investment.
-                        </p>
-                        <Button
-                          className="bg-gradient-to-r from-primary to-blue-500 text-white px-10 py-3 rounded-xl text-lg font-bold shadow-lg hover:scale-105 transition"
-                          onClick={() => navigate('/cashier')}
-                        >
-                          <span className="mr-2">🚀</span> Invest Now
-                        </Button>
-                        <div className="absolute inset-0 pointer-events-none z-0" />
-                      </div>
-                    </div>
-                    {/* Always show Affiliate Rank Card, even if zero */}
-                    <div className="bg-secondary rounded-2xl p-6">
-                      <div className="h-full flex flex-col justify-between">
-                        {/* Top: Show only the rank, no icon or "Affiliate Status" text */}
-                        <div className="space-y-1 mb-2">
-                          <h3 className="text-3xl font-medium">
-                            {businessStats.currentRank || 'New Member'}
-                          </h3>
-                        </div>
-                        
-                        {/* Progress to Next Rank - Moved to bottom */}
-                        {businessStats.nextRank && (
-                          <div className="space-y-2 mt-auto pt-4">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
-                              <span>
-                                {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary transition-all duration-500"
-                                style={{ 
-                                  width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
-                                }}
-                              />
-                            </div>
+                  {/* Balance Container */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Show Invest First Container if both balances are zero */}
+                    {withdrawalBalance === 0 && totalInvested === 0 ? (
+                      <>
+                        <div className="md:col-span-2">
+                          <div className="flex flex-col items-center justify-center bg-gradient-to-br from-primary/90 via-blue-400/80 to-secondary-foreground/80 border-2 border-primary/60 rounded-2xl p-10 shadow-xl text-center relative overflow-hidden">
+                            {/* Decorative background shapes */}
+                            <div className="absolute -top-10 -left-10 w-40 h-40 bg-primary/10 rounded-full blur-2xl z-0" />
+                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl z-0" />
+                            <svg width="72" height="72" fill="none" viewBox="0 0 64 64" className="mb-4 z-10">
+                              <circle cx="32" cy="32" r="32" fill="#F3F4F6"/>
+                              <path d="M32 18v28M18 32h28" stroke="#6366F1" strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                            <h2 className="text-3xl font-extrabold mb-2 text-foreground z-10 drop-shadow-lg">No Investments Yet</h2>
+                            <p className="text-base text-secondary mb-6 z-10">
+                              Start your journey by investing in an <span className="font-semibold text-primary">AI Trading Plan</span>.<br />
+                              Your available balance and trading balance will appear here after your first investment.
+                            </p>
+                            <Button
+                              className="bg-gradient-to-r from-primary to-blue-500 text-white px-10 py-3 rounded-xl text-lg font-bold shadow-lg hover:scale-105 transition"
+                              onClick={() => navigate('/cashier')}
+                            >
+                              <span className="mr-2">🚀</span> Invest Now
+                            </Button>
+                            <div className="absolute inset-0 pointer-events-none z-0" />
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    {/* Use shared components for cards */}
-                    <BalanceCard
-                      withdrawalBalance={withdrawalBalance}
-                      userProfile={userProfile}
-                    />
-                    <AlphaQuantCard
-                      totalInvested={totalInvested}
-                      activePlans={activePlans}
-                      onClick={() => navigate('/plans')}
-                    />
-                    <AffiliateRankCard
-                      businessStats={businessStats}
-                    />
-                  </>
-                )}
-              </div>
-              {/* Action Buttons Row */}
-              <DashboardActionButtons
-                theme={theme}
-                navigate={navigate}
-                directCount={directCount}
-                businessStats={businessStats}
-                // handleDirectsClick removed, handled internally
-              />
-              {/* Redesigned Markets Section as Table */}
-              <PlatformMarkets
-                cryptoData={cryptoData}
-                forexData={forexData}
-                marketPrices={marketPrices}
-                getPriceDecimals={getPriceDecimals}
-                getPriceChangeClass={getPriceChangeClass}
-                renderPriceWithBigDigits={renderPriceWithBigDigits}
-                forexMarketOpen={forexMarketOpen}
-                navigate={navigate}
-              />
-
-              {/* Replace Tabs section with new component */}
-              <DashboardTabs
-                transactions={transactions}
-                transactionsLoading={transactionsLoading}
-                hasMore={hasMore}
-                isLoadingMore={isLoadingMore}
-                handleLoadMore={handleLoadMore}
-                handleCopyId={handleCopyId}
-                ranks={ranks}
-                ranksLoading={ranksLoading}
-                businessStats={businessStats}
-                claimedRanks={claimedRanks}
-                claimingRank={claimingRank}
-                onClaimRankBonus={handleClaimRankBonus}
-                closedTrades={closedTrades}
-                closedTradesLoading={closedTradesLoading}
-                groupTradesByDate={groupTradesByDate}
-                formatDateLabel={formatDateLabel}
-              />
+                        </div>
+                        {/* Always show Affiliate Rank Card, even if zero */}
+                        <div className="bg-secondary rounded-2xl p-6">
+                          <div className="h-full flex flex-col justify-between">
+                            {/* Top: Show only the rank, no icon or "Affiliate Status" text */}
+                            <div className="space-y-1 mb-2">
+                              <h3 className="text-3xl font-medium">
+                                {businessStats.currentRank || 'New Member'}
+                              </h3>
+                            </div>
+                            
+                            {/* Progress to Next Rank - Moved to bottom */}
+                            {businessStats.nextRank && (
+                              <div className="space-y-2 mt-auto pt-4">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">Next: {businessStats.nextRank.title}</span>
+                                  <span>
+                                    {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD more
+                                  </span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-primary transition-all duration-500"
+                                    style={{ 
+                                      width: `${(businessStats.totalVolume / businessStats.nextRank.business_amount) * 100}%` 
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                      {/* Use shared components for cards */}
+                      <BalanceCard
+                        withdrawalBalance={withdrawalBalance}
+                        userProfile={userProfile}
+                      />
+                      <AlphaQuantCard
+                        totalInvested={totalInvested}
+                        activePlans={activePlans}
+                        totalCredits={getTotalInvestmentReturns(transactions)}
+                        onClick={() => navigate('/plans')}
+                      />
+                      <AffiliateRankCard
+                        businessStats={businessStats}
+                        directs={directCount}
+                        businessVolume={businessStats.totalVolume}
+                      />
+                    </>
+                    )}
+                  </div>
+                  {/* Redesigned Markets Section as Table */}
+                  <PlatformMarkets
+                    cryptoData={cryptoData}
+                    forexData={forexData}
+                    marketPrices={marketPrices}
+                    getPriceDecimals={getPriceDecimals}
+                    getPriceChangeClass={getPriceChangeClass}
+                    renderPriceWithBigDigits={renderPriceWithBigDigits}
+                    forexMarketOpen={forexMarketOpen}
+                    navigate={navigate}
+                  />
+                  {/* Top 5 Transactions and Closed Trades */}
+                  <TopDashboardLists transactions={transactions} trades={closedTrades} />
+                </div>
+              )}
             </div>
-          )}
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

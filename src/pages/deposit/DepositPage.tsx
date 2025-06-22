@@ -1,31 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Topbar } from "@/components/shared/Topbar";
 import { supabase } from "@/lib/supabase";
-import { Copy, ArrowLeft, Info, CurrencyDollar, Receipt } from "@phosphor-icons/react"; // Changed from lucide-react
+import { Copy } from "@phosphor-icons/react"; // Changed from lucide-react
 import { useToast } from "@/hooks/use-toast";
-import QRCode from "qrcode";
-import { Card, CardContent } from "@/components/ui/card";
+import QRCodeStyling from "qr-code-styling";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label"; // Add this import
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TransactionTable } from "@/components/transactionTable/TransactionTable";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 
-import { BalanceCard } from "@/components/shared/BalanceCards";
 import { KycVariant } from "@/components/shared/KycVariants";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import axios from "axios";
+import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
 
 interface Promocode {
   id: string;
@@ -104,6 +100,7 @@ export default function CashierPage() {
   const { profile, loading } = useUserProfile();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const selectedPlan = location.state?.plan as Plan | null;
   const { toast } = useToast();
   const [cryptoType, setCryptoType] = useState<string>("");
@@ -142,6 +139,8 @@ export default function CashierPage() {
   const [withdrawHistorySortDirection, setWithdrawHistorySortDirection] = useState<'asc' | 'desc'>('desc');
   const [withdrawCopied, setWithdrawCopied] = useState(false);
   const [withdrawAddressError, setWithdrawAddressError] = useState<string | null>(null);
+
+  const qrCodeRef = useRef<HTMLDivElement>(null); // Add this ref
 
   useEffect(() => {
     if (currentUser) return;
@@ -346,68 +345,89 @@ export default function CashierPage() {
     }
   };
 
-  // Update generateQRCode with better validation
-  const generateQRCode = async (address: string | null | undefined, amount: number, symbol: string | null | undefined, net: string | null) => {
+  // Replace generateQRCode with qr-code-styling logic
+  const generateQRCode = (
+    address: string | null | undefined,
+    amount: number,
+    symbol: string | null | undefined,
+    net: string | null
+  ) => {
     if (!address || !symbol || amount <= 0) return;
-    
-    try {
-      // Format the URI according to BIP21/EIP67 standards for wallet compatibility
-      let qrData;
-      const cryptoAmount = calculateCryptoAmount(amount, symbol);
-      const cleanSymbol = symbol.toLowerCase();
-      
-      // Different format for different cryptocurrencies
-      switch(cleanSymbol) {
-        case 'btc':
-          qrData = `bitcoin:${address}?amount=${cryptoAmount}`;
-          break;
-        case 'eth':
-          qrData = `ethereum:${address}${net ? `@${net}` : ''}?value=${cryptoAmount}`;
-          break;
-        case 'bnb':
-          if (net?.toLowerCase().includes('bsc')) {
-            qrData = `bnb:${address}@56?amount=${cryptoAmount}`; // BSC Mainnet
-          } else {
-            qrData = `bnb:${address}?amount=${cryptoAmount}`; // BNB Chain
-          }
-          break;
-        default:
-          // Generic format for other tokens
-          qrData = `${cleanSymbol}:${address}?amount=${cryptoAmount}${net ? `&network=${net}` : ''}`;
-      }
-      
-      const qrDataUrl = await QRCode.toDataURL(qrData, {
-        errorCorrectionLevel: 'H',
-        margin: 1,
-        width: 300,
-        color: {
-          dark: '#000000', // QR code color (white)
-          light: '#ffffff' // Background color
+
+    // Format the URI according to BIP21/EIP67 standards for wallet compatibility
+    let qrData;
+    const cryptoAmount = calculateCryptoAmount(amount, symbol);
+    const cleanSymbol = symbol.toLowerCase();
+
+    switch (cleanSymbol) {
+      case "btc":
+        qrData = `bitcoin:${address}?amount=${cryptoAmount}`;
+        break;
+      case "eth":
+        qrData = `ethereum:${address}${net ? `@${net}` : ""}?value=${cryptoAmount}`;
+        break;
+      case "bnb":
+        if (net?.toLowerCase().includes("bsc")) {
+          qrData = `bnb:${address}@56?amount=${cryptoAmount}`;
+        } else {
+          qrData = `bnb:${address}?amount=${cryptoAmount}`;
         }
-      });
-      
-      setQrCodeUrl(qrDataUrl);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate QR code",
-        variant: "destructive"
-      });
+        break;
+      default:
+        qrData = `${cleanSymbol}:${address}?amount=${cryptoAmount}${net ? `&network=${net}` : ""}`;
+    }
+
+    // Find the logo for the selected crypto
+    const selectedCrypto = availableCryptos.find(
+      (c) => c.symbol.toLowerCase() === cleanSymbol && (!net || c.network === net)
+    );
+    const logoImage = selectedCrypto?.logo_url || "";
+
+    // Create and render QR code (bigger, rounded, with logo in center)
+    const qrCode = new QRCodeStyling({
+      width: 240,
+      height: 240,
+      data: qrData,
+      dotsOptions: {
+        color: "#000000",
+        type: "extra-rounded"
+      },
+      backgroundOptions: {
+        color: "#ffffff"
+      },
+      image: logoImage,
+      imageOptions: {
+        crossOrigin: "anonymous",
+        hideBackgroundDots: true,
+        imageSize: 0.25, // 25% of QR code area
+        margin: 2
+      }
+    });
+
+    if (qrCodeRef.current) {
+      qrCodeRef.current.innerHTML = ""; // Clear previous QR
+      qrCode.append(qrCodeRef.current);
     }
   };
 
   // Update effect to watch for amount changes and regenerate QR code
   useEffect(() => {
-    const selectedCrypto = availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType);
-    if (!selectedCrypto?.deposit_address || !amount || isNaN(parseFloat(amount))) {
+    const selectedCrypto = availableCryptos.find(
+      (c) => formatCryptoDisplayName(c) === cryptoType
+    );
+    if (
+      !selectedCrypto?.deposit_address ||
+      !amount ||
+      isNaN(parseFloat(amount))
+    ) {
+      if (qrCodeRef.current) qrCodeRef.current.innerHTML = "";
       return;
     }
 
     generateQRCode(
       selectedCrypto.deposit_address,
       parseFloat(amount),
-      selectedCrypto.symbol || '',
+      selectedCrypto.symbol || "",
       selectedCrypto.network || null
     );
   }, [cryptoType, amount, availableCryptos]);
@@ -481,7 +501,8 @@ export default function CashierPage() {
         toast({
           title: "Invalid Code",
           description: "This promo code is invalid or has expired",
-          variant: "destructive"
+          variant: "destructive",
+          className: "text-white"
         });
         return;
       }
@@ -509,8 +530,9 @@ export default function CashierPage() {
       setSelectedPromocode(data);
       setPromoInput("");
       toast({
-        title: "Success",
-        description: "Promo code applied successfully"
+        title: "Promo code applied!",
+        description: getPromoDescription(data),
+        className: "text-green-600 font-bold"
       });
     } catch (error) {
       console.error('Error applying promo code:', error);
@@ -956,73 +978,127 @@ export default function CashierPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Topbar 
-        title="Cashier"
-        leftContent={
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} weight="regular" />
-          </Button>
-        }
-      />
-      <div className="container mx-auto max-w-[1200px] px-4 py-6 space-y-6">
-        <div className="flex items-center justify-between mb-6">
-          <Tabs defaultValue="add-funds" className="w-full">
-            <div className="flex items-center justify-between w-full">
-              <TabsList className="grid grid-cols-2 w-[200px] sm:w-[300px]">
-                <TabsTrigger value="add-funds">Add Funds</TabsTrigger>
-                <TabsTrigger value="withdraw">Payouts</TabsTrigger>
-              </TabsList>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="flex items-center gap-2 text-xs sm:text-sm"
-                onClick={() => setShowPromoDialog(true)}
-              >
-                <span className="hidden sm:inline">Have a Promocode?</span>
-                <span className="sm:hidden">Have Code?</span>
-                <Badge variant="secondary">PROMO</Badge>
-              </Button>
-            </div>
+  // --- Tab state synced with URL ---
+  const tabParam = searchParams.get("tab");
+  const [tab, setTab] = useState(tabParam === "payout" ? "withdraw" : "add-funds");
 
-            <TabsContent value="add-funds">
-              <div className="grid gap-6 lg:grid-cols-2"> {/* Two columns on desktop, one on mobile */}
-                <div className="space-y-6 max-w-[400px]"> {/* Deposit form */}
-                  {/* Remove Card and CardContent wrappers for deposit form */}
-                  <form>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="crypto" className="text-foreground">Currency</Label>
-                        <Select
-                          value={cryptoType || ''}
-                          onValueChange={setCryptoType}
-                        >
-                          <SelectTrigger className="bg-secondary border-none text-foreground">
-                            <SelectValue placeholder="Select cryptocurrency" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[200px] overflow-y-auto sm:max-h-none">
-                            {/* Group USDT and USDC first, showing all networks and displaying the network */}
-                            {['usdt', 'usdc'].flatMap(symbol => {
-                              return availableCryptos
-                                .filter(c => c.symbol.toLowerCase() === symbol)
+  // Sync tab state with URL param
+  useEffect(() => {
+    const currentTab = searchParams.get("tab");
+    if (currentTab === "payout" && tab !== "withdraw") {
+      setTab("withdraw");
+    } else if ((!currentTab || currentTab === "deposit") && tab !== "add-funds") {
+      setTab("add-funds");
+    }
+  }, [searchParams]);
+
+  // When tab changes, update URL param
+  const handleTabChange = (value: string) => {
+    setTab(value);
+    if (value === "withdraw") {
+      setSearchParams({ tab: "payout" });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Topbar at the top */}
+      <Topbar title="Cashier" />
+      {/* Flex row: sidebar and main content */}
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar for desktop */}
+        <PlatformSidebar />
+        {/* Main content */}
+        <main className="flex-1 min-w-0">
+          <div className="container mx-auto max-w-[1200px] px-4 py-6 space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
+                <div className="flex items-center justify-between w-full">
+                  <TabsList className="grid grid-cols-2 w-[200px] sm:w-[300px]">
+                    <TabsTrigger value="add-funds">Add Funds</TabsTrigger>
+                    <TabsTrigger value="withdraw">Payout</TabsTrigger>
+                  </TabsList>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex items-center gap-2 text-xs sm:text-sm rounded-md"
+                    onClick={() => setShowPromoDialog(true)}
+                  >
+                    <span className="hidden sm:inline">Have a Promocode?</span>
+                    <span className="sm:hidden">Have Code?</span>
+                    <Badge variant="secondary">PROMO</Badge>
+                  </Button>
+                </div>
+
+                <TabsContent value="add-funds">
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="space-y-6 max-w-[400px]">
+                      {/* Deposit form remains unchanged */}
+                      <form>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="crypto" className="text-foreground">Currency</Label>
+                            <Select
+                              value={cryptoType || ''}
+                              onValueChange={setCryptoType}
+                            >
+                              <SelectTrigger className="bg-secondary border-none text-foreground">
+                                <SelectValue placeholder="Select cryptocurrency" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-[200px] overflow-y-auto sm:max-h-none">
+                                {/* Group USDT and USDC first, showing all networks and displaying the network */}
+                                {['usdt', 'usdc'].flatMap(symbol => {
+                                  return availableCryptos
+                                    .filter(c => c.symbol.toLowerCase() === symbol)
+                                    .map(crypto => {
+                                      const price = cryptoPrices[crypto.symbol.toLowerCase()]?.usd || 0;
+                                      const displayName = formatCryptoDisplayName(crypto);
+                                      if (!displayName) return null;
+                                      return (
+                                        <SelectItem key={displayName} value={displayName}>
+                                          <div className="flex items-center justify-between w-full gap-4">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              {crypto.logo_url && (
+                                                <img src={crypto.logo_url} alt={crypto.name} className="w-6 h-6" />
+                                              )}
+                                              <span className="truncate">{sanitize(crypto.name)} ({crypto.symbol.toUpperCase()})</span>
+                                              {crypto.network && (
+                                                <span className="ml-2 px-2 py-0.5 rounded bg-secondary-foreground text-xs text-foreground">
+                                                  {crypto.network}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-sm font-medium text-muted-foreground ml-auto">
+                                              ${price.toLocaleString()}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                    );
+                                    });
+                                })}
+                                {/* Divider if there are other cryptos */}
+                                {availableCryptos.some(
+                                  c => !['usdt', 'usdc'].includes(c.symbol.toLowerCase())
+                              ) && (
+                                <div className="px-2 py-1 text-xs text-muted-foreground">Other Cryptos</div>
+                              )}
+                              {/* Render the rest */}
+                              {availableCryptos
+                                .filter(c => !['usdt', 'usdc'].includes(c.symbol.toLowerCase()))
                                 .map(crypto => {
                                   const price = cryptoPrices[crypto.symbol.toLowerCase()]?.usd || 0;
-                                  const displayName = formatCryptoDisplayName(crypto);
-                                  if (!displayName) return null;
+                                  // Only show the network as a badge if present, not the full displayName
                                   return (
-                                    <SelectItem key={displayName} value={displayName}>
+                                    <SelectItem key={formatCryptoDisplayName(crypto)} value={formatCryptoDisplayName(crypto)}>
                                       <div className="flex items-center justify-between w-full gap-4">
                                         <div className="flex items-center gap-2 min-w-0">
                                           {crypto.logo_url && (
                                             <img src={crypto.logo_url} alt={crypto.name} className="w-6 h-6" />
                                           )}
                                           <span className="truncate">{sanitize(crypto.name)} ({crypto.symbol.toUpperCase()})</span>
-                                          {crypto.network && (
-                                            <span className="ml-2 px-2 py-0.5 rounded bg-secondary-foreground text-xs text-foreground">
-                                              {crypto.network}
-                                            </span>
-                                          )}
+                                          {/* Do not display network for other cryptos */}
                                         </div>
                                         <span className="text-sm font-medium text-muted-foreground ml-auto">
                                           ${price.toLocaleString()}
@@ -1030,451 +1106,310 @@ export default function CashierPage() {
                                       </div>
                                     </SelectItem>
                                   );
-                                });
-                            })}
-                            {/* Divider if there are other cryptos */}
-                            {availableCryptos.some(
-                              c => !['usdt', 'usdc'].includes(c.symbol.toLowerCase())
-                            ) && (
-                              <div className="px-2 py-1 text-xs text-muted-foreground">Other Cryptos</div>
-                            )}
-                            {/* Render the rest */}
-                            {availableCryptos
-                              .filter(c => !['usdt', 'usdc'].includes(c.symbol.toLowerCase()))
-                              .map(crypto => {
-                                const price = cryptoPrices[crypto.symbol.toLowerCase()]?.usd || 0;
-                                // Only show the network as a badge if present, not the full displayName
-                                return (
-                                  <SelectItem key={formatCryptoDisplayName(crypto)} value={formatCryptoDisplayName(crypto)}>
-                                    <div className="flex items-center justify-between w-full gap-4">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        {crypto.logo_url && (
-                                          <img src={crypto.logo_url} alt={crypto.name} className="w-6 h-6" />
-                                        )}
-                                        <span className="truncate">{sanitize(crypto.name)} ({crypto.symbol.toUpperCase()})</span>
-                                        {/* Do not display network for other cryptos */}
-                                      </div>
-                                      <span className="text-sm font-medium text-muted-foreground ml-auto">
-                                        ${price.toLocaleString()}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Amount Input */}
-                        <div className="relative">
-                          <Input
-                            id="amount"
-                            type="number"
-                            min="0"
-                            value={amount}
-                            label="Amount"
-                            onChange={handleAmountChange}
-                            className="pr-16 bg-secondary border-none text-foreground placeholder:text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-foreground">
-                            USD
-                          </div>
-                        </div>
-                        {amountError && (
-                          <p className="text-sm text-destructive">{amountError}</p>
-                        )}
-
-                      {/* Deposit Details Section */}
-                      {cryptoType && amount && !amountError && (
-                        <div className="space-y-4">
-                          <div className="rounded-xl bg-secondary overflow-hidden">
-                            {/* Amount Display */}
-                            <div className="p-3 sm:p-5 bg-secondary border-b border-secondary">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
-                                {/* Left: You're Sending (crypto) */}
-                                <div>
-                                  <div className="text-sm text-foreground mb-1">You're Sending</div>
-                                  <div className="flex items-center gap-2 text-xl font-mono sm:text-2xl font-semibold text-primary">
-                                    {calculateCryptoAmount(parseFloat(amount || '0'), availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol || '')}
-                                    <span className="text-bold sm:text-lg text-primary">
-                                      {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol.toUpperCase()}
-                                    </span>
-                                  </div>
-                                </div>
-                                {/* Right: You'll Get (USD) */}
-                                <div className="sm:text-right">
-                                  <div className="text-sm text-foreground mb-1">You'll Get</div>
-                                  <div className="text-xl sm:text-2xl font-semibold text-foreground break-all">
-                                    {parseFloat(amount).toLocaleString()} USD
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="p-3 sm:p-5 space-y-4">
-                              {/* QR Code */}
-                              {qrCodeUrl && (
-                                <div className="flex justify-center mb-4">
-                                  <div className="p-2 sm:p-3 bg-foreground rounded-lg">
-                                    <img src={qrCodeUrl} alt="Deposit QR Code" className="w-32 h-32 sm:w-40 sm:h-40" />
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Deposit Address */}
-                              <div>
-                                <div className="text-sm text-foreground/60 mb-2">Deposit Address</div>
-                                <div className="flex items-center gap-2 bg-secondary-foreground rounded-lg p-2 sm:p-3">
-                                  <code className="flex-1 font-mono text-xs sm:text-sm text-foreground break-all sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
-                                    {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address}
-                                  </code>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 bg-foreground border-0 hover:bg-foreground/80 rounded-md"
-                                    type="button"
-                                    onClick={() => handleCopyAddress(availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address || '')}
-                                  >
-                                    <Copy className="text-white h-4 w-4 sm:h-5 sm:w-5" weight="bold" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    
-                    </div>
-                    <div className="mt-6 flex flex-col gap-3">
-                      <Button 
-                        type="submit"
-                        className="w-full bg-primary text-white rounded-md hover:bg-primary/90 focus:ring-2 focus:ring-primary/50 focus:outline-none"
-                        size="lg"
-                        disabled={!amount || !cryptoType || !!amountError}
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const selectedCrypto = availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType);
-                          if (selectedCrypto) {
-                            setWithdrawIsSubmitting(true); // Show spinner
-                            await handleSubmit(parseFloat(amount));
-                            setWithdrawIsSubmitting(false);
-                            navigate('/platform');
-                          }
-                        }}
-                      >
-                        {withdrawIsSubmitting && (
-                          <span className="inline-flex items-center mr-2 align-middle">
-                            <Spinner size="sm" />
-                          </span>
-                        )}
-                        Confirm Deposit
-                      </Button>
-                    </div>
-                  </form>
-
-                  {/* Promo code section */}
-                  {selectedPromocode && (
-                    <div className="rounded-lg bg-[#212121] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-white">Applied Code:</span>
-                        <Badge>{sanitize(selectedPromocode.code)}</Badge>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={selectedPromocode.type === 'multiplier' ? 'default' : 'outline'}>
-                            {selectedPromocode.type === 'multiplier' ? '2X Deposit' : `${selectedPromocode.discount_percentage}% Cashback`}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {sanitize(selectedPromocode.description)}
-                        </p>
-                      </div>
-
-                      {amount && (
-                        <div className="space-y-2 pt-2 border-t border-[#212121]">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-secondary-foreground">Original Amount</span>
-                            <span className="text-secondary">${parseFloat(amount).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between font-medium">
-                            <span className="text-primary">Final Amount</span>
-                            <span className="text-primary">${calculateFinalAmount(parseFloat(amount)).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      <Button 
-                        variant="secondary" 
-                        className="w-full hover:bg-secondary/80"
-                        onClick={() => setSelectedPromocode(null)}
-                      >
-                        Remove Code
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-0 lg:mt-0"> {/* Deposit History on right for desktop, below for mobile */}
-                  {/* Deposit History Header and Filter */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-2xl font-semibold text-foreground">Deposit History</h2>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          id="history-filter"
-                          value={historySortField}
-                          onValueChange={setHistorySortField}
-                        >
-                          <SelectTrigger className="w-[120px] bg-secondary border-none text-foreground">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="date">Date</SelectItem>
-                            <SelectItem value="amount">Amount</SelectItem>
-                            <SelectItem value="status">Status</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
-                          className="text-foreground bg-secondary hover:bg-secondary/80"
-                          title="Toggle sort direction"
-                        >
-                          {historySortDirection === "asc" ? (
-                            <span className="text-foreground">&uarr;</span>
-                          ) : (
-                            <span className="text-foreground">&darr;</span>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border-b border-foreground/10 mb-2" />
-                  {/* Filtered and sorted table */}
-                  {isLoading ? (
-                    <div className="text-center py-6">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <div className="mt-4 text-sm text-muted-foreground">Loading deposits...</div>
-                    </div>
-                  ) : filteredAndSortedDeposits.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
-                      <Receipt size={40} weight="duotone" className="mb-2 text-primary/80" />
-                      <div className="text-lg font-semibold">No Deposits Yet</div>
-                      <div className="text-sm max-w-xs text-center">
-                        You haven't made any deposits yet.<br />
-                        Start by adding funds to your account.
-                      </div>
-                    </div>
-                  ) : (
-                    <TransactionTable 
-                      transactions={filteredAndSortedDeposits}
-                      onCopyId={handleCopyId}
-                    />
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-            {/* The rest of your code remains unchanged */}
-            <TabsContent value="withdraw" className="w-full">
-              {/* Withdrawals Implementation */}
-              <div className="w-full min-h-screen bg-background">
-                <div className="container max-w-[1200px] mx-auto">
-                  {/* KYC Status */}
-                  <div className="max-w-lg mx-auto mb-8">
-                    {kycStatus !== 'completed' && (
-                      <KycVariant status={kycStatus as any} date={kycDate} />
-                    )}
-                  </div>
-                  {/* Withdraw Form and Payout History side by side on desktop, stacked on mobile */}
-                  <div className="grid gap-8 lg:grid-cols-2">
-                    <div className="w-full max-w-[400px]"> {/* Withdraw form */}
-                      {kycStatus === 'completed' ? (
-                        <form onSubmit={handleWithdrawSubmit} className="space-y-6">
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-xs font-normal">Select Currency</Label>
-                              <Select 
-                                value={withdrawForm.cryptoId || withdrawCryptoOptions[0]?.id} 
-                                onValueChange={(value) => {
-                                  const selectedMethod = depositMethods.find(m => m.id === value);
-                                  const network = selectedMethod?.network || '';
-                                  setWithdrawForm(prev => ({ 
-                                    ...prev, 
-                                    cryptoId: value,
-                                    network
-                                  }));
-                                }}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select cryptocurrency" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <div>
-                                    <div className="px-2 py-1 text-xs text-muted-foreground">USDT</div>
-                                    {depositMethods
-                                      .filter(method => 
-                                        method.method === 'crypto' && 
-                                        method.is_active && 
-                                        method.crypto_symbol?.toLowerCase() === 'usdt'
-                                      )
-                                      .map(method => (
-                                        <SelectItem key={method.id} value={method.id}>
-                                          <div className="flex items-center gap-2">
-                                            {method.logo_url && (
-                                              <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
-                                            )}
-                                            {method.crypto_name} • {method.network}
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                  </div>
-                                  <div>
-                                    <div className="px-2 py-1 text-xs text-muted-foreground">USDC</div>
-                                    {depositMethods
-                                      .filter(method => 
-                                        method.method === 'crypto' && 
-                                        method.is_active && 
-                                        method.crypto_symbol?.toLowerCase() === 'usdc'
-                                      )
-                                      .map(method => (
-                                        <SelectItem key={method.id} value={method.id}>
-                                          <div className="flex items-center gap-2">
-                                            {method.logo_url && (
-                                              <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
-                                            )}
-                                            {method.crypto_name} • {method.network}
-                                          </div>
-                                        </SelectItem>
-                                      ))}
-                                  </div>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="walletAddress" className="text-xs font-normal text-foreground">Wallet Address</Label>
-                              <Input
-                                id="walletAddress"
-                                placeholder={`Enter ${
-                                  withdrawSelectedCrypto?.name?.toUpperCase() || 'USDT'
-                                } ${withdrawForm.network || 'TRC20'} address`}
-                                value={withdrawForm.walletAddress}
-                                onChange={handleWithdrawAddressChange}
-                                className="placeholder:text-foreground bg-secondary text-foreground"
-                              />
-                              {withdrawAddressError && (
-                                <p className="text-sm text-red-500">{withdrawAddressError}</p>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="amount" className="text-xs font-normal text-foreground">Amount</Label>
-                              <div className="relative">
-                                <Input
-                                  id="amount"
-                                  type="number"
-                                  min="0"
-                                  placeholder="Enter amount"
-                                  className={`${withdrawAmountError ? 'border-red-500' : ''} placeholder:text-foreground bg-secondary text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                                  value={withdrawForm.amount}
-                                  onChange={handleWithdrawAmountChange}
-                                />
-                                <span className="absolute right-3 top-2.5 text-foreground">USD</span>
-                              </div>
-                              {withdrawAmountError && (
-                                <p className="text-sm text-red-500">{withdrawAmountError}</p>
-                              )}
-                              {withdrawForm.amount && !withdrawAmountError && (
-                                <p className="text-sm text-muted-foreground">
-                                  Your balance after withdrawal → {(userBalance - parseFloat(withdrawForm.amount)).toLocaleString()} USD
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 rounded-md" disabled={withdrawIsSubmitting || !canSubmit}>
-                            {withdrawIsSubmitting ? "Processing..." : "Request Payout"}
-                          </Button>
-                        </form>
-                      ) : null}
-                    </div>
-                    <div className="w-full"> {/* Payout History on right for desktop, below for mobile */}
-                      {/* Payout History Header and Filter */}
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-                        <h2 className="text-xl font-semibold text-foreground">Payout History</h2>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            id="payout-history-filter"
-                            value={withdrawHistorySortField}
-                            onValueChange={setWithdrawHistorySortField}
-                          >
-                            <SelectTrigger className="w-[120px] bg-secondary border-none text-foreground">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="date">Date</SelectItem>
-                              <SelectItem value="amount">Amount</SelectItem>
-                              <SelectItem value="status">Status</SelectItem>
+                                })}
                             </SelectContent>
                           </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setWithdrawHistorySortDirection(d => d === "asc" ? "desc" : "asc")}
-                            className="text-foreground bg-secondary hover:bg-secondary/80"
-                            title="Toggle sort direction"
-                          >
-                            {withdrawHistorySortDirection === "asc" ? (
-                              <span className="text-foreground">&uarr;</span>
-                            ) : (
-                              <span className="text-foreground">&darr;</span>
-                            )}
-                          </Button>
                         </div>
-                      </div>
-                      <div className="border-b border-foreground/10 mb-2" />
-                      <div className="mt-4">
-                        {filteredAndSortedWithdrawTransactions.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
-                            <CurrencyDollar size={40} weight="duotone" className="mb-2 text-primary/80" />
-                            <div className="text-lg font-semibold">No Payouts Yet</div>
-                            <div className="text-sm max-w-xs text-center">
-                              You haven't requested any payouts yet.<br />
-                              You can see all your payout requests here once you make them.
+
+                        {/* Amount Input */}
+                          <div className="relative">
+                            <Input
+                              id="amount"
+                              type="number"
+                              min="0"
+                              value={amount}
+                              label="Amount"
+                              onChange={handleAmountChange}
+                              className="pr-16 bg-secondary border-none text-foreground placeholder:text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              helperText={
+                                selectedPromocode && !amountError && amount && !isNaN(parseFloat(amount)) ? (() => {
+                                  const baseAmount = parseFloat(amount);
+                                  let bonus = 0;
+                                  if (selectedPromocode.type === 'multiplier') {
+                                    bonus = baseAmount;
+                                  } else if (selectedPromocode.type === 'cashback') {
+                                    bonus = baseAmount * (selectedPromocode.discount_percentage / 100);
+                                  }
+                                  return bonus > 0
+                                    ? `Bonus applied: $${bonus.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : undefined;
+                                })() : undefined
+                              }
+                            />
+                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-foreground">
+                              USD
                             </div>
                           </div>
-                        ) : (
-                          <TransactionTable
-                            transactions={filteredAndSortedWithdrawTransactions}
-                            onCopyId={handleWithdrawCopyId}
-                          />
+                          {amountError && (
+                            <p className="text-sm text-destructive">{amountError}</p>
+                          )}
+                          {/* Helper badge for selected crypto and network */}
+                          {cryptoType && (
+                            <div className="mt-2 flex flex-col gap-1 max-w-full">
+                              <div className="flex flex-row flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="flex flex-nowrap items-center gap-1 px-2 py-1 text-xs font-mono max-w-full rounded-md"
+                                  style={{ minWidth: 0 }}
+                                >
+                                  {(() => {
+                                    const selected = availableCryptos.find(
+                                      (c) => formatCryptoDisplayName(c) === cryptoType
+                                    );
+                                    if (!selected) return null;
+                                    const isUSDTorUSDC = ['usdt', 'usdc'].includes(selected.symbol.toLowerCase());
+                                    return (
+                                      <>
+                                        {selected.logo_url && (
+                                          <img
+                                            src={selected.logo_url}
+                                            alt={selected.name}
+                                            className="w-4 h-4 mr-1 rounded-full bg-white border border-gray-200 flex-shrink-0"
+                                            style={{ minWidth: '1rem', minHeight: '1rem' }}
+                                          />
+                                        )}
+                                        <span className="font-semibold">{selected.symbol.toUpperCase()}</span>
+                                        {isUSDTorUSDC && selected.network && (
+                                          <span className="ml-2 px-2 py-0.5 rounded bg-muted text-xs text-foreground border border-muted-foreground whitespace-nowrap">
+                                            {selected.network}
+                                          </span>
+                                        )}
+                                        {/* Warning text inside the badge */}
+                                        <span className="ml-2 text-xs text-gray-500 font-normal">
+                                          Using wrong network/crypto results in permanent asset loss
+                                        </span>
+                                      </>
+                                    );
+                                  })()}
+                                </Badge>
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Deposit Details Section */}
+                        {cryptoType && amount && !amountError && (
+                          <div className="space-y-4 mt-6">
+                            <div className="rounded-xl bg-secondary overflow-hidden">
+                              {/* Amount Display */}
+                              <div className="p-3 sm:p-5 bg-secondary border-b border-secondary">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+                                  {/* Left: You're Sending (crypto) */}
+                                  <div>
+                                    <div className="text-sm text-foreground mb-1">You're Sending</div>
+                                    <div className="flex items-center gap-2 text-xl font-mono sm:text-2xl font-semibold text-primary">
+                                      {calculateCryptoAmount(parseFloat(amount || '0'), availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol || '')}
+                                      <span className="text-bold sm:text-lg text-primary">
+                                        {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.symbol.toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {/* Right: You'll Get (USD) */}
+                                  <div className="sm:text-right">
+                                    <div className="text-sm text-foreground mb-1">You'll Get</div>
+                                    <div className="text-xl sm:text-2xl font-semibold text-foreground break-all">
+                                      {parseFloat(amount).toLocaleString()} USD
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="p-3 sm:p-5 space-y-4">
+                                {/* QR Code */}
+                                <div className="flex justify-center mb-4">
+                                  {/* Make the QR code itself rounded-xl, remove extra bg/rounded wrappers */}
+                                  <div
+                                    className="overflow-hidden rounded-xl flex items-center justify-center"
+                                    style={{ width: 240, height: 240, background: "#fff" }}
+                                  >
+                                    <div ref={qrCodeRef} />
+                                  </div>
+                                </div>
+
+                                {/* Deposit Address */}
+                                <div>
+                                  <div className="text-sm text-foreground/60 mb-2">Deposit Address</div>
+                                  <div className="flex items-center gap-2 bg-secondary-foreground rounded-lg p-2 sm:p-3">
+                                    <code className="flex-1 font-mono text-xs sm:text-sm text-foreground break-all sm:overflow-hidden sm:text-ellipsis sm:whitespace-nowrap">
+                                      {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address}
+                                    </code>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 bg-secondary border-0 hover:bg-secondary-foreground rounded-md"
+                                      type="button"
+                                      onClick={() => handleCopyAddress(availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address || '')}
+                                    >
+                                      <Copy className="text-foreground h-4 w-4 sm:h-5 sm:w-5" weight="bold" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         )}
+                      
+                      </div>
+                    </form> {/* Close deposit form */}
+                    </div> {/* Close grid column for deposit form */}
+                  </div> {/* Close grid for add-funds */}
+                </TabsContent>
+                {/* Withdrawals tab remains unchanged */}
+                <TabsContent value="withdraw" className="w-full">
+                  {/* Withdrawals Implementation */}
+                  <div className="w-full min-h-screen bg-background">
+                    <div className="container max-w-[1200px] mx-auto">
+                      {/* KYC Status */}
+                      <div className="max-w-lg mx-auto mb-8">
+                        {kycStatus !== 'completed' && (
+                          <KycVariant status={kycStatus as any} date={kycDate} />
+                        )}
+                      </div>
+                      {/* Withdraw Form only, payout history removed */}
+                      <div className="grid gap-8 lg:grid-cols-2">
+                        <div className="w-full max-w-[400px]"> {/* Withdraw form */}
+                          {kycStatus === 'completed' ? (
+                            <form onSubmit={handleWithdrawSubmit} className="space-y-6">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs font-normal">Select Currency</Label>
+                                  <Select 
+                                    value={withdrawForm.cryptoId || withdrawCryptoOptions[0]?.id} 
+                                    onValueChange={(value) => {
+                                      const selectedMethod = depositMethods.find(m => m.id === value);
+                                      const network = selectedMethod?.network || '';
+                                      setWithdrawForm(prev => ({ 
+                                        ...prev, 
+                                        cryptoId: value,
+                                        network
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select cryptocurrency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <div>
+                                        <div className="px-2 py-1 text-xs text-muted-foreground">USDT</div>
+                                        {depositMethods
+                                          .filter(method => 
+                                            method.method === 'crypto' && 
+                                            method.is_active && 
+                                            method.crypto_symbol?.toLowerCase() === 'usdt'
+                                          )
+                                          .map(method => (
+                                            <SelectItem key={method.id} value={method.id}>
+                                              <div className="flex items-center gap-2">
+                                                {method.logo_url && (
+                                                  <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
+                                                )}
+                                                {method.crypto_name} • {method.network}
+                                              </div>
+                                            </SelectItem>
+                                          ))}
+                                      </div>
+                                      <div>
+                                        <div className="px-2 py-1 text-xs text-muted-foreground">USDC</div>
+                                        {depositMethods
+                                          .filter(method => 
+                                            method.method === 'crypto' && 
+                                            method.is_active && 
+                                            method.crypto_symbol?.toLowerCase() === 'usdc'
+                                          )
+                                          .map(method => (
+                                            <SelectItem key={method.id} value={method.id}>
+                                              <div className="flex items-center gap-2">
+                                                {method.logo_url && (
+                                                  <img src={method.logo_url} alt={method.crypto_name || ''} className="w-4 h-4" />
+                                                )}
+                                                {method.crypto_name} • {method.network}
+                                              </div>
+                                            </SelectItem>
+                                          ))}
+                                      </div>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="walletAddress" className="text-xs font-normal text-foreground">Wallet Address</Label>
+                                  <Input
+                                    id="walletAddress"
+                                    placeholder={`Enter ${
+                                      withdrawSelectedCrypto?.name?.toUpperCase() || 'USDT'
+                                    } ${withdrawForm.network || 'TRC20'} address`}
+                                    value={withdrawForm.walletAddress}
+                                    onChange={handleWithdrawAddressChange}
+                                    className="placeholder:text-foreground bg-secondary text-foreground"
+                                  />
+                                  {withdrawAddressError && (
+                                    <p className="text-sm text-red-500">{withdrawAddressError}</p>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="amount" className="text-xs font-normal text-foreground">Amount</Label>
+                                  <div className="relative">
+                                    <Input
+                                      id="amount"
+                                      type="number"
+                                      min="0"
+                                      placeholder="Enter amount"
+                                      className={`${withdrawAmountError ? 'border-red-500' : ''} placeholder:text-foreground bg-secondary text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                      value={withdrawForm.amount}
+                                      onChange={handleWithdrawAmountChange}
+                                    />
+                                    <span className="absolute right-3 top-2.5 text-foreground">USD</span>
+                                  </div>
+                                  {withdrawAmountError && (
+                                    <p className="text-sm text-red-500">{withdrawAmountError}</p>
+                                  )}
+                                  {withdrawForm.amount && !withdrawAmountError && (
+                                    <p className="text-sm text-muted-foreground">
+                                      Your balance after withdrawal → {(userBalance - parseFloat(withdrawForm.amount)).toLocaleString()} USD
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 rounded-md" disabled={withdrawIsSubmitting || !canSubmit}>
+                                {withdrawIsSubmitting ? "Processing..." : "Request Payout"}
+                              </Button>
+                            </form>
+                          ) : null}
+                        </div>
+                        {/* Remove payout history column */}
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </TabsContent>
-            </Tabs>
-        </div>
-      </div>
-
-      {/* Promo Code Dialog */}
-      <Dialog open={showPromoDialog} onOpenChange={setShowPromoDialog}>
-        <DialogContent className="max-w-full w-[95vw] sm:w-[400px] p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-2xl font-bold">Enter Promo Code</DialogTitle>
-          </DialogHeader>
-          <div className="flex gap-2 py-4">
-            <Input
-              placeholder="Enter code"
-              value={promoInput}
-              onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-              className="uppercase placeholder:text-foreground"
-            />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
-          <DialogFooter>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* Promo Code Dialog */}
+          <Dialog open={showPromoDialog} onOpenChange={setShowPromoDialog}>
+            <DialogContent className="max-w-full w-[95vw] sm:w-[400px] p-4 sm:p-6 bg-background">
+              <DialogHeader>
+                <DialogTitle className="text-lg sm:text-2xl font-bold text-foreground">Enter Promo Code</DialogTitle>
+              </DialogHeader>
+              <div className="flex gap-2 py-4">
+                <Input
+                  label="Enter code"
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                  className="uppercase"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={handleApplyPromoCode}
+                  disabled={isApplyingPromo || !promoInput}
+                  className="w-full"
+                >
+                  {isApplyingPromo ? "Verifying..." : "Verify"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </main>
+      </div>
     </div>
   );
 }

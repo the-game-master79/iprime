@@ -245,16 +245,25 @@ export const Topbar = ({
         language={language}
         setLanguage={setLanguage}
       />
-      <header className="flex flex-col bg-background w-full px-4 md:px-8 py-4">
-        <div className="max-w-[1200px] mx-auto w-full">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2">
+      <header className="flex flex-col bg-background w-full md:px-4 md:py-2 px-4 py-2 border-b border-border"
+        style={{
+          // Set a CSS variable for the topbar height for sidebar alignment
+          // 64px for desktop, 56px for mobile (adjust as needed)
+          // This ensures the sidebar always starts below the Topbar
+          ['--topbar-height' as any]: window.innerWidth >= 768 ? '64px' : '56px',
+        }}
+      >
+        <div className="mx-auto w-full">
+          {/* First row: Logo and Back button */}
+          <div className="flex items-center justify-between w-full min-h-[48px] md:min-h-[64px]">
+            {/* Left items: Back button and Logo */}
+            <div className="flex items-center gap-1 md:gap-2 flex-1 min-w-0">
               {/* Back Button */}
               {!platform && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-lg relative bg-secondary hover:bg-secondary-foreground mr-1"
+                  className="h-9 w-9 md:h-10 md:w-10 rounded-lg relative bg-secondary hover:bg-secondary-foreground mr-1"
                   onClick={() => navigate('/platform')}
                   aria-label="Back"
                 >
@@ -269,7 +278,8 @@ export const Topbar = ({
                     : "/arthaa-logo-light.svg"
                 }
                 alt="Arthaa"
-                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
+                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
+                style={{ maxWidth: 140 }}
                 onClick={() => window.location.reload()}
               />
               <img
@@ -279,127 +289,138 @@ export const Topbar = ({
                     : "/arthaa-light.svg"
                 }
                 alt="Arthaa"
-                className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
+                className="h-12 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
+                style={{ maxWidth: 200 }}
                 onClick={() => window.location.reload()}
               />
             </div>
-            <div className="flex items-center gap-3">
-              {/* Available Balance */}
-              <div className="hidden md:flex flex-col items-end mr-2">
-                <span className="text-xs text-muted-foreground">Available Balance</span>
-                <span className="font-regular text-lg text-foreground">
-                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                  <span className="font-bold">USD</span>
+            {/* Right items: Balance, Notifications, Profile */}
+            <div className="flex items-center min-w-0 gap-2 md:gap-2">
+              {/* Available Balance: Badge for mobile, text for desktop */}
+              <div>
+                {/* Mobile: Badge with wallet icon */}
+                <span className="flex md:hidden items-center min-w-[120px]">
+                  <Badge className="flex items-center gap-1 px-2 py-2 rounded-md text-xs font-medium bg-secondary-foreground text-foreground">
+                    <Wallet className="w-4 h-4 mr-1 flex-shrink-0" weight="bold" />
+                    <span className="truncate">
+                      {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </span>
+                  </Badge>
+                </span>
+                {/* Desktop: Text */}
+                <span className="hidden md:flex flex-col items-end mr-0 min-w-[120px]">
+                  <span className="text-xs text-muted-foreground">Available Balance</span>
+                  <span className="font-regular text-lg text-foreground">
+                    {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                    <span className="font-bold">USD</span>
+                  </span>
                 </span>
               </div>
-              {/* Mobile: Balance badge with wallet icon */}
-              <div className="flex md:hidden items-center">
-                <Badge className="flex items-center gap-1 px-3 py-3 rounded-md text-xs font-medium bg-secondary text-foreground">
-                  <Wallet className="w-4 h-4 mr-1" weight="bold" />
-                  {Number(availableBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                </Badge>
-              </div>
               {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-10 w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground inline-flex"
-                  >
-                    <Bell className="h-5 w-5 text-foreground" weight="bold" />
-                    {unreadCount > 0 && (
-                      <Badge 
-                        variant="default" 
-                        className="absolute -right-1 -top-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary text-primary-foreground"
-                      >
-                        {unreadCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[380px] bg-background text-card-foreground border-border">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-                    <DropdownMenuLabel className="text-foreground">Notifications</DropdownMenuLabel>
-                    {notices.length > 0 && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs hover:text-primary"
-                        onClick={handleMarkAllAsRead}
-                      >
-                        Mark all as read
-                      </Button>
-                    )}
-                  </div>
-                  <div className="max-h-[300px] overflow-auto">
-                    {notices.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-muted-foreground text-center">
-                        No notifications
-                      </div>
-                    ) : (
-                      notices.map((notice) => (
-                        <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default hover:bg-accent">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-foreground">{notice.title}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {notice.content.replace(
-                                /\$?([\d,.]+)(\.\d+)?/g,
-                                (match, whole, decimal) => {
-                                  const num = parseFloat(match.replace(/[$,]/g, ''));
-                                  return isNaN(num) ? match : `$${num.toFixed(2)}`;
-                                }
-                              )}
-                            </p>
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              
+              <div className="flex items-center min-w-[48px] justify-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-9 w-9 md:h-10 md:w-10 rounded-lg relative bg-secondary-foreground hover:bg-secondary-foreground inline-flex"
+                    >
+                      <Bell className="h-5 w-5 text-foreground" weight="bold" />
+                      {unreadCount > 0 && (
+                        <Badge 
+                          variant="default" 
+                          className="absolute -right-1 -top-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary text-primary-foreground"
+                        >
+                          {unreadCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[90vw] max-w-[380px] bg-background text-card-foreground border-border">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+                      <DropdownMenuLabel className="text-foreground">Notifications</DropdownMenuLabel>
+                      {notices.length > 0 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs hover:text-primary"
+                          onClick={handleMarkAllAsRead}
+                        >
+                          Mark all as read
+                        </Button>
+                      )}
+                    </div>
+                    <div className="max-h-[300px] overflow-auto">
+                      {notices.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                          No notifications
+                        </div>
+                      ) : (
+                        notices.map((notice) => (
+                          <DropdownMenuItem key={notice.id} className="px-4 py-3 cursor-default hover:bg-accent">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium text-foreground">{notice.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {notice.content.replace(
+                                  /\$?([\d,.]+)(\.\d+)?/g,
+                                  (match, whole, decimal) => {
+                                    const num = parseFloat(match.replace(/[$,]/g, ''));
+                                    return isNaN(num) ? match : `$${num.toFixed(2)}`;
+                                  }
+                                )}
+                              </p>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               {/* Profile Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="rounded-lg bg-secondary hover:bg-secondary-foreground"
-                  >
-                    <Avatar className="h-10 w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
-                      <AvatarFallback className="bg-primary rounded-lg">
-                        <UserCircle weight="bold" className="h-6 w-6 text-white" />
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 bg-background text-foreground border-border">
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <UserCircle className="mr-2 h-4 w-4" weight="bold" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-                    <GearSix className="mr-2 h-4 w-4" weight="bold" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="bg-destructive text-white" onClick={handleLogout}>
-                    <SignOut className="mr-2 h-4 w-4" weight="bold" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center min-w-[48px] justify-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-9 w-9 md:h-10 md:w-10 rounded-lg bg-secondary hover:bg-secondary-foreground"
+                    >
+                      <Avatar className="h-8 w-8 md:h-10 md:w-10 bg-primary hover:bg-primary/90 rounded-lg transition-colors">
+                        <AvatarFallback className="bg-primary rounded-lg">
+                          <UserCircle weight="bold" className="h-6 w-6 text-white" />
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 bg-background text-foreground border-border">
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      <UserCircle className="mr-2 h-4 w-4" weight="bold" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                      <GearSix className="mr-2 h-4 w-4" weight="bold" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="bg-destructive text-white" onClick={handleLogout}>
+                      <SignOut className="mr-2 h-4 w-4" weight="bold" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
+          {/* New row: Title below logo */}
+          {title && !platform && (
+            <div className="flex w-full mt-2 md:mt-3">
+              <span className="font-bold text-2xl md:text-4xl text-foreground tracking-tight text-left">
+                {title}
+              </span>
+            </div>
+          )}
         </div>
-        {/* Title row */}
-        {title && !platform && (
-          <div className="w-full mt-2">
-            <div className="max-w-[1200px] mx-auto">
-              <span className="font-semibold text-2xl text-foreground block">{title}</span>
-            </div>
-          </div>
-        )}
+        {/* Removed separate title row at the end */}
       </header>
     </>
   );

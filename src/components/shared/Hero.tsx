@@ -87,11 +87,11 @@ export const Hero = ({
         <div className="flex-1 flex flex-col items-start md:items-start md:text-left">
           {/* Cinematic, powerful header */}
           <div className="w-full flex flex-col items-start md:items-start md:text-left">
-            <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-tight text-white mb-3 animate-fade-in-up">
+            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-tight text-white mb-3 animate-fade-in-up">
               {title}
             </h1>
             {subtitle && (
-              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-regular mb-16 animate-fade-in-up delay-200">
+              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-thin mb-16 animate-fade-in-up delay-200">
                 {subtitle}
               </p>
             )}
@@ -122,11 +122,11 @@ export const Hero = ({
                 <div className="w-full flex flex-row flex-wrap items-center justify-center gap-4 mt-6" style={{ maxWidth: 340 }}>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                    <span className="text-white text-md font-book tracking-tight">Zero commissions</span>
                   </div>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                    <span className="text-white text-md font-book tracking-tight">1.5X faster payouts</span>
                   </div>
                 </div>
               </>
@@ -146,10 +146,10 @@ export const Hero = ({
                   <div className="hidden md:flex flex-row items-center gap-4 justify-start w-full md:w-auto mt-6 md:mt-0">
                     <RabbitIcon size={40} weight="bold" className="text-white" />
                     <div className="flex flex-col items-start">
-                      <span className="text-base md:text-lg font-bold text-white leading-tight">
+                      <span className="text-base md:text-lg font-bold text-white leading-tight tracking-tight">
                         {weeklyNumber.toLocaleString()} traders joined 
                       </span>
-                      <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
+                      <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight tracking-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
                         Arthaa in the last 7 days
                       </span>
                     </div>
@@ -159,20 +159,20 @@ export const Hero = ({
                 <div className="flex flex-row flex-wrap items-center justify-center gap-4 mt-4 md:hidden" style={{ maxWidth: 340 }}>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                    <span className="text-white text-sm font-medium tracking-tight">Zero commissions</span>
                   </div>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                    <span className="text-white text-sm font-medium tracking-tight">1.5X faster payouts</span>
                   </div>
                 </div>
                 <div className="flex md:hidden flex-row items-center gap-4 justify-start w-full mt-6">
                   <RabbitIcon size={40} weight="bold" className="text-white" />
                   <div className="flex flex-col items-start">
-                    <span className="text-base md:text-lg font-bold text-white leading-tight">
+                    <span className="text-base md:text-lg font-bold text-white leading-tight tracking-tight">
                       {weeklyNumber.toLocaleString()} traders joined 
                     </span>
-                    <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
+                    <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight tracking-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
                       Arthaa in the last 7 days
                     </span>
                   </div>
@@ -181,11 +181,11 @@ export const Hero = ({
                 <div className="hidden md:flex flex-row flex-wrap items-center justify-center gap-4" style={{ maxWidth: 340, marginTop: 24 }}>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">Zero commissions</span>
+                    <span className="text-white text-sm font-medium tracking-tight">Zero commissions</span>
                   </div>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                     <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium">1.5X faster payouts</span>
+                    <span className="text-white text-sm font-medium tracking-tight">1.5X faster payouts</span>
                   </div>
                 </div>
               </div>
