@@ -1,5 +1,5 @@
 const CACHE_VERSION = 'v1.0.0';
-const CACHE_NAME = `cloudforex-${CACHE_VERSION}`;
+const CACHE_NAME = `arthaa-${CACHE_VERSION}`;
 const STATIC_CACHE = 'static-v1';
 const DYNAMIC_CACHE = 'dynamic-v1';
 

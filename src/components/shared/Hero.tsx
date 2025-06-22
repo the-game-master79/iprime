@@ -72,7 +72,7 @@ export const Hero = ({
   }, []);
 
   // Use local webp hero image instead of Unsplash and iPhone mockup
-  const mockupImg = "/cloudforex-hero.webp";
+  const mockupImg = "/arthaa-hero.webp";
   return (
     <section className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
       <Navbar /> {/* <-- Use the shared Navbar at the top */}
@@ -150,7 +150,7 @@ export const Hero = ({
                         {weeklyNumber.toLocaleString()} traders joined 
                       </span>
                       <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
-                        cloudtrade in the last 7 days
+                        Arthaa in the last 7 days
                       </span>
                     </div>
                   </div>
@@ -173,7 +173,7 @@ export const Hero = ({
                       {weeklyNumber.toLocaleString()} traders joined 
                     </span>
                     <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
-                      cloudtrade in the last 7 days
+                      Arthaa in the last 7 days
                     </span>
                   </div>
                 </div>

@@ -59,22 +59,22 @@ const Index = () => {
     <>
       <Helmet>
         {/* ✅ Primary SEO Meta Tags */}
-        <title>CloudForex | Best Trading Platform for Forex & Crypto</title>
-        <meta name="description" content="CloudForex is the best trading platform to trade currency and crypto. Enjoy AI-powered analytics, ultra-fast execution, and zero commissions." />
+        <title>Arthaa | Best Trading Platform for Forex & Crypto</title>
+        <meta name="description" content="Arthaa is the best trading platform to trade currency and crypto. Enjoy AI-powered analytics, ultra-fast execution, and zero commissions." />
         {/* ✅ Open Graph / Facebook */}
-        <meta property="og:title" content="CloudForex | Best Trading Platform for Forex & Crypto" />
-        <meta property="og:description" content="CloudForex is the best platform to trade currency and crypto with AI-powered tools, tight spreads, and real-time execution." />
-        <meta property="og:url" content="https://www.cloudforex.club/" />
+        <meta property="og:title" content="Arthaa | Best Trading Platform for Forex & Crypto" />
+        <meta property="og:description" content="Arthaa is the best platform to trade currency and crypto with AI-powered tools, tight spreads, and real-time execution." />
+        <meta property="og:url" content="https://www.arthaa.club/" />
         <meta property="og:image" content="/og-image/home.jpg" />
         <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="CloudForex" />
+        <meta property="og:site_name" content="Arthaa" />
         {/* ✅ Twitter Meta Tags */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="CloudForex | Best Trading Platform for Forex & Crypto" />
-        <meta name="twitter:description" content="Trade smarter on CloudForex — the best trading platform for forex and crypto in 2025. Zero commissions. 24/7 human support." />
+        <meta name="twitter:title" content="Arthaa | Best Trading Platform for Forex & Crypto" />
+        <meta name="twitter:description" content="Trade smarter on Arthaa — the best trading platform for forex and crypto in 2025. Zero commissions. 24/7 human support." />
         <meta name="twitter:image" content="/og-image/home.jpg" />
         {/* ✅ Canonical */}
-        <link rel="canonical" href="https://www.cloudforex.club/" />
+        <link rel="canonical" href="https://www.arthaa.club/" />
       </Helmet>
       <PageTransition>
         <div className="flex min-h-screen flex-col bg-background text-foreground tracking-tight overflow-hidden relative">
@@ -116,11 +116,11 @@ const Index = () => {
                     Have questions, need support, or want to partner with us? Our team is here to help you every step of the way.
                   </div>
                   <a
-                    href="mailto:hello@cloudforex.club"
+                    href="mailto:hello@arthaa.pro"
                     className="text-primary font-semibold underline break-all"
-                    aria-label="Email CloudForex support at hello@cloudforex.club"
+                    aria-label="Email Arthaa support at hello@arthaa.pro"
                   >
-                    hello@cloudforex.club
+                    hello@arthaa.pro
                   </a>
                 </div>
               </DialogContent>

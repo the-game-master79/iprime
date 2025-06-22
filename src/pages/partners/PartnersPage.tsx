@@ -19,7 +19,7 @@ const PartnersPage = () => {
               icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />, 
               text: "Partner Program"
             }}
-            title="Partner With CloudForex"
+            title="Partner With Arthaa"
             subtitle="Earn. Grow. Succeed Together."
             description="Join our exclusive partnership program and earn substantial commissions while helping others discover professional trading. Benefit from our multi-tier commission structure and comprehensive support system."
             action={{

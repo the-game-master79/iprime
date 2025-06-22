@@ -80,7 +80,7 @@ const PrivacyPolicy = () => {
                 If you have any questions about this Privacy Policy, please contact us at:
               </p>
               <div className="pl-6">
-                <p>Email: privacy@cloudforex.com</p>
+                <p>Email: privacy@arthaa.com</p>
                 <p>Address: 123 Trading Street, Financial District</p>
                 <p>Phone: +1 (555) 123-4567</p>
               </div>

@@ -12,7 +12,7 @@ export function InfoDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[425px] md:max-w-[600px] rounded-xl">
         <DialogHeader>
-          <DialogTitle>CloudForex Guide</DialogTitle>
+          <DialogTitle>Arthaa Guide</DialogTitle>
         </DialogHeader>
         
         <Tabs defaultValue="investors" className="w-full">

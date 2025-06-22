@@ -40,12 +40,12 @@ const BlogPost: React.FC = () => {
   // Possible share messages
   const shareMessages = [
     "🔥 Check out this insane trading platform for 2025",
-    "🚀 Discover why CloudForex is the #1 platform for traders in 2025.",
-    "📈 Master your trades in volatile markets, use CloudForex, etc."
+    "🚀 Discover why Arthaa is the #1 platform for traders in 2025.",
+    "📈 Master your trades in volatile markets, use Arthaa, etc."
   ];
   // Pick one message at random for each share
   const shareMessage = shareMessages[Math.floor(Math.random() * shareMessages.length)];
-  const shareTags = "#Forex #TradingPlatform #CloudForex #AlphaQuant";
+  const shareTags = "#Forex #TradingPlatform #Arthaa #AlphaQuant";
   const shareText = `${shareMessage}\n\n${referralLink}\n\n${shareTags}`;
 
   useEffect(() => {
@@ -116,18 +116,18 @@ const BlogPost: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>{blog.title} | CloudForex Blog</title>
+        <title>{blog.title} | Arthaa Blog</title>
         <meta name="description" content={blog.description || blog.content.slice(0, 150)} />
-        <meta property="og:title" content={`${blog.title} | CloudForex Blog`} />
+        <meta property="og:title" content={`${blog.title} | Arthaa Blog`} />
         <meta property="og:description" content={blog.description || blog.content.slice(0, 150)} />
         <meta property="og:image" content={blog.image_url || '/og-image/default.jpg'} />
-        <meta property="og:url" content={`https://www.cloudforex.club/blog/${blog.slug}`} />
+        <meta property="og:url" content={`https://www.arthaa.pro/blog/${blog.slug}`} />
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={`${blog.title} | CloudForex Blog`} />
+        <meta name="twitter:title" content={`${blog.title} | Arthaa Blog`} />
         <meta name="twitter:description" content={blog.description || blog.content.slice(0, 150)} />
         <meta name="twitter:image" content={blog.image_url || '/og-image/default.jpg'} />
-        <link rel="canonical" href={`https://www.cloudforex.club/blog/${blog.slug}`} />
+        <link rel="canonical" href={`https://www.arthaa.pro/blog/${blog.slug}`} />
         {/* JSON-LD Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
@@ -139,13 +139,13 @@ const BlogPost: React.FC = () => {
               "name": blog.author
             },
             "datePublished": blog.date,
-            "image": blog.image_url || "https://www.cloudforex.club/og-image/default.jpg",
+            "image": blog.image_url || "https://www.arthaa.pro/og-image/default.jpg",
             "publisher": {
               "@type": "Organization",
-              "name": "CloudForex",
+              "name": "arthaa",
               "logo": {
                 "@type": "ImageObject",
-                "url": "https://www.cloudforex.club/og-image/home.jpg"
+                "url": "https://www.arthaa.pro/og-image/home.jpg"
               }
             },
             "description": blog.description || blog.content.slice(0, 150)
@@ -169,7 +169,7 @@ const BlogPost: React.FC = () => {
         </nav>
         {blog.image_url && (
           <img
-            src={blog.image_url}
+            src={blog.image_url + '?cb=' + Date.now()}
             alt={blog.title}
             className="w-full max-h-[630px] object-cover rounded-lg shadow mb-8"
           />
@@ -284,7 +284,7 @@ const BlogPost: React.FC = () => {
                 >
                   {post.image_url && (
                     <img
-                      src={post.image_url}
+                      src={post.image_url + '?cb=' + Date.now()}
                       alt={post.title}
                       className="w-full h-32 object-cover"
                     />

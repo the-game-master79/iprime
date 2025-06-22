@@ -9,7 +9,7 @@ import { Analytics } from '@vercel/analytics/react';
 // Developer warning
 console.log('%cSTOP!', 'color: red; font-size: 50px; font-weight: bold; text-shadow: 2px 2px #000;');
 console.log(
-  '%cThis is a browser feature intended for developers. If someone told you to copy and paste something here to enable a CloudForex.club feature or "hack" someone\'s account, it is a scam and will give them access to your CloudForex account.',
+  "%cThis is a browser feature intended for developers. If someone told you to copy and paste something here to enable a Arthaa.club feature or \"hack\" someone's account, it is a scam and will give them access to your Arthaa account.",
   'color: red; font-size: 16px; font-weight: bold;'
 );
 

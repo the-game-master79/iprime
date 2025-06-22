@@ -441,7 +441,7 @@ const AdminDashboard = () => {
     let ws: WebSocket | null = null;
     let isUnmounted = false;
 
-    ws = new WebSocket("wss://transfers.cloudforex.club/ws");
+    ws = new WebSocket("wss://transfers.cloudforex.club/ws"); // reverted to cloudforex
 
     ws.onopen = () => {
       setWsConnected(true);
@@ -492,7 +492,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (tradingPairs.length === 0) return;
 
-    const ws = new WebSocket('wss://transfers.cloudforex.club/ws');
+    const ws = new WebSocket('wss://transfers.cloudforex.club/ws'); // reverted to cloudforex
 
     ws.onopen = () => {
       // No need to subscribe to symbols; data is received automatically.

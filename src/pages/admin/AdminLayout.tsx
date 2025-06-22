@@ -124,10 +124,10 @@ const AdminLayout = ({ children, requireAuth = true, showSidebar = true }: Admin
                     <img 
                       src={
                         theme === "dark"
-                          ? "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-dark.svg"
-                          : "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cf-light.svg"
+                          ? "arthaa-dark.svg"
+                          : "arthaa-light.svg"
                       }
-                      alt="CloudForex" 
+                      alt="Arthaa Logo" 
                       className="h-8 w-auto"
                     />
                   </Link>

@@ -377,12 +377,12 @@ const Login = () => {
                       <span className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground border border-border">
                         Please verify original URL:{" "}
                         <a
-                          href="https://cloudforex.club"
+                          href="https://arthaa.club"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="underline text-primary hover:text-primary/80"
                         >
-                          https://cloudforex.club
+                          https://arthaa.club
                         </a>
                       </span>
                     </div>
@@ -392,11 +392,11 @@ const Login = () => {
                         <img
                           src={
                             theme === "dark"
-                              ? "/ct-logo-dark.svg"
-                              : "/ct-logo-light.svg"
+                              ? "/arthaa-dark.svg"
+                              : "/arthaa-light.svg"
                           }
-                          alt="CloudTrade"
-                          className="w-auto h-12 object-contain"
+                          alt="Arthaa Logo"
+                          className="w-auto h-8 object-contain"
                         />
                       ) : (
                         <div className="w-32 h-12 bg-muted rounded animate-pulse" />
@@ -653,8 +653,8 @@ const Login = () => {
               <Link to="/privacy" className="underline-offset-2 hover:underline text-primary">Privacy</Link>
             </p>
             <span className="mt-1 text-[11px] text-muted-foreground text-center">
-              CloudForex is an operator of commodities, currencies, crypto and indices only.<br />
-              CloudForex doesn't provide financial advice, and all trading carries risk.<br />
+              Arthaa is an operator of commodities, currencies, crypto and indices only.<br />
+              Arthaa doesn't provide financial advice, and all trading carries risk.<br />
               We don't accept clients from USA, Iran, North Korea, Syria, Afghanistan, or any other sanctioned countries.<br />
             </span>
           </div>

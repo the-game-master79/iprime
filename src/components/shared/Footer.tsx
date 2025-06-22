@@ -11,10 +11,10 @@ export const Footer = () => {
             <img
               src={
                 theme === "dark"
-                  ? "/cf-dark.svg"
-                  : "/cf-light.svg"
+                  ? "/arthaa-dark.svg"
+                  : "/arthaa-light.svg"
               }
-              alt="CloudForex Logo"
+              alt="Arthaa Logo"
               className="h-6 w-auto"
             />
           </div>
@@ -37,7 +37,7 @@ export const Footer = () => {
             </Link>
           </div>
           <div className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} CloudForex. All rights reserved.
+            © {new Date().getFullYear()} Arthaa. All rights reserved.
           </div>
         </div>
       </div>

@@ -16,7 +16,7 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
               <p className="mb-4">
-                By accessing and using CloudForex's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+                By accessing and using Arthaa's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
               </p>
             </section>
 
@@ -96,8 +96,8 @@ const TermsOfService = () => {
                 For questions about these Terms of Service, please contact us at:
               </p>
               <div className="pl-6">
-                <p>Email: support@cloudforex.com</p>
-                <p>Address: 123 Trading Street, Financial District</p>
+                <p>Email: hello@arthaa.pro</p>
+                <p>Address: 256,</p>
                 <p>Phone: +1 (555) 123-4567</p>
               </div>
             </section>

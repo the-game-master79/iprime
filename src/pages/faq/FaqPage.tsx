@@ -9,19 +9,19 @@ const faqCategories = [
 		questions: [
 			{
 				q: "How do I deposit funds?",
-				a: "To deposit funds, log in to your CloudForex dashboard and click on \"Cashier\" in the dashboard. Choose your preferred payment method—UPI, or cryptocurrency (USDT, BTC, ETH, etc.)—and follow the instructions. ✅ All deposits are processed securely with real-time tracking.",
+				a: "To deposit funds, log in to your Arthaa dashboard and click on \"Cashier\" in the dashboard. Choose your preferred payment method—UPI, or cryptocurrency (USDT, BTC, ETH, etc.)—and follow the instructions. ✅ All deposits are processed securely with real-time tracking.",
 			},
 			{
 				q: "Are there any deposit fees or hidden charges?",
-				a: "No. CloudForex does not charge any deposit fees. You keep 100% of your funds. However, third-party providers (like crypto networks or banks) may apply a small transaction fee.",
+				a: "No. Arthaa does not charge any deposit fees. You keep 100% of your funds. However, third-party providers (like crypto networks or banks) may apply a small transaction fee.",
 			},
 			{
 				q: "What are the minimum and maximum deposit limits?",
-				a: "The minimum deposit on CloudForex is just $10, depending on your currency. There is no maximum deposit limit for verified accounts.💡 We support high-volume deposits for advanced traders and institutions.",
+				a: "The minimum deposit on Arthaa is just $10, depending on your currency. There is no maximum deposit limit for verified accounts.💡 We support high-volume deposits for advanced traders and institutions.",
 			},
 			{
 				q: "How long do deposits take to reflect in my account?",
-				a: "Most deposits are instant, especially with crypto, UPI, and card payments. Non-crypto deposits may take up to 2 hours. ⏱ CloudForex processes deposits 24/7 with smart auto-verification.",
+				a: "Most deposits are instant, especially with crypto, UPI, and card payments. Non-crypto deposits may take up to 2 hours. ⏱ Arthaa processes deposits 24/7 with smart auto-verification.",
 			},
 		],
 	},
@@ -30,15 +30,15 @@ const faqCategories = [
 		title: "Payouts",
 		questions: [
 			{
-				q: "How fast are payouts processed on CloudForex?",
-				a: "CloudForex offers on-demand payouts, processed within minutes—24/7, including weekends and holidays. Whether you're withdrawing in crypto or fiat, our system ensures lightning-fast execution. ⏱ No more waiting days to access your earnings.",
+				q: "How fast are payouts processed on Arthaa?",
+				a: "Arthaa offers on-demand payouts, processed within minutes—24/7, including weekends and holidays. Whether you're withdrawing in crypto or fiat, our system ensures lightning-fast execution. ⏱ No more waiting days to access your earnings.",
 			},
 			{
 				q: "Are there any fees for receiving payouts?",
-				a: "No. CloudForex does not charge any payout or withdrawal fees. You receive the full amount, with zero commissions or hidden charges. ✅ Your money, fully yours.",
+				a: "No. Arthaa does not charge any payout or withdrawal fees. You receive the full amount, with zero commissions or hidden charges. ✅ Your money, fully yours.",
 			},
 			{
-				q: "What payout methods are available on CloudForex?",
+				q: "What payout methods are available on Arthaa?",
 				a: "You can request payouts via USDT (TRC20/ERC20/BEP20) and USDC (TRC20/ERC20/BEP20/Solana), you can choose the method that suits you best—globally or locally. 🌍 Fast, flexible, and borderless withdrawals.",
 			},
 			{
@@ -52,11 +52,11 @@ const faqCategories = [
 		title: "Trading",
 		questions: [
 			{
-				q: "What assets can I trade on CloudForex?",
-				a: "CloudForex offers 20+ high liquidity instruments including all major pairs and cryptocurrencies (like BTC, ETH, BNB) and metals. 🌐 Trade global markets—all in one platform.",
+				q: "What assets can I trade on Arthaa?",
+				a: "Arthaa offers 20+ high liquidity instruments including all major pairs and cryptocurrencies (like BTC, ETH, BNB) and metals. 🌐 Trade global markets—all in one platform.",
 			},
 			{
-				q: "Does CloudForex support automated trading?",
+				q: "Does Arthaa support automated trading?",
 				a: "We have our own AI powered trading engine, AlphaQuant, which provides advanced analytics, predictive signals, and automated strategies. You can also use third-party trading bots. 🤖 Automate your trades for optimal results.",
 			},
 			{
@@ -74,11 +74,11 @@ const faqCategories = [
 		title: "Support",
 		questions: [
 			{
-				q: "Is CloudForex support available 24/7?",
-				a: "Yes, CloudForex offers round-the-clock human support, available 24/7 including weekends and holidays. 💬 We’re always here—no matter your time zone.",
+				q: "Is Arthaa support available 24/7?",
+				a: "Yes, Arthaa offers round-the-clock human support, available 24/7 including weekends and holidays. 💬 We’re always here—no matter your time zone.",
 			},
 			{
-				q: "How can I contact CloudForex support?",
+				q: "How can I contact Arthaa support?",
 				a: "You can reach our team via live chat within the website or email. We prioritize instant connection with real human agents, not bots. 📞 Support that actually responds.",
 			},
 			{
@@ -86,7 +86,7 @@ const faqCategories = [
 				a: "Yes, our support team can assist you in several major languages. Please specify your preferred language when contacting us. 🗣️ Trade globally, get help locally—in your language.",
 			},
 			{
-				q: "Is CloudForex support handled by real people?",
+				q: "Is Arthaa support handled by real people?",
 				a: "Yes—no AI or scripted responses. Our support team is made up of real trading experts, ready to help with deposits, withdrawals, trades, and technical issues. 🧠 Real help. Real humans. Real fast.",
 			},
 		],

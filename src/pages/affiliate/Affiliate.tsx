@@ -91,31 +91,31 @@ const Affiliate = () => {
     fetchUser();
   }, [currentUser]);
 
-  // Add enhanced meta data for better SEO when accessed via any CloudForex domain
+  // Add enhanced meta data for better SEO when accessed via any Arthaa domain
   useEffect(() => {
-    // Check if we're on any CloudForex domain
-    const isCloudForexDomain = window.location.hostname.includes('cloudforex');
+    // Check if we're on any Arthaa domain
+    const isArthaaDomain = window.location.hostname.includes('arthaa');
     
-    if (isCloudForexDomain) {
+    if (isArthaaDomain) {
       // Create meta description
       const metaDesc = document.createElement('meta');
       metaDesc.name = 'description';
-      metaDesc.content = 'Join CloudForex Affiliate Program - Earn commissions, build your network, and unlock exclusive rewards as you refer new members to our platform.';
+      metaDesc.content = 'Join Arthaa Affiliate Program - Earn commissions, build your network, and unlock exclusive rewards as you refer new members to our platform.';
       document.head.appendChild(metaDesc);
       
       // Create meta keywords
       const metaKeywords = document.createElement('meta');
       metaKeywords.name = 'keywords';
-      metaKeywords.content = 'cloudforex affiliate, trading affiliate program, passive income, referral program, commission structure';
+      metaKeywords.content = 'arthaa affiliate, trading affiliate program, passive income, referral program, commission structure';
       document.head.appendChild(metaKeywords);
       
       // Update title
-      document.title = 'CloudForex Affiliate Program | Start Earning Today';
+      document.title = 'Arthaa Affiliate Program | Start Earning Today';
     }
     
     return () => {
       // Clean up if component unmounts
-      if (isCloudForexDomain) {
+      if (isArthaaDomain) {
         const metaDesc = document.querySelector('meta[name="description"]');
         const metaKeywords = document.querySelector('meta[name="keywords"]');
         if (metaDesc) metaDesc.remove();
@@ -217,7 +217,7 @@ const Affiliate = () => {
 
         if (networkError) throw networkError;
 
-        const referredIds = networkData?.filter(rel => rel.referred).map(rel => rel.referred.id) || [];
+        const referredIds = networkData?.filter(rel => rel.referred && rel.referred.length > 0).map(rel => rel.referred[0].id) || [];
         
         const { data: subscriptionsData, error: subsError } = await supabase
           .from('plans_subscriptions')
@@ -246,18 +246,18 @@ const Affiliate = () => {
         const processedData = networkData
           ?.filter(rel => rel.referred)
           .map(rel => ({
-            id: rel.referred.id,
-            name: rel.referred.email || "",
+            id: rel.referred[0]?.id,
+            name: rel.referred[0]?.email || "",
             level: rel.level,
-            joinDate: new Date(rel.referred.created_at).toLocaleDateString(),
-            status: rel.referred.status || 'Active',
+            joinDate: new Date(rel.referred[0]?.created_at).toLocaleDateString(),
+            status: rel.referred[0]?.status || 'Active',
             commissions: 0,
-            totalInvested: userStats[rel.referred.id]?.totalBusiness || 0,
+            totalInvested: userStats[rel.referred[0]?.id]?.totalBusiness || 0,
             referrerName: 'Direct Sponsor',
-            referralCode: rel.referred.referral_code,
-            directCount: rel.referred.direct_count || 0,
-            referredBy: rel.referred.referred_by || '',
-            totalSubscriptions: userStats[rel.referred.id]?.planCount || 0
+            referralCode: rel.referred[0]?.referral_code,
+            directCount: rel.referred[0]?.direct_count || 0,
+            referredBy: rel.referred[0]?.referred_by || '',
+            totalSubscriptions: userStats[rel.referred[0]?.id]?.planCount || 0
           }));
 
         setTeamData(processedData || []);
@@ -634,7 +634,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-foreground border-foreground rounded-md border border-border"
+                      className="text-foreground rounded-md border border-border"
                       disabled={rankPage === 1}
                       onClick={() => setRankPage(p => Math.max(1, p - 1))}
                     >
@@ -646,7 +646,7 @@ const Affiliate = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-foreground border-foreground rounded-md border border-border"
+                      className="text-foreground rounded-md border border-border"
                       disabled={rankPage === Math.ceil(ranks.length / ranksPerPage) || ranks.length === 0}
                       onClick={() => setRankPage(p => Math.min(Math.ceil(ranks.length / ranksPerPage), p + 1))}
                     >
@@ -1033,7 +1033,7 @@ const Affiliate = () => {
                       variant="outline" 
                       size="sm" 
                       className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none rounded-md"
-                      onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
+                      onClick={() => window.open(`https://wa.me/?text=Join me on Arthaa and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       WhatsApp
                     </Button>
@@ -1041,7 +1041,7 @@ const Affiliate = () => {
                       variant="outline" 
                       size="sm" 
                       className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none rounded-md"
-                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
+                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on Arthaa and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       Twitter
                     </Button>
@@ -1120,7 +1120,7 @@ const Affiliate = () => {
                       variant="outline" 
                       size="sm" 
                       className="bg-[#25D366] text-white hover:bg-[#25D366]/90 border-none rounded-md"
-                      onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
+                      onClick={() => window.open(`https://wa.me/?text=Join me on Arthaa and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       WhatsApp
                     </Button>
@@ -1128,7 +1128,7 @@ const Affiliate = () => {
                       variant="outline" 
                       size="sm" 
                       className="bg-[#1DA1F2] text-white hover:bg-[#1DA1F2]/90 border-none rounded-md"
-                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
+                      onClick={() => window.open(`https://twitter.com/intent/tweet?text=Join me on Arthaa and start earning! Use my referral code: ${referralCode}&url=${encodeURIComponent(referralLink)}`, '_blank')}
                     >
                       Twitter
                     </Button>
@@ -1246,7 +1246,7 @@ const Affiliate = () => {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => window.open(`https://wa.me/?text=Join me on CloudForex and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
+                        onClick={() => window.open(`https://wa.me/?text=Join me on Arthaa and start earning! Use my referral code: ${referralCode} or click ${encodeURIComponent(referralLink)}`, '_blank')}
                       >
                         Share on WhatsApp
                       </Button>
@@ -1503,7 +1503,7 @@ const Affiliate = () => {
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-1">
                   <div className="text-muted-foreground text-sm">
-                    To maximize your earnings: 1) Focus on quality referrals who are likely to subscribe to plans, 2) Educate your referrals about the benefits of our platform, 3) Aim to qualify for all commission tiers by getting at least 2 direct referrals, 4) Build depth in your network by encouraging your referrals to become affiliates themselves, 5) Leverage the marketing materials we provide, 6) Regularly engage with your network to maintain activity, and 7) Set goals to reach higher ranks and unlock bonuses.
+                    To maximize your earnings: 1) Focus on quality referrals who are likely to subscribe to plans, 2) Educate your referrals about the benefits of our platform, 3) Aim to qualify for all commission tiers by getting at least 2 direct referrals, 4) Build depth in your network by encouraging your referrals to become affiliates themselves,  5) Leverage the marketing materials we provide, 6) Regularly engage with your network to maintain activity, and 7) Set goals to reach higher ranks and unlock bonuses.
                   </div>
                 </AccordionContent>
               </AccordionItem>

@@ -165,10 +165,10 @@ const Navbar = ({
         >
           <img
             src={theme === "dark"
-              ? "/cf-dark.svg"
-              : "/cf-light.svg"
+              ? "/arthaa-dark.svg"
+              : "/arthaa-light.svg"
             }
-            alt="CloudForex Logo"
+            alt="Arthaa Logo"
             className="h-5"
             style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.07))" }}
           />

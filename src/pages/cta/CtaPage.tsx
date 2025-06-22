@@ -37,8 +37,8 @@ export const CtaPage = () => {
 					<div className="text-center">
 						<div className="flex justify-center my-12">
 							<img
-								src="/cloudtrade3d.png"
-								alt="CloudTrade 3D"
+								src="/arthaa3d.png"
+								alt="Arthaa 3D"
 								className="w-72 h-72 object-contain"
 							/>
 						</div>

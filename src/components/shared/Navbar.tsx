@@ -53,11 +53,11 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
                 src={
                   isBlogsVariant
                     ? theme === "dark"
-                      ? "/cf-dark.svg"
-                      : "/cf-light.svg"
-                    : "/cf-dark.svg"
+                      ? "/arthaa-dark.svg"
+                      : "/arthaa-light.svg"
+                    : "/arthaa-dark.svg"
                 }
-                alt="CloudForex Logo"
+                alt="Arthaa Logo"
                 className="h-6 w-auto"
               />
             </Link>

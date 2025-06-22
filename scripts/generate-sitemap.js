@@ -1,4 +1,3 @@
-// ...existing code...
 // This file was moved from project root to scripts/generate-sitemap.js
 require('dotenv').config();
 const fs = require('fs');
@@ -15,7 +14,7 @@ async function generateSitemap() {
     console.error('Error fetching blogs:', error);
     process.exit(1);
   }
-  const baseUrl = 'https://www.cloudforex.club';
+  const baseUrl = 'https://www.arthaa.club';
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
   xml += `  <url><loc>${baseUrl}/</loc><priority>1.0</priority></url>\n`;

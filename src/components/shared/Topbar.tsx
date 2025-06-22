@@ -268,17 +268,17 @@ export const Topbar = ({
                     ? "/ct-logo-dark.svg"
                     : "/ct-logo-light.svg"
                 }
-                alt="CloudForex"
+                alt="Arthaa"
                 className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity md:hidden"
                 onClick={() => window.location.reload()}
               />
               <img
                 src={
                   theme === "dark"
-                    ? "/cf-dark.svg"
-                    : "/cf-light.svg"
+                    ? "/arthaa-dark.svg"
+                    : "/arthaa-light.svg"
                 }
-                alt="CloudForex"
+                alt="Arthaa"
                 className="h-6 w-auto cursor-pointer hover:opacity-80 transition-opacity hidden md:block"
                 onClick={() => window.location.reload()}
               />

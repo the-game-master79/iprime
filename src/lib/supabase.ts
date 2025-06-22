@@ -17,7 +17,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   // Add timeout and retry limits
   global: {
     headers: {
-      'x-application-name': 'cloudforex',
+      'x-application-name': 'arthaa',
     },
     // Timeout after 30 seconds
     requestTimeout: 30000,

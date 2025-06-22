@@ -20,7 +20,7 @@ const CompanyPage = () => {
               icon: <Building className="h-5 w-5 animate-pulse text-primary" />, 
               text: "About Us"
             }}
-            title="About CloudForex"
+            title="About Arthaa"
             subtitle="Empowering Traders Worldwide."
             description="Learn about our mission, journey, and values that drive us to empower traders worldwide."
             action={{
@@ -72,7 +72,7 @@ const CompanyPage = () => {
                 </div>
                 <h2 className="text-4xl md:text-5xl font-bold text-foreground">From Vision to Reality</h2>
                 <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                  Founded in 2022, CloudForex has grown from a small startup to a leading force in online trading. 
+                  Founded in 2022, Arthaa has grown from a small startup to a leading force in online trading. 
                   Our journey has been marked by continuous innovation, technological advancement, and an unwavering 
                   commitment to our traders' success.
                 </p>
@@ -160,7 +160,7 @@ const CompanyPage = () => {
                 <Trophy className="w-4 h-4 mr-2" weight="fill" />
                 Why Choose Us
               </div>
-              <h2 className="text-4xl md:text-5xl font-bold text-foreground">The CloudForex Advantage</h2>
+              <h2 className="text-4xl md:text-5xl font-bold text-foreground">The Arthaa Advantage</h2>
               <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                 We combine advanced technology with exceptional service to provide our traders with an 
                 unmatched trading experience. Here's what sets us apart:

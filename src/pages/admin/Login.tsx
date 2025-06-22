@@ -122,8 +122,8 @@ const AdminLogin = () => {
               <div className="mx-auto flex w-full flex-col justify-center space-y-4 bg-background/90 dark:bg-[#18181b]/90 backdrop-blur-lg p-8 rounded-xl shadow-[0_2px_8px_2px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_16px_2px_rgba(0,0,0,0.32)]">
                 <div className="flex flex-col items-center space-y-4">
                   <img 
-                    src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public//cflogo.svg"
-                    alt="CloudForex Logo"
+                    src="/ct-logo-dark.svg"
+                    alt="Arthaa Logo"
                     className="w-16 h-16"
                   />
                   <p className="text-sm text-muted-foreground text-center">

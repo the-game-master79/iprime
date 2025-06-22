@@ -23,7 +23,7 @@ async function generateSitemap() {
     process.exit(1);
   }
 
-  const baseUrl = "https://www.cloudforex.club";
+  const baseUrl = "https://www.arthaa.pro";
   const today = new Date().toISOString().split("T")[0];
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;

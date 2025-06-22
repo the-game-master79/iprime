@@ -79,7 +79,7 @@ const InvestingPage = () => {
             <div className="container max-w-[1200px] mx-auto px-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                 <div className="space-y-6">
-                  <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Why Invest with CloudForex?</h2>
+                  <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Why Invest with Arthaa?</h2>
                   <p className="text-muted-foreground">
                     Our investment plans combine sophisticated trading algorithms with expert market analysis to generate 
                     consistent returns. We leverage advanced technology and years of market expertise to manage your 
