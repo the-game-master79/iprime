@@ -1,5 +1,5 @@
-import { Card } from "@/components/ui/card";
-import { CircleDollarSign, CheckCircle2, Clock, XCircle, Users, TrendingUp, DollarSign, Network } from "lucide-react";
+// Use Phosphor icons instead of lucide-react
+import { CurrencyCircleDollar, CheckCircle, Clock, XCircle, Users, TrendUp, CurrencyDollar, Network } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 export interface BalanceCardProps {
@@ -9,6 +9,7 @@ export interface BalanceCardProps {
   prefix?: string;
   className?: string;
   valueClassName?: string;
+  totalProfits?: number;
 }
 
 export const BalanceCard = ({ 
@@ -17,83 +18,84 @@ export const BalanceCard = ({
   label,
   prefix = '',
   className = '',
-  valueClassName = ''
+  valueClassName = '',
+  totalProfits
 }: BalanceCardProps) => {
   const variants = {
     default: {
-      containerClass: 'bg-blue-500/10 border-blue-500/20',
-      iconClass: 'text-blue-500',
-      iconBgClass: 'bg-blue-500/20',
-      icon: CircleDollarSign,
+      containerClass: 'bg-background border-2 border-blue-200',
+      badgeClass: 'bg-blue-100 text-blue-700 border border-blue-200',
       label: label || 'Available Balance'
     },
     success: {
-      containerClass: 'bg-green-500/10 border-green-500/20',
-      iconClass: 'text-green-500',
-      iconBgClass: 'bg-green-500/20',
-      icon: CheckCircle2,
+      containerClass: 'bg-background border-2 border-green-200',
+      badgeClass: 'bg-green-100 text-green-700 border border-green-200',
       label: label || 'Payment Success'
     },
     processing: {
-      containerClass: 'bg-amber-500/10 border-amber-500/20',
-      iconClass: 'text-amber-500',
-      iconBgClass: 'bg-amber-500/20',
-      icon: Clock,
+      containerClass: 'bg-background border-2 border-amber-200',
+      badgeClass: 'bg-amber-100 text-amber-700 border border-amber-200',
       label: label || 'Processing'
     },
     failed: {
-      containerClass: 'bg-[#FF005C]/10 border-[#FF005C]/20',
-      iconClass: 'text-[#FF005C]',
-      iconBgClass: 'bg-[#FF005C]/20',
-      icon: XCircle,
+      containerClass: 'bg-background border-2 border-[#FFD6E6]',
+      badgeClass: 'bg-[#FFD6E6] text-[#FF005C] border border-[#FFD6E6]',
       label: label || 'Failed Transaction'
     },
     referrals: {
-      containerClass: 'bg-purple-500/10 border-purple-500/20',
-      iconClass: 'text-purple-500',
-      iconBgClass: 'bg-purple-500/20', 
-      icon: Users,
+      containerClass: 'bg-background border-2 border-purple-200',
+      badgeClass: 'bg-purple-100 text-purple-700 border border-purple-200',
       label: label || 'Total Referrals'
     },
     business: {
-      containerClass: 'bg-emerald-500/10 border-emerald-500/20',
-      iconClass: 'text-emerald-500',
-      iconBgClass: 'bg-emerald-500/20',
-      icon: TrendingUp,
+      containerClass: 'bg-background border-2 border-emerald-200',
+      badgeClass: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
       label: label || 'Business Volume'
     },
     commission: {
-      containerClass: 'bg-primary/10 border-primary/20',
-      iconClass: 'text-primary',
-      iconBgClass: 'bg-primary/20',
-      icon: DollarSign,
+      containerClass: 'bg-background border-2 border-primary/20',
+      badgeClass: 'bg-primary/10 text-primary border border-primary/20',
       label: label || 'Total Commission'
     },
     direct: {
-      containerClass: 'bg-indigo-500/10 border-indigo-500/20', 
-      iconClass: 'text-indigo-500',
-      iconBgClass: 'bg-indigo-500/20',
-      icon: Network,
+      containerClass: 'bg-background border-2 border-indigo-200', 
+      badgeClass: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
       label: label || 'Direct Referrals'
     }
   };
 
-  const { containerClass, iconClass, iconBgClass, icon: Icon, label: cardLabel } = variants[variant];
-
+  const { containerClass, badgeClass, label: cardLabel } = variants[variant];
   const showUsdSuffix = variant !== 'direct' && variant !== 'referrals';
 
   return (
-    <Card className={cn(`relative p-6 ${containerClass}`, className)}>
-      <div className={`absolute top-4 right-4 w-8 h-8 rounded-full ${iconBgClass} flex items-center justify-center`}>
-        <Icon className={`w-5 h-5 ${iconClass}`} />
+    <div
+      className={cn(
+        `rounded-2xl p-6 flex flex-col justify-between min-h-[140px] ${containerClass}`,
+        className
+      )}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-md text-foreground font-semibold">{cardLabel}</span>
       </div>
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">{cardLabel}</p>
-        <h3 className={cn("text-2xl font-bold text-foreground", valueClassName)}>
-          {`${(amount || 0).toLocaleString()}${showUsdSuffix ? ' USD' : ''}`}
+      <div className="space-y-1 mt-2">
+        <h3 className={cn("text-5xl font-bold text-foreground", valueClassName)}>
+          {prefix}
+          {(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {showUsdSuffix ? <span className="text-2xl font-normal text-muted-foreground ml-2">USD</span> : null}
         </h3>
+        {typeof totalProfits === 'number' && (
+          <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-100 border border-green-300 text-xs font-semibold text-green-700 mt-4">
+            <div className="flex items-center">
+              <span className="relative flex h-3 w-3 mr-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <span>Total profit: {totalProfits.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+            </div>
+          </div>
+        )}
       </div>
-    </Card>
+    </div>
   );
 };
 

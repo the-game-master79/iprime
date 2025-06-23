@@ -58,6 +58,7 @@ const AlphaQuantPage = lazy(() => import("@/pages/alphaquant/AlphaQuantPage"));
 // Blog Pages
 const BlogList = lazy(() => import("@/pages/blogs/BlogList"));
 const BlogPost = lazy(() => import("@/pages/blogs/BlogPost"));
+const HistoryPage = lazy(() => import("@/pages/history/HistoryPage"));
 
 // Optional: hook if you need it
 // import { useCacheFlush } from '@/hooks/use-cache-flush';
@@ -118,7 +119,8 @@ const RouteGroup = () => {
     path.startsWith("/cashier") ||
     path.startsWith("/affiliate") ||
     path.startsWith("/profile") ||
-    path.startsWith("/plans")
+    path.startsWith("/plans") ||
+    path.startsWith("/history")
   ) {
     return (
       <Suspense fallback={<Spinner />}>
@@ -133,6 +135,7 @@ const RouteGroup = () => {
               <Route path="/profile" element={<AuthGuard requireAuth><Profile /></AuthGuard>} />
               <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
               <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
+              <Route path="/history" element={<AuthGuard requireAuth><HistoryPage /></AuthGuard>} />
             </Routes>
           </UserProfileProvider>
         </TooltipProvider>

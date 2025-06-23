@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
 
+// Update TradingViewWidget to hide all but the chart
+const TradingViewWidget: React.FC<{ symbol: string }> = ({ symbol }) => (
+  <iframe
+    src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(symbol)}&interval=15&theme=light&style=1&hide_top_toolbar=1&hide_legend=1&hide_side_toolbar=1&withdateranges=0&saveimage=0&studies=[]&show_popup_button=0&hideideas=1&toolbar_bg=white`}
+    style={{ width: "100%", height: 320, border: 0 }}
+    allowFullScreen
+    title="TradingView Chart"
+  />
+);
+
 export const PlatformMarkets: React.FC<{
   cryptoData: { symbol: string; image_url: string; name?: string }[];
   forexData: { symbol: string; image_url: string; name?: string }[];
@@ -99,6 +109,37 @@ export const PlatformMarkets: React.FC<{
     }
   }, [forexMarketOpen]);
 
+  // Dialog state for selected pair
+  const [selectedPair, setSelectedPair] = useState<{
+    type: "crypto" | "forex";
+    symbol: string;
+    name?: string;
+    image_url?: string;
+    decimals: number;
+    originalSymbol: string; // for lookup
+  } | null>(null);
+
+  // Update dialog priceObj in realtime
+  const [dialogPriceObj, setDialogPriceObj] = useState<{
+    price: string;
+    bid?: number;
+    ask?: number;
+    isPriceUp?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedPair) {
+      setDialogPriceObj(null);
+      return;
+    }
+    // Listen for price changes for the selected pair
+    const symbol = selectedPair.originalSymbol;
+    setDialogPriceObj(marketPrices[symbol]);
+  }, [selectedPair, marketPrices]);
+
+  // Dialog close handler
+  const closeDialog = () => setSelectedPair(null);
+
   return (
     <div className="w-full mt-2 flex flex-col md:flex-row gap-6">
       {/* Crypto Markets Container */}
@@ -116,70 +157,74 @@ export const PlatformMarkets: React.FC<{
                 No crypto pairs found.
               </div>
             ) : (
-              cryptoData.map((pair) => {
-                const symbol = pair.symbol.toUpperCase();
-                // Remove trailing '/USDT' or '-USDT' or 'USDT' at the end for display
-                let displaySymbol = symbol;
-                if (displaySymbol.endsWith('/USDT')) {
-                  displaySymbol = displaySymbol.replace(/\/USDT$/, '');
-                } else if (displaySymbol.endsWith('-USDT')) {
-                  displaySymbol = displaySymbol.replace(/-USDT$/, '');
-                } else if (displaySymbol.endsWith('USDT')) {
-                  displaySymbol = displaySymbol.replace(/USDT$/, '');
-                }
-                const priceObj = marketPrices[symbol];
-                const decimals = getPriceDecimals(symbol);
-                return (
-                  <div
-                    key={pair.symbol}
-                    className="flex items-center gap-4 py-3 px-2 hover:bg-muted/10 transition cursor-pointer"
-                    onClick={() => navigate('/tradingstation')}
-                  >
-                    {pair.image_url && (
-                      <img
-                        src={pair.image_url}
-                        alt={pair.symbol}
-                        className="w-7 h-7 object-contain"
-                      />
-                    )}
-                    <div className="flex flex-col min-w-[60px]">
-                      <span className="font-medium font-bold text-base">{displaySymbol}</span>
-                      {/* Show name below symbol */}
-                      {pair.name && (
-                        <span className="text-xs text-muted-foreground">{pair.name}</span>
-                      )}
-                    </div>
-                    <div className="ml-auto flex items-center gap-4">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={getPriceChangeClass(priceObj?.isPriceUp)}
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="py-2 px-2 text-left font-semibold">Pair</th>
+                      <th className="py-2 px-2 text-right font-semibold">Bid</th>
+                      <th className="py-2 px-2 text-right font-semibold">Ask</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cryptoData.map((pair) => {
+                      const symbol = pair.symbol.toUpperCase();
+                      let displaySymbol = symbol;
+                      if (displaySymbol.endsWith('/USDT')) {
+                        displaySymbol = displaySymbol.replace(/\/USDT$/, '');
+                      } else if (displaySymbol.endsWith('-USDT')) {
+                        displaySymbol = displaySymbol.replace(/-USDT$/, '');
+                      } else if (displaySymbol.endsWith('USDT')) {
+                        displaySymbol = displaySymbol.replace(/USDT$/, '');
+                      }
+                      const priceObj = marketPrices[symbol];
+                      const decimals = getPriceDecimals(symbol);
+                      return (
+                        <tr
+                          key={pair.symbol}
+                          className="hover:bg-muted/10 transition cursor-pointer"
+                          onClick={() =>
+                            setSelectedPair({
+                              type: "crypto",
+                              symbol: displaySymbol,
+                              name: pair.name,
+                              image_url: pair.image_url,
+                              decimals,
+                              originalSymbol: symbol,
+                            })
+                          }
                         >
-                          B:
-                        </span>
-                        <span
-                          className={getPriceChangeClass(priceObj?.isPriceUp)}
-                          key={priceObj?.bid}
-                        >
-                          {renderPriceWithBigDigits(priceObj?.bid, decimals)}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
-                        >
-                          A:
-                        </span>
-                        <span
-                          className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}
-                          key={priceObj?.ask}
-                        >
-                          {renderPriceWithBigDigits(priceObj?.ask, decimals)}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
+                          <td className="py-2 px-2">
+                            <div className="flex items-center gap-2">
+                              {pair.image_url && (
+                                <img
+                                  src={pair.image_url}
+                                  alt={pair.symbol}
+                                  className="w-6 h-6 object-contain"
+                                />
+                              )}
+                              <div className="flex flex-col">
+                                <span className="font-bold">{displaySymbol}</span>
+                                <span className="text-xs text-muted-foreground">{pair.name || "-"}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <span className={getPriceChangeClass(priceObj?.isPriceUp)}>
+                              {renderPriceWithBigDigits(priceObj?.bid, decimals)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <span className={getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)}>
+                              {renderPriceWithBigDigits(priceObj?.ask, decimals)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -208,91 +253,185 @@ export const PlatformMarkets: React.FC<{
                     No forex pairs found.
                   </div>
                 ) : (
-                  forexData.map((pair) => {
-                    const symbol = pair.symbol.toUpperCase();
-                    const priceObj = marketPrices[symbol];
-                    const decimals = getPriceDecimals(symbol);
-                    return (
-                      <div
-                        key={pair.symbol}
-                        className="flex items-center gap-4 py-3 px-2 hover:bg-muted/10 transition cursor-pointer"
-                        onClick={() => navigate('/tradingstation')}
-                      >
-                        {pair.image_url && (
-                          <img
-                            src={pair.image_url}
-                            alt={pair.symbol}
-                            className="w-7 h-7 object-contain"
-                          />
-                        )}
-                        <div className="flex flex-col min-w-[60px]">
-                          <span className="font-medium font-bold text-base">{pair.symbol}</span>
-                          {/* Show name below symbol */}
-                          {pair.name && (
-                            <span className="text-xs text-muted-foreground">{pair.name}</span>
-                          )}
-                        </div>
-                        <div className="ml-auto flex items-center gap-4">
-                          <span className="flex items-center gap-2">
-                            <span
-                              className={
-                                !forexMarketOpen
-                                  ? "text-destructive font-semibold"
-                                  : getPriceChangeClass(priceObj?.isPriceUp)
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="py-2 px-2 text-left font-semibold">Pair</th>
+                          <th className="py-2 px-2 text-right font-semibold">Bid</th>
+                          <th className="py-2 px-2 text-right font-semibold">Ask</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {forexData.map((pair) => {
+                          const symbol = pair.symbol.toUpperCase();
+                          const priceObj = marketPrices[symbol];
+                          const decimals = getPriceDecimals(symbol);
+                          return (
+                            <tr
+                              key={pair.symbol}
+                              className="hover:bg-muted/10 transition cursor-pointer"
+                              onClick={() =>
+                                setSelectedPair({
+                                  type: "forex",
+                                  symbol: pair.symbol,
+                                  name: pair.name,
+                                  image_url: pair.image_url,
+                                  decimals,
+                                  originalSymbol: symbol,
+                                })
                               }
                             >
-                              B:
-                            </span>
-                            <span
-                              className={
-                                !forexMarketOpen
-                                  ? "text-destructive font-semibold"
-                                  : getPriceChangeClass(priceObj?.isPriceUp)
-                              }
-                              key={priceObj?.bid}
-                            >
-                              {renderPriceWithBigDigits(
-                                priceObj?.bid,
-                                decimals,
-                                !forexMarketOpen
-                              )}
-                            </span>
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className={
-                                !forexMarketOpen
-                                  ? "text-destructive font-semibold"
-                                  : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
-                              }
-                            >
-                              A:
-                            </span>
-                            <span
-                              className={
-                                !forexMarketOpen
-                                  ? "text-destructive font-semibold"
-                                  : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
-                              }
-                              key={priceObj?.ask}
-                            >
-                              {renderPriceWithBigDigits(
-                                priceObj?.ask,
-                                decimals,
-                                !forexMarketOpen
-                              )}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
+                              <td className="py-2 px-2">
+                                <div className="flex items-center gap-2">
+                                  {pair.image_url && (
+                                    <img
+                                      src={pair.image_url}
+                                      alt={pair.symbol}
+                                      className="w-6 h-6 object-contain"
+                                    />
+                                  )}
+                                  <div className="flex flex-col">
+                                    <span className="font-bold">{pair.symbol}</span>
+                                    <span className="text-xs text-muted-foreground">{pair.name || "-"}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                <span
+                                  className={
+                                    !forexMarketOpen
+                                      ? "text-destructive font-semibold"
+                                      : getPriceChangeClass(priceObj?.isPriceUp)
+                                  }
+                                >
+                                  {renderPriceWithBigDigits(
+                                    priceObj?.bid,
+                                    decimals,
+                                    !forexMarketOpen
+                                  )}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                <span
+                                  className={
+                                    !forexMarketOpen
+                                      ? "text-destructive font-semibold"
+                                      : getPriceChangeClass(priceObj?.isPriceUp === false ? false : priceObj?.isPriceUp)
+                                  }
+                                >
+                                  {renderPriceWithBigDigits(
+                                    priceObj?.ask,
+                                    decimals,
+                                    !forexMarketOpen
+                                  )}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </>
           )}
         </div>
       </div>
+      {/* Pair Detail Dialog */}
+      {selectedPair && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={closeDialog}
+        >
+          <div
+            className="bg-background rounded-xl shadow-lg p-6 min-w-[340px] max-w-[95vw] relative"
+            onClick={e => e.stopPropagation()}
+            style={{ width: 400, maxWidth: "95vw" }}
+          >
+            <button
+              className="absolute top-2 right-2 text-lg px-2 py-1 rounded hover:bg-muted"
+              onClick={closeDialog}
+              aria-label="Close"
+            >
+              ×
+            </button>
+            <div className="flex items-center gap-3 mb-4">
+              {selectedPair.image_url && (
+                <img
+                  src={selectedPair.image_url}
+                  alt={selectedPair.symbol}
+                  className="w-10 h-10 object-contain"
+                />
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-lg">{selectedPair.symbol}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
+                    ${selectedPair.type === "crypto"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-yellow-100 text-yellow-700"
+                    }`}>
+                    {selectedPair.type === "crypto" ? "Crypto Market" : "Forex Market"}
+                  </span>
+                </div>
+                <div className="text-muted-foreground text-sm">{selectedPair.name || "-"}</div>
+              </div>
+            </div>
+            {/* Bid/Ask badges */}
+            <div className="flex gap-3 mb-4">
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-muted-foreground mb-1">Bid</span>
+                <span
+                  className={`px-3 py-1 rounded-full font-semibold text-sm
+                    ${dialogPriceObj?.isPriceUp === true
+                      ? "bg-green-100 text-green-700"
+                      : dialogPriceObj?.isPriceUp === false
+                        ? "bg-red-100 text-red-700"
+                        : "bg-muted text-foreground"
+                    }`}
+                >
+                  {renderPriceWithBigDigits(
+                    dialogPriceObj?.bid,
+                    selectedPair.decimals,
+                    selectedPair.type === "forex" ? !forexMarketOpen : false,
+                    dialogPriceObj?.isPriceUp
+                  )}
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xs text-muted-foreground mb-1">Ask</span>
+                <span
+                  className={`px-3 py-1 rounded-full font-semibold text-sm
+                    ${dialogPriceObj?.isPriceUp === false
+                      ? "bg-red-100 text-red-700"
+                      : dialogPriceObj?.isPriceUp === true
+                        ? "bg-green-100 text-green-700"
+                        : "bg-muted text-foreground"
+                    }`}
+                >
+                  {renderPriceWithBigDigits(
+                    dialogPriceObj?.ask,
+                    selectedPair.decimals,
+                    selectedPair.type === "forex" ? !forexMarketOpen : false,
+                    dialogPriceObj?.isPriceUp
+                  )}
+                </span>
+              </div>
+            </div>
+            {selectedPair.type === "forex" && !forexMarketOpen && (
+              <div className="text-destructive text-xs mb-2">Market Closed</div>
+            )}
+            <div className="mb-2">
+              <span className="font-semibold text-sm">Chart</span>
+            </div>
+            <div className="rounded border border-border overflow-hidden bg-white">
+              <TradingViewWidget symbol={selectedPair.originalSymbol.replace(/[-/]/g, "")} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

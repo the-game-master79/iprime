@@ -85,7 +85,7 @@ export function PlanCard({
       onMouseEnter={() => setHoverGradient(getRandomGradient())}
     >
       {/* Static secondary background */}
-      <div className="absolute inset-0 bg-secondary" />
+      <div className="absolute inset-0 bg-background" />
       {/* Random gradient on hover */}
       <div
         className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${hoverGradient}`}

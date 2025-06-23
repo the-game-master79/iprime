@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { DollarSign, Info, Bot, Coins } from "lucide-react";
+// Replace lucide-react icons with phosphor icons
+import { CurrencyDollar, Info, Robot, Coins } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase"; // Removed ShellLayout
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Topbar } from "@/components/shared/Topbar"; // Added Topbar import
+import { Topbar } from "@/components/shared/Topbar";
 import { BalanceCard } from "@/components/shared/BalanceCards"; // Add this import
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
@@ -20,6 +21,8 @@ import {
 } from "@/pages/plans/planService";
 
 import { AvailablePlanVariant, ActivePlanVariant } from "@/components/shared/PlanCardVariants";
+// Add PlatformSidebar import
+import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
 
 interface Plan {
   id: string;
@@ -430,6 +433,9 @@ const Plans = () => {
     }
   };
 
+  // Calculate total profits from all subscribed plans
+  const totalProfits = subscribedPlans.reduce((sum, plan) => sum + (plan.actual_earnings || 0), 0);
+
   // For "Load More" in Available Computes
   const handleLoadMoreAvailable = () => {
     fetchPlansHandler();
@@ -442,143 +448,155 @@ const Plans = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Topbar 
           title="AlphaQuant" 
-          variant="ai" 
-          plansCount={subscribedPlans.length}
         />
-        <div className="container mx-auto max-w-[1000px] py-6 px-4">
-          {/* Balance cards section */}
-          <div className="grid gap-4 md:grid-cols-2 mb-8">
-            <BalanceCard 
-              label="Available to Invest"
-              amount={userProfile?.withdrawal_wallet || 0}
-              variant="default"
-            />
-            <BalanceCard
-              label="Total Invested"
-              amount={totalInvested}
-              variant="success"
-            />
-          </div>
-
-          {/* Steps section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-              <div className="flex justify-center mb-6">
-                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <Bot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                </div>
-              </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">What is AlphaQuant?</h3>
-              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                It’s a GEN-AI system that trades on your behalf, maximizing profits while you relax.
-              </p>
-            </div>
-
-            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-              <div className="flex justify-center mb-6">
-                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <DollarSign className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                </div>
-              </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">How do I get started?</h3>
-              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                Simply subscribe to a trading plan that fits your goals and activate it in seconds.
-              </p>
-            </div>
-
-            <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-              <div className="flex justify-center mb-6">
-                <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                  <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                </div>
-              </div>
-              <h3 className="font-medium text-lg mb-3 text-foreground/90">When do I earn?</h3>
-              <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                You start receiving daily returns as soon as your AI begins trading.
-              </p>
-            </div>
-          </div>
-
-          <Tabs defaultValue="available" className="space-y-8">
-            <div className="flex items-center justify-between">
-              <TabsList className="w-[600px">
-                <TabsTrigger value="available" className="flex-1">Auto-trades</TabsTrigger>
-                <TabsTrigger value="subscribed" className="flex-1 relative">
-                  Your Autos
-                  {subscribedPlans.length > 0 && (
-                    <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
-                      {subscribedPlans.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                {/* <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger> */}
-              </TabsList>
-            </div>
-
-            <TabsContent value="available" className="space-y-4">
-              {loading ? (
-                <PlansSkeleton />
-              ) : (
-                <AvailablePlanVariant 
-                  plans={plans}
-                  loading={loading}
-                  onInvest={handleInvestClick}
+        {/* Add sidebar/main layout as in DepositPage */}
+        <div className="flex flex-1 min-h-0">
+          {/* Sidebar for desktop */}
+          <PlatformSidebar />
+          {/* Main content */}
+          <main className="flex-1 min-w-0">
+            <div className="container mx-auto max-w-[1200px] py-6 px-4">
+              {/* Balance cards section */}
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-3 mb-8">
+                <BalanceCard 
+                  label="Available to Invest"
+                  amount={userProfile?.withdrawal_wallet || 0}
+                  variant="default"
                 />
-              )}
-              {availableHasMore && !loading && (
-                <div className="flex justify-center mt-4">
-                  <Button onClick={handleLoadMoreAvailable} variant="outline" disabled={loading}>
-                    {loading ? "Loading..." : "Load More"}
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
+                <BalanceCard
+                  label="Total Invested"
+                  amount={totalInvested}
+                  variant="success"
+                />
+                <BalanceCard
+                  label="Total Profits"
+                  amount={totalProfits}
+                  variant="business"
+                  totalProfits={totalProfits}
+                />
+              </div>
 
-            <TabsContent value="subscribed">
-              {subscribedPlans.length === 0 && !loading ? (
-                <div className="text-center py-12">
-                  <DollarSign className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                  <h3 className="mt-4 text-lg font-medium">No Active Auto-Trades</h3>
-                  <p className="mt-2 text-muted-foreground">
-                    You haven't subscribed to any computes yet.
+              {/* Steps section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+                  <div className="flex justify-center mb-6">
+                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <Robot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                    </div>
+                  </div>
+                  <h3 className="font-medium text-lg mb-3 text-foreground/90">What is AlphaQuant?</h3>
+                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                    It’s a GEN-AI system that trades on your behalf, maximizing profits while you relax.
                   </p>
-                  <Button
-                    variant="outline"
-                    className="mt-6"
-                    onClick={() => {
-                      const availableTab = document.querySelector('[value="available"]') as HTMLElement | null;
-                      availableTab?.click();
-                    }}
-                  >
-                    View Available Computes
-                  </Button>
                 </div>
-              ) : loading ? (
-                <PlansSkeleton />
-              ) : (
-                <>
-                  <ActivePlanVariant 
-                    plans={subscribedPlans}
-                    onCancel={handleCancelClick}
-                  />
-                  {activeHasMore && (
+
+                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+                  <div className="flex justify-center mb-6">
+                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <CurrencyDollar className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                    </div>
+                  </div>
+                  <h3 className="font-medium text-lg mb-3 text-foreground/90">How do I get started?</h3>
+                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                    Simply subscribe to a trading plan that fits your goals and activate it in seconds.
+                  </p>
+                </div>
+
+                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
+                  <div className="flex justify-center mb-6">
+                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                    </div>
+                  </div>
+                  <h3 className="font-medium text-lg mb-3 text-foreground/90">When do I earn?</h3>
+                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
+                    You start receiving daily returns as soon as your AI begins trading.
+                  </p>
+                </div>
+              </div>
+
+              <Tabs defaultValue="available" className="space-y-8">
+                <div className="flex items-center justify-between">
+                  <TabsList className="w-[600px]">
+                    <TabsTrigger value="available" className="flex-1">Auto-trades</TabsTrigger>
+                    <TabsTrigger value="subscribed" className="flex-1 relative">
+                      Your Autos
+                      {subscribedPlans.length > 0 && (
+                        <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
+                          {subscribedPlans.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    {/* <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger> */}
+                  </TabsList>
+                </div>
+
+                <TabsContent value="available" className="space-y-4">
+                  {loading ? (
+                    <PlansSkeleton />
+                  ) : (
+                    <AvailablePlanVariant 
+                      plans={plans}
+                      loading={loading}
+                      onInvest={handleInvestClick}
+                    />
+                  )}
+                  {availableHasMore && !loading && (
                     <div className="flex justify-center mt-4">
-                      <Button onClick={handleLoadMoreActive} variant="outline">
-                        Load More
+                      <Button onClick={handleLoadMoreAvailable} variant="outline" disabled={loading}>
+                        {loading ? "Loading..." : "Load More"}
                       </Button>
                     </div>
                   )}
-                </>
-              )}
-            </TabsContent>
+                </TabsContent>
 
-            {/* <TabsContent value="create">
-              ...Create Your Compute content...
-            </TabsContent> */}
-          </Tabs>
+                <TabsContent value="subscribed">
+                  {subscribedPlans.length === 0 && !loading ? (
+                    <div className="text-center py-12">
+                      <CurrencyDollar className="mx-auto h-12 w-12 text-muted-foreground/30" />
+                      <h3 className="mt-4 text-lg font-medium">No Active Auto-Trades</h3>
+                      <p className="mt-2 text-muted-foreground">
+                        You haven't subscribed to any computes yet.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-6"
+                        onClick={() => {
+                          const availableTab = document.querySelector('[value="available"]') as HTMLElement | null;
+                          availableTab?.click();
+                        }}
+                      >
+                        View Available Computes
+                      </Button>
+                    </div>
+                  ) : loading ? (
+                    <PlansSkeleton />
+                  ) : (
+                    <>
+                      <ActivePlanVariant 
+                        plans={subscribedPlans}
+                        onCancel={handleCancelClick}
+                      />
+                      {activeHasMore && (
+                        <div className="flex justify-center mt-4">
+                          <Button onClick={handleLoadMoreActive} variant="outline">
+                            Load More
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* <TabsContent value="create">
+                  ...Create Your Compute content...
+                </TabsContent> */}
+              </Tabs>
+            </div>
+          </main>
         </div>
 
         <Dialog open={showConfirmDialog} onOpenChange={handleDialogClose}>
@@ -591,7 +609,7 @@ const Plans = () => {
                     Please confirm your subscription to{" "}
                     <span className="font-semibold text-foreground">{planToSubscribe?.name}</span>
                   </div>
-                  <div className="rounded-lg border border-border bg-secondary-foreground border border-border text-foreground p-4 space-y-2 text-sm">
+                  <div className="rounded-lg border border-border bg-secondary-foreground text-foreground p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Current Balance:</span>
                       <span className="font-medium">${userProfile?.withdrawal_wallet.toLocaleString()} USD</span>
@@ -636,7 +654,7 @@ const Plans = () => {
                 <div className="space-y-4">
                   <p>Are you sure you want to cancel this plan? This action cannot be undone.</p>
                   
-                  <div className="mt-4 p-4 rounded-lg border bg-secondary text-foreground border border-border space-y-2">
+                  <div className="mt-4 p-4 rounded-lg border bg-secondary text-foreground border-border space-y-2">
                     <div className="flex justify-between">
                       <span>Plan Name:</span>
                       <span className="font-medium">{planToCancel?.name}</span>
@@ -775,7 +793,7 @@ function TradingPairsBento({
 // Skeleton for plans
 function PlansSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {[...Array(PAGE_SIZE)].map((_, i) => (
         <div key={i} className="rounded-lg border bg-muted/40 p-6 animate-pulse h-[220px]">
           <div className="h-6 w-1/2 bg-muted mb-4 rounded"></div>

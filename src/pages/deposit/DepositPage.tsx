@@ -22,6 +22,7 @@ import {
 import { KycVariant } from "@/components/shared/KycVariants";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
+import { TransactionTable } from "@/components/transactionTable/TransactionTable";
 
 interface Promocode {
   id: string;
@@ -1020,6 +1021,8 @@ export default function CashierPage() {
                     <TabsTrigger value="add-funds">Add Funds</TabsTrigger>
                     <TabsTrigger value="withdraw">Payout</TabsTrigger>
                   </TabsList>
+                  {/* Hide the promo code button for now */}
+                  {/* 
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -1030,10 +1033,12 @@ export default function CashierPage() {
                     <span className="sm:hidden">Have Code?</span>
                     <Badge variant="secondary">PROMO</Badge>
                   </Button>
+                  */}
                 </div>
 
                 <TabsContent value="add-funds">
-                  <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Change from grid to stack: form first, then history below */}
+                  <div className="space-y-8">
                     <div className="space-y-6 max-w-[400px]">
                       {/* Deposit form remains unchanged */}
                       <form>
@@ -1121,21 +1126,8 @@ export default function CashierPage() {
                               label="Amount"
                               onChange={handleAmountChange}
                               className="pr-16 bg-secondary border-none text-foreground placeholder:text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              helperText={
-                                selectedPromocode && !amountError && amount && !isNaN(parseFloat(amount)) ? (() => {
-                                  const baseAmount = parseFloat(amount);
-                                  let bonus = 0;
-                                  if (selectedPromocode.type === 'multiplier') {
-                                    bonus = baseAmount;
-                                  } else if (selectedPromocode.type === 'cashback') {
-                                    bonus = baseAmount * (selectedPromocode.discount_percentage / 100);
-                                  }
-                                  return bonus > 0
-                                    ? `Bonus applied: $${bonus.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                    : undefined;
-                                })() : undefined
-                              }
                             />
+                            
                             <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-foreground">
                               USD
                             </div>
@@ -1250,14 +1242,46 @@ export default function CashierPage() {
                       
                       </div>
                     </form> {/* Close deposit form */}
+                    {/* Add Funds Button */}
+                    <Button
+                      type="button"
+                      className="w-full bg-primary hover:bg-primary/90 rounded-md mt-4"
+                      disabled={
+                        !cryptoType ||
+                        !amount ||
+                        !!amountError ||
+                        isNaN(parseFloat(amount)) ||
+                        parseFloat(amount) <= 0
+                      }
+                      onClick={() => {
+                        if (!amountError && amount && !isNaN(parseFloat(amount))) {
+                          handleSubmit(parseFloat(amount));
+                        }
+                      }}
+                    >
+                      Add Funds
+                    </Button>
                     </div> {/* Close grid column for deposit form */}
+                    {/* Deposit History below the form */}
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-semibold text-foreground mb-2">History</h3>
+                      <TransactionTable
+                        transactions={[
+                          ...filteredAndSortedDeposits,
+                          ...filteredAndSortedWithdrawTransactions
+                        ].sort((a, b) =>
+                          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                        )}
+                        onCopyId={handleCopyId}
+                      />
+                    </div>
                   </div> {/* Close grid for add-funds */}
                 </TabsContent>
-                {/* Withdrawals tab remains unchanged */}
+                {/* Withdrawals tab now also shows history below the form */}
                 <TabsContent value="withdraw" className="w-full">
                   {/* Withdrawals Implementation */}
                   <div className="w-full min-h-screen bg-background">
-                    <div className="container max-w-[1200px] mx-auto">
+                    <div className="space-y-8">
                       {/* KYC Status */}
                       <div className="max-w-lg mx-auto mb-8">
                         {kycStatus !== 'completed' && (
@@ -1271,7 +1295,7 @@ export default function CashierPage() {
                             <form onSubmit={handleWithdrawSubmit} className="space-y-6">
                               <div className="space-y-4">
                                 <div className="space-y-2">
-                                  <Label className="text-xs font-normal">Select Currency</Label>
+                                  <Label className="text-xs font-normal">Currency</Label>
                                   <Select 
                                     value={withdrawForm.cryptoId || withdrawCryptoOptions[0]?.id} 
                                     onValueChange={(value) => {
@@ -1330,10 +1354,9 @@ export default function CashierPage() {
                                   </Select>
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor="walletAddress" className="text-xs font-normal text-foreground">Wallet Address</Label>
                                   <Input
                                     id="walletAddress"
-                                    placeholder={`Enter ${
+                                    label={`Enter ${
                                       withdrawSelectedCrypto?.name?.toUpperCase() || 'USDT'
                                     } ${withdrawForm.network || 'TRC20'} address`}
                                     value={withdrawForm.walletAddress}
@@ -1345,27 +1368,28 @@ export default function CashierPage() {
                                   )}
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor="amount" className="text-xs font-normal text-foreground">Amount</Label>
                                   <div className="relative">
-                                    <Input
-                                      id="amount"
-                                      type="number"
-                                      min="0"
-                                      placeholder="Enter amount"
-                                      className={`${withdrawAmountError ? 'border-red-500' : ''} placeholder:text-foreground bg-secondary text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
-                                      value={withdrawForm.amount}
-                                      onChange={handleWithdrawAmountChange}
-                                    />
-                                    <span className="absolute right-3 top-2.5 text-foreground">USD</span>
-                                  </div>
-                                  {withdrawAmountError && (
-                                    <p className="text-sm text-red-500">{withdrawAmountError}</p>
-                                  )}
-                                  {withdrawForm.amount && !withdrawAmountError && (
-                                    <p className="text-sm text-muted-foreground">
-                                      Your balance after withdrawal → {(userBalance - parseFloat(withdrawForm.amount)).toLocaleString()} USD
-                                    </p>
-                                  )}
+                                  <Input
+                                    id="amount"
+                                    type="number"
+                                    label="Amount"
+                                    min="0"
+                                    // Remove placeholder, use label instead
+                                    // placeholder="Enter amount"
+                                    className={`${withdrawAmountError ? 'border-red-500' : ''} placeholder:text-foreground bg-secondary text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                    value={withdrawForm.amount}
+                                    onChange={handleWithdrawAmountChange}
+                                  />
+                                  <span className="absolute right-3 top-2.5 text-foreground">USD</span>
+                                </div>
+                                {withdrawAmountError && (
+                                  <p className="text-sm text-red-500">{withdrawAmountError}</p>
+                                )}
+                                {withdrawForm.amount && !withdrawAmountError && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Your balance after withdrawal → {(userBalance - parseFloat(withdrawForm.amount)).toLocaleString()} USD
+                                  </p>
+                                )}
                                 </div>
                               </div>
                               <Button type="submit" className="w-full bg-primary hover:bg-primary/90 rounded-md" disabled={withdrawIsSubmitting || !canSubmit}>
@@ -1375,6 +1399,19 @@ export default function CashierPage() {
                           ) : null}
                         </div>
                         {/* Remove payout history column */}
+                      </div>
+                      {/* Withdraw/Deposit History below the form, stacked */}
+                      <div className="space-y-6 mt-8">
+                        <h3 className="text-lg font-semibold text-foreground mb-2">History</h3>
+                        <TransactionTable
+                          transactions={[
+                            ...filteredAndSortedDeposits,
+                            ...filteredAndSortedWithdrawTransactions
+                          ].sort((a, b) =>
+                            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                          )}
+                          onCopyId={handleCopyId}
+                        />
                       </div>
                     </div>
                   </div>

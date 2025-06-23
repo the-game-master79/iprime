@@ -760,7 +760,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
         // Fetch all forex pairs
         const { data: forexPairs, error: forexError } = await supabase
           .from('trading_pairs')
-          .select('symbol, image_url, type')
+          .select('symbol, image_url, type, name')
           .eq('type', 'forex');
 
         if (cryptoError) throw cryptoError;
@@ -950,7 +950,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                       <AlphaQuantCard
                         totalInvested={totalInvested}
                         activePlans={activePlans}
-                        totalCredits={getTotalInvestmentReturns(transactions)}
+                        totalCredits={investmentReturns}
                         onClick={() => navigate('/plans')}
                       />
                       <AffiliateRankCard

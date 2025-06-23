@@ -1,16 +1,25 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, DollarSign, ArrowDownCircle, ArrowUpCircle, BarChart2, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
+import { Home, DollarSign, ArrowDownCircle, ArrowUpCircle, BarChart2, TrendingUp, ChevronLeft, ChevronRight, Cpu } from "lucide-react";
 
+// Desktop sidebar items (no Markets, add AlphaQuant)
 const sidebarItems = [
 	{ label: "Home", icon: <Home size={20} />, path: "/platform" },
 	{ label: "Deposit", icon: <ArrowDownCircle size={20} />, path: "/cashier" },
 	{ label: "Payout", icon: <ArrowUpCircle size={20} />, path: "/cashier?tab=payout" },
 	{ label: "History", icon: <BarChart2 size={20} />, path: "/history" },
-	{ label: "Transactions", icon: <DollarSign size={20} />, path: "/transactions" },
 	{ label: "Trade", icon: <TrendingUp size={20} />, path: "/tradingstation" },
-	{ label: "Markets", icon: <BarChart2 size={20} />, path: "/markets" },
-	// Add more items as needed
+	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" },
+	// Removed Markets
+];
+
+// Mobile sidebar items: Home, Deposit, Trade, AlphaQuant only
+const mobileSidebarItems = [
+	{ label: "Home", icon: <Home size={20} />, path: "/platform" },
+	{ label: "Deposit", icon: <ArrowDownCircle size={20} />, path: "/cashier" },
+	{ label: "History", icon: <BarChart2 size={20} />, path: "/history" },
+	{ label: "Trade", icon: <TrendingUp size={20} />, path: "/tradingstation" },
+	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" }, // Fix path to match desktop
 ];
 
 export const PlatformSidebar: React.FC = () => {
@@ -98,7 +107,7 @@ export const PlatformSidebar: React.FC = () => {
 
 			{/* Mobile Bottom Navigation */}
 			<nav className="fixed bottom-0 left-0 right-0 z-20 flex md:hidden bg-secondary border-t border-border h-14 px-1 justify-around items-center">
-				{sidebarItems.map((item) => (
+				{mobileSidebarItems.map((item) => (
 					<button
 						key={item.label}
 						className={`flex flex-col items-center justify-center flex-1 h-full px-0.5 py-0.5 rounded-md transition-all duration-200 font-medium text-xs hover:bg-muted/70 focus:outline-none ${
