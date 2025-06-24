@@ -23,6 +23,7 @@ export function AvailablePlanVariant({ plans, loading, onInvest }: AvailablePlan
           percentage={Number(plan.returns_percentage)}
           duration={plan.duration_days}
           benefits={plan.benefits.split('•').filter(Boolean)}
+          description={plan.description}
           onInvest={() => onInvest(plan.id)}  
         />
       ))}
@@ -51,6 +52,7 @@ export function ActivePlanVariant({ plans, onCancel }: ActivePlanVariantProps) {
             earnings={Number(plan.actual_earnings || 0)}
             daysRemaining={plan.duration_days - (plan.days_credited || 0)}
             subscriptionDate={plan.subscription_date}
+            description={plan.description}
             onCancel={() => onCancel(plan)}
           />
         );

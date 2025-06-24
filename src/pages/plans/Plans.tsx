@@ -520,17 +520,16 @@ const Plans = () => {
 
               <Tabs defaultValue="available" className="space-y-8">
                 <div className="flex items-center justify-between">
-                  <TabsList className="w-[600px]">
-                    <TabsTrigger value="available" className="flex-1">Auto-trades</TabsTrigger>
-                    <TabsTrigger value="subscribed" className="flex-1 relative">
+                  <TabsList>
+                    <TabsTrigger value="available">Auto-trades</TabsTrigger>
+                    <TabsTrigger value="subscribed" className="relative">
                       Your Autos
                       {subscribedPlans.length > 0 && (
-                        <span className="relative  inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium">
+                        <span className="relative inline-flex items-center justify-center rounded-full border-background bg-primary text-primary-foreground h-5 min-w-[20px] px-1.5 text-xs font-medium ml-2">
                           {subscribedPlans.length}
                         </span>
                       )}
                     </TabsTrigger>
-                    {/* <TabsTrigger value="create" className="flex-1">Create Your Compute</TabsTrigger> */}
                   </TabsList>
                 </div>
 
@@ -539,7 +538,7 @@ const Plans = () => {
                     <PlansSkeleton />
                   ) : (
                     <AvailablePlanVariant 
-                      plans={plans}
+                      plans={plans.map(plan => ({ ...plan, description: plan.description }))}
                       loading={loading}
                       onInvest={handleInvestClick}
                     />
@@ -577,7 +576,7 @@ const Plans = () => {
                   ) : (
                     <>
                       <ActivePlanVariant 
-                        plans={subscribedPlans}
+                        plans={subscribedPlans.map(plan => ({ ...plan, description: plan.description }))}
                         onCancel={handleCancelClick}
                       />
                       {activeHasMore && (
@@ -704,6 +703,10 @@ const Plans = () => {
         </Dialog>
 
       </div>
+      {/* Disclaimer Footer */}
+      <footer className="w-full py-6 px-4 text-center text-xs text-muted-foreground bg-background border-t border-border">
+        <span role="img" aria-label="disclaimer">📌</span> Projected gains are estimates based on historical simulations and current market models. Actual performance may vary. AlphaQuant does not provide guaranteed returns or financial advice.
+      </footer>
     </>
   );
 };
