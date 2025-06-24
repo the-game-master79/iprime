@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, LotsInput } from "@/components/ui/input";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
@@ -319,7 +319,7 @@ const TradingPanel = ({
           {/* Lots input with + and - buttons */}
           <div className={`${isMobile ? 'mb-1' : 'mb-2'}`}>
             <label className={`block ${isMobile ? 'text-[11px]' : 'text-xs'} font-medium text-foreground ${isMobile ? 'mb-0.5' : 'mb-1'} flex items-center justify-between`}>
-              <span>Lots</span>
+              <span></span>
               {/* Max lots badge - click to set max lots */}
               <span
                 className="ml-2 px-2 py-0.5 rounded-full bg-muted text-[10px] font-semibold text-muted-foreground cursor-pointer hover:bg-primary/10"
@@ -330,57 +330,16 @@ const TradingPanel = ({
                 Max {getLotsLimits().max}
               </span>
             </label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                className={`${isMobile ? 'h-8 w-8' : 'h-10 w-10'}`}
-                onClick={() => {
-                  const { min } = getLotsLimits();
-                  setQuantity((prev) => {
-                    const next = Math.max(min, parseFloat((prev - 0.01).toFixed(5)));
-                    return Number.isNaN(next) ? min : next;
-                  });
-                }}
-              >
-                -
-              </Button>
-              <Input
-                type="text"
-                value={quantity}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const { min, max } = getLotsLimits();
-                  if (value === "") {
-                    setQuantity(min);
-                  } else {
-                    const parsed = parseFloat(value);
-                    if (!isNaN(parsed)) {
-                      // Clamp to min/max
-                      let clamped = Math.max(min, Math.min(max, parsed));
-                      // Round to 5 decimals for precision
-                      clamped = parseFloat(clamped.toFixed(5));
-                      setQuantity(clamped);
-                    }
-                  }
-                }}
-                className="w-full text-center text-foreground appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                min={getLotsLimits().min}
-                max={getLotsLimits().max}
-              />
-              <Button
-                variant="outline"
-                className={`${isMobile ? 'h-8 w-8' : 'h-10 w-10'}`}
-                onClick={() => {
-                  const { min, max } = getLotsLimits();
-                  setQuantity((prev) => {
-                    const next = Math.min(max, parseFloat((prev + 0.01).toFixed(5)));
-                    return Number.isNaN(next) ? min : next;
-                  });
-                }}
-              >
-                +
-              </Button>
-            </div>
+            <LotsInput
+              label="Lots"
+              value={quantity}
+              min={getLotsLimits().min}
+              max={getLotsLimits().max}
+              step={0.01}
+              onChange={setQuantity}
+              disabled={balance <= 0 || margin > freeMargin}
+              className="w-full"
+            />
             {/* Insufficient balance or margin warning */}
             {(balance <= 0 || margin > freeMargin) && (
               <div className="mt-0.5 text-error text-[11px] flex items-center gap-1">

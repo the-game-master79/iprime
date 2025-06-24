@@ -83,4 +83,128 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 )
 Input.displayName = "Input"
 
+interface LotsInputProps {
+  label?: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (value: number) => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+export const LotsInput: React.FC<LotsInputProps & { error?: string; helperText?: React.ReactNode; disabledText?: string; }> = ({
+  label,
+  value,
+  min = 1,
+  max = 100,
+  step = 1,
+  onChange,
+  disabled,
+  className,
+  error,
+  helperText,
+  disabledText
+}) => {
+  const [isFocused, setIsFocused] = React.useState(false);
+  const isFilled = isFocused || value !== undefined;
+  const inputId = label ? `lots-input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined;
+
+  const handleDecrement = () => {
+    if (!disabled && value > min) onChange(parseFloat((value - step).toFixed(5)));
+  };
+  const handleIncrement = () => {
+    if (!disabled && value < max) onChange(parseFloat((value + step).toFixed(5)));
+  };
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/[^\d.]/g, "");
+    const parts = val.split('.');
+    if (parts.length > 2) {
+      val = parts[0] + '.' + parts.slice(1).join('');
+    }
+    val = val.replace(/^0+(?!\.)/, '');
+    let num = parseFloat(val);
+    if (!isNaN(num)) {
+      num = Math.max(min, Math.min(max, parseFloat(num.toFixed(5))));
+      onChange(num);
+    } else if (val === "") {
+      onChange(min);
+    }
+  };
+
+  return (
+    <div className={cn("relative w-full", className)}>
+      <div className="flex items-center gap-2 w-full">
+        <button
+          type="button"
+          onClick={handleDecrement}
+          disabled={disabled || value <= min}
+          className={cn(
+            // Make button medium rounded
+            "w-11 h-11 flex items-center justify-center rounded-xl bg-secondary-foreground text-primary text-lg font-bold transition disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-primary",
+            disabled || value <= min ? "opacity-50" : "hover:bg-primary/10"
+          )}
+          aria-label="Decrease lots"
+        >
+          -
+        </button>
+        <div className="relative flex-1">
+          <input
+            id={inputId}
+            type="text"
+            inputMode="decimal"
+            pattern="^[0-9]*[.,]?[0-9]*$"
+            className={cn(
+              // Remove extra padding for label, make input full height
+              "peer flex h-11 w-full rounded-xl px-4 text-base shadow-sm transition-colors text-center",
+              "placeholder:text-transparent",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:border-transparent",
+              disabled ? "bg-secondary !text-muted-foreground" : "bg-secondary-foreground text-foreground",
+              "md:text-sm",
+              error ? "border border-red-500 focus-visible:ring-red-500/40" : "border border-transparent"
+            )}
+            value={value}
+            onChange={handleInput}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            disabled={disabled}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined}
+          />
+          {disabled && disabledText && (
+            <div className="absolute inset-0 flex items-center px-4 pointer-events-none select-none text-muted-foreground text-base">
+              {disabledText}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleIncrement}
+          disabled={disabled || value >= max}
+          className={cn(
+            // Make button medium rounded
+            "w-11 h-11 flex items-center justify-center rounded-xl bg-secondary-foreground text-primary text-lg font-bold transition disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-primary",
+            disabled || value >= max ? "opacity-50" : "hover:bg-primary/10"
+          )}
+          aria-label="Increase lots"
+        >
+          +
+        </button>
+      </div>
+      {(error || helperText) && (
+        <p
+          id={error ? `${inputId}-error` : `${inputId}-helper`}
+          className={cn(
+            "mt-1 text-xs",
+            error ? "text-red-500" : "text-muted-foreground"
+          )}
+        >
+          {error ? error : helperText}
+        </p>
+      )}
+    </div>
+  );
+};
+
 export { Input }

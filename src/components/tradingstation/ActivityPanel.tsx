@@ -1,8 +1,11 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, X, Copy, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ActivityExpandableTrades from "./ActivityExpandableTrades";
+import ActivityMobileView from "./ActivityMobileView";
+import CopyButton from "@/components/ui/CopyButton";
 
 interface ActivityPanelProps {
   isCollapsed: boolean;
@@ -109,9 +112,8 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
     }));
   };
 
-  // Function to render the trades in an expanded way
-  const renderExpandableTrades = (trades: any[]) => {
-    // Group trades by pair and type
+  // --- Extract grouping logic to a separate function ---
+  function groupAndCalculateTrades(trades: any[], localPrices: Record<string, any>, getPriceDecimals = (s: string) => 2) {
     const grouped: Record<string, { 
       key: string,
       pair: string, 
@@ -128,7 +130,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
         maxHedgedSellLots: number
       }
     }> = {};
-    
     trades.forEach((trade) => {
       const key = `${trade.pair}|${(trade.type || "").toLowerCase()}`;
       if (!grouped[key]) {
@@ -146,14 +147,12 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       grouped[key].trades.push(trade);
       grouped[key].totalLots += Number(trade.lots) || 0;
       grouped[key].totalMargin += Number(trade.margin_amount) || 0;
-      
       // Calculate live PnL for this trade
       const currentPrice =
         localPrices[trade.pair]?.price !== undefined
           ? parseFloat(localPrices[trade.pair].price)
           : parseFloat(trade.open_price);
       const openPrice = parseFloat(trade.open_price);
-
       let pipSize = 0.0001;
       let lotSize = 100000;
       if (trade.pair.endsWith("USDT")) {
@@ -173,7 +172,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       } else {
         pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
       }
-
       let livePnl = 0;
       if (trade.pair.endsWith("USDT")) {
         if (trade.type?.toLowerCase() === "buy") {
@@ -189,13 +187,11 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
         }
       }
       grouped[key].totalLivePnl += livePnl;
-      
       // Use earliest openedAt for group
       if (new Date(trade.created_at) < new Date(grouped[key].openedAt)) {
         grouped[key].openedAt = trade.created_at;
       }
     });
-
     // For each pair, check if both buy and sell exist and calculate hedging capacity
     const pairTypes: Record<string, { buyLots: number, sellLots: number, hedgedBuyLots: number, hedgedSellLots: number }> = {};
     Object.values(grouped).forEach((g) => {
@@ -203,17 +199,44 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
       if (g.type === "buy") pairTypes[g.pair].buyLots += g.totalLots;
       if (g.type === "sell") pairTypes[g.pair].sellLots += g.totalLots;
     });
-    
     // Calculate hedged lots for each pair
     Object.keys(pairTypes).forEach(pair => {
-      // Hedged lots equals the minimum of buy and sell lots (that's all that can be hedged)
       const hedgedLots = Math.min(pairTypes[pair].buyLots, pairTypes[pair].sellLots);
       pairTypes[pair].hedgedBuyLots = hedgedLots;
       pairTypes[pair].hedgedSellLots = hedgedLots;
     });
+    // Attach hedging tracker to each group
+    Object.values(grouped).forEach((g) => {
+      g.hedgingTracker = {
+        hedgedBuyLots: 0,
+        hedgedSellLots: 0,
+        maxHedgedBuyLots: pairTypes[g.pair].hedgedBuyLots,
+        maxHedgedSellLots: pairTypes[g.pair].hedgedSellLots
+      };
+    });
+    return grouped;
+  }
 
-    // Render the groups with expandable rows
-    return Object.values(grouped).map((g) => {
+  // --- Memoize grouped expandable trades ---
+  const groupedExpandableTrades = useMemo(() => {
+    return groupAndCalculateTrades(openTrades, localPrices, getPriceDecimals);
+  }, [openTrades, localPrices, getPriceDecimals]);
+
+  // Function to render the trades in an expanded way
+  const renderExpandableTrades = (grouped: Record<string, any>) => {
+    // For each pair, check if both buy and sell exist and calculate hedging capacity
+    const pairTypes: Record<string, { buyLots: number, sellLots: number, hedgedBuyLots: number, hedgedSellLots: number }> = {};
+    Object.values(grouped).forEach((g: any) => {
+      if (!pairTypes[g.pair]) pairTypes[g.pair] = { buyLots: 0, sellLots: 0, hedgedBuyLots: 0, hedgedSellLots: 0 };
+      if (g.type === "buy") pairTypes[g.pair].buyLots += g.totalLots;
+      if (g.type === "sell") pairTypes[g.pair].sellLots += g.totalLots;
+    });
+    Object.keys(pairTypes).forEach(pair => {
+      const hedgedLots = Math.min(pairTypes[pair].buyLots, pairTypes[pair].sellLots);
+      pairTypes[pair].hedgedBuyLots = hedgedLots;
+      pairTypes[pair].hedgedSellLots = hedgedLots;
+    });
+    return Object.values(grouped).map((g: any) => {
       const decimals = getPriceDecimals(g.pair);
       const isHedged = pairTypes[g.pair].buyLots > 0 && pairTypes[g.pair].sellLots > 0;
       const firstTrade = g.trades[0];
@@ -761,83 +784,6 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
   // Helper to detect mobile (simple window width check)
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
 
-  // Mobile version: render open trades as cards like DashboardTabs closed trades
-  const renderMobilePairs = (trades: any[]) => {
-    if (!trades || trades.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <span className="h-16 w-16 mb-4 text-white/20">📉</span>
-          <p className="text-base">No open trades found</p>
-          <p className="text-sm text-white/50 mt-1">Your open trades will appear here</p>
-        </div>
-      );
-    }
-    // Group by pair and type for mobile, or just flat list if needed
-    return (
-      <div className="space-y-4">
-        {trades.map((trade: any) => {
-          const decimals =
-            trade.pair === "XAUUSD" ? 2 :
-            trade.pair.endsWith("JPY") ? 3 :
-            trade.pair.endsWith("USDT") && ["BTCUSDT", "ETHUSDT", "SOLUSDT", "LINKUSDT", "BNBUSDT"].includes(trade.pair) ? 2 :
-            trade.pair === "DOGEUSDT" ? 5 :
-            trade.pair === "ADAUSDT" || trade.pair === "TRXUSDT" ? 4 :
-            trade.pair === "DOTUSDT" ? 3 :
-            !trade.pair.endsWith("USDT") ? 5 : 2;
-          const isProfitable = trade.pnl >= 0;
-          const openAt = trade.created_at;
-          const currentPrice = localPrices[trade.pair]?.price !== undefined
-            ? parseFloat(localPrices[trade.pair].price)
-            : parseFloat(trade.open_price);
-          return (
-            <div
-              key={trade.id}
-              className="p-4 rounded-xl border border-border bg-muted/10 shadow-sm flex flex-col"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                {/* Buy/Sell circle indicator */}
-                <span
-                  className={`h-3 w-3 rounded-full ${
-                    trade.type?.toLowerCase() === "buy"
-                      ? "bg-primary"
-                      : "bg-error"
-                  }`}
-                  title={trade.type?.toUpperCase()}
-                />
-                {/* Display name instead of symbol */}
-                <span className="font-bold text-base">
-                  {pairNameMap[trade.pair] || trade.pair}
-                </span>
-                <span className={`ml-auto font-bold ${isProfitable ? "text-success" : "text-error"}`}>
-                  {isProfitable ? "+" : ""}
-                  {trade.pnl?.toFixed(2)} USD
-                </span>
-              </div>
-              {/* Lots/open price line and close price in same row */}
-              <div className="flex items-center justify-between">
-                <span className="font-medium">
-                  <span
-                    className={
-                      trade.type?.toLowerCase() === "buy"
-                        ? "text-primary font-medium"
-                        : "text-error font-medium"
-                    }
-                  >
-                    {`${trade.type?.charAt(0).toUpperCase() + trade.type?.slice(1).toLowerCase()} ${Number(trade.lots).toFixed(2)} Lot`}
-                  </span>
-                  {` at ${Number(trade.open_price).toFixed(decimals)}`}
-                </span>
-                <span className="text-md text-foreground font-medium ml-2">
-                  {Number(currentPrice).toFixed(decimals)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
   return (
     <div
       className={`${fullPage 
@@ -1154,321 +1100,29 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   ) : activeTradeTab === "open" ? (
                     openTrades && openTrades.length > 0 ?
                       (!fullPage ? (
-                        // Only use renderExpandableTrades for desktop open trades table (table look)
-                        <>
-                          {renderExpandableTrades(openTrades)}
-                        </>
+                        // Use ActivityExpandableTrades for desktop open trades table
+                        <ActivityExpandableTrades
+                          grouped={groupedExpandableTrades}
+                          expandedGroups={expandedGroups}
+                          toggleGroupExpand={toggleGroupExpand}
+                          getPriceDecimals={getPriceDecimals}
+                          localPrices={localPrices}
+                          handleCloseTrade={_handleCloseTrade}
+                          isForexTrade={isForexTrade}
+                          isForexMarketOpen={isForexMarketOpen}
+                          getCryptoImageForSymbol={getCryptoImageForSymbol}
+                          getForexImageForSymbol={getForexImageForSymbol}
+                          formatPairName={formatPairName}
+                        />
                       ) : (
-                        // Add scroll area for open positions in mobile/fullPage mode
+                        // Use ActivityMobileView for mobile/fullPage mode
                         <tr>
                           <td colSpan={5} className="p-0 border-0">
-                            <div
-                              className="overflow-y-auto flex flex-col gap-2 py-2 pb-32"
-                              style={{
-                                // Ensure the scroll area does not go behind the summary
-                                maxHeight: "calc(100dvh - 220px)", // 220px = approx header + summary height
-                                minHeight: 0,
-                              }}
-                            >
-                              {/* Group open trades by pair and type for mobile */}
-                              {(() => {
-                                // Group trades by pair and type
-                                const grouped: Record<string, { 
-                                  key: string,
-                                  pair: string,
-                                  type: string,
-                                  trades: any[],
-                                  totalLots: number,
-                                  totalLivePnL: number,
-                                  openPrice: number,
-                                  currentPrice: number,
-                                  decimals: number,
-                                  hedgingTracker?: {
-                                    hedgedBuyLots: number,
-                                    hedgedSellLots: number,
-                                    maxHedgedBuyLots: number,
-                                    maxHedgedSellLots: number
-                                  }
-                                }> = {};
-                                openTrades.forEach((trade) => {
-                                  const key = `${trade.pair}|${(trade.type || "").toLowerCase()}`;
-                                  if (!grouped[key]) {
-                                    grouped[key] = {
-                                      key,
-                                      pair: trade.pair,
-                                      type: (trade.type || "").toLowerCase(),
-                                      trades: [],
-                                      totalLots: 0,
-                                      totalLivePnL: 0,
-                                      openPrice: 0,
-                                      currentPrice: 0,
-                                      decimals: getPriceDecimals(trade.pair)
-                                    };
-                                  }
-                                  grouped[key].trades.push(trade);
-                                  grouped[key].totalLots += Number(trade.lots) || 0;
-                                });
-
-                                // Calculate total PnL and prices for each group
-                                Object.values(grouped).forEach((g) => {
-                                  let totalPnL = 0;
-                                  let totalLots = 0;
-                                  let openPriceSum = 0;
-                                  let currentPriceSum = 0;
-                                  g.trades.forEach((trade) => {
-                                    const currentPrice = localPrices[trade.pair]?.price !== undefined
-                                      ? parseFloat(localPrices[trade.pair].price)
-                                      : parseFloat(trade.open_price);
-                                    const openPrice = parseFloat(trade.open_price);
-                                    let pipSize = 0.0001;
-                                    let lotSize = 100000;
-                                    let livePnL = 0;
-                                    if (trade.pair.endsWith("USDT")) {
-                                      pipSize = 1;
-                                      lotSize = 1;
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = currentPrice - openPrice;
-                                      } else {
-                                        livePnL = openPrice - currentPrice;
-                                      }
-                                    } else if (trade.pair === "XAUUSD") {
-                                      pipSize = 0.01;
-                                      lotSize = 100;
-                                      const lots = Number(trade.lots) || 0;
-                                      const pipValue = pipSize * lots * 100;
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                      } else {
-                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                      }
-                                    } else {
-                                      if (trade.pair.endsWith("JPY")) {
-                                        pipSize = 0.01;
-                                      }
-                                      const lots = Number(trade.lots) || 0;
-                                      const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                      } else {
-                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                      }
-                                    }
-                                    totalPnL += livePnL;
-                                    totalLots += Number(trade.lots) || 0;
-                                    openPriceSum += openPrice * (Number(trade.lots) || 0);
-                                    currentPriceSum += currentPrice * (Number(trade.lots) || 0);
-                                  });
-                                  g.totalLivePnL = totalPnL;
-                                  g.totalLots = totalLots;
-                                  g.openPrice = totalLots > 0 ? openPriceSum / totalLots : 0;
-                                  g.currentPrice = totalLots > 0 ? currentPriceSum / totalLots : 0;
-                                });
-
-                                // --- HEDGING LOGIC FOR MOBILE ---
-                                // Find buy/sell lots per pair
-                                const pairTypes: Record<string, { buyLots: number, sellLots: number, hedgedBuyLots: number, hedgedSellLots: number }> = {};
-                                Object.values(grouped).forEach((g) => {
-                                  if (!pairTypes[g.pair]) pairTypes[g.pair] = { buyLots: 0, sellLots: 0, hedgedBuyLots: 0, hedgedSellLots: 0 };
-                                  if (g.type === "buy") pairTypes[g.pair].buyLots += g.totalLots;
-                                  if (g.type === "sell") pairTypes[g.pair].sellLots += g.totalLots;
-                                });
-                                Object.keys(pairTypes).forEach(pair => {
-                                  const hedgedLots = Math.min(pairTypes[pair].buyLots, pairTypes[pair].sellLots);
-                                  pairTypes[pair].hedgedBuyLots = hedgedLots;
-                                  pairTypes[pair].hedgedSellLots = hedgedLots;
-                                });
-
-                                // Attach hedging tracker to each group
-                                Object.values(grouped).forEach((g) => {
-                                  g.hedgingTracker = {
-                                    hedgedBuyLots: 0,
-                                    hedgedSellLots: 0,
-                                    maxHedgedBuyLots: pairTypes[g.pair]?.hedgedBuyLots || 0,
-                                    maxHedgedSellLots: pairTypes[g.pair]?.hedgedSellLots || 0
-                                  };
-                                });
-
-                                // --- FIX: Do not mutate g.hedgingTracker during render ---
-                                // Instead, precompute which trades are hedged before rendering
-                                // This avoids setState or mutation during render
-
-                                // For each group, build an array of booleans for hedged status
-                                const groupHedgedStatus: Record<string, boolean[]> = {};
-                                Object.values(grouped).forEach((g) => {
-                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
-                                  let buyHedgeLeft = g.hedgingTracker!.maxHedgedBuyLots;
-                                  let sellHedgeLeft = g.hedgingTracker!.maxHedgedSellLots;
-                                  groupHedgedStatus[g.key] = g.trades.map((trade) => {
-                                    const type = trade.type?.toLowerCase();
-                                    const lots = Number(trade.lots) || 0;
-                                    if (!isHedged) return false;
-                                    if (type === "buy" && buyHedgeLeft > 0) {
-                                      const hedged = buyHedgeLeft >= lots;
-                                      buyHedgeLeft -= lots;
-                                      return hedged || buyHedgeLeft >= 0;
-                                    }
-                                    if (type === "sell" && sellHedgeLeft > 0) {
-                                      const hedged = sellHedgeLeft >= lots;
-                                      sellHedgeLeft -= lots;
-                                      return hedged || sellHedgeLeft >= 0;
-                                    }
-                                    return false;
-                                  });
-                                });
-
-                                return Object.values(grouped).map((g, idx) => {
-                                  const isProfitable = g.totalLivePnL >= 0;
-                                  const isExpanded = mobileExpandedGroups[g.key] || false;
-                                  // Is this group hedged at all?
-                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
-                                  const typeColor = g.type === "buy" ? "bg-primary" : "bg-destructive";
-                                  const typeLabel = g.type.charAt(0).toUpperCase() + g.type.slice(1).toLowerCase();
-                                  return (
-                                    <div key={`open-group-${g.key}-${idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
-                                      {/* First row: colored circle, logo, pair name, PnL, close button */}
-                                      <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-3">
-                                          {/* Colored circle for buy/sell */}
-                                          <span className={`h-3 w-3 rounded-full mr-2 ${typeColor}`} title={g.type.toUpperCase()} />
-                                          <img
-                                            src={
-                                              g.pair.endsWith("USDT")
-                                                ? getCryptoImageForSymbol(g.pair)
-                                                : getForexImageForSymbol(g.pair)
-                                            }
-                                            alt={g.pair}
-                                            className="h-7 w-7"
-                                          />
-                                          <span className="font-semibold text-base">{formatPairName(g.pair)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <span className={`font-bold text-base ${isProfitable ? "text-success" : "text-destructive"}`}>
-                                            {isProfitable ? "+" : ""}${g.totalLivePnL.toFixed(2)}
-                                          </span>
-                                          {(() => {
-                                            const isForex = isForexTrade(g.trades[0]);
-                                            return (
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
-                                                className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                disabled={isForex && !isForexMarketOpen}
-                                                title={
-                                                  isForex
-                                                    ? "You can only close forex trades when the market is open."
-                                                    : g.trades.length > 1 ? "Close All" : "Close"
-                                                }
-                                              >
-                                                <X size={16} />
-                                              </Button>
-                                            );
-                                          })()}
-                                        </div>
-                                      </div>
-                                      {/* Second row: full sentence for trade summary and live price right-aligned below PnL */}
-                                      <div className="flex items-center mb-1 ml-8">
-                                        <div className="text-sm text-foreground/80 flex-1">
-                                          {`${typeLabel} ${g.totalLots.toFixed(2)} Lot${g.totalLots !== 1 ? 's' : ''} at ${Number(g.openPrice).toFixed(g.decimals)}`}
-                                        </div>
-                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium ml-auto">
-                                          {Number(g.currentPrice).toFixed(g.decimals)}
-                                        </span>
-                                      </div>
-                                      {/* Third row: expand/collapse if multiple trades */}
-                                      <div className="flex items-center ml-8 gap-2">
-                                        {g.trades.length > 1 && (
-                                          <button
-                                            type="button"
-                                            className="rounded-full p-1 hover:bg-muted/20 transition"
-                                            onClick={() => toggleMobileGroupExpand(g.key)}
-                                            aria-label={isExpanded ? "Collapse" : "Expand"}
-                                          >
-                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                          </button>
-                                        )}
-                                      </div>
-                                      {/* Expanded individual trades for mobile */}
-                                      {isExpanded && (
-                                        <div className="mt-2 border-t border-border/20 pt-2">
-                                          {g.trades.map((trade, tIdx) => {
-                                            // Calculate individual PnL
-                                            const currentPrice = localPrices[trade.pair]?.price !== undefined
-                                              ? parseFloat(localPrices[trade.pair].price)
-                                              : parseFloat(trade.open_price);
-                                            const openPrice = parseFloat(trade.open_price);
-                                            let pipSize = 0.0001;
-                                            let lotSize = 100000;
-                                            let livePnL = 0;
-                                            if (trade.pair.endsWith("USDT")) {
-                                              pipSize = 1;
-                                              lotSize = 1;
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = currentPrice - openPrice;
-                                              } else {
-                                                livePnL = openPrice - currentPrice;
-                                              }
-                                            } else if (trade.pair === "XAUUSD") {
-                                              pipSize = 0.01;
-                                              lotSize = 100;
-                                              const lots = Number(trade.lots) || 0;
-                                              const pipValue = pipSize * lots * 100;
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                              } else {
-                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                              }
-                                            } else {
-                                              if (trade.pair.endsWith("JPY")) {
-                                                pipSize = 0.01;
-                                              }
-                                              const lots = Number(trade.lots) || 0;
-                                              const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                              } else {
-                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                              }
-                                            }
-                                            const decimals = getPriceDecimals(trade.pair);
-                                            const isProfitable = livePnL >= 0;
-                                            const isTradeHedged = groupHedgedStatus[g.key]?.[tIdx] ?? false;
-                                            return (
-                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-2 py-2 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 40 }}>
-                                                {/* (H) badge if hedged */}
-                                                {isTradeHedged && (
-                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold mr-1">H</span>
-                                                )}
-                                                {/* Lot and price sentence */}
-                                                <span className="text-sm text-foreground/90">
-                                                  {`${Number(trade.lots).toFixed(2)} Lot at ${Number(openPrice).toFixed(decimals)}`}
-                                                </span>
-                                                {/* PnL right aligned */}
-                                                <span className={`ml-auto font-mono text-sm ${isProfitable ? "text-success" : "text-destructive"}`}
-                                                  style={{ minWidth: 70, textAlign: 'right' }}>
-                                                  {livePnL >= 0 ? '+' : ''}${livePnL.toFixed(2)}
-                                                </span>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleCloseTrade(trade)}
-                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500 ml-2"
-                                                  title="Close Position"
-                                                  style={{ minWidth: 28, minHeight: 28 }}
-                                                  disabled={isForexTrade(trade) && !isForexMarketOpen}
-                                                >
-                                                  <X size={14} />
-                                                </Button>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
+                            <ActivityMobileView
+                              trades={openTrades}
+                              localPrices={localPrices}
+                              pairNameMap={pairNameMap}
+                            />
                           </td>
                         </tr>
                       ))
@@ -1481,321 +1135,29 @@ const ActivityPanel: React.FC<ActivityPanelProps> = ({
                   ) : (
                     closedTrades && closedTrades.length > 0 ?
                       (!fullPage ? (
-                        // Only use renderExpandableTrades for desktop open trades table (table look)
-                        <>
-                          {renderExpandableTrades(closedTrades)}
-                        </>
+                        // Use ActivityExpandableTrades for desktop closed trades table
+                        <ActivityExpandableTrades
+                          grouped={groupAndCalculateTrades(closedTrades, localPrices, getPriceDecimals)}
+                          expandedGroups={expandedGroups}
+                          toggleGroupExpand={toggleGroupExpand}
+                          getPriceDecimals={getPriceDecimals}
+                          localPrices={localPrices}
+                          handleCloseTrade={_handleCloseTrade}
+                          isForexTrade={isForexTrade}
+                          isForexMarketOpen={isForexMarketOpen}
+                          getCryptoImageForSymbol={getCryptoImageForSymbol}
+                          getForexImageForSymbol={getForexImageForSymbol}
+                          formatPairName={formatPairName}
+                        />
                       ) : (
-                        // Add scroll area for open positions in mobile/fullPage mode
+                        // Use ActivityMobileView for mobile/fullPage mode
                         <tr>
                           <td colSpan={5} className="p-0 border-0">
-                            <div
-                              className="overflow-y-auto flex flex-col gap-2 py-2 pb-32"
-                              style={{
-                                // Ensure the scroll area does not go behind the summary
-                                maxHeight: "calc(100dvh - 220px)", // 220px = approx header + summary height
-                                minHeight: 0,
-                              }}
-                            >
-                              {/* Group open trades by pair and type for mobile */}
-                              {(() => {
-                                // Group trades by pair and type
-                                const grouped: Record<string, { 
-                                  key: string,
-                                  pair: string,
-                                  type: string,
-                                  trades: any[],
-                                  totalLots: number,
-                                  totalLivePnL: number,
-                                  openPrice: number,
-                                  currentPrice: number,
-                                  decimals: number,
-                                  hedgingTracker?: {
-                                    hedgedBuyLots: number,
-                                    hedgedSellLots: number,
-                                    maxHedgedBuyLots: number,
-                                    maxHedgedSellLots: number
-                                  }
-                                }> = {};
-                                closedTrades.forEach((trade) => {
-                                  const key = `${trade.pair}|${(trade.type || "").toLowerCase()}`;
-                                  if (!grouped[key]) {
-                                    grouped[key] = {
-                                      key,
-                                      pair: trade.pair,
-                                      type: (trade.type || "").toLowerCase(),
-                                      trades: [],
-                                      totalLots: 0,
-                                      totalLivePnL: 0,
-                                      openPrice: 0,
-                                      currentPrice: 0,
-                                      decimals: getPriceDecimals(trade.pair)
-                                    };
-                                  }
-                                  grouped[key].trades.push(trade);
-                                  grouped[key].totalLots += Number(trade.lots) || 0;
-                                });
-
-                                // Calculate total PnL and prices for each group
-                                Object.values(grouped).forEach((g) => {
-                                  let totalPnL = 0;
-                                  let totalLots = 0;
-                                  let openPriceSum = 0;
-                                  let currentPriceSum = 0;
-                                  g.trades.forEach((trade) => {
-                                    const currentPrice = localPrices[trade.pair]?.price !== undefined
-                                      ? parseFloat(localPrices[trade.pair].price)
-                                      : parseFloat(trade.open_price);
-                                    const openPrice = parseFloat(trade.open_price);
-                                    let pipSize = 0.0001;
-                                    let lotSize = 100000;
-                                    let livePnL = 0;
-                                    if (trade.pair.endsWith("USDT")) {
-                                      pipSize = 1;
-                                      lotSize = 1;
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = currentPrice - openPrice;
-                                      } else {
-                                        livePnL = openPrice - currentPrice;
-                                      }
-                                    } else if (trade.pair === "XAUUSD") {
-                                      pipSize = 0.01;
-                                      lotSize = 100;
-                                      const lots = Number(trade.lots) || 0;
-                                      const pipValue = pipSize * lots * 100;
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                      } else {
-                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                      }
-                                    } else {
-                                      if (trade.pair.endsWith("JPY")) {
-                                        pipSize = 0.01;
-                                      }
-                                      const lots = Number(trade.lots) || 0;
-                                      const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
-                                      if (trade.type?.toLowerCase() === "buy") {
-                                        livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                      } else {
-                                        livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                      }
-                                    }
-                                    totalPnL += livePnL;
-                                    totalLots += Number(trade.lots) || 0;
-                                    openPriceSum += openPrice * (Number(trade.lots) || 0);
-                                    currentPriceSum += currentPrice * (Number(trade.lots) || 0);
-                                  });
-                                  g.totalLivePnL = totalPnL;
-                                  g.totalLots = totalLots;
-                                  g.openPrice = totalLots > 0 ? openPriceSum / totalLots : 0;
-                                  g.currentPrice = totalLots > 0 ? currentPriceSum / totalLots : 0;
-                                });
-
-                                // --- HEDGING LOGIC FOR MOBILE ---
-                                // Find buy/sell lots per pair
-                                const pairTypes: Record<string, { buyLots: number, sellLots: number, hedgedBuyLots: number, hedgedSellLots: number }> = {};
-                                Object.values(grouped).forEach((g) => {
-                                  if (!pairTypes[g.pair]) pairTypes[g.pair] = { buyLots: 0, sellLots: 0, hedgedBuyLots: 0, hedgedSellLots: 0 };
-                                  if (g.type === "buy") pairTypes[g.pair].buyLots += g.totalLots;
-                                  if (g.type === "sell") pairTypes[g.pair].sellLots += g.totalLots;
-                                });
-                                Object.keys(pairTypes).forEach(pair => {
-                                  const hedgedLots = Math.min(pairTypes[pair].buyLots, pairTypes[pair].sellLots);
-                                  pairTypes[pair].hedgedBuyLots = hedgedLots;
-                                  pairTypes[pair].hedgedSellLots = hedgedLots;
-                                });
-
-                                // Attach hedging tracker to each group
-                                Object.values(grouped).forEach((g) => {
-                                  g.hedgingTracker = {
-                                    hedgedBuyLots: 0,
-                                    hedgedSellLots: 0,
-                                    maxHedgedBuyLots: pairTypes[g.pair]?.hedgedBuyLots || 0,
-                                    maxHedgedSellLots: pairTypes[g.pair]?.hedgedSellLots || 0
-                                  };
-                                });
-
-                                // --- FIX: Do not mutate g.hedgingTracker during render ---
-                                // Instead, precompute which trades are hedged before rendering
-                                // This avoids setState or mutation during render
-
-                                // For each group, build an array of booleans for hedged status
-                                const groupHedgedStatus: Record<string, boolean[]> = {};
-                                Object.values(grouped).forEach((g) => {
-                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
-                                  let buyHedgeLeft = g.hedgingTracker!.maxHedgedBuyLots;
-                                  let sellHedgeLeft = g.hedgingTracker!.maxHedgedSellLots;
-                                  groupHedgedStatus[g.key] = g.trades.map((trade) => {
-                                    const type = trade.type?.toLowerCase();
-                                    const lots = Number(trade.lots) || 0;
-                                    if (!isHedged) return false;
-                                    if (type === "buy" && buyHedgeLeft > 0) {
-                                      const hedged = buyHedgeLeft >= lots;
-                                      buyHedgeLeft -= lots;
-                                      return hedged || buyHedgeLeft >= 0;
-                                    }
-                                    if (type === "sell" && sellHedgeLeft > 0) {
-                                      const hedged = sellHedgeLeft >= lots;
-                                      sellHedgeLeft -= lots;
-                                      return hedged || sellHedgeLeft >= 0;
-                                    }
-                                    return false;
-                                  });
-                                });
-
-                                return Object.values(grouped).map((g, idx) => {
-                                  const isProfitable = g.totalLivePnL >= 0;
-                                  const isExpanded = mobileExpandedGroups[g.key] || false;
-                                  // Is this group hedged at all?
-                                  const isHedged = pairTypes[g.pair]?.buyLots > 0 && pairTypes[g.pair]?.sellLots > 0;
-                                  const typeColor = g.type === "buy" ? "bg-primary" : "bg-destructive";
-                                  const typeLabel = g.type.charAt(0).toUpperCase() + g.type.slice(1).toLowerCase();
-                                  return (
-                                    <div key={`open-group-${g.key}-${idx}`} className="px-3 py-4 mx-2 mb-2 mt-2 border border-border/60 rounded-lg last:mb-0 bg-muted/5 shadow-sm hover:bg-muted/10 transition-colors">
-                                      {/* First row: colored circle, logo, pair name, PnL, close button */}
-                                      <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-3">
-                                          {/* Colored circle for buy/sell */}
-                                          <span className={`h-3 w-3 rounded-full mr-2 ${typeColor}`} title={g.type.toUpperCase()} />
-                                          <img
-                                            src={
-                                              g.pair.endsWith("USDT")
-                                                ? getCryptoImageForSymbol(g.pair)
-                                                : getForexImageForSymbol(g.pair)
-                                            }
-                                            alt={g.pair}
-                                            className="h-7 w-7"
-                                          />
-                                          <span className="font-semibold text-base">{formatPairName(g.pair)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <span className={`font-bold text-base ${isProfitable ? "text-success" : "text-destructive"}`}>
-                                            {isProfitable ? "+" : ""}${g.totalLivePnL.toFixed(2)}
-                                          </span>
-                                          {(() => {
-                                            const isForex = isForexTrade(g.trades[0]);
-                                            return (
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => g.trades.forEach(trade => handleCloseTrade(trade))}
-                                                className="h-8 w-8 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500"
-                                                disabled={isForex && !isForexMarketOpen}
-                                                title={
-                                                  isForex
-                                                    ? "You can only close forex trades when the market is open."
-                                                    : g.trades.length > 1 ? "Close All" : "Close"
-                                                }
-                                              >
-                                                <X size={16} />
-                                              </Button>
-                                            );
-                                          })()}
-                                        </div>
-                                      </div>
-                                      {/* Second row: full sentence for trade summary and live price right-aligned below PnL */}
-                                      <div className="flex items-center mb-1 ml-8">
-                                        <div className="text-sm text-foreground/80 flex-1">
-                                          {`${typeLabel} ${g.totalLots.toFixed(2)} Lot${g.totalLots !== 1 ? 's' : ''} at ${Number(g.openPrice).toFixed(g.decimals)}`}
-                                        </div>
-                                        <span className="px-2 py-1 rounded-md bg-success/10 text-success text-xs font-medium ml-auto">
-                                          {Number(g.currentPrice).toFixed(g.decimals)}
-                                        </span>
-                                      </div>
-                                      {/* Third row: expand/collapse if multiple trades */}
-                                      <div className="flex items-center ml-8 gap-2">
-                                        {g.trades.length > 1 && (
-                                          <button
-                                            type="button"
-                                            className="rounded-full p-1 hover:bg-muted/20 transition"
-                                            onClick={() => toggleMobileGroupExpand(g.key)}
-                                            aria-label={isExpanded ? "Collapse" : "Expand"}
-                                          >
-                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                          </button>
-                                        )}
-                                      </div>
-                                      {/* Expanded individual trades for mobile */}
-                                      {isExpanded && (
-                                        <div className="mt-2 border-t border-border/20 pt-2">
-                                          {g.trades.map((trade, tIdx) => {
-                                            // Calculate individual PnL
-                                            const currentPrice = localPrices[trade.pair]?.price !== undefined
-                                              ? parseFloat(localPrices[trade.pair].price)
-                                              : parseFloat(trade.open_price);
-                                            const openPrice = parseFloat(trade.open_price);
-                                            let pipSize = 0.0001;
-                                            let lotSize = 100000;
-                                            let livePnL = 0;
-                                            if (trade.pair.endsWith("USDT")) {
-                                              pipSize = 1;
-                                              lotSize = 1;
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = currentPrice - openPrice;
-                                              } else {
-                                                livePnL = openPrice - currentPrice;
-                                              }
-                                            } else if (trade.pair === "XAUUSD") {
-                                              pipSize = 0.01;
-                                              lotSize = 100;
-                                              const lots = Number(trade.lots) || 0;
-                                              const pipValue = pipSize * lots * 100;
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                              } else {
-                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                              }
-                                            } else {
-                                              if (trade.pair.endsWith("JPY")) {
-                                                pipSize = 0.01;
-                                              }
-                                              const lots = Number(trade.lots) || 0;
-                                              const pipValue = (pipSize * lotSize * lots) / (currentPrice || 1);
-                                              if (trade.type?.toLowerCase() === "buy") {
-                                                livePnL = ((currentPrice - openPrice) / pipSize) * pipValue;
-                                              } else {
-                                                livePnL = ((openPrice - currentPrice) / pipSize) * pipValue;
-                                              }
-                                            }
-                                            const decimals = getPriceDecimals(trade.pair);
-                                            const isProfitable = livePnL >= 0;
-                                            const isTradeHedged = groupHedgedStatus[g.key]?.[tIdx] ?? false;
-                                            return (
-                                              <div key={`open-group-${g.key}-trade-${tIdx}`} className="flex items-center gap-2 py-2 border-b border-dashed border-border/20 last:border-0" style={{ minHeight: 40 }}>
-                                                {/* (H) badge if hedged */}
-                                                {isTradeHedged && (
-                                                  <span className="px-2 py-1 rounded-full border border-primary text-primary bg-primary/10 text-xs font-semibold mr-1">H</span>
-                                                )}
-                                                {/* Lot and price sentence */}
-                                                <span className="text-sm text-foreground/90">
-                                                  {`${Number(trade.lots).toFixed(2)} Lot at ${Number(openPrice).toFixed(decimals)}`}
-                                                </span>
-                                                {/* PnL right aligned */}
-                                                <span className={`ml-auto font-mono text-sm ${isProfitable ? "text-success" : "text-destructive"}`}
-                                                  style={{ minWidth: 70, textAlign: 'right' }}>
-                                                  {livePnL >= 0 ? '+' : ''}${livePnL.toFixed(2)}
-                                                </span>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleCloseTrade(trade)}
-                                                  className="w-7 h-7 p-0 rounded-full hover:bg-red-500/10 hover:text-red-500 ml-2"
-                                                  title="Close Position"
-                                                  style={{ minWidth: 28, minHeight: 28 }}
-                                                  disabled={isForexTrade(trade) && !isForexMarketOpen}
-                                                >
-                                                  <X size={14} />
-                                                </Button>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
+                            <ActivityMobileView
+                              trades={closedTrades}
+                              localPrices={localPrices}
+                              pairNameMap={pairNameMap}
+                            />
                           </td>
                         </tr>
                       ))
