@@ -49,6 +49,7 @@ interface DashboardTabsProps {
   closedTradesLoading: boolean;
   groupTradesByDate: (trades: Trade[]) => { dateKey: string; trades: Trade[] }[];
   formatDateLabel: (dateKey: string) => string;
+  activeTab?: string;
 }
 
 export const DashboardTabs: React.FC<DashboardTabsProps> = ({
@@ -68,6 +69,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   closedTradesLoading,
   groupTradesByDate,
   formatDateLabel,
+  activeTab,
 }) => {
   // Add a mapping from symbol to display name
   const pairNameMap: Record<string, string> = {
@@ -86,7 +88,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
 
   return (
     <div>
-      <Tabs defaultValue="transactions" className="w-full">
+      <Tabs defaultValue={activeTab || "transactions"} className="w-full">
         <TabsList>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="ranks">Ranks</TabsTrigger>

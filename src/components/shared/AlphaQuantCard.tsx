@@ -6,8 +6,8 @@ export const AlphaQuantCard: React.FC<{
   totalInvested: number;
   activePlans: { count: number; amount: number };
   onClick: () => void;
-  totalCredits?: number;
-}> = ({ totalInvested, activePlans, onClick, totalCredits }) => (
+  todaysProfit?: number;
+}> = ({ totalInvested, activePlans, onClick, todaysProfit }) => (
   <div
     className="bg-background border-2 border-warning rounded-2xl p-6 flex flex-col justify-between cursor-pointer transition-shadow"
     onClick={onClick}
@@ -32,14 +32,14 @@ export const AlphaQuantCard: React.FC<{
           </h3>
         </div>
       </div>
-      {typeof totalCredits === 'number' && (
-        <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-100 border border-green-300 text-xs font-semibold text-green-700 shadow-sm mt-4">
+      {typeof todaysProfit === 'number' && (
+        <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-400/10 border border-green-300/50 text-xs font-semibold text-foreground shadow-sm mt-4">
           <div className="flex items-center">
             <span className="relative flex h-3 w-3 mr-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            <span>Total profit: {totalCredits.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+            <span>Today's profit: {todaysProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
           </div>
         </div>
       )}

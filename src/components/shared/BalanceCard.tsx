@@ -33,17 +33,17 @@ export const BalanceCard: React.FC<{
       </div>
       <div className="mt-6 flex gap-4 flex-row">
         <Button
-          className="w-full px-6 py-2 rounded-lg bg-primary text-background font-semibold hover:bg-primary/90 transition-colors"
+          className="w-full px-6 py-2 rounded-lg bg-primary text-white font-semibold hover:bg-primary/90 transition-colors"
           onClick={() => navigate("/cashier")}
         >
-          Deposit
+          Add funds
         </Button>
         <Button
-          className="w-full px-6 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10 transition-colors"
+          className="w-full px-6 py-2 rounded-lg border border-primary text-foreground font-semibold hover:bg-primary/10 hover:text-foreground transition-colors"
           variant="outline"
           onClick={handlePayoutClick}
         >
-          Withdraw
+          Payout
         </Button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import type { Transaction } from "@/types/dashboard";
 import { ArrowUpRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 // Define Trade interface locally since it's not exported from types
 interface Trade {
@@ -27,6 +28,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: Trade[] }> = ({ transactions, trades }) => {
+  const navigate = useNavigate();
   const hasTransactions = transactions && transactions.length > 0;
   const hasTrades = trades && trades.length > 0;
   if (!hasTransactions && !hasTrades) return null;
@@ -65,9 +67,13 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
       <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Recent Transactions</h3>
-          <a href="/transactions" className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto">
+          <button
+            type="button"
+            className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
+            onClick={() => navigate('/history?tab=transactions')}
+          >
             View All <ArrowUpRight className="w-4 h-4" />
-          </a>
+          </button>
         </div>
         {hasTransactions ? (
           <ul>
@@ -95,9 +101,13 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
       <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Your Trades</h3>
-          <a href="/history" className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto">
+          <button
+            type="button"
+            className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
+            onClick={() => navigate('/history?tab=closed_trades')}
+          >
             View All <ArrowUpRight className="w-4 h-4" />
-          </a>
+          </button>
         </div>
         {hasTrades ? (
           <ul>

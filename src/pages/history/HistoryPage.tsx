@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardTabs } from "../../components/dashboard/DashboardTabs";
 import { Topbar } from "../../components/shared/Topbar";
 import { PlatformSidebar } from "../../components/shared/PlatformSidebar";
@@ -10,6 +11,7 @@ const ITEMS_PER_PAGE = 10;
 
 const HistoryPage: React.FC = () => {
   const { profile } = useUserProfile();
+  const [searchParams] = useSearchParams();
   const [transactions, setTransactions] = useState([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -29,6 +31,7 @@ const HistoryPage: React.FC = () => {
   const [closedTrades, setClosedTrades] = useState([]);
   const [closedTradesLoading, setClosedTradesLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const tabParam = searchParams.get("tab") || "transactions";
 
   useEffect(() => {
     if (!profile) return;
@@ -196,35 +199,37 @@ const HistoryPage: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Helmet>
-        <title>History | iPrime</title>
-      </Helmet>
-      <PlatformSidebar />
-      <div className="flex-1 flex flex-col">
-        <Topbar title="History" />
-        <main className="flex-1 p-4">
-          <div className="mx-auto w-full max-w-[1200px]">
-            <DashboardTabs
-              transactions={transactions}
-              transactionsLoading={transactionsLoading}
-              hasMore={hasMore}
-              isLoadingMore={isLoadingMore}
-              handleLoadMore={handleLoadMore}
-              handleCopyId={handleCopyId}
-              ranks={ranks}
-              ranksLoading={ranksLoading}
-              businessStats={businessStats}
-              claimedRanks={claimedRanks}
-              claimingRank={claimingRank}
-              onClaimRankBonus={onClaimRankBonus}
-              closedTrades={closedTrades}
-              closedTradesLoading={closedTradesLoading}
-              groupTradesByDate={groupTradesByDate}
-              formatDateLabel={formatDateLabel}
-            />
-          </div>
-        </main>
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Topbar full width at the top */}
+      <Topbar title="History" />
+      <div className="flex flex-1">
+        {/* Sidebar below Topbar */}
+        <PlatformSidebar />
+        <div className="flex-1 flex flex-col">
+          <main className="flex-1 p-4">
+            <div className="mx-auto w-full max-w-[1200px]">
+              <DashboardTabs
+                transactions={transactions}
+                transactionsLoading={transactionsLoading}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                handleLoadMore={handleLoadMore}
+                handleCopyId={handleCopyId}
+                ranks={ranks}
+                ranksLoading={ranksLoading}
+                businessStats={businessStats}
+                claimedRanks={claimedRanks}
+                claimingRank={claimingRank}
+                onClaimRankBonus={onClaimRankBonus}
+                closedTrades={closedTrades}
+                closedTradesLoading={closedTradesLoading}
+                groupTradesByDate={groupTradesByDate}
+                formatDateLabel={formatDateLabel}
+                activeTab={tabParam}
+              />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );

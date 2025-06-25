@@ -23,17 +23,17 @@ export const BalanceCard = ({
 }: BalanceCardProps) => {
   const variants = {
     default: {
-      containerClass: 'bg-background border-2 border-blue-200',
+      containerClass: 'bg-background border-2 border-blue-500',
       badgeClass: 'bg-blue-100 text-blue-700 border border-blue-200',
       label: label || 'Available Balance'
     },
     success: {
-      containerClass: 'bg-background border-2 border-green-200',
+      containerClass: 'bg-background border-2 border-green-500',
       badgeClass: 'bg-green-100 text-green-700 border border-green-200',
       label: label || 'Payment Success'
     },
     processing: {
-      containerClass: 'bg-background border-2 border-amber-200',
+      containerClass: 'bg-background border-2 border-amber-500',
       badgeClass: 'bg-amber-100 text-amber-700 border border-amber-200',
       label: label || 'Processing'
     },
@@ -48,7 +48,7 @@ export const BalanceCard = ({
       label: label || 'Total Referrals'
     },
     business: {
-      containerClass: 'bg-background border-2 border-emerald-200',
+      containerClass: 'bg-background border-2 border-emerald-500',
       badgeClass: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
       label: label || 'Business Volume'
     },
@@ -84,7 +84,7 @@ export const BalanceCard = ({
           {showUsdSuffix ? <span className="text-2xl font-normal text-muted-foreground ml-2">USD</span> : null}
         </h3>
         {typeof totalProfits === 'number' && (
-          <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-100 border border-green-300 text-xs font-semibold text-green-700 mt-4">
+          <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-500/10 border border-green-500 text-xs font-semibold text-foreground mt-4">
             <div className="flex items-center">
               <span className="relative flex h-3 w-3 mr-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>

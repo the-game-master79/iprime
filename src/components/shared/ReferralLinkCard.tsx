@@ -27,7 +27,7 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
   onCopyLink,
 }) => {
   return (
-    <div className="bg-secondary rounded-2xl p-4 border border-border">
+    <div className="bg-secondary rounded-3xl p-4 border border-border">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row items-stretch gap-2">
           <div className="relative flex-1 flex flex-row gap-2">
@@ -43,7 +43,7 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
               size="icon"
               variant="secondary"
               onClick={onCopyLink}
-              className="h-12 w-12 rounded-lg flex-shrink-0 bg-secondary-foreground text-foreground font-bold hover:bg-secondary-foreground active:bg-secondary-foreground focus:bg-secondary-foreground"
+              className="h-12 w-12 rounded-xl flex-shrink-0 bg-secondary-foreground text-foreground font-bold hover:bg-secondary-foreground active:bg-secondary-foreground focus:bg-secondary-foreground"
               title="Copy Link"
             >
               <Copy className="h-8 w-8 font-bold" weight="bold" />

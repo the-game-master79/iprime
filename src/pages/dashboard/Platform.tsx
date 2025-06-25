@@ -144,6 +144,15 @@ function formatDateLabel(dateKey: string) {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// Helper to get today's investment return profit
+function getTodaysInvestmentProfit(transactions: Transaction[]): number {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+  return transactions
+    .filter(tx => tx.type === 'investment_return' && tx.status === 'Completed' && tx.created_at && tx.created_at.slice(0, 10) === todayStr)
+    .reduce((sum, tx) => sum + tx.amount, 0);
+}
+
 const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const { profile, loading: profileLoading } = useUserProfile();
   const { isMobile } = useBreakpoints();
@@ -950,7 +959,7 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                       <AlphaQuantCard
                         totalInvested={totalInvested}
                         activePlans={activePlans}
-                        totalCredits={investmentReturns}
+                        todaysProfit={getTodaysInvestmentProfit(transactions)}
                         onClick={() => navigate('/plans')}
                       />
                       <AffiliateRankCard
