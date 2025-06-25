@@ -159,7 +159,7 @@ const FaqPage = () => {
 									<h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
 										{category.title === "AlphaQuant" ? (
 											<>
-												<span className="text-black">Alpha</span>
+												<span className="text-foreground">Alpha</span>
 												<span className="text-card">Quant</span>
 											</>
 										) : (

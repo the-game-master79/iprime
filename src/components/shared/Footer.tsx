@@ -19,6 +19,12 @@ export const Footer = () => {
             />
           </div>
           <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center">
+            <Link to="/company" className="text-sm text-muted-foreground hover:text-foreground">
+              Company
+            </Link>
+            <Link to="/partners" className="text-sm text-muted-foreground hover:text-foreground">
+              Partners
+            </Link>
             <Link to="/legal/terms" className="text-sm text-muted-foreground hover:text-foreground">
               Terms of Service
             </Link>

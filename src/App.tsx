@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import {
   HashRouter,
   BrowserRouter,
@@ -154,6 +154,21 @@ const RouteGroup = () => {
       <Route path="/auth/login" element={<Login />} />
       <Route path="/legal/privacy" element={<PrivacyPolicy />} />
       <Route path="/legal/terms" element={<TermsOfService />} />
+      <Route path="/trading" element={
+        <Suspense fallback={<Spinner />}>
+          {React.createElement(lazy(() => import("@/pages/trading/TradingPage")))}
+        </Suspense>
+      } />
+      <Route path="/forex-trading" element={
+        <Suspense fallback={<Spinner />}>
+          {React.createElement(lazy(() => import("@/pages/trading/ForexTradingPage")))}
+        </Suspense>
+      } />
+      <Route path="/crypto-trading" element={
+        <Suspense fallback={<Spinner />}>
+          {React.createElement(lazy(() => import("@/pages/trading/CryptoTradingPage")))}
+        </Suspense>
+      } />
       <Route path="/tradingstation" element={<TradingStation />} />
       <Route path="/theme-palette" element={<ThemePalettePage />} />
       <Route path="/alphaquant" element={<AlphaQuantPage />} />

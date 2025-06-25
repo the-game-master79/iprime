@@ -26,11 +26,6 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
       navigate("/auth/login");
       return;
     }
-    // Prevent navigation to /trading, only allow tradingstation for logged in users
-    if (path === "/trading") {
-      window.open("/tradingstation", "_blank");
-      return;
-    }
     // All other routes (public) can be navigated to directly
     navigate(path);
   };
@@ -64,73 +59,24 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
             <nav className="hidden md:flex items-center gap-3">
               {[
                 { path: "/trading", label: "Trading" },
+                { path: "/forex-trading", label: "Forex Trading" },
+                { path: "/crypto-trading", label: "Crypto Trading" },
                 { path: "/alphaquant", label: "AlphaQuant" },
-                { path: "/partners", label: "Partners" },
-                { path: "/company", label: "Company" },
                 { path: "/blogs", label: "Blogs" },
-              ].map((item) =>
-                item.path === "/trading" ? (
-                  <a
-                    key={item.path}
-                    href="/tradingstation"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      "text-base font-normal px-3 py-2 transition-colors",
-                      isBlogsVariant ? "text-foreground" : "text-white"
-                    )}
-                    style={{ border: "none", borderRadius: 0, background: "none" }}
-                  >
-                    {item.label}
-                  </a>
-                ) : item.path === "/alphaquant" ? (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigation(item.path)}
-                    className={cn(
-                      "text-base font-normal px-3 py-2 transition-colors",
-                      isActive(item.path)
-                        ? isBlogsVariant
-                          ? "text-foreground"
-                          : ""
-                        : isBlogsVariant
-                        ? "text-foreground"
-                        : "text-white"
-                    )}
-                    style={{ border: "none", borderRadius: 0, background: "none" }}
-                  >
-                    {isActive(item.path) ? (
-                      <>
-                        <span style={{ color: isBlogsVariant ? "inherit" : "#000" }}>
-                          Alpha
-                        </span>
-                        <span
-                          style={{
-                            color: isBlogsVariant ? "inherit" : "#FF9900",
-                          }}
-                        >
-                          Quant
-                        </span>
-                      </>
-                    ) : (
-                      "AlphaQuant"
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    key={item.path}
-                    onClick={() => handleNavigation(item.path)}
-                    className={cn(
-                      "text-base font-normal px-3 py-2 transition-colors",
-                      isBlogsVariant ? "text-foreground" : "text-white",
-                      isActive(item.path) && "underline underline-offset-4"
-                    )}
-                    style={{ border: "none", borderRadius: 0, background: "none" }}
-                  >
-                    {item.label}
-                  </button>
-                )
-              )}
+              ].map((item) => (
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigation(item.path)}
+                  className={cn(
+                    "text-base font-normal px-3 py-2 transition-colors",
+                    isBlogsVariant ? "text-foreground" : "text-white",
+                    isActive(item.path) && "underline underline-offset-4"
+                  )}
+                  style={{ border: "none", borderRadius: 0, background: "none" }}
+                >
+                  {item.label}
+                </button>
+              ))}
             </nav>
           </div>
           <div className="flex items-center gap-3">
