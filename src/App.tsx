@@ -11,6 +11,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LoadingSpinner from "@/components/ui/loading-spinner";
+import TradingPage from "./pages/trading/TradingPage";
+import ForexTradingPage from "./pages/trading/ForexTradingPage";
+import CryptoTradingPage from "./pages/trading/CryptoTradingPage";
 
 // Lazy Providers
 const AuthProvider = lazy(() => import("@/contexts/AuthContext").then(mod => ({ default: mod.AuthProvider })));
@@ -154,21 +157,9 @@ const RouteGroup = () => {
       <Route path="/auth/login" element={<Login />} />
       <Route path="/legal/privacy" element={<PrivacyPolicy />} />
       <Route path="/legal/terms" element={<TermsOfService />} />
-      <Route path="/trading" element={
-        <Suspense fallback={<Spinner />}>
-          {React.createElement(lazy(() => import("@/pages/trading/TradingPage")))}
-        </Suspense>
-      } />
-      <Route path="/forex-trading" element={
-        <Suspense fallback={<Spinner />}>
-          {React.createElement(lazy(() => import("@/pages/trading/ForexTradingPage")))}
-        </Suspense>
-      } />
-      <Route path="/crypto-trading" element={
-        <Suspense fallback={<Spinner />}>
-          {React.createElement(lazy(() => import("@/pages/trading/CryptoTradingPage")))}
-        </Suspense>
-      } />
+      <Route path="/trading" element={<TradingPage />} />
+      <Route path="/forex-trading" element={<ForexTradingPage />} />
+      <Route path="/crypto-trading" element={<CryptoTradingPage />} />
       <Route path="/tradingstation" element={<TradingStation />} />
       <Route path="/theme-palette" element={<ThemePalettePage />} />
       <Route path="/alphaquant" element={<AlphaQuantPage />} />

@@ -74,7 +74,7 @@ export const Hero = ({
   // Use local webp hero image instead of Unsplash and iPhone mockup
   const mockupImg = "/arthaa-hero.webp";
   return (
-    <section className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
+    <section id="hero" className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
       <Navbar /> {/* <-- Use the shared Navbar at the top */}
       {/* Cinematic background gradients and light rays */}
       <div className="pointer-events-none absolute inset-0 z-0">

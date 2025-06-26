@@ -14,5 +14,4 @@ Disallow: /api/
 Crawl-delay: 10
 
 # Sitemap location
-Sitemap: https://www.arthaa.club/sitemap.xml
-
+Sitemap: https://www.arthaa.pro/sitemap.xml

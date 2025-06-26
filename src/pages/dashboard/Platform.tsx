@@ -811,7 +811,17 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
           data.data?.bid ??
           data.data?.ask;
         if (data.symbol && price) {
-          const symbol = data.symbol.toUpperCase();
+          // Normalize symbol for comparison (uppercase, remove delimiters)
+          const normalize = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+          const symbol = normalize(data.symbol);
+
+          // Only update if symbol is in the displayed crypto or forex pairs
+          const displayedSymbols = [
+            ...cryptoData.map(pair => normalize(pair.symbol)),
+            ...forexData.map(pair => normalize(pair.symbol))
+          ];
+          if (!displayedSymbols.includes(symbol)) return;
+
           const prevPrice = parseFloat(marketPrices[symbol]?.price || "0");
           const newPrice = parseFloat(price);
 

@@ -109,7 +109,7 @@ export const Features = () => {
 											<p className="text-sm md:text-base font-medium text-background">
 												{feature.subtitle}
 											</p>
-											<h3 className="font-extrabold text-2xl md:text-3xltracking-tight !text-left w-full text-background !text-4xl md:!text-6xl">
+											<h3 className="font-extrabold tracking-tight !text-left w-full text-background !text-4xl md:!text-6xl">
 												{feature.title}
 											</h3>
 										</div>
@@ -189,7 +189,7 @@ export const Features = () => {
 														{feature.subtitle}
 													</p>
 												)}
-												<h3 className="font-extrabold text-7xl md:text-7xl drop-shadow-sm tracking-tight text-center text-white md:text-7xl text-5xl">
+												<h3 className="font-extrabold drop-shadow-sm tracking-tight text-center text-white md:text-7xl text-5xl">
 													{feature.title}
 												</h3>
 											</div>
@@ -206,7 +206,7 @@ export const Features = () => {
 														{feature.subtitle}
 													</p>
 												)}
-												<h3 className="font-extrabold text-7xl md:text-6xl drop-shadow-sm tracking-tight text-center text-white md:text-5xl text-4xl">
+												<h3 className="font-extrabold drop-shadow-sm tracking-tight text-center text-white md:text-5xl text-4xl">
 													{feature.title}
 												</h3>
 											</>

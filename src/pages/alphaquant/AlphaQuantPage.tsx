@@ -3,6 +3,7 @@ import { Lightning, CardsThree, Robot, Brain, Kanban, ShieldCheck } from "@phosp
 import WallOfLove from "@/pages/testimonials/WallOfLove";
 import CtaPage from "@/pages/cta/CtaPage";
 import { Footer } from "@/components/shared/Footer";
+import { Helmet } from "react-helmet-async";
 
 const alphaQuantFeatures = [
 	{
@@ -63,7 +64,12 @@ const alphaQuantFeatures = [
 
 const AlphaQuantPage = () => {
 	return (
-		<div>
+		<>
+			<Helmet>
+				<title>AlphaQuant | AI-Powered Trading Analytics | Arthaa</title>
+				<meta name="description" content="Unlock AI-powered trading analytics and strategies with AlphaQuant on Arthaa. Maximize your trading potential with advanced tools and insights." />
+				<link rel="canonical" href="https://www.arthaa.pro/alphaquant" />
+			</Helmet>
 			<Hero
 				title={
 					<>
@@ -213,7 +219,7 @@ const AlphaQuantPage = () => {
 			<WallOfLove />
 			<CtaPage />
 			<Footer />
-		</div>
+		</>
 	);
 };
 

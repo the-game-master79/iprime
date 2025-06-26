@@ -76,7 +76,7 @@ export const QuickFeatures = () => {
 function FeatureCard({ feature, index }: { feature: any; index: number }) {
   return (
     <div
-      className="relative animate-on-scroll opacity-0 translate-y-4 transition-all duration-700"
+      className="relative transition-all duration-700"
       style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className="h-full w-full rounded-2xl transition-colors bg-transparent">

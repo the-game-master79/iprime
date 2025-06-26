@@ -26,7 +26,7 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
       navigate("/auth/login");
       return;
     }
-    // All other routes (public) can be navigated to directly
+    // All routes (public or not) can be navigated to directly, no reload for same path
     navigate(path);
   };
 
