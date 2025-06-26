@@ -1,32 +1,33 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, DollarSign, ArrowDownCircle, ArrowUpCircle, BarChart2, TrendingUp, ChevronLeft, ChevronRight, Cpu } from "lucide-react";
+import { House, CurrencyDollar, ArrowCircleDown, ArrowCircleUp, ChartBar, TrendUp, CaretLeft, CaretRight, Cpu, DownloadSimple } from "@phosphor-icons/react";
+import { usePwaInstall } from '@/hooks/use-pwa-install';
 
 // Desktop sidebar items (no Markets, add AlphaQuant)
 const sidebarItems = [
-	{ label: "Home", icon: <Home size={20} />, path: "/platform" },
-	{ label: "Deposit", icon: <ArrowDownCircle size={20} />, path: "/cashier" },
-	{ label: "Payout", icon: <ArrowUpCircle size={20} />, path: "/cashier?tab=payout" },
-	{ label: "History", icon: <BarChart2 size={20} />, path: "/history" },
-	{ label: "Trade", icon: <TrendingUp size={20} />, path: "/tradingstation" },
+	{ label: "Home", icon: <House size={20} />, path: "/platform" },
+	{ label: "Deposit", icon: <ArrowCircleDown size={20} />, path: "/cashier" },
+	{ label: "Payout", icon: <ArrowCircleUp size={20} />, path: "/cashier?tab=payout" },
+	{ label: "History", icon: <ChartBar size={20} />, path: "/history" },
+	{ label: "Trade", icon: <TrendUp size={20} />, path: "/tradingstation" },
 	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" },
 	// Removed Markets
 ];
 
 // Mobile sidebar items: Home, Deposit, Trade, AlphaQuant only
 const mobileSidebarItems = [
-	{ label: "Home", icon: <Home size={20} />, path: "/platform" },
-	{ label: "Deposit", icon: <ArrowDownCircle size={20} />, path: "/cashier" },
-	{ label: "History", icon: <BarChart2 size={20} />, path: "/history" },
-	{ label: "Trade", icon: <TrendingUp size={20} />, path: "/tradingstation" },
+	{ label: "Home", icon: <House size={20} />, path: "/platform" },
+	{ label: "Deposit", icon: <ArrowCircleDown size={20} />, path: "/cashier" },
+	{ label: "History", icon: <ChartBar size={20} />, path: "/history" },
+	{ label: "Trade", icon: <TrendUp size={20} />, path: "/tradingstation" },
 	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" }, // Fix path to match desktop
 ];
 
 export const PlatformSidebar: React.FC = () => {
 	const navigate = useNavigate();
 	const location = useLocation();
-	// Set sidebar to be collapsed by default
 	const [collapsed, setCollapsed] = useState(true);
+	const { canInstall, install } = usePwaInstall();
 
 	const getActiveSidebarItem = () => {
 		// Special handling for /cashier and /cashier?tab=payout
@@ -88,6 +89,17 @@ export const PlatformSidebar: React.FC = () => {
 						</button>
 					))}
 				</nav>
+				{/* Download icon button above collapse button, now sticky */}
+				<div className="sticky bottom-14 bg-background z-20 w-full flex justify-center">
+					<button
+						className="flex items-center justify-center mb-2 rounded-md bg-primary text-white hover:bg-primary/90 transition-colors w-10 h-10"
+						onClick={install}
+						aria-label="Download Arthaa App"
+						style={{ outline: 'none' }}
+					>
+						<DownloadSimple size={22} />
+					</button>
+				</div>
 				{/* Collapse button styled like other sidebar buttons */}
 				<div className="sticky bottom-0 bg-background z-20 w-full">
 					<button
@@ -99,7 +111,7 @@ export const PlatformSidebar: React.FC = () => {
 						style={{ minHeight: 32, position: 'relative' }}
 					>
 						<span className="flex items-center justify-center rounded-md w-8 h-8">
-							{collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+							{collapsed ? <CaretRight size={20} /> : <CaretLeft size={20} />}
 						</span>
 					</button>
 				</div>

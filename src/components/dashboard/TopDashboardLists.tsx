@@ -31,7 +31,6 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
   const navigate = useNavigate();
   const hasTransactions = transactions && transactions.length > 0;
   const hasTrades = trades && trades.length > 0;
-  if (!hasTransactions && !hasTrades) return null;
 
   // Helper for date formatting (returns formatted date string as 'Jun, 19 • 5:30 AM')
   const formatDate = (dateStr?: string) => {
@@ -67,13 +66,15 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
       <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Recent Transactions</h3>
-          <button
-            type="button"
-            className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
-            onClick={() => navigate('/history?tab=transactions')}
-          >
-            View All <ArrowUpRight className="w-4 h-4" />
-          </button>
+          {hasTransactions && (
+            <button
+              type="button"
+              className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
+              onClick={() => navigate('/history?tab=transactions')}
+            >
+              View All <ArrowUpRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
         {hasTransactions ? (
           <ul>
@@ -94,20 +95,22 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
             ))}
           </ul>
         ) : (
-          <div className="text-muted-foreground text-sm text-center py-6">No recent transactions</div>
+          <div className="text-muted-foreground text-sm text-center py-6">All your transactions will appear here</div>
         )}
       </div>
       {/* Recent Closed Trades */}
       <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold">Your Trades</h3>
-          <button
-            type="button"
-            className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
-            onClick={() => navigate('/history?tab=closed_trades')}
-          >
-            View All <ArrowUpRight className="w-4 h-4" />
-          </button>
+          {hasTrades && (
+            <button
+              type="button"
+              className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
+              onClick={() => navigate('/history?tab=closed_trades')}
+            >
+              View All <ArrowUpRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
         {hasTrades ? (
           <ul>
@@ -141,7 +144,7 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
             })}
           </ul>
         ) : (
-          <div className="text-muted-foreground text-sm text-center py-6">No recent closed trades</div>
+          <div className="text-muted-foreground text-sm text-center py-6">All your recent closed trades will appear here</div>
         )}
       </div>
     </div>

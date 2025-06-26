@@ -32,7 +32,7 @@ export const AlphaQuantCard: React.FC<{
           </h3>
         </div>
       </div>
-      {typeof todaysProfit === 'number' && (
+      {typeof todaysProfit === 'number' && totalInvested > 0 && (
         <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-400/10 border border-green-300/50 text-xs font-semibold text-foreground shadow-sm mt-4">
           <div className="flex items-center">
             <span className="relative flex h-3 w-3 mr-2">
@@ -44,6 +44,16 @@ export const AlphaQuantCard: React.FC<{
         </div>
       )}
     </div>
+    {activePlans.count === 0 && totalInvested === 0 && (
+      <button
+        className="w-full mt-4 px-4 py-2 rounded-lg bg-warning text-foreground text-sm font-semibold border border-warning hover:bg-warning/80 transition-colors focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2"
+        type="button"
+        onClick={onClick}
+        aria-label="Activate your strategy"
+      >
+        Activate your strategy
+      </button>
+    )}
   </div>
 );
 

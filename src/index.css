@@ -71,12 +71,23 @@
 
 /* ====== Scrollbar Styling ====== */
 ::-webkit-scrollbar {
-  width: 8px;
-  background: var(--color-scrollbar-track);
+  width: 12px;
+  background: #f4f4f5;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: var(--color-scrollbar-thumb);
-  border-radius: 8px;
+  background: #d4d4d8;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 #f4f4f5;
 }
 
 @layer utilities {
