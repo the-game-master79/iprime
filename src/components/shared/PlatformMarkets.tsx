@@ -168,17 +168,17 @@ export const PlatformMarkets: React.FC<{
                   </thead>
                   <tbody>
                     {cryptoData.map((pair) => {
-                      const symbol = pair.symbol.toUpperCase();
-                      let displaySymbol = symbol;
-                      if (displaySymbol.endsWith('/USDT')) {
-                        displaySymbol = displaySymbol.replace(/\/USDT$/, '');
-                      } else if (displaySymbol.endsWith('-USDT')) {
-                        displaySymbol = displaySymbol.replace(/-USDT$/, '');
-                      } else if (displaySymbol.endsWith('USDT')) {
-                        displaySymbol = displaySymbol.replace(/USDT$/, '');
-                      }
+                      // Use the symbol as-is from Supabase
+                      const symbol = pair.symbol;
                       const priceObj = marketPrices[symbol];
                       const decimals = getPriceDecimals(symbol);
+                      // Remove 'USD' or 'USDT' suffix for display
+                      let displaySymbol = symbol;
+                      if (symbol.endsWith('USDT')) {
+                        displaySymbol = symbol.replace(/USDT$/, '');
+                      } else if (symbol.endsWith('USD')) {
+                        displaySymbol = symbol.replace(/USD$/, '');
+                      }
                       return (
                         <tr
                           key={pair.symbol}
@@ -186,7 +186,7 @@ export const PlatformMarkets: React.FC<{
                           onClick={() =>
                             setSelectedPair({
                               type: "crypto",
-                              symbol: displaySymbol,
+                              symbol: symbol,
                               name: pair.name,
                               image_url: pair.image_url,
                               decimals,
@@ -367,7 +367,11 @@ export const PlatformMarkets: React.FC<{
               )}
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg">{selectedPair.symbol}</span>
+                  <span className="font-bold text-lg">
+                    {selectedPair.type === "crypto"
+                      ? selectedPair.symbol.replace(/USDT$/, '').replace(/USD$/, '')
+                      : selectedPair.symbol}
+                  </span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold
                     ${selectedPair.type === "crypto"
                       ? "bg-blue-100 text-blue-700"

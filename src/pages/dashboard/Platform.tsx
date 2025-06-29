@@ -12,13 +12,11 @@ import { supabase } from "@/lib/supabase";
 import { Topbar } from "@/components/shared/Topbar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { BalanceCard } from "@/components/shared/BalanceCard";
-import { AlphaQuantCard, getTotalInvestmentReturns } from "@/components/shared/AlphaQuantCard";
+import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
 import { AffiliateRankCard } from "@/components/shared/AffiliateRankCard";
 import { PlatformMarkets } from "@/components/shared/PlatformMarkets";
 import { ReferralLinkCard } from "@/components/shared/ReferralLinkCard";
-import { DashboardTabs } from "@/components/dashboard/DashboardTabs";
 import LoadingSpinner from "@/components/ui/loading-spinner";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useBreakpoints } from "@/hooks/use-breakpoints";
 import { useTheme } from "@/hooks/use-theme";
@@ -73,10 +71,10 @@ const getPriceChangeClass = (isUp?: boolean) => {
     : "text-red-500";
 };
 
-// Update renderPriceWithBigDigits to accept a "marketClosed" flag and show "Market Closed" in error color
+// Update renderPriceWithBigDigits to display decimals as per the data, without forcing a fixed number of decimals. Only format the last 2 digits visually
 const renderPriceWithBigDigits = (
-  value: number | undefined,
-  decimals: number,
+  value: number | string | undefined,
+  decimals: number, // keep for formatting, but don't use to round
   marketClosed?: boolean,
   isUp?: boolean
 ) => {
@@ -84,21 +82,12 @@ const renderPriceWithBigDigits = (
     return <span className="text-xs text-destructive font-semibold">Market Closed</span>;
   }
   if (value === undefined) return <span className="text-xs text-muted-foreground">Awaiting tick</span>;
-  const str = Number(value).toFixed(decimals);
+  const str = typeof value === 'string' ? value : value.toString();
 
-  if (decimals === 2) {
-    // Make the last 2 digits bigger (including the decimal point)
-    if (str.length < 4) return str;
-    const normal = str.slice(0, -3); // up to before ".dd"
-    const big = str.slice(-3); // ".dd"
-    return (
-      <>
-        {normal}
-        <span className="text-lg font-bold">{big}</span>
-      </>
-    );
-  } else if (decimals > 2) {
-    // Make the last 2 digits bigger
+  // Find the decimal point
+  const dotIdx = str.indexOf(".");
+  if (dotIdx !== -1 && str.length - dotIdx > 2) {
+    // Make the last 2 digits bigger (after decimal)
     const normal = str.slice(0, -2);
     const big = str.slice(-2);
     return (
@@ -108,7 +97,7 @@ const renderPriceWithBigDigits = (
       </>
     );
   }
-  // fallback
+  // fallback: just show as is
   return str;
 };
 
@@ -193,12 +182,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   const [totalReferrals, setTotalReferrals] = useState({ active: 0, total: 0 });
   const [totalCommissions, setTotalCommissions] = useState(0);
   const [rankBonusTotal, setRankBonusTotal] = useState(0);
-  const [businessRank, setBusinessRank] = useState<BusinessRankState>({
-    currentRank: null,
-    nextRank: null,
-    progress: 0,
-    totalBusiness: 0
-  });
 
   const [businessStats, setBusinessStats] = useState({
     currentRank: '',
@@ -239,8 +222,6 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
 
   // Debounced market price update ref
   const marketPricesRef = React.useRef(marketPrices);
-  const pendingUpdatesRef = React.useRef<Record<string, { price: string; bid?: number; ask?: number; isPriceUp?: boolean }>>({});
-  const rafRef = React.useRef<number | null>(null);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -797,7 +778,8 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   useEffect(() => {
     if (cryptoData.length === 0 && forexData.length === 0) return;
 
-    const ws = new WebSocket('wss://transfers.cloudforex.club/ws');
+    // Use the correct WebSocket URL
+    const ws = new WebSocket('wss://transfers.arthaa.pro/ws');
 
     ws.onopen = () => {
       // No need to subscribe to symbols; data is received automatically.
@@ -806,38 +788,34 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        const price =
-          data.data?.price ??
-          data.data?.bid ??
-          data.data?.ask;
-        if (data.symbol && price) {
-          // Normalize symbol for comparison (uppercase, remove delimiters)
-          const normalize = (s: string) => s.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-          const symbol = normalize(data.symbol);
-
+        const symbol = data.symbol;
+        const bid = data.bid;
+        const ask = data.ask;
+        const changePct = data.change_pct;
+        if (symbol && (bid !== undefined || ask !== undefined)) {
           // Only update if symbol is in the displayed crypto or forex pairs
           const displayedSymbols = [
-            ...cryptoData.map(pair => normalize(pair.symbol)),
-            ...forexData.map(pair => normalize(pair.symbol))
+            ...cryptoData.map(pair => pair.symbol),
+            ...forexData.map(pair => pair.symbol)
           ];
           if (!displayedSymbols.includes(symbol)) return;
 
-          const prevPrice = parseFloat(marketPrices[symbol]?.price || "0");
-          const newPrice = parseFloat(price);
+          // Use change_pct to determine price direction if available
+          const isPriceUp = changePct !== undefined ? changePct > 0 : undefined;
 
           setMarketPrices(prev => ({
             ...prev,
             [symbol]: {
-              price: price.toString(),
-              bid: typeof data.data?.bid === "number" ? data.data.bid : undefined,
-              ask: typeof data.data?.ask === "number" ? data.data.ask : undefined,
-              isPriceUp: newPrice > prevPrice
+              price: bid !== undefined ? bid.toString() : ask.toString(),
+              bid,
+              ask,
+              isPriceUp
             }
           }));
 
           setPriceChangeDirection(prev => ({
             ...prev,
-            [symbol]: newPrice > prevPrice ? true : newPrice < prevPrice ? false : prev[symbol]
+            [symbol]: isPriceUp
           }));
 
           // Remove color after 1s
@@ -998,7 +976,7 @@ const Dashboard = () => {
     );
   }
 
-  if (!user) return null;;
+  if (!user) return null;
 
   return <DashboardContent loading={loading} />;
 };
