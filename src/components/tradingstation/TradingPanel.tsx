@@ -19,7 +19,7 @@ interface TradingPanelProps {
   setQuantity: (value: number) => void;
   selectedLeverage: string;
   handleLeverageChange: (leverage: string) => void;
-  leverageOptions: Record<string, string[]>;
+  leverageOptions: string[];
   margin: number;
   balance: number;
   freeMargin: number;
@@ -41,7 +41,7 @@ interface TradingPanelProps {
   totalOpenPnL?: number; // Add total PnL prop
   closeAllTrades?: () => void; // Add closeAllTrades function prop
   openCount?: number; // Add open positions count for button visibility
-  lotsLimits: Record<string, { min: number; max: number }>;
+  lotsLimits: { min: number; max: number };
   isForexTimeActive?: boolean; // <-- Add this prop
 }
 
@@ -155,7 +155,7 @@ const TradingPanel = ({
   // Helper to get min/max lots for current pair, with max lots based on free margin
   const getLotsLimits = () => {
     if (!selectedPair) return { min: 0.01, max: 100 };
-    const staticLimits = lotsLimits[selectedPair.symbol] || { min: 0.01, max: 100 };
+    const staticLimits = lotsLimits || { min: 0.01, max: 100 };
     // Estimate margin per lot
     let marginPerLot = 0;
     if (quantity > 0) {
@@ -469,7 +469,7 @@ const TradingPanel = ({
                     {/* Leverage Options */}
                     <div className="space-y-7">
                       {/* Low Risk */}
-                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) <= 20) && (
+                      {leverageOptions.some((leverage) => parseInt(leverage) <= 20) && (
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-success/20 text-success">
@@ -478,7 +478,7 @@ const TradingPanel = ({
                             <h3 className="text-base font-semibold text-green-700">Low Risk (2-20x)</h3>
                           </div>
                           <div className={`grid ${isMobile ? 'grid-cols-4' : 'grid-cols-5'} gap-2`}>
-                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) <= 20).map((leverage) => (
+                            {leverageOptions.filter((leverage) => parseInt(leverage) <= 20).map((leverage) => (
                               <button
                                 key={leverage}
                                 className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
@@ -495,7 +495,7 @@ const TradingPanel = ({
                         </div>
                       )}
                       {/* Medium Risk */}
-                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500) && (
+                      {leverageOptions.some((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500) && (
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-warning/20 text-warning">
@@ -504,7 +504,7 @@ const TradingPanel = ({
                             <h3 className="text-base font-semibold text-yellow-700">Medium Risk (21-500x)</h3>
                           </div>
                           <div className="grid grid-cols-5 gap-2">
-                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500).map((leverage) => (
+                            {leverageOptions.filter((leverage) => parseInt(leverage) > 20 && parseInt(leverage) <= 500).map((leverage) => (
                               <button
                                 key={leverage}
                                 className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
@@ -521,7 +521,7 @@ const TradingPanel = ({
                         </div>
                       )}
                       {/* High Risk */}
-                      {leverageOptions[selectedPair?.symbol || ""]?.some((leverage) => parseInt(leverage) > 500) && (
+                      {leverageOptions.some((leverage) => parseInt(leverage) > 500) && (
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-error/20 text-error">
@@ -530,7 +530,7 @@ const TradingPanel = ({
                             <h3 className="text-base font-semibold text-red-700">High Risk (500x+)</h3>
                           </div>
                           <div className="grid grid-cols-5 gap-2">
-                            {leverageOptions[selectedPair?.symbol || ""]?.filter((leverage) => parseInt(leverage) > 500).map((leverage) => (
+                            {leverageOptions.filter((leverage) => parseInt(leverage) > 500).map((leverage) => (
                               <button
                                 key={leverage}
                                 className={`flex flex-col items-center px-3 py-2 rounded-xl border-2 font-bold text-sm transition-all duration-200 shadow-sm
@@ -547,7 +547,7 @@ const TradingPanel = ({
                         </div>
                       )}
                       {/* No Leverage Available */}
-                      {!leverageOptions[selectedPair?.symbol || ""]?.length && (
+                      {!leverageOptions.length && (
                         <div className="text-center text-gray-400 py-8">
                           No leverage options available for this pair.
                         </div>

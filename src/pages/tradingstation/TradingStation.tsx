@@ -22,17 +22,22 @@ const LazyActivityPanel = typeof window !== "undefined" && window.innerWidth < 7
   : null;
 
 // WebSocket URL from environment variables
-const WS_URL = import.meta.env.VITE_WS_URL || "wss://transfers.cloudforex.club/ws";
+const WS_URL = import.meta.env.VITE_WS_URL;
 
 // Add constants for WebSocket connection management
 const WS_INITIAL_DELAY = 500; // 0.5 initial delay
 const WS_RECONNECT_DELAY = 5000; // 5 seconds between reconnection attempts
 const WS_MAX_RECONNECT_ATTEMPTS = 5; // Maximum number of reconnection attempts
 
-interface PriceData {
+// Update PriceData type to include ask, bid, changePct
+// If you have a types file, update there. Otherwise, add here for local use:
+type PriceData = {
   price: string;
   symbol: string;
-  isPriceUp?: boolean; // Track if the price went up
+  isPriceUp?: boolean;
+  ask?: number;
+  bid?: number;
+  changePct?: number;
 }
 
 const TradingStation = () => {
@@ -75,6 +80,45 @@ const TradingStation = () => {
   const [userTimezone, setUserTimezone] = useState("Etc/UTC");
   const [userProfile, setUserProfile] = useState<{ id: string; full_name?: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const [tradingPairs, setTradingPairs] = useState<string[]>([]); // Raw trading pairs from DB
+  const [tradingPairMeta, setTradingPairMeta] = useState<Record<string, {
+    leverage_options: string[];
+    min_lots: number;
+    max_lots: number;
+    type: "crypto" | "forex";
+    name?: string; // Add name property
+  }>>({}); // Add state to store trading pair meta info
+
+  // Track last price update time for each pair
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Record<string, number>>({});
+  const [isMarketSlow, setIsMarketSlow] = useState(false);
+
+  // Update lastPriceUpdate on price change
+  useEffect(() => {
+    const now = Date.now();
+    const updated: Record<string, number> = { ...lastPriceUpdate };
+    Object.keys(localPrices).forEach((symbol) => {
+      if (
+        !lastPriceUpdate[symbol] ||
+        localPrices[symbol]?.price !== undefined && localPrices[symbol]?.price !== "0"
+      ) {
+        updated[symbol] = now;
+      }
+    });
+    setLastPriceUpdate(updated);
+    // eslint-disable-next-line
+  }, [localPrices]);
+
+  // Check for slow market
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const isSlow = Object.values(lastPriceUpdate).some((ts) => now - ts > 3000);
+      setIsMarketSlow(isSlow);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastPriceUpdate]);
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -188,20 +232,32 @@ const TradingStation = () => {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            // Accept price, or fallback to bid, or ask
-            const price =
-              data.data?.price ??
-              data.data?.bid ??
-              data.data?.ask;
-            if (data.symbol && price) {
-              // Throttle price updates using requestAnimationFrame
-              const prevPrice = parseFloat(localPrices[data.symbol]?.price || "0");
-              const newPrice = parseFloat(price);
-              pendingPricesRef.current[data.symbol] = {
-                price: price.toString(),
-                symbol: data.symbol,
-                isPriceUp: newPrice > prevPrice,
-              };
+            // Accept both root-level and data-nested fields
+            const wsSymbol = data.symbol || data.data?.symbol;
+            // Remove mapping logic: do not convert USD to USDT
+            const appSymbol = wsSymbol;
+            const ask = data.ask ?? data.data?.ask;
+            const bid = data.bid ?? data.data?.bid;
+            const changePct = data.change_pct ?? data.data?.change_pct;
+            // Use ask as price if available, else bid
+            const price = ask ?? bid;
+            if (appSymbol && price !== undefined) {
+              // Find all tradingPairs that end with appSymbol (e.g., "BINANCE:BTCUSD")
+              const matchingSymbols = tradingPairs.filter(pair => pair.endsWith(appSymbol));
+              // Always include the base symbol as well
+              matchingSymbols.push(appSymbol);
+              matchingSymbols.forEach(symbolKey => {
+                const prevPrice = parseFloat(localPrices[symbolKey]?.price || "0");
+                const newPrice = parseFloat(price);
+                pendingPricesRef.current[symbolKey] = {
+                  price: price.toString(),
+                  symbol: symbolKey,
+                  isPriceUp: newPrice > prevPrice,
+                  ask,
+                  bid,
+                  changePct,
+                };
+              });
               if (!rafRef.current) {
                 rafRef.current = window.requestAnimationFrame(() => {
                   setLocalPrices((prev) => ({
@@ -273,7 +329,7 @@ const TradingStation = () => {
         rafRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, []); // Remove tradingPairs and localPrices from dependencies, run only once on mount
 
   // Update selected pair price when WebSocket data comes in
   useEffect(() => {
@@ -326,100 +382,91 @@ const TradingStation = () => {
     fetchTrades();
   }, []);
 
-  const filteredPairs = Object.values(localPrices).filter((pair) => {
-    const isCrypto = pair.symbol.endsWith("USDT");
-    
-    // Always show crypto pairs
-    if (isCrypto) {
-      return activeTab === "crypto" && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
-    }
-    
-    // Always show forex pairs if forex tab is active
-    return activeTab === "forex" && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  // Fetch trading pairs and their meta info from DB on mount
+  useEffect(() => {
+    const fetchPairs = async () => {
+      const { data, error } = await supabase
+        .from("trading_pairs")
+        .select("symbol, leverage_options, min_lots, max_lots, type, name"); // Fetch name too
+      if (error) {
+        console.error("Error fetching trading pairs:", error);
+        setTradingPairs([]);
+        setTradingPairMeta({});
+      } else {
+        setTradingPairs(data?.map((row: any) => row.symbol) || []);
+        // Map meta info by symbol
+        const meta: Record<string, { leverage_options: string[]; min_lots: number; max_lots: number; type: "crypto" | "forex"; name?: string }> = {};
+        (data || []).forEach((row: any) => {
+          meta[row.symbol] = {
+            leverage_options: Array.isArray(row.leverage_options)
+              ? row.leverage_options.map(String)
+              : typeof row.leverage_options === "string"
+                ? row.leverage_options.split(",").map((l: string) => l.trim())
+                : [],
+            min_lots: Number(row.min_lots) || 0.01,
+            max_lots: Number(row.max_lots) || 100,
+            type: row.type === "crypto" ? "crypto" : "forex",
+            name: row.name || undefined,
+          };
+        });
+        setTradingPairMeta(meta);
+      }
+    };
+    fetchPairs();
+  }, []);
+
+  // WebSocket connection status effect
+  useEffect(() => {
+    const status = wsStatus === "connected" ? "Online" : wsStatus === "disconnected" ? "Offline" : "Connecting...";
+    document.title = `Trading Station - ${status}`;
+  }, [wsStatus]);
+
+  // Check if user profile is loaded
+  if (loading) {
+    return <div>Loading user profile...</div>;
+  }
+
+  // Replace filteredPairs logic to use tradingPairMeta for type
+  const filteredPairs = tradingPairs
+    .map((symbol) => ({
+      symbol,
+      price: localPrices[symbol]?.price || "0",
+      isPriceUp: localPrices[symbol]?.isPriceUp,
+      type: tradingPairMeta[symbol]?.type || "forex",
+    }))
+    .filter((pair) => {
+      return pair.type === activeTab && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+    });
 
   const formatPairName = (symbol: string) => {
     if (symbol.startsWith("FX:")) {
       return symbol.replace("FX:", "").replace("/", ""); // Remove FX: and /
     }
     if (symbol.startsWith("BINANCE:")) {
-      return symbol.replace("BINANCE:", ""); // Remove BINANCE:
+      symbol = symbol.replace("BINANCE:", ""); // Remove BINANCE:
+    }
+    // Remove USDT suffix for crypto pairs
+    if (symbol.endsWith("USDT")) {
+      return symbol.replace(/USDT$/, "");
     }
     return symbol;
   };
 
+  // Replace getFullName to use tradingPairMeta name
   const getFullName = (symbol: string) => {
-    const forexNames: Record<string, string> = {
-      XAU: "Gold",
-      EUR: "Euro",
-      CHF: "Swiss Franc",
-      JPY: "Yen",
-      GBP: "Pounds",
-      CAD: "Canadian Dollar",
-      AUD: "Australian Dollar",
-      USD: "US Dollar",
-    };
-
-    const cryptoNames: Record<string, string> = {
-      BNBUSDT: "Binance Smart Chain",
-      BTCUSDT: "Bitcoin",
-      SOLUSDT: "Solana",
-      ETHUSDT: "Ethereum",
-      DOGEUSDT: "Dogecoin",
-      LINKUSDT: "Chainlink",
-      TRXUSDT: "Tron",
-      ADAUSDT: "Cardano",
-      DOTUSDT: "Polkadot",
-    };
-
-    if (symbol.endsWith("USDT")) {
-      return cryptoNames[symbol] || "Unknown Crypto";
-    }
-
-    const baseCurrency = symbol.slice(0, 3);
-    const quoteCurrency = symbol.slice(3);
-    return `${forexNames[baseCurrency] || baseCurrency} Vs ${
-      forexNames[quoteCurrency] || quoteCurrency
-    }`;
+    return tradingPairMeta[symbol]?.name || symbol;
   };
 
   const getCryptoImageForSymbol = (symbol: string) => {
-    const cryptoImages: Record<string, string> = {
-      BTCUSDT: "btc",
-      ETHUSDT: "eth",
-      SOLUSDT: "sol",
-      DOGEUSDT: "doge",
-      BNBUSDT: "bnb",
-      LINKUSDT: "link",
-      TRXUSDT: "trx",
-      ADAUSDT: "ada",
-      DOTUSDT: "dot",
-      // Add more Crypto mappings here
-    };
-
+    // Use the symbol in lowercase for trading_pairs.svg
     const baseUrl = "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public";
-    // If symbol is not mapped, try to use the base asset (e.g., SOLUSDT -> sol)
-    let cryptoKey = cryptoImages[symbol];
-    if (!cryptoKey && symbol.endsWith("USDT")) {
-      cryptoKey = symbol.replace("USDT", "").toLowerCase();
-    }
-    return cryptoKey
-      ? `${baseUrl}/${cryptoKey}.svg`
-      : `${baseUrl}/default.svg`;
+    return `${baseUrl}/${symbol.toLowerCase()}.svg`;
   };
 
-  // Fix getForexImageForSymbol to always use dash between base and quote
+  // Update getForexImageForSymbol to use the symbol in lowercase
   const getForexImageForSymbol = (symbol: string) => {
     const baseUrl = "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public";
-    // Remove FX: or BINANCE: prefix, then split into base and quote, join with dash, and lowercase
-    let cleanSymbol = symbol.replace(/^FX:|^BINANCE:/, "");
-    if (cleanSymbol.includes("/")) {
-      cleanSymbol = cleanSymbol.replace("/", "-");
-    } else if (cleanSymbol.length === 6) {
-      cleanSymbol = cleanSymbol.slice(0, 3) + "-" + cleanSymbol.slice(3);
-    }
-    cleanSymbol = cleanSymbol.toLowerCase();
-    return `${baseUrl}/${cleanSymbol}.svg`;
+    return `${baseUrl}/${symbol.toLowerCase()}.svg`;
   };
 
   const calculateVolumeWithLeverage = () => {
@@ -448,53 +495,22 @@ const TradingStation = () => {
     }
   };
 
-  const leverageOptions: Record<string, string[]> = {
-    USDCHF: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    SOLUSDT: ["2", "5", "10", "20", "50", "100"],
-    BNBUSDT: ["2", "5", "10", "20", "50", "100", "200", "500"],
-    DOTUSDT: ["2", "5", "10", "20", "50", "100"],
-    EURUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    ETHUSDT: ["2", "5", "10", "20"],
-    EURJPY: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    DOGEUSDT: ["1"],
-    BTCUSDT: ["2", "5", "10", "20", "50", "100", "200", "500", "1000"],
-    USDJPY: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    XAUUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000"],
-    TRXUSDT: ["2", "5", "10", "20", "50", "100"],
-    AUDUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    EURCHF: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    POLUSDT: ["2", "5", "10", "20", "50", "100"],
-    LINKUSDT: ["2", "5", "10", "20", "50", "100"],
-    GBPUSD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    USDCAD: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    EURGBP: ["2", "5", "10", "20", "50", "100", "200", "500", "1000", "2000"],
-    ADAUSDT: ["2", "5", "10", "20", "50", "100"],
+  // Helper to get leverage options for selected pair
+  const getLeverageOptions = (symbol: string | undefined) => {
+    if (!symbol) return [];
+    return tradingPairMeta[symbol]?.leverage_options || [];
   };
 
-  // Add lots limits for all pairs
-  const lotsLimits: Record<string, { min: number; max: number }> = {
-    USDCHF: { min: 0.01, max: 100 },
-    SOLUSDT: { min: 0.01, max: 100 },
-    BNBUSDT: { min: 0.01, max: 100 },
-    DOTUSDT: { min: 0.01, max: 100 },
-    EURUSD: { min: 0.01, max: 100 },
-    ETHUSDT: { min: 0.01, max: 100 },
-    EURJPY: { min: 0.01, max: 100 },
-    DOGEUSDT: { min: 1, max: 100000 },
-    BTCUSDT: { min: 0.001, max: 10 },
-    USDJPY: { min: 0.01, max: 100 },
-    XAUUSD: { min: 0.01, max: 50 },
-    TRXUSDT: { min: 10, max: 100000 },
-    AUDUSD: { min: 0.01, max: 100 },
-    EURCHF: { min: 0.01, max: 100 },
-    POLUSDT: { min: 0.01, max: 100 },
-    LINKUSDT: { min: 0.01, max: 100 },
-    GBPUSD: { min: 0.01, max: 100 },
-    USDCAD: { min: 0.01, max: 100 },
-    EURGBP: { min: 0.01, max: 100 },
-    ADAUSDT: { min: 1, max: 100000 },
-    // Add more pairs as needed
+  // Helper to get lots limits for selected pair
+  const getLotsLimits = (symbol: string | undefined) => {
+    if (!symbol) return { min: 0.01, max: 100 };
+    return {
+      min: tradingPairMeta[symbol]?.min_lots ?? 0.01,
+      max: tradingPairMeta[symbol]?.max_lots ?? 100,
+    };
   };
+
+  // Remove the timezone effect and fetchTimezone
 
   const calculateMargin = () => {
     if (!selectedPair) return 0;
@@ -574,7 +590,7 @@ const TradingStation = () => {
         return [filteredPairs[0]];
       });
       // Set leverage to max available for the pair
-      const leverages = leverageOptions[filteredPairs[0].symbol || ""] || [];
+      const leverages = getLeverageOptions(filteredPairs[0].symbol);
       const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
       if (maxLeverageForPair !== -Infinity) {
         setSelectedLeverage(maxLeverageForPair.toString());
@@ -592,7 +608,7 @@ const TradingStation = () => {
         setSelectedPair(firstForexPair);
         setSelectedPairs([firstForexPair]);
         // Set leverage to max available for the pair
-        const leverages = leverageOptions[firstForexPair.symbol || ""] || [];
+        const leverages = getLeverageOptions(firstForexPair.symbol);
         const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
         if (maxLeverageForPair !== -Infinity) {
           setSelectedLeverage(maxLeverageForPair.toString());
@@ -615,7 +631,7 @@ const TradingStation = () => {
     });
 
     // Always select the max leverage for the pair
-    const leverages = leverageOptions[pair.symbol || ""] || [];
+    const leverages = getLeverageOptions(pair.symbol);
     const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
 
     if (maxLeverageForPair === -Infinity) {
@@ -626,18 +642,15 @@ const TradingStation = () => {
   };
 
   const handleLeverageChange = (newLeverage: string) => {
-    const maxLeverageForPair = Math.max(
-      ...(leverageOptions[selectedPair?.symbol || ""] || []).map((l) => parseInt(l))
-    );
-  
+    const leverages = getLeverageOptions(selectedPair?.symbol);
+    const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
+
     if (parseInt(newLeverage) > maxLeverageForPair) {
-      // Use the pair's max leverage without updating the database
       setSelectedLeverage(maxLeverageForPair.toString());
       console.log(
         `Selected leverage exceeds max leverage for this pair. Using max leverage: ${maxLeverageForPair}x`
       );
     } else {
-      // Update leverage and save to the database
       setSelectedLeverage(newLeverage);
     }
   };
@@ -779,16 +792,16 @@ const TradingStation = () => {
           </td>
           <td className="px-4 py-2">
             <span className="px-2 py-1 rounded-full bg-secondary text-foreground text-xs font-semibold hover:bg-muted/30 transition-all">
-              {trade.lots.toFixed(2)}
+              {trade.lots}
             </span>
           </td>
           <td className="px-4 py-2 text-xs text-foreground">
-            {Number(trade.open_price).toFixed(decimals)}
+            {trade.open_price}
           </td>
           <td className="px-4 py-2 text-xs text-foreground">
-            {Number(trade.close_price).toFixed(decimals)}
+            {trade.close_price}
           </td>
-          <td className="px-4 py-2 text-xs text-foreground">${Number(trade.margin_amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+          <td className="px-4 py-2 text-xs text-foreground">${trade.margin_amount ?? 0}</td>
           <td className="px-4 py-2">
             <span
               className={`px-2 py-1 rounded-full text-white text-xs font-semibold transition-all ${
@@ -814,7 +827,7 @@ const TradingStation = () => {
             })}
           </td>
           <td className={`px-4 py-2 text-xs ${Number(trade.pnl ?? 0) >= 0 ? "text-success" : "text-error"}`}>
-            ${Number(trade.pnl ?? 0).toFixed(2)}
+            ${trade.pnl ?? 0}
           </td>
         </tr>
       );
@@ -859,7 +872,6 @@ const TradingStation = () => {
 
   // For tab badges, update counts to use real trades:
   const openCount = openTrades.length;
-  const pendingCount = pendingTrades.length;
   const closedCount = closedTrades.length;
 
   // Calculate free margin as balance minus used margin
@@ -1070,7 +1082,7 @@ const TradingStation = () => {
           </td>
           <td className="px-4 py-2">
             <span className="px-2 py-1 rounded-full bg-muted/20 text-xs font-semibold hover:bg-muted/30 transition-all">
-              {g.totalLots.toFixed(2)}
+              {g.totalLots}
             </span>
             {/* Show open positions count if more than 1 */}
             {g.trades.length > 0 && (
@@ -1080,13 +1092,13 @@ const TradingStation = () => {
             )}
           </td>
           <td className="px-4 py-2 text-xs">
-            {Number(firstTrade.open_price).toFixed(decimals)}
+            {firstTrade.open_price}
           </td>
           <td className="px-4 py-2 text-xs">
-            {Number(currentPrice).toFixed(decimals)}
+            {currentPrice}
           </td>
           <td className="px-4 py-2 text-xs">
-            ${g.totalMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            ${g.totalMargin}
           </td>
           <td className="px-4 py-2">
             <span
@@ -1113,7 +1125,7 @@ const TradingStation = () => {
             })}
           </td>
           <td className={`px-4 py-2 text-xs ${g.totalLivePnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-            ${g.totalLivePnl.toFixed(2)}
+            ${g.totalLivePnl}
           </td>
           <td className="px-4 py-2 text-xs">
             {/* Show Close button for open trades (all trades in group are open) */}
@@ -1650,6 +1662,15 @@ const TradingStation = () => {
         </style>
 
         <div className="relative flex flex-col md:flex-row">
+          {/* Market Slow Badge Below Tabs in Sidebar */}
+          {isMarketSlow && (
+            <div className="absolute left-0 right-0 top-12 z-10 flex justify-center">
+              <span className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded shadow text-xs font-semibold">
+                Market is slow today
+              </span>
+            </div>
+          )}
+
           {/* Mobile Menu Overlay */}
           {isMobile && showMobileMenu && (
             <div 
@@ -1677,7 +1698,8 @@ const TradingStation = () => {
                 getForexImageForSymbol={getForexImageForSymbol}
                 isMobile={isMobile}
                 closeMobileMenu={() => setShowMobileMenu(false)}
-                navigateToTradeTab={() => toggleMobileView("trading")} 
+                navigateToTradeTab={() => toggleMobileView("trading")}
+                isMarketSlow={isMarketSlow} // Pass market slow state to Sidebar
               />
             </div>
           )}
@@ -1707,7 +1729,7 @@ const TradingStation = () => {
                     setQuantity={setQuantity}
                     selectedLeverage={selectedLeverage}
                     handleLeverageChange={handleLeverageChange}
-                    leverageOptions={leverageOptions}
+                    leverageOptions={getLeverageOptions(selectedPair?.symbol)}
                     margin={margin}
                     balance={balance}
                     freeMargin={freeMargin}
@@ -1729,8 +1751,7 @@ const TradingStation = () => {
                     totalOpenPnL={totalOpenPnL}
                     closeAllTrades={closeAllTrades}
                     openCount={openCount}
-                    lotsLimits={lotsLimits}
-                    isForexTimeActive={isForexTimeActive()}
+                    lotsLimits={getLotsLimits(selectedPair?.symbol)}
                   />
                 </Suspense>
               ) : (
@@ -1741,7 +1762,7 @@ const TradingStation = () => {
                     setQuantity={setQuantity}
                     selectedLeverage={selectedLeverage}
                     handleLeverageChange={handleLeverageChange}
-                    leverageOptions={leverageOptions}
+                    leverageOptions={getLeverageOptions(selectedPair?.symbol)}
                     margin={margin}
                     balance={balance}
                     freeMargin={freeMargin}
@@ -1763,8 +1784,7 @@ const TradingStation = () => {
                     totalOpenPnL={totalOpenPnL}
                     closeAllTrades={closeAllTrades}
                     openCount={openCount}
-                    lotsLimits={lotsLimits}
-                    isForexTimeActive={isForexTimeActive()}
+                    lotsLimits={getLotsLimits(selectedPair?.symbol)}
                   />
                 )
               )}
@@ -1780,15 +1800,13 @@ const TradingStation = () => {
                 activityCollapsed={false} // Always expanded in mobile view
                 setActivityCollapsed={setActivityCollapsed}
                 activityHeight={activityHeight}
-                activeTradeTab={activeTradeTab}
+                activeTradeTab={activeTradeTab === "pending" ? "open" : activeTradeTab}
                 setActiveTradeTab={setActiveTradeTab}
                 openCount={openCount}
-                pendingCount={pendingCount}
                 closedCount={closedCount}
                 totalOpenPnL={totalOpenPnL}
                 totalClosedPnL={totalClosedPnL}
-                renderOpenTrades={(trades) => renderTrades(trades)}
-                renderPendingTrades={(trades) => renderTrades(trades)}
+                renderOpenTrades={renderTrades}
                 renderClosedTrades={renderClosedTrades}
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -1799,7 +1817,6 @@ const TradingStation = () => {
                 marginLevel={marginLevel}
                 onResizeStart={onResizeStart}
                 openTrades={openTrades}
-                pendingTrades={pendingTrades}
                 localPrices={localPrices}
                 handleCloseTrade={handleCloseTrade}
                 formatPairName={formatPairName}
@@ -1808,7 +1825,6 @@ const TradingStation = () => {
                 getPriceDecimals={getPriceDecimals}
                 closedTrades={closedTrades}
                 fullPage={true} // Set fullPage mode to true for mobile
-                isForexTimeActive={isForexTimeActive()}
               />
             </Suspense>
           ) : null
@@ -1819,26 +1835,24 @@ const TradingStation = () => {
             activityCollapsed={activityCollapsed}
             setActivityCollapsed={setActivityCollapsed}
             activityHeight={activityHeight}
-            activeTradeTab={activeTradeTab}
+            activeTradeTab={activeTradeTab === "pending" ? "open" : activeTradeTab}
             setActiveTradeTab={setActiveTradeTab}
             openCount={openCount}
-            pendingCount={pendingCount}
             closedCount={closedCount}
             totalOpenPnL={totalOpenPnL}
             totalClosedPnL={totalClosedPnL}
             renderOpenTrades={(trades) => renderTrades(trades)}
-            renderPendingTrades={(trades) => renderTrades(trades)}
             renderClosedTrades={renderClosedTrades}
+
             currentPage={currentPage}
             totalPages={totalPages}
             handlePageChange={handlePageChange}
             balance={balance}
-            usedMargin={usedMargin}
+            usedMargin={ usedMargin}
             freeMargin={freeMargin}
             marginLevel={marginLevel}
             onResizeStart={onResizeStart}
             openTrades={openTrades}
-            pendingTrades={pendingTrades}
             localPrices={localPrices}
             handleCloseTrade={handleCloseTrade}
             formatPairName={formatPairName}
@@ -1847,7 +1861,6 @@ const TradingStation = () => {
             getPriceDecimals={getPriceDecimals}
             closedTrades={closedTrades}
             fullPage={false} // Standard bottom panel for desktop
-            isForexTimeActive={isForexTimeActive()}
           />
         )}
 
@@ -1863,7 +1876,7 @@ const TradingStation = () => {
               }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect>
+                               <rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect>
                 <line x1="8" y1="12" x2="16" y2="12"></line>
                 <line x1="8" y1="16" x2="16" y2="16"></line>
                 <line x1="8" y1="8" x2="16" y2="8"></line>
@@ -1874,6 +1887,7 @@ const TradingStation = () => {
             <button
               className={`mobile-menu-button ${activeView === "trading" ? "active" : ""}`}
               onClick={() => {
+
                 toggleMobileView("trading");
                 setShowMobileMenu(false); // Always hide mobile menu when selecting trade
               }}

@@ -14,6 +14,7 @@ interface PriceData {
   price: string;
   symbol: string;
   isPriceUp?: boolean;
+  type?: "crypto" | "forex";
 }
 
 interface SidebarProps {
@@ -33,6 +34,7 @@ interface SidebarProps {
   isMobile?: boolean;
   closeMobileMenu?: () => void;
   navigateToTradeTab?: () => void; // Add new prop for navigating to trade tab
+  isMarketSlow?: boolean; // Add prop for market slow badge
 }
 
 // Add this utility for price animation (before Sidebar)
@@ -59,7 +61,8 @@ const Sidebar = ({
   getForexImageForSymbol,
   isMobile = false,
   closeMobileMenu,
-  navigateToTradeTab
+  navigateToTradeTab,
+  isMarketSlow = false // Destructure new prop with default
 }: SidebarProps) => {
   // For mobile, we'll ignore the isCollapsed prop and always show content
   const showContent = isMobile || !isCollapsed;
@@ -163,27 +166,11 @@ const Sidebar = ({
     }
   };
   
-  // Add this helper to format price with big digits for bid/ask
-  const renderPriceWithBigDigits = (value: string | number | undefined, decimals: number) => {
+  // Add this helper to format price with big digits for last 2 digits
+  const renderPriceWithBigDigits = (value: string | number | undefined) => {
     if (value === undefined) return "-";
-    const str = Number(value).toFixed(decimals);
-
-    if (decimals === 2) {
-      // Make the digit before the decimal and the decimal point bigger
-      const dotIdx = str.indexOf(".");
-      if (dotIdx <= 0) return str;
-      const before = str.slice(0, dotIdx - 1);
-      const big = str.slice(dotIdx - 1, dotIdx + 1); // digit before + "."
-      const after = str.slice(dotIdx + 1);
-      return (
-        <>
-          {before}
-          <span className="text-lg font-bold">{big}</span>
-          {after}
-        </>
-      );
-    } else if (decimals > 2) {
-      // Make the last 2 digits bigger
+    const str = value.toString();
+    if (str.length > 2) {
       const normal = str.slice(0, -2);
       const big = str.slice(-2);
       return (
@@ -195,20 +182,6 @@ const Sidebar = ({
     }
     // fallback
     return str;
-  };
-
-  // Helper to get decimals for a symbol
-  const getPriceDecimals = (symbol: string) => {
-    if (symbol === "XAUUSD") return 2;
-    if (symbol.endsWith("JPY")) return 3;
-    if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
-    if (symbol === "DOGEUSDT") return 5;
-    if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
-    if (symbol === "DOTUSDT") return 3;
-    // Default: forex pairs (non-JPY, non-XSUPER, non-crypto)
-    if (!symbol.endsWith("USDT")) return 5;
-    // Fallback
-    return 2;
   };
 
   // Track previous prices for animation
@@ -376,7 +349,6 @@ const Sidebar = ({
               {isMobile ? "Markets" : "Trading Station"}
             </h1>
           </div>
-          
           {/* Search bar - Compact */}
           <div className="relative mb-3">
             <MagnifyingGlass className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -387,7 +359,6 @@ const Sidebar = ({
               className="pl-8 pr-2 h-8 text-sm rounded-md bg-muted/40 border border-border/20 focus:border-primary/40 transition-colors"
             />
           </div>
-          
           {/* Tab buttons - Sleek pill style */}
           <div className="flex gap-1 mb-3 w-full bg-muted/10 rounded-lg p-1">
             <Button
@@ -407,11 +378,32 @@ const Sidebar = ({
               Forex
             </Button>
           </div>
+          {/* Market Slow Badge Below Tabs */}
+          {isMarketSlow && (
+            <div className="mb-3 flex justify-center">
+              <span className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded shadow text-xs font-regular">
+                <span className="text-foreground font-bold">Alpha</span>
+                <span className="text-yellow-800 font-bold">Quant </span>
+                says: Market is slow right now.
+              </span>
+            </div>
+          )}
+          {/* Show forex market closed banner if needed */}
+          {activeTab === "forex" && !isForexMarketOpen && (
+            <div className="mb-3 p-2 rounded-md bg-yellow-100 text-yellow-800 text-center text-sm font-medium border border-yellow-300">
+              Forex market is currently closed.<br />
+              {countdown && (
+                <span>
+                  Market opens in <span className="font-semibold">{countdown}</span>
+                </span>
+              )}
+            </div>
+          )}
           {/* Market pairs grid - Compact, elegant cards */}
           <div className="grid grid-cols-1 gap-1 overflow-y-auto">
             {filteredPairs.map((pair) => {
-              const decimals = getPriceDecimals(pair.symbol);
               const isUp = animatedPairs[pair.symbol];
+              // No disabling or lock icon, just show pairs as normal
               return (
                 <Button
                   key={pair.symbol}
@@ -429,7 +421,7 @@ const Sidebar = ({
                   <div className="flex items-center gap-2">
                     <img
                       src={
-                        pair.symbol.endsWith("USDT")
+                        pair.type === "crypto"
                           ? getCryptoImageForSymbol(pair.symbol)
                           : getForexImageForSymbol(pair.symbol)
                       }
@@ -450,7 +442,7 @@ const Sidebar = ({
                       key={pair.symbol + "-" + pair.price}
                       className={`font-mono font-medium text-base transition-all duration-500 ${getPriceChangeClass(isUp)}`}
                     >
-                      {renderPriceWithBigDigits(pair.price, decimals)}
+                      {renderPriceWithBigDigits(pair.price)}
                     </div>
                   </div>
                 </Button>

@@ -433,7 +433,7 @@ const Login = () => {
                           helperText={
                             currentUserReferralCode
                             ? (
-                              <span className="text-success-foreground">
+                              <span className="text-success">
                                 User is Active. Code: <b>{currentUserReferralCode}</b>
                               </span>
                               )

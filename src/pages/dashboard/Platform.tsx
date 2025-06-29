@@ -778,8 +778,8 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   useEffect(() => {
     if (cryptoData.length === 0 && forexData.length === 0) return;
 
-    // Use the correct WebSocket URL
-    const ws = new WebSocket('wss://transfers.arthaa.pro/ws');
+    // Use the WebSocket URL from environment variable
+    const ws = new WebSocket(import.meta.env.VITE_WS_URL as string);
 
     ws.onopen = () => {
       // No need to subscribe to symbols; data is received automatically.
