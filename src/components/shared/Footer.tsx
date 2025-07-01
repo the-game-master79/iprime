@@ -18,8 +18,8 @@ export const Footer = () => {
           </a>
         </div>
         {/* Row 2: Links (left) and Socials (right) */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 w-full">
-          <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-start md:items-center">
             <Link to="/company" className="text-sm text-muted-foreground hover:text-foreground">
               Company
             </Link>
@@ -43,7 +43,7 @@ export const Footer = () => {
               Contact Us
             </Link>
           </div>
-          <div className="flex gap-4 items-center mt-4 md:mt-0">
+          <div className="flex gap-4 items-center mt-4 md:mt-0 justify-start md:justify-end w-full md:w-auto">
             <a href="https://x.com/arthaa_pro" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">
               <TwitterLogo size={20} weight="fill" />
             </a>
@@ -70,20 +70,20 @@ export const Footer = () => {
         {/* Divider */}
         <div className="w-full border-t border-muted-foreground/20 my-2"></div>
         {/* Row 4: Payment/Security/Token Logos (left) and Copyright (right) */}
-        <div className="flex flex-col md:flex-row justify-between items-center w-full text-xs text-muted-foreground mt-2 gap-2">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full text-xs text-muted-foreground mt-2 gap-2">
           <div className="flex gap-3 items-center mb-2 md:mb-0 flex-wrap">
             <div className="flex items-center px-2 py-1 bg-background/60 shadow-sm">
               <CreditCard size={20} weight="fill" className="text-foreground mr-2" />
               <span className="font-medium text-foreground text-[13px] tracking-tight">Credit / Debit Card</span>
             </div>
             <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/pci-dss.svg" alt="PCI DSS" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/btc.svg" alt="Bitcoin" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/btcusd.svg" alt="Bitcoin" className="h-6 w-auto" />
             <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/usdt.svg" alt="USDT" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/trx.svg" alt="Tron" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/eth.svg" alt="Ethereum" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/sol.svg" alt="Solana" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/bnb.svg" alt="BNB" className="h-6 w-auto" />
-            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ada.svg" alt="Cardano" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/trxusd.svg" alt="Tron" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/ethusd.svg" alt="Ethereum" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/solusd.svg" alt="Solana" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/bnbusd.svg" alt="BNB" className="h-6 w-auto" />
+            <img src="https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public/adausd.svg" alt="Cardano" className="h-6 w-auto" />
             <span className="border border-foreground text-foreground rounded px-2 py-2 font-bold text-xs flex items-center gap-1 ml-2" style={{lineHeight:1}}>
               18+
             </span>
@@ -91,7 +91,7 @@ export const Footer = () => {
               Trade<br />Responsibly
             </span>
           </div>
-          <div className="flex justify-end w-full md:w-auto">
+          <div className="flex justify-start md:justify-end w-full md:w-auto">
             © {new Date().getFullYear()} Arthaa. All rights reserved.
           </div>
         </div>

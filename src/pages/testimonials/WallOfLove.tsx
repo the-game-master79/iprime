@@ -218,7 +218,7 @@ const WallOfLove = () => {
 					<div className="container max-w-[1200px] mx-auto px-4">
 						<div className="flex flex-col md:flex-row md:items-center md:justify-between items-start text-left gap-3 max-w-7xl mb-8 mt-12 w-full">
 							<div className="w-full flex flex-col md:flex-row md:items-center md:justify-between">
-								<h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full md:w-auto">
+								<h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full md:w-auto tracking-tight">
 									Wall of{" "}
 									<span className="bg-clip-text text-transparent bg-gradient-to-br from-pink-500 to-red-500">
 										Love
@@ -320,7 +320,7 @@ const WallOfLove = () => {
 											/>
 											<div>
 												<div className="flex items-center gap-1">
-													<span className="font-semibold text-foreground text-base">
+													<span className="font-semibold text-foreground text-base tracking-tight">
 														{testimonial.name}
 													</span>
 													{/* Fake Twitter checkmark */}
@@ -352,7 +352,7 @@ const WallOfLove = () => {
 											</div>
 										</div>
 										{/* Content */}
-										<p className="text-[15px] text-foreground leading-relaxed font-normal mb-4">
+										<p className="text-[15px] text-foreground leading-relaxed font-normal mb-4 tracking-tight">
 											{testimonial.content}
 										</p>
 										{/* Footer: Twitter icon */}

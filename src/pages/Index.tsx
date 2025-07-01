@@ -1,12 +1,7 @@
 import { lazy, Suspense, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageTransition } from "@/components/ui-components";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Envelope, Lightning } from "@phosphor-icons/react";
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
@@ -99,7 +94,7 @@ const Index = () => {
             {/* Lazy load below-the-fold sections */}
             <Suspense fallback={<div className="min-h-[200px]" />}> <QuickFeatures /> </Suspense>
             <Suspense fallback={<div className="min-h-[200px]" />}> <HowItWorks /> </Suspense>
-            <ClEngine />
+            <Suspense fallback={<div className="min-h-[200px]" />}> <ClEngine /> </Suspense>
             <Suspense fallback={<div className="min-h-[200px]" />}> <Features /> </Suspense>
             <Suspense fallback={<div className="min-h-[200px]" />}> <FaqPage /> </Suspense>
             <Suspense fallback={<div className="min-h-[200px]" />}> <WallOfLove /> </Suspense>

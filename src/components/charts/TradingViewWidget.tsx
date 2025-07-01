@@ -127,10 +127,12 @@ function TradingViewWidget({
             theme: defaultTheme,
             style: defaultStyle,
             locale: defaultLocale,
-            hide_legend: defaultHideLegend,
-            allow_symbol_change: defaultAllowSymbolChange,
+            hide_legend: false, // Ensure legend/details are visible
+            allow_symbol_change: true, // Always allow symbol change
             save_image: false,
-            support_host: "https://www.tradingview.com"
+            support_host: "https://www.tradingview.com",
+            details: true, // Ensure details are visible
+            withdateranges: true // Optional: enhance UI
           };
           
           script.innerHTML = JSON.stringify(config);

@@ -7,7 +7,7 @@ export const HowItWorks = () => {
         <div className="flex flex-col items-end text-right gap-4 max-w-2xl ml-auto mb-12">
           <div className="flex items-center gap-2">
           </div>
-          <h2 className="text-5xl md:text-6xl font-bold text-foreground text-right w-full">
+          <h2 className="text-5xl md:text-6xl font-bold text-foreground text-right w-full tracking-tight">
             What should I do after sign up?
           </h2>
         </div>
@@ -28,7 +28,7 @@ export const HowItWorks = () => {
             />
             {/* Content */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.5fr] items-center gap-4 md:gap-8 max-w-3xl">
-              <h3 className="text-4xl font-extrabold text-primary mb-0 leading-tight">
+              <h3 className="text-4xl font-extrabold text-primary mb-0 leading-tight tracking-tight">
                 Fund Your <br /> Account
               </h3>
               <p className="text-xl font-medium text-primary/80 mb-0 text-left max-w-[340px]">
@@ -52,7 +52,7 @@ export const HowItWorks = () => {
             />
             {/* Content */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.5fr] items-center gap-4 md:gap-8 max-w-3xl">
-              <h3 className="text-4xl font-extrabold text-primary mb-0 leading-tight">
+              <h3 className="text-4xl font-extrabold text-primary mb-0 leading-tight tracking-tight">
                 Execute <br /> Trades
               </h3>
               <p className="text-xl font-medium text-primary/80 mb-0 text-left max-w-[340px]">
@@ -76,7 +76,7 @@ export const HowItWorks = () => {
             />
             {/* Content */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.5fr] items-center gap-4 md:gap-8 max-w-3xl">
-                <h3 className="text-4xl font-extrabold mb-0 leading-tight">
+                <h3 className="text-4xl font-extrabold mb-0 leading-tight tracking-tight">
                 <span className="text-primary">Invest with <br></br></span>
                 <span>
                   <span className="text-foreground">Alpha</span>

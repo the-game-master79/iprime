@@ -58,7 +58,7 @@ export const QuickFeatures = () => {
       {/* Removed SVG grid and dot patterns */}
       <div className="container max-w-[1200px] mx-auto px-4 relative z-10">
         <div className="flex flex-col items-start text-left gap-3 max-w-2xl mb-8 mt-12">
-          <h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full">
+          <h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full tracking-tight">
             The <span className="whitespace-nowrap">all-in-one</span><br />
             trading ecosystem
           </h2>
@@ -87,7 +87,7 @@ function FeatureCard({ feature, index }: { feature: any; index: number }) {
           <feature.icon className={`h-10 w-10 ${feature.iconColor}`} weight="fill" />
         </div>
         <h3
-          className={`font-bold text-3xl md:text-4xl mt-2 text-left bg-clip-text text-transparent bg-gradient-to-br ${feature.color}`}
+          className={`font-bold text-3xl md:text-4xl mt-2 text-left bg-clip-text text-transparent bg-gradient-to-br ${feature.color} tracking-tight`}
         >
           {feature.title}
         </h3>

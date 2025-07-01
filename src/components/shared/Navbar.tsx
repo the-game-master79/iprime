@@ -1,15 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sun, Moon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/hooks/use-theme";
+import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
 
 export const Navbar = ({ variant }: { variant?: "blogs" }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setTheme, theme } = useTheme();
 
   const handleNavigation = (path: string) => {
     // List of routes that require authentication
@@ -47,9 +45,7 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
               <img
                 src={
                   isBlogsVariant
-                    ? theme === "dark"
-                      ? "/arthaa-dark.svg"
-                      : "/arthaa-light.svg"
+                    ? "/arthaa-light.svg"
                     : "/arthaa-dark.svg"
                 }
                 alt="Arthaa Logo"
@@ -80,35 +76,20 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            {/* Theme toggle button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "flex items-center justify-center",
-                isBlogsVariant ? "text-foreground" : "text-white"
-              )}
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" && <Sun className="h-5 w-5" weight="bold" />}
-              {theme !== "dark" && <Moon className="h-5 w-5" weight="bold" />}
-            </Button>
-            <Link to={user ? "/platform" : "/auth/login"}>
-              <Button className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
-                {user ? (
-                  <>
-                    <span className="hidden md:inline">Access Platform</span>
-                    <span className="inline md:hidden">Dashboard</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="hidden md:inline">Register</span>
-                    <span className="inline md:hidden">Register</span>
-                  </>
-                )}
-              </Button>
-            </Link>
+            {user ? (
+              <AccessPlatformButton
+                navbar // Use the new navbar prop for compact style
+                desktopOnly={false}
+                mobileOnly={false}
+              />
+            ) : (
+              <Link to="/auth/login">
+                <Button className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
+                  <span className="hidden md:inline">Register</span>
+                  <span className="inline md:hidden">Register</span>
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

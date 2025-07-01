@@ -235,7 +235,7 @@ export const ClEngine = () => {
                             />
                           </span>
                         )}
-                        <span className="font-bold text-base text-foreground">{pair.symbol}</span>
+                        <span className="font-bold text-base text-foreground tracking-tight">{pair.symbol}</span>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
                         <span className="text-green-500">
@@ -244,7 +244,7 @@ export const ClEngine = () => {
                             <path d="M17 13V7h-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </span>
-                        <span className="font-bold text-green-600 text-sm">
+                        <span className="font-bold text-green-600 text-sm tracking-tight">
                           +${pairProfits[pair.id]?.toLocaleString() ?? "--"}
                         </span>
                         <span className="text-[10px] text-foreground/60 font-medium ml-1">today</span>

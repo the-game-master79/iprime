@@ -10,6 +10,7 @@ import { ArrowCircleRight, Moon, Sun, SealCheck } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { Navbar } from "@/components/shared/Navbar"; // <-- Add this import
+import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
 
 interface HeroProps {
   badge: {
@@ -100,24 +101,8 @@ export const Hero = ({
           <div className="block pt-8 w-full">
             {user ? (
               <>
-                {/* Mobile button */}
-                <Link to="/platform" className="block md:hidden w-full">
-                  <Button
-                    size="sm"
-                    className="gap-2 px-6 bg-card text-card-foreground hover:bg-card/95 text-base transition-all h-14 rounded-md w-full"
-                  >
-                    Access Platform
-                  </Button>
-                </Link>
-                {/* Desktop button */}
-                <Link to="/platform" className="hidden md:inline-block">
-                  <Button
-                    size="lg"
-                    className="gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md"
-                  >
-                    Access Platform
-                  </Button>
-                </Link>
+                <AccessPlatformButton mobileOnly />
+                <AccessPlatformButton desktopOnly />
                 {/* SealCheck icons row always directly below the button */}
                 <div className="w-full flex flex-row flex-wrap items-center justify-center gap-4 mt-6" style={{ maxWidth: 340 }}>
                   <div className="flex flex-row items-center gap-2 whitespace-nowrap">

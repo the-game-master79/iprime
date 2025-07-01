@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
 import { SealCheck } from "@phosphor-icons/react";
+import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
 
 const sealChecks = [
 	"Smarter Trading. Faster Profits.",
@@ -43,30 +44,14 @@ export const CtaPage = () => {
 							/>
 						</div>
 						<h2 className="text-4xl font-bold tracking-tight sm:text-6xl text-foreground">
-							Your last stop for most trusted moderator
+							Your last stop for most trusted broker
 						</h2>
 						{/* Hero-style button */}
 						<div className="flex flex-col items-center gap-6 mt-10 w-full">
 							{user ? (
 								<>
-									{/* Mobile button */}
-									<Link to="/platform" className="block md:hidden w-full">
-										<Button
-											size="sm"
-											className="gap-2 px-6 bg-card text-card-foreground hover:bg-card/95 text-base transition-all h-14 rounded-md w-full"
-										>
-											Access Platform
-										</Button>
-									</Link>
-									{/* Desktop button */}
-									<Link to="/platform" className="hidden md:inline-block">
-										<Button
-											size="lg"
-											className="gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md"
-										>
-											Access Platform
-										</Button>
-									</Link>
+									<AccessPlatformButton mobileOnly />
+									<AccessPlatformButton desktopOnly />
 								</>
 							) : (
 								<>

@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { House, CurrencyDollar, ArrowCircleDown, ArrowCircleUp, ChartBar, TrendUp, CaretLeft, CaretRight, Cpu, DownloadSimple } from "@phosphor-icons/react";
+import { House, CurrencyDollar, ArrowCircleDown, ArrowCircleUp, ChartBar, TrendUp, CaretLeft, CaretRight, Cpu, DownloadSimple, ShareNetwork } from "@phosphor-icons/react";
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 
-// Desktop sidebar items (no Markets, add AlphaQuant)
+// Desktop sidebar items (no Markets, add AlphaQuant, add Affiliates)
 const sidebarItems = [
 	{ label: "Home", icon: <House size={20} />, path: "/platform" },
 	{ label: "Deposit", icon: <ArrowCircleDown size={20} />, path: "/cashier" },
@@ -11,16 +11,16 @@ const sidebarItems = [
 	{ label: "History", icon: <ChartBar size={20} />, path: "/history" },
 	{ label: "Trade", icon: <TrendUp size={20} />, path: "/tradingstation" },
 	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" },
-	// Removed Markets
+	{ label: "Affiliates", icon: <ShareNetwork size={20} />, path: "/affiliate" }, // Changed to ShareNetwork icon
 ];
 
-// Mobile sidebar items: Home, Deposit, Trade, AlphaQuant only
+// Mobile sidebar items: Home, History, Trade, AlphaQuant, Affiliates (no Deposit)
 const mobileSidebarItems = [
 	{ label: "Home", icon: <House size={20} />, path: "/platform" },
-	{ label: "Deposit", icon: <ArrowCircleDown size={20} />, path: "/cashier" },
 	{ label: "History", icon: <ChartBar size={20} />, path: "/history" },
 	{ label: "Trade", icon: <TrendUp size={20} />, path: "/tradingstation" },
-	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" }, // Fix path to match desktop
+	{ label: "AlphaQuant", icon: <Cpu size={20} />, path: "/plans" },
+	{ label: "Affiliates", icon: <ShareNetwork size={20} />, path: "/affiliate" }, // Changed to ShareNetwork icon
 ];
 
 export const PlatformSidebar: React.FC = () => {
