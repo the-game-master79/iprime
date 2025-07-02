@@ -127,12 +127,28 @@ function TradingViewWidget({
             theme: defaultTheme,
             style: defaultStyle,
             locale: defaultLocale,
-            hide_legend: false, // Ensure legend/details are visible
-            allow_symbol_change: true, // Always allow symbol change
+            hide_legend: true, // Hide legend
+            allow_symbol_change: false, // Disable symbol change
             save_image: false,
             support_host: "https://www.tradingview.com",
-            details: true, // Ensure details are visible
-            withdateranges: true // Optional: enhance UI
+            details: false, // Hide details
+            withdateranges: false, // Hide date ranges
+            hide_top_toolbar: false, // Show top toolbar
+            hide_side_toolbar: true, // Hide side toolbar
+            hide_ideas: true, // Hide ideas
+            hide_volume: false, // Show volume
+            studies: ["Volume@tv-basicstudies"], // Show volume indicator
+            hide_symbol_logo: true, // Hide symbol logo
+            hide_indicators: false, // Allow indicators (but only volume is shown)
+            hide_market_status: true, // Hide market status
+            hide_settings: true, // Hide settings button
+            hide_symbol_search: true, // Hide symbol search
+            hide_compare: true, // Hide compare button
+            hide_news: true, // Hide news
+            hide_calendar: true, // Hide calendar
+            hide_screenshot: true, // Hide screenshot button
+            hide_alerts: true, // Hide alerts
+            container_id: "tradingview-widget-container"
           };
           
           script.innerHTML = JSON.stringify(config);

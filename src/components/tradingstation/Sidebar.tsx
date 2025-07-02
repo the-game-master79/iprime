@@ -175,13 +175,13 @@ const Sidebar = ({
       const big = str.slice(-2);
       return (
         <>
-          {normal}
+          <span className="font-normal">{normal}</span>
           <span className="text-lg font-bold">{big}</span>
         </>
       );
     }
     // fallback
-    return str;
+    return <span className="font-normal">{str}</span>;
   };
 
   // Track previous prices for animation
@@ -350,15 +350,15 @@ const Sidebar = ({
             </h1>
           </div>
           {/* Search bar - Compact */}
-          <div className="relative mb-3">
+            <div className="relative mb-3">
             <MagnifyingGlass className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search pairs..."
+              label="Search markets"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-2 h-8 text-sm rounded-md bg-muted/40 border border-border/20 focus:border-primary/40 transition-colors"
+              rightIcon={<MagnifyingGlass className="h-4 w-4 text-muted-foreground" />}
             />
-          </div>
+            </div>
           {/* Tab buttons - Sleek pill style */}
           <div className="flex gap-1 mb-3 w-full bg-muted/10 rounded-lg p-1">
             <Button
@@ -378,16 +378,6 @@ const Sidebar = ({
               Forex
             </Button>
           </div>
-          {/* Market Slow Badge Below Tabs */}
-          {isMarketSlow && (
-            <div className="mb-3 flex justify-center">
-              <span className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded shadow text-xs font-regular">
-                <span className="text-foreground font-bold">Alpha</span>
-                <span className="text-yellow-800 font-bold">Quant </span>
-                says: Market is slow right now.
-              </span>
-            </div>
-          )}
           {/* Show forex market closed banner if needed */}
           {activeTab === "forex" && !isForexMarketOpen && (
             <div className="mb-3 p-2 rounded-md bg-yellow-100 text-yellow-800 text-center text-sm font-medium border border-yellow-300">
@@ -440,7 +430,7 @@ const Sidebar = ({
                   <div className="text-right">
                     <div
                       key={pair.symbol + "-" + pair.price}
-                      className={`font-mono font-medium text-base transition-all duration-500 ${getPriceChangeClass(isUp)}`}
+                      className={`font-bold text-base transition-all duration-500 ${getPriceChangeClass(isUp)}`}
                     >
                       {renderPriceWithBigDigits(pair.price)}
                     </div>

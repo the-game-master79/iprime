@@ -228,6 +228,17 @@ const TradingPanel = ({
   // Helper to check if selected pair is forex
   const isSelectedPairForex = selectedPair && !selectedPair.symbol.endsWith("USDT") && selectedPair.symbol !== "XAUUSD";
 
+  // Helper to get the correct quote currency for a symbol
+  const getPanelQuoteCurrency = (symbol: string) => {
+    if (!symbol) return "";
+    if (symbol.endsWith("USDT")) return "USDT";
+    if (symbol.endsWith("USD")) return "USD";
+    if (symbol === "XAUUSD") return "USD";
+    // For forex, quote is last 3 chars, but avoid slicing into the base for USD pairs
+    if (symbol.length > 6) return symbol.slice(-3);
+    return "";
+  };
+
   return (
     <div className={`
       ${isMobile 
@@ -574,13 +585,13 @@ const TradingPanel = ({
             <div className="flex justify-between items-center">
               <span className="font-medium text-muted-foreground">Volume:</span>
               <span className="font-bold font-mono">
-                {calculateVolumeWithLeverage()} {getQuoteCurrency()}
+                {calculateVolumeWithLeverage()} {selectedPair ? getPanelQuoteCurrency(selectedPair.symbol) : ""}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="font-medium text-muted-foreground">Value:</span>
               <span className="font-bold font-mono">
-                {formatLargeNumber(calculateActualVolume())} {getQuoteCurrency()}
+                {formatLargeNumber(calculateActualVolume())} {selectedPair ? getPanelQuoteCurrency(selectedPair.symbol) : ""}
               </span>
             </div>
             <div className="flex justify-between items-center">
