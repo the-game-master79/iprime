@@ -62,7 +62,7 @@
     "embla-carousel-react": "^8.5.2",
     "express": "^5.1.0",
     "financial-flag-icons": "^1.0.5",
-    "framer-motion": "^12.6.5",
+    "framer-motion": "^12.23.0",
     "i18next": "^25.0.1",
     "i18next-browser-languagedetector": "^8.0.5",
     "input-otp": "^1.4.2",

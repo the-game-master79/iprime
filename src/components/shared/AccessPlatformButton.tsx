@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import React from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AccessPlatformButtonProps {
   mobileOnly?: boolean;
@@ -21,6 +22,7 @@ export const AccessPlatformButton: React.FC<AccessPlatformButtonProps> = ({
   size,
   navbar = false, // Add navbar default
 }) => {
+  const { user } = useAuth();
   let visibility = "";
   if (mobileOnly) visibility = "block md:hidden w-full";
   else if (desktopOnly) visibility = "hidden md:inline-block";
@@ -38,13 +40,17 @@ export const AccessPlatformButton: React.FC<AccessPlatformButtonProps> = ({
     ? "gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md"
     : "gap-2 px-7 h-14 bg-card text-card-foreground hover:bg-card/95 text-lg md:text-2xl transition-all rounded-md w-full md:w-auto";
 
+  // Show Register if not signed in, else Access Platform
+  const buttonText = user ? "Access Platform" : "Register";
+  const buttonLink = user ? "/platform" : "/auth/login";
+
   return (
-    <Link to="/platform" className={visibility}>
+    <Link to={buttonLink} className={visibility}>
       <Button
         size={btnSize}
         className={baseClass + (className ? ` ${className}` : "")}
       >
-        Access Platform
+        {buttonText}
       </Button>
     </Link>
   );

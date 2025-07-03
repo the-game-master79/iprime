@@ -76,29 +76,32 @@ const Index = () => {
           {/* Removed Dots and grid background overlay */}
           {/* Removed Magic Gradient Orb */}
           <main className="relative z-10">
-            <Hero 
-              title={
-                <>
-                  Institutional Liquidity.<br />
-                  Retail Control.<br />
-                  Global Access.
-                </>
-              }
-              subtitle="Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform."
-              action={{
-                text: "Start Trading",
-                href: "/auth/login"
-              }}
+            <Hero
+              title="Tier-1 Liquidity at your fingertips."
+              subtitle="Get the fastest and access to top-tier liquidity pools in crypto and forex right in your hands. No bullshit — No crap."
             />
-            
             {/* Lazy load below-the-fold sections */}
-            <Suspense fallback={<div className="min-h-[200px]" />}> <QuickFeatures /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <HowItWorks /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <ClEngine /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <Features /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <FaqPage /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <WallOfLove /> </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}> <CtaPage /> </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <QuickFeatures />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <HowItWorks />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <ClEngine />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <Features />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <FaqPage />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <WallOfLove />
+            </Suspense>
+            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <CtaPage />
+            </Suspense>
             <Footer />
             <Dialog open={showContact} onOpenChange={setShowContact}>
               <DialogContent className="bg-background text-foreground shadow-md backdrop-blur-sm backdrop-filter backdrop-opacity-90 border border-border/50 max-w-md">

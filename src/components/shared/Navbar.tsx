@@ -3,11 +3,24 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
+import { useEffect, useState } from "react";
+import { Sun, Moon } from "@phosphor-icons/react";
+import { useTheme } from "@/hooks/use-theme";
 
 export const Navbar = ({ variant }: { variant?: "blogs" }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { setTheme, theme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleNavigation = (path: string) => {
     // List of routes that require authentication
@@ -37,26 +50,25 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
     variant === "blogs" || location.pathname.startsWith("/blogs");
 
   return (
-    <header className="w-full py-3 absolute top-0 left-0 z-20 mt-4">
-      <div className="max-w-[1200px] mx-auto px-4">
+    <header
+      className={cn(
+        "w-full max-w-[1200px] mx-auto py-3 pl-6 pr-4 fixed top-6 left-1/2 -translate-x-1/2 z-30 bg-background/80 backdrop-blur-md shadow-lg rounded-xl border border-border text-foreground transition-all duration-300"
+      )}
+    >
+      <div className="w-full">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2">
+            <Link to="/" className="flex items-center gap-2 text-foreground">
+              {/* Show logo based on theme, not just dark class */}
               <img
-                src={
-                  isBlogsVariant
-                    ? "/arthaa-light.svg"
-                    : "/arthaa-dark.svg"
-                }
+                src={theme === "dark" ? "/arthaa-dark.svg" : "/arthaa-light.svg"}
                 alt="Arthaa Logo"
                 className="h-6 w-auto"
               />
             </Link>
-            <nav className="hidden md:flex items-center gap-3">
+            <nav className="hidden md:flex items-center gap-1">
               {[
                 { path: "/trading", label: "Trading" },
-                { path: "/forex-trading", label: "Forex Trading" },
-                { path: "/crypto-trading", label: "Crypto Trading" },
                 { path: "/alphaquant", label: "AlphaQuant" },
                 { path: "/blogs", label: "Blogs" },
               ].map((item) => (
@@ -64,8 +76,7 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
                   key={item.path}
                   onClick={() => handleNavigation(item.path)}
                   className={cn(
-                    "text-base font-normal px-3 py-2 transition-colors",
-                    isBlogsVariant ? "text-foreground" : "text-white",
+                    "text-base font-normal px-2 py-2 transition-colors text-foreground",
                     isActive(item.path) && "underline underline-offset-4"
                   )}
                   style={{ border: "none", borderRadius: 0, background: "none" }}
@@ -76,6 +87,19 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {/* Theme toggler */}
+            <button
+              aria-label="Toggle theme"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="flex items-center justify-center w-10 h-10 rounded-md bg-transparent hover:bg-border transition-colors border border-border mr-1"
+              type="button"
+            >
+              {theme === "dark" ? (
+                <Sun size={20} className="text-yellow-400" />
+              ) : (
+                <Moon size={20} className="text-blue-600" />
+              )}
+            </button>
             {user ? (
               <AccessPlatformButton
                 navbar // Use the new navbar prop for compact style
@@ -83,12 +107,11 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
                 mobileOnly={false}
               />
             ) : (
-              <Link to="/auth/login">
-                <Button className="px-6 bg-card text-card-foreground hover:bg-card/95 rounded-md">
-                  <span className="hidden md:inline">Register</span>
-                  <span className="inline md:hidden">Register</span>
-                </Button>
-              </Link>
+              <AccessPlatformButton
+                navbar
+                desktopOnly={false}
+                mobileOnly={false}
+              />
             )}
           </div>
         </div>

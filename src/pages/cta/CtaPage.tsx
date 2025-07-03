@@ -48,25 +48,7 @@ export const CtaPage = () => {
 						</h2>
 						{/* Hero-style button */}
 						<div className="flex flex-col items-center gap-6 mt-10 w-full">
-							{user ? (
-								<>
-									<AccessPlatformButton mobileOnly />
-									<AccessPlatformButton desktopOnly />
-								</>
-							) : (
-								<>
-									{/* Register button */}
-									<Link to="/auth/login" className="block w-full md:w-auto">
-										<Button
-											size="lg"
-											className="gap-4 px-12 py-8 h-14 text-lg md:text-2xl font-extrabold bg-card text-card-foreground hover:bg-card/95 transition-all rounded-md w-full md:w-auto"
-										>
-											<span className="hidden md:inline">Get your Free Account</span>
-											<span className="inline md:hidden">Register</span>
-										</Button>
-									</Link>
-								</>
-							)}
+							<AccessPlatformButton />
 						</div>
 						{/* Marquee SealCheck row with side blur */}
 						<div className="relative w-full mt-8">

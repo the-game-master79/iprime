@@ -1,40 +1,18 @@
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Rabbit as RabbitIcon } from "@phosphor-icons/react";
 import { useMemo } from "react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowCircleRight, Moon, Sun, SealCheck } from "@phosphor-icons/react";
-import { cn } from "@/lib/utils";
+import { Moon, SealCheck, Bank, UsersThree } from "@phosphor-icons/react";
 import { useTheme } from "@/hooks/use-theme";
-import { Navbar } from "@/components/shared/Navbar"; // <-- Add this import
+import { Navbar } from "@/components/shared/Navbar";
 import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
 
 interface HeroProps {
-  badge: {
-    icon: React.ReactNode;
-    text: string;
-  };
-  badges?: {
-    icon: React.ReactNode;
-    text: string;
-  }[];
   title: string;
-  subtitle?: string; // Optional subtitle prop
-  description: string;
-  action?: {
-    text: string;
-    href: string;
-  };
-  lottie?: React.ReactNode;
+  subtitle: string;
 }
 
-export const Hero = ({
-  title = "Institutional Liquidity.",
-  subtitle = "Experience lightning-fast execution, smart analytics, and pro-grade tools—all in one powerful platform.",
-}: Partial<HeroProps> = {}) => {
+export const Hero = ({ title, subtitle }: HeroProps) => {
   const { user } = useAuth();
 
   // Navbar logic
@@ -75,110 +53,64 @@ export const Hero = ({
   // Use local webp hero image instead of Unsplash and iPhone mockup
   const mockupImg = "/arthaa-hero.webp";
   return (
-    <section id="hero" className="relative w-full pt-32 pb-10 md:pb-20 overflow-hidden bg-primary">
-      <Navbar /> {/* <-- Use the shared Navbar at the top */}
+    <>
+    <section id="hero" className="relative w-full pt-40 pb-32 md:pt-56 md:pb-44 overflow-hidden bg-background">
+      <Navbar />
       {/* Cinematic background gradients and light rays */}
       <div className="pointer-events-none absolute inset-0 z-0">
         <div className="absolute w-[900px] h-[900px] -top-[350px] -left-[300px] bg-gradient-to-br from-primary/30 via-primary/0 to-transparent blur-[120px] opacity-70 animate-pulse-slow" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-transparent pointer-events-none" />
         <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[120vw] h-40 bg-gradient-to-b from-white/60 via-white/0 to-transparent blur-2xl opacity-40" />
       </div>
-      <div className="relative z-10 w-full max-w-[1200px] mx-auto px-4 flex flex-col items-center md:items-start md:text-left">
+      <div className="relative z-10 w-full max-w-[1200px] mx-auto px-4 flex flex-col items-center text-center">
         {/* Content */}
-        <div className="flex-1 flex flex-col items-start md:items-start md:text-left">
-          {/* Cinematic, powerful header */}
-          <div className="w-full flex flex-col items-start md:items-start md:text-left">
-            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-tight text-white mb-3 animate-fade-in-up">
-              {title}
-            </h1>
-            {subtitle && (
-              <p className="text-2xl md:text-3xl text-white max-w-3xl mx-auto md:mx-0 font-thin mb-16 animate-fade-in-up delay-200">
+        <div className="flex-1 flex flex-col items-center text-center w-full">
+          {/* Badge for users joined in last 7 days - moved just above the title */}
+          <div className="relative w-full flex flex-col items-center text-center">
+            <div className="mb-6">
+                <span className="inline-flex items-center px-4 py-1 rounded-full bg-secondary text-foreground shadow-lg text-sm md:text-base font-normal animate-fade-in-up">
+                {weeklyNumber.toLocaleString()} joined in 7 days
+                </span>
+            </div>
+            {/* Cinematic, powerful header */}
+            <div className="w-full flex flex-col items-center text-center">
+              <h1 className="text-6xl md:text-8xl font-bold tracking-tighter leading-tight text-foreground mb-3 animate-fade-in-up">
+                {title}
+              </h1>
+              <p className="text-2xl md:text-3xl text-foreground max-w-3xl mx-auto font-thin mb-16 animate-fade-in-up delay-200">
                 {subtitle}
               </p>
-            )}
+            </div>
           </div>
           {/* Show Login or Access Platform based on user authentication */}
           <div className="block pt-8 w-full">
-            {user ? (
-              <>
-                <AccessPlatformButton mobileOnly />
-                <AccessPlatformButton desktopOnly />
-                {/* SealCheck icons row always directly below the button */}
-                <div className="w-full flex flex-row flex-wrap items-center justify-center gap-4 mt-6" style={{ maxWidth: 340 }}>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-md font-book tracking-tight">Zero commissions</span>
-                  </div>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-md font-book tracking-tight">1.5X faster payouts</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-start gap-0 w-full">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-start md:justify-start gap-6 w-full">
-                  <Link to="/auth/login" className="block w-full md:w-auto">
-                    <Button
-                      size="lg"
-                      className="gap-4 px-12 py-8 h-14 text-lg md:text-2xl font-extrabold bg-card text-card-foreground hover:bg-card/95 transition-all rounded-md w-full md:w-auto"
-                    >
-                      <span className="hidden md:inline">Get your Free Account</span>
-                      <span className="inline md:hidden">Register</span>
-                    </Button>
-                  </Link>
-                  {/* Stats: always next to the button on desktop */}
-                  <div className="hidden md:flex flex-row items-center gap-4 justify-start w-full md:w-auto mt-6 md:mt-0">
-                    <RabbitIcon size={40} weight="bold" className="text-white" />
-                    <div className="flex flex-col items-start">
-                      <span className="text-base md:text-lg font-bold text-white leading-tight tracking-tight">
-                        {weeklyNumber.toLocaleString()} traders joined 
-                      </span>
-                      <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight tracking-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
-                        Arthaa in the last 7 days
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                {/* Mobile: SealCheck row first, then stats row */}
-                <div className="flex flex-row flex-wrap items-center justify-center gap-4 mt-4 md:hidden" style={{ maxWidth: 340 }}>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium tracking-tight">Zero commissions</span>
-                  </div>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium tracking-tight">1.5X faster payouts</span>
-                  </div>
-                </div>
-                <div className="flex md:hidden flex-row items-center gap-4 justify-start w-full mt-6">
-                  <RabbitIcon size={40} weight="bold" className="text-white" />
-                  <div className="flex flex-col items-start">
-                    <span className="text-base md:text-lg font-bold text-white leading-tight tracking-tight">
-                      {weeklyNumber.toLocaleString()} traders joined 
-                    </span>
-                    <span className="text-base md:text-lg font-regular text-white mt-0 leading-tight tracking-tight" style={{ marginTop: 0, lineHeight: "1.1" }}>
-                      Arthaa in the last 7 days
-                    </span>
-                  </div>
-                </div>
-                {/* Desktop: SealCheck row below button as before */}
-                <div className="hidden md:flex flex-row flex-wrap items-center justify-center gap-4" style={{ maxWidth: 340, marginTop: 24 }}>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium tracking-tight">Zero commissions</span>
-                  </div>
-                  <div className="flex flex-row items-center gap-2 whitespace-nowrap">
-                    <SealCheck size={24} className="text-white" weight="fill" />
-                    <span className="text-white text-sm font-medium tracking-tight">1.5X faster payouts</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* ...existing code... */}
+            <AccessPlatformButton mobileOnly />
+            <AccessPlatformButton desktopOnly />
           </div>
         </div>
       </div>
     </section>
+    {/* Features Section - Row with Icons on Left */}
+    <section className="w-full pt-4 pb-8 border-t border-border">
+      <div className="max-w-[1200px] mx-auto px-4 flex flex-col md:flex-row gap-6 md:gap-0 justify-between items-center text-center">
+        <div className="flex items-center gap-2">
+          <SealCheck size={22} weight="duotone" className="text-foreground" />
+          <span className="text-base md:text-lg font-semibold">Regulated Tier-1 Liquidity</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Bank size={22} weight="duotone" className="text-foreground" />
+          <span className="text-base md:text-lg font-semibold">$500M+ AUM</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <UsersThree size={22} weight="duotone" className="text-foreground" />
+          <span className="text-base md:text-lg font-semibold">50K+ Active Traders</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Moon size={22} weight="duotone" className="text-foreground" />
+          <span className="text-base md:text-lg font-semibold">Fully Decentralised</span>
+        </div>
+      </div>
+    </section>
+    </>
   );
 };
