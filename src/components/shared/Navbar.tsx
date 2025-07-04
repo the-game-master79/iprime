@@ -1,26 +1,66 @@
-import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { AccessPlatformButton } from "@/components/shared/AccessPlatformButton";
-import { useEffect, useState } from "react";
-import { Sun, Moon } from "@phosphor-icons/react";
-import { useTheme } from "@/hooks/use-theme";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { AuthActionButton } from "./AuthActionButton";
+import { Menu, X } from "lucide-react";
 
-export const Navbar = ({ variant }: { variant?: "blogs" }) => {
+// Debounce function to limit the rate at which a function can fire
+const debounce = (func: Function, wait: number) => {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return function executedFunction(...args: any[]) {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+export const Navbar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setTheme, theme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navbarRef = useRef<HTMLElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node) && 
+          navbarRef.current && !navbarRef.current.contains(event.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Memoize the scroll handler with useCallback
+  const handleScroll = useCallback(() => {
+    const isScrolled = window.scrollY > 20;
+    // Only update state if it's different to prevent unnecessary re-renders
+    setScrolled(prev => prev !== isScrolled ? isScrolled : prev);
+  }, []);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+    // Create a debounced version of the scroll handler
+    const debouncedHandleScroll = debounce(handleScroll, 10);
+    
+    // Add passive event listener for better performance
+    window.addEventListener('scroll', debouncedHandleScroll, { passive: true });
+    
+    // Initial check
+    handleScroll();
+    
+    return () => {
+      window.removeEventListener('scroll', debouncedHandleScroll);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [handleScroll]);
 
   const handleNavigation = (path: string) => {
     // List of routes that require authentication
@@ -37,6 +77,8 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
       navigate("/auth/login");
       return;
     }
+    // Close mobile menu when navigating
+    setMobileMenuOpen(false);
     // All routes (public or not) can be navigated to directly, no reload for same path
     navigate(path);
   };
@@ -45,77 +87,117 @@ export const Navbar = ({ variant }: { variant?: "blogs" }) => {
     return location.pathname === path;
   };
 
-  // Detect if variant is blogs or if current path is /blogs or /blogs/:slug
-  const isBlogsVariant =
-    variant === "blogs" || location.pathname.startsWith("/blogs");
-
   return (
-    <header
-      className={cn(
-        "w-full max-w-[1200px] mx-auto py-3 pl-6 pr-4 fixed top-6 left-1/2 -translate-x-1/2 z-30 bg-background/80 backdrop-blur-md shadow-lg rounded-xl border border-border text-foreground transition-all duration-300"
-      )}
-    >
-      <div className="w-full">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2 text-foreground">
-              {/* Show logo based on theme, not just dark class */}
-              <img
-                src={theme === "dark" ? "/arthaa-dark.svg" : "/arthaa-light.svg"}
-                alt="Arthaa Logo"
-                className="h-6 w-auto"
-              />
-            </Link>
-            <nav className="hidden md:flex items-center gap-1">
-              {[
-                { path: "/trading", label: "Trading" },
-                { path: "/alphaquant", label: "AlphaQuant" },
-                { path: "/blogs", label: "Blogs" },
-              ].map((item) => (
-                <button
-                  key={item.path}
-                  onClick={() => handleNavigation(item.path)}
-                  className={cn(
-                    "text-base font-normal px-2 py-2 transition-colors text-foreground",
-                    isActive(item.path) && "underline underline-offset-4"
-                  )}
-                  style={{ border: "none", borderRadius: 0, background: "none" }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Theme toggler */}
-            <button
-              aria-label="Toggle theme"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex items-center justify-center w-10 h-10 rounded-md bg-transparent hover:bg-border transition-colors border border-border mr-1"
-              type="button"
-            >
-              {theme === "dark" ? (
-                <Sun size={20} className="text-yellow-400" />
-              ) : (
-                <Moon size={20} className="text-blue-600" />
-              )}
-            </button>
-            {user ? (
-              <AccessPlatformButton
-                navbar // Use the new navbar prop for compact style
-                desktopOnly={false}
-                mobileOnly={false}
-              />
-            ) : (
-              <AccessPlatformButton
-                navbar
-                desktopOnly={false}
-                mobileOnly={false}
-              />
-            )}
+    <>
+      {/* Always render the spacer but control its visibility */}
+      <div 
+        className={`transition-opacity duration-300 ${scrolled ? 'opacity-100' : 'opacity-0 h-0'}`} 
+        style={{ height: scrolled ? '4rem' : '0' }} 
+        aria-hidden="true"
+      />
+      <header
+        ref={navbarRef}
+        className={cn(
+          "w-full max-w-[1200px] z-30 text-foreground will-change-transform",
+          "transition-all duration-300 ease-out",
+          scrolled
+            ? "fixed top-6 inset-x-0 mx-auto bg-background/80 backdrop-blur-md shadow-lg rounded-xl border border-border py-3 px-6"
+            : "relative bg-background my-6 mx-auto py-3 pl-6 pr-4"
+        )}
+        style={{
+          // Optimize for GPU acceleration
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          perspective: '1000px',
+          // Smooth transitions for specific properties
+          transitionProperty: 'background, box-shadow, border-radius, transform, padding, margin',
+        }}
+      >
+        <div className="w-full">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-6">
+              <Link to="/" className="flex items-center gap-2 text-foreground">
+                <img
+                  src={"/arthaa-light.svg"}
+                  alt="Arthaa Logo"
+                  className="h-8 md:h-10 w-auto max-w-[180px] object-contain"
+                  style={{
+                    height: 'auto',
+                    maxHeight: '100%',
+                    width: 'auto',
+                    maxWidth: '180px',
+                  }}
+                />
+              </Link>
+              <nav className="hidden md:flex items-center gap-1">
+                {[
+                  { path: "/trading", label: "Trading" },
+                  { path: "/alphaquant", label: "AlphaQuant" },
+                  { path: "/blogs", label: "Blogs" },
+                ].map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => handleNavigation(item.path)}
+                    className={cn(
+                      "text-sm md:text-base lg:text-lg px-2 md:px-3 py-1.5 transition-colors text-foreground hover:text-primary hover:scale-105 whitespace-nowrap",
+                      isActive(item.path) && "underline underline-offset-4"
+                    )}
+                    style={{ border: "none", borderRadius: 0, background: "none" }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+              
+              {/* Mobile menu button */}
+              <button 
+                className="md:hidden p-2 text-foreground hover:text-primary focus:outline-none"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 md:gap-4 ml-auto">
+              <AuthActionButton className="px-4 py-1.5 md:px-6 md:py-2 text-sm md:text-base lg:text-xl font-semibold shadow-lg whitespace-nowrap" />
+            </div>
           </div>
         </div>
+      </header>
+
+      {/* Mobile Menu */}
+      <div 
+        ref={menuRef}
+        className={cn(
+          "fixed inset-x-0 top-0 z-20 bg-background/95 backdrop-blur-md transition-all duration-300 ease-in-out md:hidden",
+          mobileMenuOpen ? "translate-y-0 shadow-lg" : "-translate-y-full"
+        )}
+        style={{
+          paddingTop: navbarRef.current?.offsetHeight,
+          maxHeight: `calc(100vh - ${navbarRef.current?.offsetHeight}px)`,
+          overflowY: 'auto',
+        }}
+      >
+        <div className="px-4 sm:px-6 py-4 space-y-4 mx-4 sm:mx-6 my-4 rounded-lg bg-background/80">
+          {[
+            { path: "/trading", label: "Trading" },
+            { path: "/alphaquant", label: "AlphaQuant" },
+            { path: "/blogs", label: "Blogs" },
+          ].map((item) => (
+            <button
+              key={item.path}
+              onClick={() => handleNavigation(item.path)}
+              className={cn(
+                "block w-full text-left px-4 py-3 text-lg transition-colors rounded-lg",
+                "hover:bg-accent hover:text-accent-foreground",
+                isActive(item.path) ? "bg-primary/10 text-primary" : "text-foreground"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       </div>
-    </header>
+    </>
   );
 };

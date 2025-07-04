@@ -1,143 +1,116 @@
-import { Timer, CaretDown, Users, CurrencyDollar, Shield, Buildings } from "@phosphor-icons/react";
+import { useRef } from 'react';
+import { useSpring, animated } from '@react-spring/web';
+import { useGesture } from '@use-gesture/react';
+import { CrosshairSimpleIcon, CpuIcon, EyeIcon } from "@phosphor-icons/react";
 
-// Solid color palette for each feature (no gradients)
-const featureColors = [
-	{
-		bg: "bg-amber-500",
-		iconBg: "bg-amber-500",
-		iconColor: "text-white",
-		text: "text-amber-700",
-		border: "border-amber-200",
-	},
-	{
-		bg: "bg-purple-600",
-		iconBg: "bg-purple-600",
-		iconColor: "text-white",
-		text: "text-purple-700",
-		border: "border-purple-200",
-	},
-	{
-		bg: "bg-pink-500",
-		iconBg: "bg-pink-500",
-		iconColor: "text-white",
-		text: "text-pink-700",
-		border: "border-pink-200",
-	},
-	{
-		bg: "bg-lime-800",
-		iconBg: "bg-lime-800",
-		iconColor: "text-white",
-		text: "text-lime-900",
-		border: "border-lime-200",
-	},
-	{
-		bg: "bg-blue-600",
-		iconBg: "bg-blue-600",
-		iconColor: "text-white",
-		text: "text-blue-800",
-		border: "border-blue-200",
-	},
-	{
-		bg: "bg-green-600",
-		iconBg: "bg-green-600",
-		iconColor: "text-white",
-		text: "text-green-800",
-		border: "border-green-200",
-	},
+const features = [
+  {
+    icon: CrosshairSimpleIcon,
+    title: "Precision at Every Click",
+    description: "Execute trades with razor-sharp speed and surgical accuracy. Real-time charts, instant order placement, and institutional-grade spreads — all engineered into one seamless command center."
+  },
+  {
+    icon: CpuIcon,
+    title: "Smart Trade Engine",
+    description: "Arthaa’s AI-enhanced backend routes your trades through Tier-1 liquidity pools, ensuring zero spread above $500 and lightning-fast execution."
+  },
+  {
+    icon: EyeIcon,
+    title: "Clarity Meets Control",
+    description: "View open trades, monitor real-time PnL, and place limit/market orders with absolute transparency. No noise. No confusion. Just full control."
+  }
 ];
 
-export const QuickFeatures = () => {
-	const features = [
-		{
-			icon: Timer,
-			title: "On-Demand Payouts",
-			description:
-				"Instant 24/7 withdrawals in crypto or currency—no delays, no hassle, funds delivered within minutes.*",
-		},
-		{
-			icon: CaretDown,
-			title: "Ultra-Tight Spreads",
-			description:
-				"Trade forex and crypto with AI precision, tight spreads, and lightning-fast execution.",
-		},
-		{
-			icon: Users,
-			title: "24/7 Human Support",
-			description:
-				"Real human support, not bots—available 24/7 to assist you instantly, anytime you need help.",
-		},
-		{
-			icon: CurrencyDollar,
-			title: "No Charges or Fees",
-			description:
-				"Zero commissions, no hidden fees—keep 100% of your profits, whether you trade or invest.",
-		},
-		{
-			icon: Shield,
-			title: "Bank-Grade Security",
-			description:
-				"Your funds are secured with multi-layer protection, encryption, cold wallets, audits, and 24/7 monitoring.",
-		},
-		{
-			icon: Buildings,
-			title: "Regulated & Licensed",
-			description:
-				"A licensed, CySEC and FCA-compliant platform—trade forex and crypto with full legal trust and protection.",
-		},
-	];
+const TiltImage = () => {
+  const ref = useRef<HTMLDivElement>(null);
+  
+  const [spring, api] = useSpring(() => ({
+    x: 0,
+    y: 0,
+    rotateX: 0,
+    rotateY: 0,
+    scale: 1,
+    config: { mass: 5, tension: 350, friction: 40 }
+  }));
 
-	return (
-		<section className="py-12 relative overflow-hidden">
-			<div className="container max-w-[1200px] mx-auto px-4 relative z-10">
-				<div className="flex flex-col items-start text-left gap-3 max-w-2xl mb-8 mt-12">
-					<h2 className="text-5xl md:text-6xl font-bold text-foreground text-left w-full tracking-tight">
-						The{" "}
-						<span className="whitespace-nowrap">all-in-one</span>
-						<br />
-						trading ecosystem
-					</h2>
-				</div>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-					{features.map((feature, index) => (
-						<FeatureCard key={index} feature={feature} index={index} />
-					))}
-				</div>
-			</div>
-		</section>
-	);
+  useGesture({
+    onMove: ({ xy: [x, y], hovering }) => {
+      if (!ref.current || !hovering) return;
+      const rect = ref.current.getBoundingClientRect();
+      const X = (x - rect.left) / rect.width;
+      const Y = (y - rect.top) / rect.height;
+      
+      api.start({
+        rotateX: (Y - 0.5) * 10,
+        rotateY: (0.5 - X) * 10,
+        scale: 1.03,
+      });
+    },
+    onHover: ({ hovering }) => {
+      if (!hovering) {
+        api.start({
+          rotateX: 0,
+          rotateY: 0,
+          scale: 1,
+        });
+      }
+    },
+  }, { target: ref });
+
+  return (
+    <div ref={ref} className="w-full max-w-7xl mx-auto perspective-1000">
+      <animated.div
+        className="w-full h-full will-change-transform"
+        style={{
+          transform: 'perspective(1000px)',
+          transformStyle: 'preserve-3d',
+          ...spring,
+        }}
+      >
+        <img
+          src="/trade-page.png"
+          alt="Trading Platform"
+          className="w-full h-auto"
+          style={{ maxHeight: '800px' }}
+          loading="lazy"
+        />
+      </animated.div>
+    </div>
+  );
 };
 
-function FeatureCard({ feature, index }: { feature: any; index: number }) {
-	const color = featureColors[index % featureColors.length];
-	return (
-		<div
-			className={`relative transition-all duration-300 group hover:scale-[1.03]`}
-			style={{ animationDelay: `${index * 100}ms` }}
-		>
-			<div
-				className={`h-full w-full border ${color.border} bg-white rounded-2xl transition-colors group-hover:shadow-lg group-hover:rounded-2xl`}
-			>
-				<div className="relative h-full w-full rounded-2xl p-8 overflow-hidden flex flex-col gap-4 items-start">
-					<div
-						className={`rounded-xl w-16 h-16 flex items-center justify-center ${color.iconBg} shadow-lg border border-white/40 mb-2`}
-					>
-						<feature.icon
-							className={`h-8 w-8 ${color.iconColor}`}
-							weight="fill"
-						/>
-					</div>
-					<h3
-						className={`font-bold text-2xl md:text-3xl mt-2 text-left ${color.text} tracking-tight`}
-					>
-						{feature.title}
-					</h3>
-					<p
-						className={`text-base md:text-lg relative z-10 text-left text-gray-600`}
-					>
-						{feature.description}
-					</p>
-				</div>
-			</div>
-		</div>
-	);
-}
+export const QuickFeatures = () => {
+  return (
+    <section className="py-16 relative overflow-hidden bg-background">
+      <div className="container max-w-7xl mx-auto px-4 relative z-10">
+        <div className="text-center">
+          <h2 className="text-5xl md:text-7xl font-bold text-gray-900 dark:text-white mb-16">
+            Built for Speed. <br />Engineered for Trust.
+          </h2>
+          
+          {/* Trading Platform Image */}
+          <TiltImage />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
+          {features.map((feature, index) => (
+            <div 
+              key={index}
+              className="bg-white dark:bg-gray-800 rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 hover:-translate-y-2"
+            >
+              <div className="w-12 h-12 mb-4 flex items-center justify-center text-gray-800 dark:text-gray-200">
+                <feature.icon size={32} weight="bold" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                {feature.title}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};

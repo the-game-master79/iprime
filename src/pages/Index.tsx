@@ -4,8 +4,11 @@ import { PageTransition } from "@/components/ui-components";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Envelope, Lightning } from "@phosphor-icons/react";
 import { Footer } from "@/components/shared/Footer";
+import { Navbar } from "@/components/shared/Navbar";
 import { Hero } from "@/components/shared/Hero";
+import DepthMarquee from "@/components/shared/DepthMarquee";
 import { ClEngine } from "@/components/shared/ClEngine";
+import { AlphaQuant } from '@/components/shared/AlphaQuant';
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { Helmet } from "react-helmet-async";
 
@@ -76,30 +79,17 @@ const Index = () => {
           {/* Removed Dots and grid background overlay */}
           {/* Removed Magic Gradient Orb */}
           <main className="relative z-10">
+            <Navbar />
             <Hero
-              title="Tier-1 Liquidity at your fingertips."
-              subtitle="Get the fastest and access to top-tier liquidity pools in crypto and forex right in your hands. No bullshit — No crap."
+              title="Tier-1 Liquidity. In Your Hands."
+              subtitle="Access the fastest execution and deepest liquidity pools across crypto and forex — no fluff, no delays."
             />
+            <DepthMarquee />
             {/* Lazy load below-the-fold sections */}
             <Suspense fallback={<div className="min-h-[200px]" />}>
               <QuickFeatures />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
-              <HowItWorks />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
-              <ClEngine />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
-              <Features />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
+              <AlphaQuant />
               <FaqPage />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
-              <WallOfLove />
-            </Suspense>
-            <Suspense fallback={<div className="min-h-[200px]" />}>
               <CtaPage />
             </Suspense>
             <Footer />

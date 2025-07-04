@@ -19,22 +19,22 @@ export const Footer = () => {
         </div>
         {/* Row 2: Links (left) and Socials (right) */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
-          <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-start md:items-center">
-            <Link to="/company" className="text-sm text-muted-foreground hover:text-foreground">
+          <div className="flex flex-col md:flex-row gap-5 md:gap-10 items-start md:items-center">
+            <Link to="/company" className="text-base text-muted-foreground hover:text-foreground transition-colors">
               Company
             </Link>
-            <Link to="/partners" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link to="/partners" className="text-base text-muted-foreground hover:text-foreground transition-colors">
               Partners
             </Link>
-            <Link to="/legal/terms" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link to="/legal/terms" className="text-base text-muted-foreground hover:text-foreground transition-colors">
               Terms of Service
             </Link>
-            <Link to="/legal/privacy" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link to="/legal/privacy" className="text-base text-muted-foreground hover:text-foreground transition-colors">
               Privacy Policy
             </Link>
             <Link
               to="#"
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="text-base text-muted-foreground hover:text-foreground"
               onClick={e => {
                 e.preventDefault();
                 window.dispatchEvent(new CustomEvent("open-contact-dialog"));

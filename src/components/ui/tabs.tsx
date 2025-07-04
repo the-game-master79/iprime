@@ -11,10 +11,11 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      // Fix: ensure background and border fill the full height, remove gradient for solid look
-      "inline-flex h-12 min-h-[3rem] items-center rounded-xl p-1 bg-secondary gap-1 border border-border shadow-sm relative",
+      // Modified: Remove border for a cleaner look
+      "inline-flex h-12 min-h-[3rem] items-center rounded-xl p-1 bg-secondary gap-1 relative w-auto",
       className
     )}
+    style={{ width: 'fit-content' }}
     {...props}
   />
 ))
@@ -29,16 +30,17 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Enhanced: add smooth transitions, focus ring, and active underline
+      // Modified: Use secondary foreground for non-selected tabs
       "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-5 py-2 text-base font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-      "text-foreground hover:bg-secondary/60 hover:text-primary",
-      "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:font-bold data-[state=active]:shadow-md data-[state=active]:border-b-2 data-[state=active]:border-primary",
-      "relative overflow-hidden",
+      "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
+      "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:shadow-sm",
+      "relative",
       className
     )}
+    style={{ width: 'auto' }}
     {...props}
   >
-    <div className="relative z-10 flex items-center gap-2">
+    <div className="relative z-10 flex items-center gap-2 whitespace-nowrap">
       {icon && <span className="w-4 h-4 flex items-center justify-center">{icon}</span>}
       {children}
     </div>
@@ -53,10 +55,13 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      // Enhanced: add subtle fade and padding
-      "mt-5 w-full ring-offset-background p-2 sm:p-4 bg-background rounded-xl shadow-sm border border-border",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2",
-      "data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=active]:animate-in data-[state=active]:fade-in-0",
+      // Add smooth transition effects
+      "overflow-hidden transition-all duration-300 ease-in-out",
+      // Animation for inactive state
+      "data-[state=inactive]:animate-out data-[state=inactive]:fade-out-0 data-[state=inactive]:slide-out-to-right-2",
+      // Animation for active state
+      "data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-left-2",
       className
     )}
     {...props}

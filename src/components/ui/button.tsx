@@ -1,56 +1,98 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
-import { ArrowRight } from "lucide-react"
+import React from "react";
+import { ArrowRight } from "lucide-react";
+import { cn } from "../../lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:scale-104 hover:z-10",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground",
-        destructive: "bg-destructive text-destructive-foreground",
-        outline: "border-2 border-input bg-background",
-        secondary: "bg-secondary-foreground text-foreground",
-        ghost: "",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-11 px-4 py-2",
-        sm: "h-9 px-3",
-        lg: "h-12 px-8",
-        icon: "h-11 w-11",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+type ButtonVariant = "primary" | "secondary" | "danger";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  icon?: React.ReactNode;
+  interactive?: boolean; // Enable Magic UI interactive hover effect
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+const variantClasses: Record<ButtonVariant, string> = {
+  primary: "bg-background text-foreground border-border hover:bg-primary hover:text-background hover:border-primary/20",
+  secondary: "bg-background text-foreground border-border hover:bg-secondary hover:text-background hover:border-secondary/20",
+  danger: "bg-background text-foreground border-border hover:bg-destructive hover:text-background hover:border-destructive/20",
+};
+
+const interactiveVariantClasses: Record<ButtonVariant, string> = {
+  primary: "bg-primary text-foreground",
+  secondary: "bg-secondary text-foreground",
+  danger: "bg-destructive text-foreground",
+};
+
+const interactiveInitialClasses: Record<ButtonVariant, string> = {
+  primary: "bg-background text-foreground border-border",
+  secondary: "bg-background text-foreground border-border",
+  danger: "bg-background text-foreground border-border",
+};
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = "primary", className = "", children, icon, interactive = false, ...props }, ref) => {
+    if (interactive) {
+      return (
+        <button
+          ref={ref}
+          className={cn(
+            "group relative w-auto cursor-pointer overflow-hidden rounded-full border p-2 px-6 text-center font-semibold transition-all duration-300 hover:shadow-lg",
+            interactiveInitialClasses[variant],
+            className,
+          )}
+          {...props}
+        >
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "h-2 w-2 rounded-full transition-all duration-300 group-hover:scale-[100.8]",
+              "bg-foreground/40 group-hover:bg-current"
+            )}></div>
+            <span className="inline-block transition-all duration-300 group-hover:translate-x-12 group-hover:opacity-0">
+              {children}
+            </span>
+          </div>
+          <div className={cn(
+            "absolute top-0 z-10 flex h-full w-full translate-x-12 items-center justify-center gap-2 opacity-0 transition-all duration-300 group-hover:-translate-x-5 group-hover:opacity-100",
+            interactiveVariantClasses[variant]
+          )}>
+            <span>{children}</span>
+            {icon || <ArrowRight className="h-4 w-4" />}
+          </div>
+        </button>
+      );
+    }
+
+    // Fallback to regular button
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+      <button
         ref={ref}
+        className={cn(
+          "group relative inline-flex h-10 items-center justify-center overflow-hidden rounded-xl px-6 font-medium transition-all duration-300 ease-out",
+          variantClasses[variant],
+          className
+        )}
         {...props}
       >
-        {children}
-        <ArrowRight className="ml-2" />
-      </Comp>
-    )
+        <span className="relative flex items-center gap-2 transition-all duration-300 ease-out group-hover:pr-4">
+          {children}
+          {icon && (
+            <span className="ml-1 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100 translate-x-2">
+              {React.isValidElement(icon)
+                ? React.cloneElement(
+                    icon as React.ReactElement<any>,
+                    {
+                      className: cn(
+                        (icon as React.ReactElement<any>).props.className || "",
+                        "h-4 w-4"
+                      ),
+                    }
+                  )
+                : icon}
+            </span>
+          )}
+        </span>
+      </button>
+    );
   }
-)
-Button.displayName = "Button"
+);
 
-export { Button, buttonVariants }
+Button.displayName = "Button";
