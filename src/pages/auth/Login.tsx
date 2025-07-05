@@ -520,7 +520,7 @@ const Login = () => {
                       disabled={isLoading || !email || !passwordValue || !!referralError}
                       className={`px-6 py-2 text-sm font-medium ${isLoading || !email || !passwordValue || !!referralError ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      {isLoading ? "Processing..." : "Continue"}
+                      {isLoading ? "Logging in..." : "Login"}
                     </InteractiveHoverButton>
                   </div>
                 </form>

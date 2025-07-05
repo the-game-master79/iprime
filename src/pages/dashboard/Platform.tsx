@@ -27,7 +27,6 @@ import type {
   UserProfile, 
   Transaction
 } from "@/types/dashboard";
-import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
 import { TopDashboardLists } from "@/components/dashboard/TopDashboardLists";
 
 // Define Trade interface locally since it's not exported from "@/types/dashboard"
@@ -49,21 +48,7 @@ interface Trade {
 // Constants
 const ITEMS_PER_PAGE = 10;
 
-// Add this utility function before the DashboardContent component
-const getPriceDecimals = (symbol: string) => {
-  if (symbol === "XAUUSD") return 2;
-  if (symbol.endsWith("JPY")) return 3;
-  if (symbol === "BTCUSDT" || symbol === "ETHUSDT" || symbol === "SOLUSDT" || symbol === "LINKUSDT" || symbol === "BNBUSDT") return 2;
-  if (symbol === "DOGEUSDT") return 5;
-  if (symbol === "ADAUSDT" || symbol === "TRXUSDT") return 4;
-  if (symbol === "DOTUSDT") return 3;
-  // Default: forex pairs (non-JPY, non-XSUPER, non-crypto)
-  if (!symbol.endsWith("USDT")) return 5;
-  // Fallback
-  return 2;
-};
-
-// Add this utility for price animation (before DashboardContent)
+// Price animation utility
 const getPriceChangeClass = (isUp?: boolean) => {
   if (isUp === undefined) return "";
   return isUp
@@ -71,10 +56,9 @@ const getPriceChangeClass = (isUp?: boolean) => {
     : "text-red-500";
 };
 
-// Update renderPriceWithBigDigits to display decimals as per the data, without forcing a fixed number of decimals. Only format the last 2 digits visually
+// Format price with last 2 digits in bold for better readability
 const renderPriceWithBigDigits = (
   value: number | string | undefined,
-  decimals: number, // keep for formatting, but don't use to round
   marketClosed?: boolean,
   isUp?: boolean
 ) => {
@@ -851,71 +835,56 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground transition-colors flex flex-col">
-      {/* Topbar full width at the top */}
+    <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
       <Topbar platform />
-      <div className="flex flex-1">
-        {/* Sidebar below Topbar */}
-        <PlatformSidebar />
-        <div className="flex-1 flex flex-col">
-          <main className="py-8">
-            <div className="container mx-auto px-4 max-w-[1200px]">
-              {loading || isLoading ? (
-                // Replace spinner with skeletons
-                <DashboardSkeleton />
-              ) : (
-                <div className="space-y-4">
-                  {/* Referral Card with Promotions Button */}
-                  <div className="space-y-4">
-                    {/* Referral Link Container */}
-                    {/* <div className="bg-secondary rounded-2xl p-4 border border-border">
-                      ...referral link code...
-                    </div> */}
-                    <ReferralLinkCard
-                      referralLink={referralLink}
-                      onCopyLink={handleCopyLink}
-                    />
-                  </div>
+      <main className="py-8">
+        <div className="container mx-auto px-4 max-w-[1200px]">
+          {loading || isLoading ? (
+            <DashboardSkeleton />
+          ) : (
+            <div className="space-y-4">
+              {/* Referral Card */}
+              <ReferralLinkCard
+                referralLink={referralLink}
+                onCopyLink={handleCopyLink}
+              />
 
-                  {/* Balance Container */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Remove Invest First Container if both balances are zero */}
-                    {/* Always show the three cards, even if balances are zero */}
-                    <BalanceCard
-                      withdrawalBalance={withdrawalBalance}
-                      userProfile={userProfile}
-                    />
-                    <AlphaQuantCard
-                      totalInvested={totalInvested}
-                      activePlans={activePlans}
-                      todaysProfit={getTodaysInvestmentProfit(transactions)}
-                      onClick={() => navigate('/plans')}
-                    />
-                    <AffiliateRankCard
-                      businessStats={businessStats}
-                      directs={directCount}
-                      businessVolume={businessStats.totalVolume}
-                    />
-                  </div>
-                  {/* Redesigned Markets Section as Table */}
-                  <PlatformMarkets
-                    cryptoData={cryptoData}
-                    forexData={forexData}
-                    marketPrices={marketPrices}
-                    getPriceDecimals={getPriceDecimals}
-                    getPriceChangeClass={getPriceChangeClass}
-                    renderPriceWithBigDigits={renderPriceWithBigDigits}
-                    forexMarketOpen={forexMarketOpen}
-                    navigate={navigate}
-                  />
-                  {/* Top 5 Transactions and Closed Trades */}
-                  <TopDashboardLists transactions={transactions} trades={closedTrades} />
-                </div>
-              )}
+              {/* Balance Container */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <BalanceCard
+                  withdrawalBalance={withdrawalBalance}
+                  userProfile={userProfile}
+                />
+                <AlphaQuantCard
+                  totalInvested={totalInvested}
+                  activePlans={activePlans}
+                  todaysProfit={getTodaysInvestmentProfit(transactions)}
+                  onClick={() => navigate('/plans')}
+                />
+                <AffiliateRankCard
+                  businessStats={businessStats}
+                  directs={directCount}
+                  businessVolume={businessStats.totalVolume}
+                />
+              </div>
+
+              {/* Markets Section */}
+              <PlatformMarkets
+                cryptoData={cryptoData}
+                forexData={forexData}
+                marketPrices={marketPrices}
+                getPriceChangeClass={getPriceChangeClass}
+                renderPriceWithBigDigits={renderPriceWithBigDigits}
+                forexMarketOpen={forexMarketOpen}
+                navigate={navigate}
+              />
+              
+              {/* Transactions and Trades */}
+              <TopDashboardLists transactions={transactions} trades={closedTrades} />
             </div>
-          </main>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

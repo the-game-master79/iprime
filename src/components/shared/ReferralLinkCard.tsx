@@ -1,7 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy } from "@phosphor-icons/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Copy, Check, QrCode } from "@phosphor-icons/react";
+
+import { QRCodeSVG } from "qrcode.react";
 
 interface ReferralLinkCardProps {
   referralLink: string;
@@ -26,31 +30,129 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
   referralLink,
   onCopyLink,
 }) => {
+  const [copied, setCopied] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const displayLink = getTrimmedReferralLink(referralLink);
+
+  useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => setCopied(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copied]);
+
+  const handleCopy = () => {
+    onCopyLink();
+    setCopied(true);
+  };
+
+  const handleDownloadQR = () => {
+    const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const pngUrl = canvas.toDataURL('image/png');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pngUrl;
+      downloadLink.download = 'referral-qr.png';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+  };
   return (
-    <div className="bg-secondary rounded-3xl p-4 border border-border">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row items-stretch gap-2">
-          <div className="relative flex-1 flex flex-row gap-2">
-            <Input
-              id="referral-link-input"
-              value={getTrimmedReferralLink(referralLink)}
-              label="Referral Link"
-              readOnly
-              className="w-full font-medium text-foreground text-sm bg-secondary-foreground h-12 border border-border pr-2 truncate"
-              style={{ minWidth: 0 }}
-            />
-            <Button
-              size="icon"
-              variant="secondary"
-              onClick={onCopyLink}
-              className="h-12 w-12 rounded-xl flex-shrink-0 bg-secondary-foreground text-foreground font-bold hover:bg-secondary-foreground active:bg-secondary-foreground focus:bg-secondary-foreground"
-              title="Copy Link"
-            >
-              <Copy className="h-8 w-8 font-bold" weight="bold" />
-            </Button>
+    <Card className="relative border-primary/50 hover:border-primary/70 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-100 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-100" />
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">Your Referral Link</CardTitle>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Input
+                id="referral-link-input"
+                value={displayLink}
+                label="Referral Link"
+                disabled
+                className="h-10 text-sm"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={handleCopy}
+                className={`h-10 w-20 text-sm transition-colors ${
+                  copied 
+                    ? 'bg-green-500/10 text-green-600 border-green-500/30 hover:bg-green-500/20' 
+                    : 'bg-secondary hover:bg-secondary/80 border-border'
+                }`}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowQrCode(true)}
+                className="h-10 w-10 p-0 bg-secondary hover:bg-secondary/80 border-border"
+                title="Show QR Code"
+              >
+                <QrCode className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Share your referral link to earn rewards
+          </p>
+
+          <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-center">Scan QR Code</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col items-center space-y-6 py-4 px-4">
+                <div className="p-4 bg-white rounded-2xl border shadow-sm">
+                  <div className="[&>svg>rect]:rounded-[5px] [&>svg>rect]:border-2 [&>svg>rect]:border-white">
+                    <QRCodeSVG
+                      value={referralLink}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                      className="w-[200px] h-[200px] [&>rect:first-child]:fill-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="w-full space-y-2">
+                  <p className="text-sm text-muted-foreground text-center">
+                    Share this QR code or link
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={referralLink}
+                      disabled
+                      className="flex-1 text-sm"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        navigator.clipboard.writeText(referralLink);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="h-10 w-10 p-0 flex-shrink-0 flex items-center justify-center"
+                      title="Copy to clipboard"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

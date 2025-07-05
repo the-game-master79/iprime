@@ -1,7 +1,9 @@
 import React from "react";
 import type { Transaction } from "@/types/dashboard";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, BarChart2, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // Define Trade interface locally since it's not exported from types
 interface Trade {
@@ -63,41 +65,58 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       {/* Recent Transactions */}
-      <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold">Recent Transactions</h3>
-          {hasTransactions && (
-            <button
-              type="button"
-              className="text-primary text-xs font-medium flex items-center gap-1 hover:underline ml-auto bg-transparent border-0 cursor-pointer"
-              onClick={() => navigate('/history?tab=transactions')}
-            >
-              View All <ArrowUpRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        {hasTransactions ? (
-          <ul>
-            {transactions.slice(0, 5).map(tx => (
-              <li key={tx.id} className="py-2 flex flex-col gap-1 last:pb-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${getStatusColor(tx.status)}`}></span>
-                    <span className="font-medium text-foreground text-sm">{tx.type === 'investment_return' ? 'Trade Profit' : tx.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+      <Card className="bg-background rounded-2xl border-border flex flex-col h-full overflow-hidden">
+        <CardHeader className="pb-4 pt-6 px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <BarChart2 className="w-5 h-5 text-primary" />
+              </div>
+              <CardTitle className="text-lg font-semibold">Recent Transactions</CardTitle>
+            </div>
+            {hasTransactions && (
+              <button
+                type="button"
+                className="text-primary text-xs font-medium flex items-center gap-1 hover:underline bg-transparent border-0 cursor-pointer px-2 py-1 hover:bg-muted/50 rounded-md"
+                onClick={() => navigate('/history?tab=transactions')}
+              >
+                View All <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="px-6 pb-6 flex-1">
+          {hasTransactions ? (
+            <div className="space-y-4">
+              {transactions.slice(0, 5).map(tx => (
+                <div key={tx.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${getStatusColor(tx.status)}`}></span>
+                      <span className="font-medium text-foreground text-sm">
+                        {tx.type === 'investment_return' ? 'Trade Profit' : tx.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                    </div>
+                    <span className={`font-semibold ${Number(tx.amount) > 0 ? 'text-success' : 'text-destructive'}`}>
+                      {Number(tx.amount) > 0 ? '+' : ''}{Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
+                    </span>
                   </div>
-                  <span className={`font-semibold ${Number(tx.amount) > 0 ? 'text-success' : 'text-destructive'}`}>{Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD</span>
+                  <div className="flex items-center justify-between w-full pl-4">
+                    <span className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</span>
+                    <span className="text-xs text-muted-foreground capitalize">{tx.status || 'unknown'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</span>
-                  <span className="text-xs text-muted-foreground">{tx.status || 'unknown'}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-muted-foreground text-sm text-center py-6">All your transactions will appear here</div>
-        )}
-      </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted-foreground text-sm text-center py-6">
+              All your transactions will appear here
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       {/* Recent Closed Trades */}
       <div className="bg-background rounded-2xl p-4 border border-border flex flex-col h-full">
         <div className="flex items-center justify-between mb-3">

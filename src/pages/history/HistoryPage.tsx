@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardTabs } from "../../components/dashboard/DashboardTabs";
 import { Topbar } from "../../components/shared/Topbar";
-import { PlatformSidebar } from "../../components/shared/PlatformSidebar";
-import { Helmet } from "react-helmet-async";
 import { supabase } from "../../lib/supabase";
 import { useUserProfile } from "../../contexts/UserProfileContext";
 
@@ -203,8 +201,6 @@ const HistoryPage: React.FC = () => {
       {/* Topbar full width at the top */}
       <Topbar title="History" />
       <div className="flex flex-1">
-        {/* Sidebar below Topbar */}
-        <PlatformSidebar />
         <div className="flex-1 flex flex-col">
           <main className="flex-1 p-4">
             <div className="mx-auto w-full max-w-[1200px]">

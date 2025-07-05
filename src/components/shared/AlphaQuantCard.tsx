@@ -1,60 +1,54 @@
 import React from "react";
-import { Wallet } from "@phosphor-icons/react";
 import type { Transaction } from "@/types/dashboard";
+import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export const AlphaQuantCard: React.FC<{
   totalInvested: number;
   activePlans: { count: number; amount: number };
   onClick: () => void;
-  todaysProfit?: number;
-}> = ({ totalInvested, activePlans, onClick, todaysProfit }) => (
-  <div
-    className="bg-background border-2 border-warning rounded-2xl p-6 flex flex-col justify-between cursor-pointer transition-shadow"
-    onClick={onClick}
-    tabIndex={0}
-    role="button"
-    aria-label="Go to Plans"
-  >
-    <div className="flex-1 flex flex-col justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="text-md text-foreground">AlphaQuant</span>
-          <span className="ml-2 px-2 py-0.5 rounded-full bg-warning text-foreground text-xs font-semibold border border-warning">
-            {activePlans.count === 0
-              ? "Quant Inactive"
-              : `${activePlans.count} ${activePlans.count === 1 ? "Active Plan" : "Active Plans"}`}
-          </span>
-        </div>
-        <div className="space-y-1 mt-2">
-          <h3 className="text-5xl font-bold text-foreground">
-            {totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            <span className="text-2xl font-normal text-muted-foreground ml-2">USD</span>
-          </h3>
-        </div>
+  onSubscribe: () => void;
+}> = ({ totalInvested, activePlans, onClick, onSubscribe }) => (
+  <Card className="relative border-warning/50 hover:border-warning/70 overflow-hidden">
+    <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-transparent opacity-100 pointer-events-none" />
+    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-warning/40 to-transparent opacity-100" />
+    <CardHeader className="pb-2">
+      <div className="flex items-center justify-between">
+        <CardTitle className="text-lg">AlphaQuant</CardTitle>
+        <Badge variant={activePlans.count === 0 ? "warning" : "secondary"}>
+          {activePlans.count === 0
+            ? "Quant Inactive"
+            : `${activePlans.count} ${activePlans.count === 1 ? "Active Plan" : "Active Plans"}`}
+        </Badge>
       </div>
-      {typeof todaysProfit === 'number' && totalInvested > 0 && (
-        <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-400/10 border border-green-300/50 text-xs font-semibold text-foreground shadow-sm mt-4">
-          <div className="flex items-center">
-            <span className="relative flex h-3 w-3 mr-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
-            <span>Today's profit: {todaysProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
-          </div>
-        </div>
-      )}
-    </div>
-    {activePlans.count === 0 && totalInvested === 0 && (
-      <button
-        className="w-full mt-4 px-4 py-2 rounded-lg bg-warning text-foreground text-sm font-semibold border border-warning hover:bg-warning/80 transition-colors focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2"
-        type="button"
-        onClick={onClick}
-        aria-label="Activate your strategy"
+    </CardHeader>
+    <CardContent className="pb-4">
+      <div className="space-y-1">
+        <h3 className="text-4xl font-bold tracking-tight">
+          ${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </h3>
+      </div>
+    </CardContent>
+    <CardFooter className="flex gap-3 pt-0 bg-gradient-to-t from-warning/10 to-transparent">
+      <InteractiveHoverButton
+        className="w-full bg-warning text-foreground hover:bg-warning/90"
+        dotColor="bg-foreground"
+        hoverTextColor="text-white"
+        onClick={onSubscribe}
       >
-        Activate your strategy
-      </button>
-    )}
-  </div>
+        Subscribe
+      </InteractiveHoverButton>
+      {activePlans.count === 0 && totalInvested === 0 && (
+        <InteractiveHoverButton
+          className="w-full border border-foreground/20 hover:bg-foreground/5"
+          onClick={onClick}
+        >
+          Activate
+        </InteractiveHoverButton>
+      )}
+    </CardFooter>
+  </Card>
 );
 
 // Helper to get sum of all investment_return transactions

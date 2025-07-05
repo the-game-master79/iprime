@@ -1,22 +1,24 @@
 import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-const rankStyles: Record<string, { bg: string; icon: string; border: string }> = {
-  "New Member":      { bg: "bg-gray-200/10",      icon: "text-gray-500",    border: "border-blue-500" },
-  "Amber":           { bg: "bg-amber-100/10",     icon: "text-amber-500",   border: "border-amber-500" },
-  "Jade":            { bg: "bg-green-100/10",     icon: "text-green-600",   border: "border-green-500" },
-  "Pearl":           { bg: "bg-sky-100/10",       icon: "text-sky-400",     border: "border-sky-500" },
-  "Sapphire":        { bg: "bg-blue-100/10",      icon: "text-blue-500",    border: "border-blue-500" },
-  "Topaz":           { bg: "bg-yellow-100/10",    icon: "text-yellow-500",  border: "border-yellow-500" },
-  "Ruby":            { bg: "bg-rose-100/10",      icon: "text-rose-500",    border: "border-rose-500" },
-  "Emerald":         { bg: "bg-emerald-100/10",   icon: "text-emerald-500", border: "border-emerald-500" },
-  "Diamond":         { bg: "bg-cyan-100/10",      icon: "text-cyan-500",    border: "border-cyan-500" },
-  "Platinum":        { bg: "bg-slate-200/10",     icon: "text-slate-500",   border: "border-slate-500" },
-  "Gold":            { bg: "bg-yellow-200/10",    icon: "text-yellow-600",  border: "border-yellow-500" },
-  "Legend":          { bg: "bg-purple-100/10",    icon: "text-purple-500",  border: "border-purple-500" },
-  "Ultra Legend":    { bg: "bg-indigo-100/10",    icon: "text-indigo-500",  border: "border-indigo-500" },
-  "The King":        { bg: "bg-orange-100/10",    icon: "text-orange-500",  border: "border-orange-500" },
-  "Mastermind":      { bg: "bg-pink-100/10",      icon: "text-pink-500",    border: "border-pink-500" },
-  "Kohinoor":        { bg: "bg-fuchsia-100/10",   icon: "text-fuchsia-600", border: "border-fuchsia-500" },
+const rankStyles: Record<string, { bg: string; icon: string; border: string; gradient: string }> = {
+  "New Member":      { bg: "bg-gray-200/10",      icon: "text-gray-100",    border: "border-blue-500/50",    gradient: "from-blue-500/5 via-transparent to-transparent" },
+  "Amber":           { bg: "bg-amber-100/10",     icon: "text-amber-100",   border: "border-amber-500/50",   gradient: "from-amber-500/5 via-transparent to-transparent" },
+  "Jade":            { bg: "bg-green-100/10",     icon: "text-green-100",   border: "border-green-500/50",   gradient: "from-green-500/5 via-transparent to-transparent" },
+  "Pearl":           { bg: "bg-sky-100/10",       icon: "text-sky-100",     border: "border-sky-500/50",     gradient: "from-sky-500/5 via-transparent to-transparent" },
+  "Sapphire":        { bg: "bg-blue-100/10",      icon: "text-blue-100",    border: "border-blue-500/50",    gradient: "from-blue-500/5 via-transparent to-transparent" },
+  "Topaz":           { bg: "bg-yellow-100/10",    icon: "text-yellow-100",  border: "border-yellow-500/50",  gradient: "from-yellow-500/5 via-transparent to-transparent" },
+  "Ruby":            { bg: "bg-rose-100/10",      icon: "text-rose-100",    border: "border-rose-500/50",    gradient: "from-rose-500/5 via-transparent to-transparent" },
+  "Emerald":         { bg: "bg-emerald-100/10",   icon: "text-emerald-100", border: "border-emerald-500/50", gradient: "from-emerald-500/5 via-transparent to-transparent" },
+  "Diamond":         { bg: "bg-cyan-100/10",      icon: "text-cyan-100",    border: "border-cyan-500/50",    gradient: "from-cyan-500/5 via-transparent to-transparent" },
+  "Platinum":        { bg: "bg-slate-200/10",     icon: "text-slate-100",   border: "border-slate-500/50",   gradient: "from-slate-500/5 via-transparent to-transparent" },
+  "Gold":            { bg: "bg-yellow-200/10",    icon: "text-yellow-100",  border: "border-yellow-500/50",  gradient: "from-yellow-500/5 via-transparent to-transparent" },
+  "Legend":          { bg: "bg-purple-100/10",    icon: "text-purple-100",  border: "border-purple-500/50",  gradient: "from-purple-500/5 via-transparent to-transparent" },
+  "Ultra Legend":    { bg: "bg-indigo-100/10",    icon: "text-indigo-100",  border: "border-indigo-500/50",  gradient: "from-indigo-500/5 via-transparent to-transparent" },
+  "The King":        { bg: "bg-orange-100/10",    icon: "text-orange-100",  border: "border-orange-500/50",  gradient: "from-orange-500/5 via-transparent to-transparent" },
+  "Mastermind":      { bg: "bg-pink-100/10",      icon: "text-pink-100",    border: "border-pink-500/50",    gradient: "from-pink-500/5 via-transparent to-transparent" },
+  "Kohinoor":        { bg: "bg-fuchsia-100/10",   icon: "text-fuchsia-100", border: "border-fuchsia-500/50", gradient: "from-fuchsia-500/5 via-transparent to-transparent" },
 };
 
 export const AffiliateRankCard: React.FC<{
@@ -32,35 +34,33 @@ export const AffiliateRankCard: React.FC<{
   const style = rankStyles[rank] || rankStyles['New Member'];
 
   return (
-    <div
-      className={`bg-background border-2 rounded-2xl p-6 flex flex-col justify-between cursor-pointer transition-shadow ${style.border}`}
-      tabIndex={0}
-      role="region"
-      aria-label="Affiliate Rank Card"
-    >
-      <div className="flex-1 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-md text-foreground">Affiliate</span>
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold border ${style.bg} ${style.icon} ${style.border}`}>
-              {rank}
+    <Card className={`relative overflow-hidden border-2 ${style.border} hover:${style.border.replace('/50', '/70')}`}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${style.gradient} opacity-100 pointer-events-none`} />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-current/40 to-transparent opacity-100" />
+      
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Affiliates</CardTitle>
+          <Badge variant="secondary" className={style.icon.replace('text-', 'bg-').replace('text-', 'border-')}>
+            {rank}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="grid grid-cols-2 gap-4 mt-2 w-full">
+          <div className="flex flex-col items-start">
+            <span className="text-xs text-muted-foreground mb-1">Direct</span>
+            <span className="inline-flex items-center w-full justify-between px-4 py-2 rounded-full bg-green-400/10 border border-green-300/50 text-foreground text-xl font-bold">
+              <span>{directs}</span>
+              <span className="text-xs font-medium text-foreground bg-green-400/20 rounded-full px-2 py-0.5 ml-2">Users</span>
             </span>
           </div>
-          <div className="flex gap-4 mt-4 w-full">
-            <div className="flex flex-col items-start w-1/2">
-              <span className="text-xs text-muted-foreground mb-1">Directs</span>
-              <span className="inline-flex items-center w-full justify-between px-4 py-2 rounded-full bg-green-400/10 border border-green-300/50 text-foreground text-xl font-bold">
-                <span>{directs}</span>
-                <span className="text-xs font-medium text-foreground bg-green-400/20 rounded-full px-2 py-0.5 ml-2">Active</span>
-              </span>
-            </div>
-            <div className="flex flex-col items-start w-1/2">
-              <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
-              <span className="inline-flex items-center w-full justify-between px-4 py-2 rounded-full bg-yellow-400/10 border border-yellow-300/50 text-foreground text-xl font-bold">
-                <span>{businessVolume.toLocaleString()}</span>
-                <span className="text-xs font-medium text-foreground bg-yellow-400/20 rounded-full px-2 py-0.5 ml-2">USD</span>
-              </span>
-            </div>
+          <div className="flex flex-col items-start">
+            <span className="text-xs text-muted-foreground mb-1">Business Volume</span>
+            <span className="inline-flex items-center w-full justify-between px-4 py-2 rounded-full bg-yellow-400/10 border border-yellow-300/50 text-foreground text-xl font-bold">
+              <span>{businessVolume.toLocaleString()}</span>
+              <span className="text-xs font-medium text-foreground bg-yellow-400/20 rounded-full px-2 py-0.5 ml-2">USD</span>
+            </span>
           </div>
         </div>
         {businessStats.nextRank && (
@@ -72,10 +72,12 @@ export const AffiliateRankCard: React.FC<{
               </span>
               <span>Next: {businessStats.nextRank.title}</span>
             </div>
-            <span className="text-foreground font-normal ml-2">{(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD required</span>
+            <span className="text-foreground font-normal ml-2">
+              {(businessStats.nextRank.business_amount - businessStats.totalVolume).toLocaleString()} USD required
+            </span>
           </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };

@@ -7,8 +7,8 @@ import { Footer } from "@/components/shared/Footer";
 import { Navbar } from "@/components/shared/Navbar";
 import { Hero } from "@/components/shared/Hero";
 import DepthMarquee from "@/components/shared/DepthMarquee";
-import { ClEngine } from "@/components/shared/ClEngine";
 import { AlphaQuant } from '@/components/shared/AlphaQuant';
+import { AlphaQuantCard } from '@/components/shared/AlphaQuantCard';
 import { useScrollAnimation } from "@/hooks/use-scroll-animation";
 import { Helmet } from "react-helmet-async";
 
@@ -89,6 +89,23 @@ const Index = () => {
             <Suspense fallback={<div className="min-h-[200px]" />}>
               <QuickFeatures />
               <AlphaQuant />
+              
+              {/* AlphaQuant Dashboard Section */}
+              <section id="alphaquant-dashboard" className="py-16 bg-background">
+                <div className="container mx-auto px-4">
+                  <h2 className="text-3xl font-bold text-center mb-8">Your AlphaQuant Dashboard</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <AlphaQuantCard 
+                      totalInvested={12500.75}
+                      activePlans={{ count: 3, amount: 8500.00 }}
+                      onClick={() => window.location.href = '/dashboard/plans'}
+                      onSubscribe={() => window.location.href = '/dashboard/plans'}
+                    />
+                    {/* Add more cards or dashboard components here */}
+                  </div>
+                </div>
+              </section>
+              
               <FaqPage />
               <CtaPage />
             </Suspense>

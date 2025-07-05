@@ -30,10 +30,10 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      // Modified: Use secondary foreground for non-selected tabs
+      // Modified: Use primary color with transparent background for active state
       "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-5 py-2 text-base font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-      "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
-      "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:font-bold data-[state=active]:shadow-sm",
+      "text-muted-foreground hover:bg-foreground/5 hover:text-foreground/90",
+      "data-[state=active]:bg-primary/5 data-[state=active]:text-primary data-[state=active]:font-semibold data-[state=active]:shadow-sm",
       "relative",
       className
     )}

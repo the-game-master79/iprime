@@ -21,7 +21,6 @@ import {
 
 import { KycVariant } from "@/components/shared/KycVariants";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
 import { TransactionTable } from "@/components/transactionTable/TransactionTable";
 
 interface Promocode {
@@ -1009,8 +1008,6 @@ export default function CashierPage() {
       <Topbar title="Cashier" />
       {/* Flex row: sidebar and main content */}
       <div className="flex flex-1 min-h-0">
-        {/* Sidebar for desktop */}
-        <PlatformSidebar />
         {/* Main content */}
         <main className="flex-1 min-w-0">
           <div className="container mx-auto max-w-[1200px] px-4 py-6 space-y-6">
@@ -1225,8 +1222,6 @@ export default function CashierPage() {
                                       {availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address}
                                     </code>
                                     <Button
-                                      variant="outline"
-                                      size="sm"
                                       className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 bg-secondary border-0 hover:bg-secondary-foreground rounded-md"
                                       type="button"
                                       onClick={() => handleCopyAddress(availableCryptos.find(c => formatCryptoDisplayName(c) === cryptoType)?.deposit_address || '')}

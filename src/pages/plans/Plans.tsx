@@ -8,7 +8,6 @@ import { Separator } from "@/components/ui/separator";
 import { Topbar } from "@/components/shared/Topbar";
 import { BalanceCard } from "@/components/shared/BalanceCards"; // Add this import
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast"; // <-- add this import
 import {
   getPlans,
@@ -21,8 +20,6 @@ import {
 } from "@/pages/plans/planService";
 
 import { AvailablePlanVariant, ActivePlanVariant } from "@/components/shared/PlanCardVariants";
-// Add PlatformSidebar import
-import { PlatformSidebar } from "@/components/shared/PlatformSidebar";
 
 interface Plan {
   id: string;
@@ -454,8 +451,6 @@ const Plans = () => {
         />
         {/* Add sidebar/main layout as in DepositPage */}
         <div className="flex flex-1 min-h-0">
-          {/* Sidebar for desktop */}
-          <PlatformSidebar />
           {/* Main content */}
           <main className="flex-1 min-w-0">
             <div className="container mx-auto max-w-[1200px] py-6 px-4">
