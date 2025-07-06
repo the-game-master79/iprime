@@ -155,20 +155,7 @@ const Login = () => {
         .single();
 
       if (userExistsData && !userExistsError) {
-        // Check if user already has a referral code
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('referred_by')
-          .eq('email', email)
-          .single();
-
-        if (profileData?.referred_by) {
-          setEmailError("A referral code has already been added to this account.");
-          setIsLoading(false);
-          return;
-        }
-
-        // User exists and no referral code, try to sign in
+        // User exists, try to sign in first
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -178,6 +165,33 @@ const Login = () => {
           setPasswordError(signInError.message || "Incorrect email or password.");
           setIsLoading(false);
           return;
+        }
+
+        // After successful login, check if they're trying to add a referral code
+        if (referral) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('referred_by')
+            .eq('email', email)
+            .single();
+
+          if (profileData?.referred_by) {
+            // Sign out since we don't want to keep them logged in with an invalid state
+            await supabase.auth.signOut();
+            setEmailError("A referral code has already been added to this account.");
+            setIsLoading(false);
+            return;
+          }
+
+          // If no referral code exists, update with the new one
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ referred_by: referral })
+            .eq('email', email);
+
+          if (updateError) {
+            console.error('Failed to update referral code:', updateError);
+          }
         }
 
         // Check Supabase session after login

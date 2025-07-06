@@ -818,34 +818,36 @@ const Profile = () => {
                       ) : (
                         <>
                           <div className="space-y-2 col-span-1">
-                            <label htmlFor="firstName" className="text-sm text-muted-foreground">Add your First Name</label>
-                            <Input
-                              id="firstName"
-                              name="firstName"
-                              value={userData.firstName}
-                              onChange={e => setUserData(prev => ({
-                                ...prev,
-                                firstName: e.target.value,
-                                fullName: `${e.target.value} ${prev.lastName}`.trim()
-                              }))}
-                              placeholder="First Name"
-                              className="bg-secondary text-foreground placeholder:text-foreground"
-                            />
+                            <div className="space-y-1">
+                              <label htmlFor="firstName" className="text-sm text-muted-foreground">First Name</label>
+                              <Input
+                                id="firstName"
+                                name="firstName"
+                                value={userData.firstName}
+                                onChange={e => setUserData(prev => ({
+                                  ...prev,
+                                  firstName: e.target.value,
+                                  fullName: `${e.target.value} ${prev.lastName}`.trim()
+                                }))}
+                                className="bg-secondary text-foreground"
+                              />
+                            </div>
                           </div>
                           <div className="space-y-2 col-span-1">
-                            <label htmlFor="lastName" className="text-sm text-muted-foreground">Add your Last Name</label>
-                            <Input
-                              id="lastName"
-                              name="lastName"
-                              value={userData.lastName}
-                              onChange={e => setUserData(prev => ({
-                                ...prev,
-                                lastName: e.target.value,
-                                fullName: `${prev.firstName} ${e.target.value}`.trim()
-                              }))}
-                              placeholder="Last Name"
-                              className="bg-secondary text-foreground placeholder:text-foreground"
-                            />
+                            <div className="space-y-1">
+                              <label htmlFor="lastName" className="text-sm text-muted-foreground">Last Name</label>
+                              <Input
+                                id="lastName"
+                                name="lastName"
+                                value={userData.lastName}
+                                onChange={e => setUserData(prev => ({
+                                  ...prev,
+                                  lastName: e.target.value,
+                                  fullName: `${prev.firstName} ${e.target.value}`.trim()
+                                }))}
+                                className="bg-secondary text-foreground"
+                              />
+                            </div>
                           </div>
                         </>
                       )}

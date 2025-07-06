@@ -72,7 +72,6 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
               <Input
                 id="referral-link-input"
                 value={displayLink}
-                label="Referral Link"
                 disabled
                 className="h-10 text-sm"
               />
@@ -99,9 +98,7 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
               </Button>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Share your referral link to earn rewards
-          </p>
+
 
           <Dialog open={showQrCode} onOpenChange={setShowQrCode}>
             <DialogContent className="sm:max-w-[425px]">
@@ -121,13 +118,9 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
                   </div>
                 </div>
                 <div className="w-full space-y-2">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Share this QR code or link
-                  </p>
                   <div className="flex items-center gap-2">
                     <Input
                       value={referralLink}
-                      label="Referral Link"
                       disabled
                       className="flex-1 text-sm"
                     />

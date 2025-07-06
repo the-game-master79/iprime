@@ -21,9 +21,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           type={type}
           className={cn(
-            "peer flex h-12 w-full rounded-xl border border-input bg-background px-4 pt-4 pb-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-12 w-full rounded-xl border border-input bg-background px-4 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            label ? "pt-4 pb-1 peer" : "py-0", // Only add pt-4 pb-1 when there's a label
             rightIcon ? "pr-10" : "", // Add right padding if icon present
             type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : '',
+            !label && "items-center", // Keep text left-aligned but vertically centered when no label
             className
           )}
           ref={ref}

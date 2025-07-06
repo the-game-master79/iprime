@@ -10,9 +10,7 @@ export const AlphaQuantCard: React.FC<{
   onClick: () => void;
   onSubscribe: () => void;
 }> = ({ totalInvested, activePlans, onClick, onSubscribe }) => (
-  <Card className="relative border-warning/50 hover:border-warning/70 overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-warning/5 via-transparent to-transparent opacity-100 pointer-events-none" />
-    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-warning/40 to-transparent opacity-100" />
+  <Card className="relative border-warning/50 overflow-hidden">
     <CardHeader className="pb-2">
       <div className="flex items-center justify-between">
         <CardTitle className="text-lg">AlphaQuant</CardTitle>
@@ -30,23 +28,15 @@ export const AlphaQuantCard: React.FC<{
         </h3>
       </div>
     </CardContent>
-    <CardFooter className="flex gap-3 pt-0 bg-gradient-to-t from-warning/10 to-transparent">
+    <CardFooter className="flex gap-3 pt-0">
       <InteractiveHoverButton
-        className="w-full bg-warning text-foreground hover:bg-warning/90"
+        className="w-full bg-warning text-foreground transition-colors duration-200 hover:bg-warning/90"
         dotColor="bg-foreground"
         hoverTextColor="text-white"
-        onClick={onSubscribe}
+        onClick={() => window.location.href = '/plans'}
       >
-        Subscribe
+        Subscribe Now
       </InteractiveHoverButton>
-      {activePlans.count === 0 && totalInvested === 0 && (
-        <InteractiveHoverButton
-          className="w-full border border-foreground/20 hover:bg-foreground/5"
-          onClick={onClick}
-        >
-          Activate
-        </InteractiveHoverButton>
-      )}
     </CardFooter>
   </Card>
 );

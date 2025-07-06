@@ -89,7 +89,7 @@ export const DashboardTabs: React.FC<DashboardTabsProps> = ({
   return (
     <div>
       <Tabs defaultValue={activeTab || "transactions"} className="w-full">
-        <TabsList>
+        <TabsList className="mb-6">
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="ranks">Ranks</TabsTrigger>
           <TabsTrigger value="closed_trades">Closed Trades</TabsTrigger>

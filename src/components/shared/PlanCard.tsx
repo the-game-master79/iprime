@@ -87,13 +87,8 @@ export function PlanCard({
   const randomPairs = useMemo(() => getRandomPairs(tradingPairs, 3), [tradingPairs]);
 
   return (
-    <Card
-      className="group relative overflow-visible transition-all duration-300 bg-secondary shadow-lg"
-    >
-      {/* Gradient background */}
-      <div className={`absolute inset-0 ${getRandomGradient()}`} />
-      
-      <div className="relative p-6 space-y-6">
+    <Card className="overflow-visible transition-all duration-300 bg-secondary shadow-lg">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -103,13 +98,11 @@ export function PlanCard({
             >
               {name}
             </Badge>
-            <div className="p-2 rounded-xl bg-primary/10 flex items-center">
-              {variant === 'available' ? (
-                <Lock className="h-5 w-5 text-primary" />
-              ) : (
+            {variant === 'active' && (
+              <div className="p-2 rounded-xl bg-primary/10 flex items-center">
                 <Clock className="h-5 w-5 text-primary" />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="space-y-1">              
@@ -189,9 +182,9 @@ export function PlanCard({
             <div className="w-full">
               <InteractiveHoverButton 
                 onClick={onInvest}
-                className="w-full text-foreground hover:bg-primary hover:text-background"
-                dotColor="bg-primary"
-                hoverTextColor="text-background"
+                className="w-full text-white bg-primary hover:bg-foreground hover:text-primary"
+                dotColor="bg-white"
+                hoverTextColor="text-primary"
               >
                 Activate
               </InteractiveHoverButton>
@@ -259,7 +252,7 @@ export function PlanCard({
           <div className="flex items-center gap-3">              
             <Button
               variant="destructive"
-              className="flex-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300 text-white rounded-md"
+              className="flex-1 opacity-100 hover:opacity-90 transition-opacity duration-300 text-white rounded-md"
               onClick={onCancel}
             >
               Cancel Plan
