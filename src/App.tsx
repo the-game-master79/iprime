@@ -30,7 +30,6 @@ const Platform = lazy(() => import("@/pages/dashboard/Platform"));
 const Plans = lazy(() => import("@/pages/plans/Plans"));
 const Affiliate = lazy(() => import("@/pages/affiliate/Affiliate"));
 const Profile = lazy(() => import("@/pages/profile/Profile"));
-const DepositPage = lazy(() => import("@/pages/deposit/DepositPage"));
 const Promotions = lazy(() => import("@/pages/promotions/Promotions"));
 const AdminLogin = lazy(() => import("@/pages/admin/Login"));
 const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"));
@@ -119,7 +118,6 @@ const RouteGroup = () => {
 
   if (
     path.startsWith("/platform") ||
-    path.startsWith("/cashier") ||
     path.startsWith("/affiliate") ||
     path.startsWith("/profile") ||
     path.startsWith("/plans") ||
@@ -133,11 +131,8 @@ const RouteGroup = () => {
               <Route path="/platform" element={<AuthGuard requireAuth><Platform /></AuthGuard>} />
               <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
               <Route path="/affiliate" element={<AuthGuard requireAuth><Affiliate /></AuthGuard>} />
-              <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
               <Route path="/promotions" element={<AuthGuard requireAuth><Promotions /></AuthGuard>} />
               <Route path="/profile" element={<AuthGuard requireAuth><Profile /></AuthGuard>} />
-              <Route path="/cashier" element={<AuthGuard requireAuth><DepositPage /></AuthGuard>} />
-              <Route path="/plans" element={<AuthGuard requireAuth><Plans /></AuthGuard>} />
               <Route path="/history" element={<AuthGuard requireAuth><HistoryPage /></AuthGuard>} />
             </Routes>
           </UserProfileProvider>

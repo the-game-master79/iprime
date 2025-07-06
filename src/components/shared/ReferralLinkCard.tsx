@@ -127,6 +127,7 @@ export const ReferralLinkCard: React.FC<ReferralLinkCardProps> = ({
                   <div className="flex items-center gap-2">
                     <Input
                       value={referralLink}
+                      label="Referral Link"
                       disabled
                       className="flex-1 text-sm"
                     />

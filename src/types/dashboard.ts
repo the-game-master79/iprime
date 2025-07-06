@@ -22,13 +22,27 @@ export interface UserProfile {
   [key: string]: any;
 }
 
+export interface WithdrawalData {
+  id: string;
+  user_id: string;
+  amount: number;
+  wallet_address: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  transaction_hash?: string;
+  created_at: string;
+  updated_at: string;
+  [key: string]: any;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
-  type: string;
+  type: 'deposit' | 'withdrawal' | 'commission' | 'investment' | 'investment_return' | 'rank_bonus' | string;
   amount: number;
-  status: string;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled' | string;
   description?: string;
   created_at: string;
+  updated_at?: string;
+  withdrawal_data?: WithdrawalData;
   [key: string]: any;
 }

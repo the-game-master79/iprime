@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { Topbar } from "@/components/shared/Topbar";
+import { Button } from "@/components/ui/button";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { BalanceCard } from "@/components/shared/BalanceCard";
 import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
@@ -28,6 +29,7 @@ import type {
   Transaction
 } from "@/types/dashboard";
 import { TopDashboardLists } from "@/components/dashboard/TopDashboardLists";
+import { DepositDialog } from "@/components/deposit/DepositDialog";
 
 // Define Trade interface locally since it's not exported from "@/types/dashboard"
 interface Trade {
@@ -126,7 +128,18 @@ function getTodaysInvestmentProfit(transactions: Transaction[]): number {
     .reduce((sum, tx) => sum + tx.amount, 0);
 }
 
-const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
+interface DashboardContentProps {
+  loading: boolean;
+  isDepositDialogOpen: boolean;
+  setIsDepositDialogOpen: (isOpen: boolean) => void;
+}
+
+const DashboardContent: React.FC<DashboardContentProps> = ({ 
+  loading, 
+  isDepositDialogOpen, 
+  setIsDepositDialogOpen 
+}) => {
+  const [isPayoutDialogOpen, setIsPayoutDialogOpen] = useState(false);
   const { profile, loading: profileLoading } = useUserProfile();
   const { isMobile } = useBreakpoints();
   const { theme, setTheme } = useTheme();
@@ -571,22 +584,52 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
       const from = (pageNumber - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      const { data, error, count } = await supabase
+      // Fetch regular transactions
+      const { data: transactionsData, error: transactionsError, count } = await supabase
         .from('transactions')
         .select('*', { count: 'exact' })
         .eq('user_id', user.id)
-        .in('type', ['deposit', 'withdrawal', 'commission', 'investment', 'investment_return', 'rank_bonus'])
+        .in('type', ['deposit', 'commission', 'investment', 'investment_return', 'rank_bonus'])
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      if (transactionsError) throw transactionsError;
+
+      // Fetch withdrawals separately
+      const { data: withdrawalsData, error: withdrawalsError } = await supabase
+        .from('withdrawals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (withdrawalsError) throw withdrawalsError;
+
+      // Map withdrawals to match transaction format
+      const formattedWithdrawals = (withdrawalsData || []).map(withdrawal => ({
+        id: `withdrawal_${withdrawal.id}`,
+        user_id: withdrawal.user_id,
+        amount: -Math.abs(withdrawal.amount), // Make amount negative for withdrawals
+        type: 'withdrawal',
+        status: withdrawal.status || 'pending',
+        description: `Withdrawal to ${withdrawal.wallet_address || 'wallet'}`,
+        created_at: withdrawal.created_at,
+        updated_at: withdrawal.updated_at,
+        withdrawal_data: withdrawal // Keep original withdrawal data
+      }));
+
+      // Combine and sort all transactions
+      const allTransactions = [
+        ...(transactionsData || []),
+        ...formattedWithdrawals
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       if (pageNumber === 1) {
-        setTransactions(data || []);
+        setTransactions(allTransactions);
       } else {
         setTransactions(prev => {
           const existingIds = new Set(prev.map(tx => tx.id));
-          const newTransactions = (data || []).filter(tx => !existingIds.has(tx.id));
+          const newTransactions = allTransactions.filter(tx => !existingIds.has(tx.id));
           return [...prev, ...newTransactions];
         });
       }
@@ -835,8 +878,31 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground transition-colors">
-      <Topbar platform />
+    <div className="flex flex-col w-full min-h-screen bg-background">
+      <Topbar 
+        platform 
+        title="Platform" 
+        onWalletClick={() => setIsDepositDialogOpen(true)}
+      />
+      <DepositDialog 
+        open={isDepositDialogOpen} 
+        onOpenChange={setIsDepositDialogOpen}
+        onDepositSuccess={() => {
+          // Refresh any necessary data after successful deposit
+          console.log('Deposit successful');
+        }}
+        currentUser={currentUser}
+      />
+      <DepositDialog 
+        open={isPayoutDialogOpen} 
+        onOpenChange={setIsPayoutDialogOpen}
+        onDepositSuccess={() => {
+          // Refresh any necessary data after successful payout
+          console.log('Payout successful');
+        }}
+        currentUser={currentUser}
+        isPayout
+      />
       <main className="py-8">
         <div className="container mx-auto px-4 max-w-[1200px]">
           {loading || isLoading ? (
@@ -854,6 +920,8 @@ const DashboardContent: React.FC<{ loading: boolean }> = ({ loading }) => {
                 <BalanceCard
                   withdrawalBalance={withdrawalBalance}
                   userProfile={userProfile}
+                  onDepositClick={() => setIsDepositDialogOpen(true)}
+                  onPayoutClick={() => setIsPayoutDialogOpen(true)}
                 />
                 <AlphaQuantCard
                   totalInvested={totalInvested}
@@ -904,27 +972,13 @@ const DashboardSkeleton = () => (
       <Skeleton className="h-48 md:col-span-2 w-full rounded-2xl" />
       <Skeleton className="h-48 w-full rounded-2xl" />
     </div>
-
-    {/* Markets Table Skeleton */}
-    <Skeleton className="h-40 w-full rounded-2xl" />
-
-    {/* Tabs Skeleton */}
-    <div>
-      <div className="flex gap-2 mb-4">
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-8 w-32" />
-      </div>
-      <Skeleton className="h-32 w-full rounded-xl" />
-      <Skeleton className="h-8 w-1/2 mt-4" />
-    </div>
   </div>
 );
 
 const Dashboard = () => {
-  const [isLoading, setIsLoading] = useState(true);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -933,13 +987,9 @@ const Dashboard = () => {
         replace: true 
       });
     }
-    
-    if (!loading) {
-      setIsLoading(false);
-    }
   }, [user, loading, navigate]);
 
-  if (loading || isLoading) {
+  if (loading) {
     return (
       <LoadingSpinner />
     );
@@ -947,7 +997,13 @@ const Dashboard = () => {
 
   if (!user) return null;
 
-  return <DashboardContent loading={loading} />;
+  return (
+    <DashboardContent 
+      loading={loading} 
+      isDepositDialogOpen={isDepositDialogOpen}
+      setIsDepositDialogOpen={setIsDepositDialogOpen}
+    />
+  );
 };
 
 export default Dashboard;

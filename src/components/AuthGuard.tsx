@@ -27,12 +27,12 @@ export const AuthGuard = ({ children, requireAuth = false, authPage = false }: A
         replace: true 
       });
     } else if (user && authPage) {
-      // Prevent redirect loop: only redirect if not already on /platform
-      const returnPath = location.state?.from || '/platform';
-      if (location.pathname !== returnPath) {
+      // Always redirect to /platform for authenticated users on auth pages
+      // Ignore any previous path to prevent redirect loops or unwanted redirects
+      if (!location.pathname.startsWith('/platform')) {
         // Optional: add a short delay for UX (e.g., splash/transition)
         setTimeout(() => {
-          navigate(returnPath, { replace: true });
+          navigate('/platform', { replace: true });
         }, 400);
       }
     }

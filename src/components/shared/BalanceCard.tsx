@@ -4,15 +4,21 @@ import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-b
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const BalanceCard: React.FC<{
+export interface BalanceCardProps {
   withdrawalBalance: number;
-  userProfile: UserProfile | null;
-}> = ({ withdrawalBalance, userProfile }) => {
-  const navigate = useNavigate();
-
-  const handlePayoutClick = () => {
-    navigate("/cashier?tab=payout");
+  userProfile?: {
+    multiplier_bonus?: number;
   };
+  onDepositClick?: () => void;
+  onPayoutClick?: () => void;
+}
+
+export const BalanceCard: React.FC<BalanceCardProps> = ({ 
+  withdrawalBalance, 
+  userProfile, 
+  onDepositClick,
+  onPayoutClick 
+}) => {
 
   return (
     <Card className="relative border-primary/50 hover:border-primary/70 overflow-hidden">
@@ -38,13 +44,13 @@ export const BalanceCard: React.FC<{
           className="w-full bg-primary text-white hover:bg-primary/90"
           dotColor="bg-white"
           hoverTextColor="text-black"
-          onClick={() => navigate("/cashier")}
+          onClick={onDepositClick}
         >
-          Add funds
+          {onDepositClick ? 'Deposit' : 'Add funds'}
         </InteractiveHoverButton>
         <InteractiveHoverButton
           className="w-full hover:bg-primary/90"
-          onClick={handlePayoutClick}
+          onClick={onPayoutClick}
         >
           Payout
         </InteractiveHoverButton>

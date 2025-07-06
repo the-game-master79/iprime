@@ -12,6 +12,7 @@ import ChartComponent from "@/components/tradingstation/ChartComponent";
 import { Button } from "@/components/ui/button";
 import TradingPanel from "@/components/tradingstation/TradingPanel";
 import ActivityPanel from "@/components/tradingstation/ActivityPanel";
+import { DepositDialog } from "@/components/deposit/DepositDialog";
 
 // Lazy load TradingPanel and ActivityPanel for mobile only
 const LazyTradingPanel = typeof window !== "undefined" && window.innerWidth < 768
@@ -93,6 +94,36 @@ const TradingStation = () => {
   // Track last price update time for each pair
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Record<string, number>>({});
   const [isMarketSlow, setIsMarketSlow] = useState(false);
+  
+  // Deposit dialog state
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
+  const [isPayoutMode, setIsPayoutMode] = useState(false);
+  
+  // Fetch user balance from the server
+  const fetchBalance = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('balance')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) throw error;
+      if (data) {
+        setBalance(parseFloat(data.balance) || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh balance. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Update lastPriceUpdate on price change
   useEffect(() => {
@@ -1700,6 +1731,14 @@ const TradingStation = () => {
                 closeMobileMenu={() => setShowMobileMenu(false)}
                 navigateToTradeTab={() => toggleMobileView("trading")}
                 isMarketSlow={isMarketSlow} // Pass market slow state to Sidebar
+                onDepositClick={() => {
+                  setIsPayoutMode(false);
+                  setIsDepositDialogOpen(true);
+                }}
+                onPayoutClick={() => {
+                  setIsPayoutMode(true);
+                  setIsDepositDialogOpen(true);
+                }}
               />
             </div>
           )}
@@ -1916,6 +1955,17 @@ const TradingStation = () => {
           </div>
         )}
       </div>
+      
+      {/* Deposit Dialog */}
+      <DepositDialog 
+        open={isDepositDialogOpen} 
+        onOpenChange={setIsDepositDialogOpen} 
+        isPayout={isPayoutMode}
+        defaultTab={isPayoutMode ? 'withdraw' : 'deposit'}
+        currentUser={currentUser}
+        onDepositSuccess={fetchBalance}
+        onWithdrawSuccess={fetchBalance}
+      />
     </>
   );
 };

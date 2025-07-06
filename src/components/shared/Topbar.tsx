@@ -17,6 +17,7 @@ interface TopbarProps {
   platform?: boolean;
   showBackButton?: boolean;
   onBack?: () => void;
+  onWalletClick?: () => void;
 }
 
 interface Notice {
@@ -34,6 +35,7 @@ export const Topbar = ({
   platform,
   showBackButton = false,
   onBack,
+  onWalletClick,
 }: TopbarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,8 +148,9 @@ export const Topbar = ({
                     {[
                       { 
                         label: "Wallet", 
-                        path: "/cashier",
-                        icon: <Wallet className="h-4 w-4 flex-shrink-0" weight="bold" />
+                        path: "#",
+                        icon: <Wallet className="h-4 w-4 flex-shrink-0" weight="bold" />,
+                        onClick: onWalletClick
                       },
                       { 
                         label: "Trade", 
@@ -175,9 +178,22 @@ export const Topbar = ({
                         value={item.path}
                         className="text-sm sm:text-base"
                         data-state={activeTab === item.path ? 'active' : 'inactive'}
+                        asChild={!!item.onClick}
                       >
-                        {item.icon}
-                        <span className="truncate">{item.label}</span>
+                        <div 
+                          onClick={(e) => {
+                            if (item.onClick) {
+                              e.preventDefault();
+                              item.onClick();
+                            } else {
+                              navigate(item.path);
+                            }
+                          }}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          {item.icon}
+                          <span className="truncate">{item.label}</span>
+                        </div>
                       </TabsTrigger>
                     ))}
                   </TabsList>
@@ -188,7 +204,10 @@ export const Topbar = ({
             {/* Right items: Balance, Notifications, Profile */}
             <div className="flex items-center min-w-0 gap-2 md:gap-2 ml-auto">
               {/* Available Balance: Badge for mobile, text for desktop */}
-              <div>
+              <div 
+                onClick={onWalletClick} 
+                className={onWalletClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}
+              >
                 {/* Mobile: Badge with wallet icon */}
                 <span className="flex md:hidden items-center min-w-[120px]">
                   <Badge className="flex items-center gap-1 px-2 py-2 rounded-md text-xs font-medium bg-secondary-foreground text-foreground">

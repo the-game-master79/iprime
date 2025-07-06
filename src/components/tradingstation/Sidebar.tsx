@@ -35,6 +35,8 @@ interface SidebarProps {
   closeMobileMenu?: () => void;
   navigateToTradeTab?: () => void; // Add new prop for navigating to trade tab
   isMarketSlow?: boolean; // Add prop for market slow badge
+  onDepositClick?: () => void; // Callback for deposit button click
+  onPayoutClick?: () => void; // Callback for payout button click
 }
 
 // Add this utility for price animation (before Sidebar)
@@ -62,7 +64,9 @@ const Sidebar = ({
   isMobile = false,
   closeMobileMenu,
   navigateToTradeTab,
-  isMarketSlow = false // Destructure new prop with default
+  isMarketSlow = false, // Destructure new prop with default
+  onDepositClick,
+  onPayoutClick
 }: SidebarProps) => {
   // For mobile, we'll ignore the isCollapsed prop and always show content
   const showContent = isMobile || !isCollapsed;
@@ -292,8 +296,9 @@ const Sidebar = ({
             variant="ghost"
             size="icon"
             className="h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-            onClick={() => window.location.assign('/cashier')}
+            onClick={onDepositClick}
             title="Deposit"
+            disabled={!onDepositClick}
           >
             <DepositIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
             <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Funds</span>
@@ -303,8 +308,9 @@ const Sidebar = ({
             variant="ghost"
             size="icon"
             className="h-9 w-9 flex flex-col items-center justify-center rounded-md mb-1 group data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-            onClick={() => window.location.assign('/cashier?payouts=1')}
+            onClick={onPayoutClick}
             title="Withdraw"
+            disabled={!onPayoutClick}
           >
             <WithdrawIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
             <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Payouts</span>

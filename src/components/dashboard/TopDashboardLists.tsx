@@ -93,9 +93,20 @@ export const TopDashboardLists: React.FC<{ transactions: Transaction[]; trades: 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${getStatusColor(tx.status)}`}></span>
-                      <span className="font-medium text-foreground text-sm">
-                        {tx.type === 'investment_return' ? 'Trade Profit' : tx.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground text-sm">
+                          {tx.type === 'investment_return' 
+                            ? 'Trade Profit' 
+                            : tx.type === 'withdrawal' && tx.withdrawal_data?.wallet_address
+                              ? `Withdrawal to ${tx.withdrawal_data.wallet_address.slice(0, 6)}...${tx.withdrawal_data.wallet_address.slice(-4)}`
+                              : tx.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        {tx.withdrawal_data?.transaction_hash && (
+                          <span className="text-xs text-muted-foreground">
+                            TX: {tx.withdrawal_data.transaction_hash.slice(0, 10)}...
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className={`font-semibold ${Number(tx.amount) > 0 ? 'text-success' : 'text-destructive'}`}>
                       {Number(tx.amount) > 0 ? '+' : ''}{Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} USD

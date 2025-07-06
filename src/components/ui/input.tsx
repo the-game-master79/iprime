@@ -21,14 +21,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           type={type}
           className={cn(
-            "peer flex h-11 w-full rounded-xl px-4 pt-5 pb-2 text-base shadow-sm transition-colors",
-            rightIcon ? "pr-12" : "", // Add right padding if icon present
-            "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-primary",
-            "placeholder:text-transparent", // hide placeholder for floating label
-            "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:border-transparent",
-            disabled ? "bg-secondary !text-muted-foreground" : "bg-secondary-foreground text-primary",
-            "md:text-sm",
-            error ? "border border-red-500 focus-visible:ring-red-500/40" : "border border-transparent",
+            "peer flex h-12 w-full rounded-xl border border-input bg-background px-4 pt-4 pb-1 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            rightIcon ? "pr-10" : "", // Add right padding if icon present
+            type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : '',
             className
           )}
           ref={ref}
@@ -59,7 +54,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               // Center label vertically when not floating
               "peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-base peer-placeholder-shown:text-muted-foreground",
               // Float label to top when filled or focused
-              isFilled ? "top-1.5 text-xs text-primary -translate-y-0" : "top-1/2 -translate-y-1/2 text-base text-muted-foreground",
+              isFilled ? "top-1.5 -translate-y-0 text-xs text-primary px-1" : "top-1/2 -translate-y-1/2 text-sm text-muted-foreground",
               error && "text-red-500"
             )}
           >
