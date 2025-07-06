@@ -1,10 +1,10 @@
 import { supabase } from "@/lib/supabase";
 
-export async function fetchThemeColors(theme: "light" | "dark") {
+export async function fetchThemeColors() {
   const { data, error } = await supabase
     .from("theme_colors")
     .select("var_name,value")
-    .eq("theme", theme);
+    .eq("theme", "light");
 
   if (error) {
     console.error("Failed to fetch theme colors:", error);
@@ -18,15 +18,9 @@ export async function fetchThemeColors(theme: "light" | "dark") {
   return vars;
 }
 
-export function injectThemeColors(vars: Record<string, string>, theme: "light" | "dark") {
+export function injectThemeColors(vars: Record<string, string>) {
   const root = document.documentElement;
   Object.entries(vars).forEach(([key, value]) => {
-    if (theme === "light") {
-      root.style.setProperty(key, value);
-    } else {
-      // For dark, set on [data-theme="dark"]
-      const darkRoot = document.querySelector('[data-theme="dark"]') || root;
-      (darkRoot as HTMLElement).style.setProperty(key, value);
-    }
+    root.style.setProperty(key, value);
   });
 }

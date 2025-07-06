@@ -5,9 +5,6 @@
 @layer base {
   :root {
     --radius: 0.5rem;
-  }
-
-  [data-theme="light"] {
     --background: 0 0% 100%;
     --foreground: 224 71% 4%;
     --primary: 222 100% 57%;
@@ -32,34 +29,6 @@
     --success-foreground: 142 100% 33%;
     --button: 210 32% 91%;
     color-scheme: light;
-    background-color: hsl(var(--background));
-  }
-
-  [data-theme="dark"] {
-    --background: 224 71% 4%;
-    --foreground: 240 5% 96%;
-    --primary: 213 100% 60%;
-    --primary-foreground: 240 6% 10%;
-    --secondary: 240 4% 6%;
-    --secondary-foreground: 240 4% 16%;
-    --card: 39 100% 50%;
-    --card-foreground: 0 0% 0%;
-    --muted: 240 6% 15%;
-    --muted-foreground: 215 16% 67%;
-    --border: 240 4% 16%;
-    --input: 240 6% 15%;
-    --ring: 221 83% 53%;
-    --shadow: 0 0% 0% / 0.24;
-    --scrollbar-thumb: 240 6% 15%;
-    --scrollbar-track: 240 6% 10%;
-    --warning: 36 100% 50%;
-    --warning-foreground: 36 100% 50%;
-    --error: 345 100% 56%;
-    --error-foreground: 344 100% 46%;
-    --success: 146 63% 50%;
-    --success-foreground: 0 0% 0%;
-    --button: 210 20% 94%;
-    color-scheme: dark;
     background-color: hsl(var(--background));
   }
 
@@ -95,10 +64,7 @@
     @apply bg-card/95 backdrop-blur-md border-border/10 shadow-sm;
   }
   
-  .dark .glass-card {
-    @apply bg-card/60 border-border/10;
-  }
-  
+
   .scrollbar-hidden {
     scrollbar-width: none;
     -ms-overflow-style: none;
