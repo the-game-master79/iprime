@@ -1,6 +1,5 @@
-// Use Phosphor icons instead of lucide-react
-import { CurrencyCircleDollar, CheckCircle, Clock, XCircle, Users, TrendUp, CurrencyDollar, Network } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export interface BalanceCardProps {
   amount?: number;
@@ -23,79 +22,88 @@ export const BalanceCard = ({
 }: BalanceCardProps) => {
   const variants = {
     default: {
-      containerClass: 'bg-background border-2 border-blue-500',
-      badgeClass: 'bg-blue-100 text-blue-700 border border-blue-200',
-      label: label || 'Available Balance'
+      containerClass: 'border-primary/50 hover:border-primary/70',
+      label: label || 'Available Balance',
+      gradient: 'from-blue-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-blue-500/40 to-transparent'
     },
     success: {
-      containerClass: 'bg-background border-2 border-green-500',
-      badgeClass: 'bg-green-100 text-green-700 border border-green-200',
-      label: label || 'Payment Success'
+      containerClass: 'border-green-500/50 hover:border-green-500/70',
+      label: label || 'Payment Success',
+      gradient: 'from-green-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-green-500/40 to-transparent'
     },
     processing: {
-      containerClass: 'bg-background border-2 border-amber-500',
-      badgeClass: 'bg-amber-100 text-amber-700 border border-amber-200',
-      label: label || 'Processing'
+      containerClass: 'border-amber-500/50 hover:border-amber-500/70',
+      label: label || 'Processing',
+      gradient: 'from-amber-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-amber-500/40 to-transparent'
     },
     failed: {
-      containerClass: 'bg-background border-2 border-[#FFD6E6]',
-      badgeClass: 'bg-[#FFD6E6] text-[#FF005C] border border-[#FFD6E6]',
-      label: label || 'Failed Transaction'
+      containerClass: 'border-red-500/50 hover:border-red-500/70',
+      label: label || 'Failed Transaction',
+      gradient: 'from-red-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-red-500/40 to-transparent'
     },
     referrals: {
-      containerClass: 'bg-background border-2 border-purple-200',
-      badgeClass: 'bg-purple-100 text-purple-700 border border-purple-200',
-      label: label || 'Total Referrals'
+      containerClass: 'border-purple-500/50 hover:border-purple-500/70',
+      label: label || 'Total Referrals',
+      gradient: 'from-purple-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-purple-500/40 to-transparent'
     },
     business: {
-      containerClass: 'bg-background border-2 border-emerald-500',
-      badgeClass: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-      label: label || 'Business Volume'
+      containerClass: 'border-emerald-500/50 hover:border-emerald-500/70',
+      label: label || 'Business Volume',
+      gradient: 'from-emerald-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-emerald-500/40 to-transparent'
     },
     commission: {
-      containerClass: 'bg-background border-2 border-primary/20',
-      badgeClass: 'bg-primary/10 text-primary border border-primary/20',
-      label: label || 'Total Commission'
+      containerClass: 'border-primary/50 hover:border-primary/70',
+      label: label || 'Total Commission',
+      gradient: 'from-primary/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-primary/40 to-transparent'
     },
     direct: {
-      containerClass: 'bg-background border-2 border-indigo-200', 
-      badgeClass: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
-      label: label || 'Direct Referrals'
+      containerClass: 'border-indigo-500/50 hover:border-indigo-500/70',
+      label: label || 'Direct Referrals',
+      gradient: 'from-indigo-500/5 via-transparent to-transparent',
+      borderGradient: 'from-transparent via-indigo-500/40 to-transparent'
     }
   };
 
-  const { containerClass, badgeClass, label: cardLabel } = variants[variant];
+  const { containerClass, label: cardLabel, gradient, borderGradient } = variants[variant];
   const showUsdSuffix = variant !== 'direct' && variant !== 'referrals';
 
   return (
-    <div
-      className={cn(
-        `rounded-2xl p-6 flex flex-col justify-between min-h-[140px] ${containerClass}`,
-        className
-      )}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-md text-foreground font-semibold">{cardLabel}</span>
-      </div>
-      <div className="space-y-1 mt-2">
-        <h3 className={cn("text-5xl font-bold text-foreground", valueClassName)}>
-          {prefix}
-          {(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          {showUsdSuffix ? <span className="text-2xl font-normal text-muted-foreground ml-2">USD</span> : null}
-        </h3>
-        {typeof totalProfits === 'number' && (
-          <div className="w-full flex justify-between items-center px-4 py-3 rounded-md bg-green-500/10 border border-green-500 text-xs font-semibold text-foreground mt-4">
-            <div className="flex items-center">
-              <span className="relative flex h-3 w-3 mr-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-              <span>Total profit: {totalProfits.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+    <Card className={cn("relative overflow-hidden", containerClass, className)}>
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-100 pointer-events-none`} />
+      <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${borderGradient} opacity-100`} />
+      
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium">{cardLabel}</CardTitle>
+      </CardHeader>
+      
+      <CardContent className="pb-4">
+        <div className="space-y-1">
+          <h3 className={cn("text-4xl font-bold tracking-tight", valueClassName)}>
+            {prefix}{(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {showUsdSuffix && <span className="text-lg font-normal text-muted-foreground ml-1">USD</span>}
+          </h3>
+          
+          {typeof totalProfits === 'number' && (
+            <div className="mt-3 px-3 py-2 rounded-md bg-green-500/10 border border-green-500/30 text-sm font-medium">
+              <div className="flex items-center">
+                <span className="relative flex h-2.5 w-2.5 mr-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                </span>
+                <span>Total profit: {totalProfits.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

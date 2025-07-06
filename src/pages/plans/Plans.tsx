@@ -470,48 +470,9 @@ const Plans = () => {
                   label="Total Profits"
                   amount={totalProfits}
                   variant="business"
-                  totalProfits={totalProfits}
                 />
               </div>
 
-              {/* Steps section */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                      <Robot className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                    </div>
-                  </div>
-                  <h3 className="font-medium text-lg mb-3 text-foreground/90">What is AlphaQuant?</h3>
-                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                    It’s a GEN-AI system that trades on your behalf, maximizing profits while you relax.
-                  </p>
-                </div>
-
-                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                      <CurrencyDollar className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                    </div>
-                  </div>
-                  <h3 className="font-medium text-lg mb-3 text-foreground/90">How do I get started?</h3>
-                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                    Simply subscribe to a trading plan that fits your goals and activate it in seconds.
-                  </p>
-                </div>
-
-                <div className="group relative bg-secondary/30 hover:bg-secondary/50 border border-primary/20 hover:border-primary/40 rounded-lg p-6 text-center transition-all duration-300 hover:-translate-y-1">
-                  <div className="flex justify-center mb-6">
-                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                      <Coins className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                    </div>
-                  </div>
-                  <h3 className="font-medium text-lg mb-3 text-foreground/90">When do I earn?</h3>
-                  <p className="text-sm text-foreground/60 group-hover:text-foreground/80 transition-colors">
-                    You start receiving daily returns as soon as your AI begins trading.
-                  </p>
-                </div>
-              </div>
 
               <Tabs defaultValue="available" className="space-y-8">
                 <div className="flex items-center justify-between">

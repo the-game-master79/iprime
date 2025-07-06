@@ -2,7 +2,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Lock, ArrowRight } from "lucide-react";
+import { Clock, Lock } from "lucide-react";
+import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useEffect, useState, useMemo } from "react";
 import { useTradingPairs } from "@/hooks/useTradingPairs";
@@ -84,19 +85,13 @@ export function PlanCard({
       : [];
   // Memoize random pairs
   const randomPairs = useMemo(() => getRandomPairs(tradingPairs, 3), [tradingPairs]);
-  const [hoverGradient, setHoverGradient] = useState(gradients[0]);
 
   return (
     <Card
-      className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg bg-secondary"
-      onMouseEnter={() => setHoverGradient(getRandomGradient())}
+      className="group relative overflow-visible transition-all duration-300 bg-secondary shadow-lg"
     >
-      {/* Static secondary background */}
-      <div className="absolute inset-0 bg-background" />
-      {/* Random gradient on hover */}
-      <div
-        className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${hoverGradient}`}
-      />
+      {/* Gradient background */}
+      <div className={`absolute inset-0 ${getRandomGradient()}`} />
       
       <div className="relative p-6 space-y-6">
         {/* Header */}
@@ -191,21 +186,25 @@ export function PlanCard({
         {/* Actions */}
         {variant === 'available' ? (
           <div className="flex items-center gap-3">
-            <Button 
-              onClick={onInvest}
-              className="flex-1 bg-primary hover:bg-primary/90 rounded-md"
-            >
-              🚀 Activate Strategy
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="w-full">
+              <InteractiveHoverButton 
+                onClick={onInvest}
+                className="w-full text-foreground hover:bg-primary hover:text-background"
+                dotColor="bg-primary"
+                hoverTextColor="text-background"
+              >
+                Activate
+              </InteractiveHoverButton>
+            </div>
             <Dialog>
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="border-primary/20 hover:border-primary/40 hover:bg-primary/5 rounded-md text-foreground"
+                <InteractiveHoverButton 
+                  className="flex w-full max-w-[150px] items-center justify-center text-foreground hover:bg-primary hover:text-background"
+                  dotColor="bg-primary"
+                  hoverTextColor="text-background"
                 >
                   Details
-                </Button>
+                </InteractiveHoverButton>
               </DialogTrigger>
               <DialogContent className="bg-background text-foreground border border-secondary/20">
                 <DialogHeader>
