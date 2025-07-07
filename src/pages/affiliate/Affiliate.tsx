@@ -412,26 +412,34 @@ const Affiliate = () => {
             label={`Your team`}
             amount={teamData.length}
             variant="referrals"
-            valueClassName="font-mono"
+            valueClassName="font-regular"
             className="rounded-md bg-secondary text-foreground"
+            showDecimals={false}
           />
           <BalanceCard 
             label="Earnings"
             amount={totalCommissions}
             variant="commission"
             className="rounded-md bg-secondary text-foreground"
+            showDecimals={true}
+            minFractionDigits={2}
+            maxFractionDigits={2}
           />
           <BalanceCard 
             label={`Volume`}
             amount={totalBusiness}
             variant="business"
             className="rounded-md bg-secondary text-foreground"
+            showDecimals={true}
+            minFractionDigits={0}
+            maxFractionDigits={0}
           />
           <BalanceCard 
             label={`Directs`}
             amount={directReferralsCount}
             variant="direct"
             className="rounded-md bg-secondary text-foreground"
+            showDecimals={false}
           />
         </div>
       </div>

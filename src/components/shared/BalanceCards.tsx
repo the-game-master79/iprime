@@ -9,6 +9,10 @@ export interface BalanceCardProps {
   className?: string;
   valueClassName?: string;
   totalProfits?: number;
+  showDecimals?: boolean;
+  minFractionDigits?: number;
+  maxFractionDigits?: number;
+  showCurrencyPrefix?: boolean;
 }
 
 export const BalanceCard = ({ 
@@ -18,7 +22,11 @@ export const BalanceCard = ({
   prefix = '',
   className = '',
   valueClassName = '',
-  totalProfits
+  totalProfits,
+  showDecimals = true,
+  minFractionDigits = 2,
+  maxFractionDigits = 2,
+  showCurrencyPrefix = true
 }: BalanceCardProps) => {
   const variants = {
     default: {
@@ -72,7 +80,6 @@ export const BalanceCard = ({
   };
 
   const { containerClass, label: cardLabel, gradient, borderGradient } = variants[variant];
-  const showUsdSuffix = variant !== 'direct' && variant !== 'referrals';
 
   return (
     <Card className={cn("relative overflow-hidden", containerClass, className)}>
@@ -86,8 +93,10 @@ export const BalanceCard = ({
       <CardContent className="pb-4">
         <div className="space-y-1">
           <h3 className={cn("text-4xl font-bold tracking-tight", valueClassName)}>
-            {prefix}{(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            {showUsdSuffix && <span className="text-lg font-normal text-muted-foreground ml-1">USD</span>}
+            {showCurrencyPrefix && variant !== 'referrals' && variant !== 'direct' && '$'}{prefix}{(amount || 0).toLocaleString('en-US', { 
+              minimumFractionDigits: showDecimals ? minFractionDigits : 0, 
+              maximumFractionDigits: showDecimals ? maxFractionDigits : 0 
+            })}
           </h3>
           
           {typeof totalProfits === 'number' && (
@@ -97,7 +106,7 @@ export const BalanceCard = ({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </span>
-                <span>Total profit: {totalProfits.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+                <span>Total profit: ${totalProfits.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           )}

@@ -289,7 +289,6 @@ const Sidebar = ({
             title="Instruments"
           >
             <InstrumentsIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Station</span>
           </Button>
           {/* Deposit */}
           <Button
@@ -301,7 +300,6 @@ const Sidebar = ({
             disabled={!onDepositClick}
           >
             <DepositIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Funds</span>
           </Button>
           {/* Withdraw */}
           <Button
@@ -313,7 +311,6 @@ const Sidebar = ({
             disabled={!onPayoutClick}
           >
             <WithdrawIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Payouts</span>
           </Button>
           {/* Calendar */}
           <Button
@@ -324,7 +321,6 @@ const Sidebar = ({
             title="Calendar"
           >
             <CalendarIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Calendar</span>
           </Button>
           {/* Auto Trading */}
           <Button
@@ -335,7 +331,6 @@ const Sidebar = ({
             title="Auto Trading"
           >
             <AutoTradingIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
-            <span className="text-[10px] mt-0.5 text-muted-foreground group-hover:text-primary">Auto</span>
           </Button>
         </div>
       )}
@@ -372,16 +367,14 @@ const Sidebar = ({
               onClick={() => setActiveTab("crypto")}
               className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "crypto" ? "shadow" : ""}`}
             >
-              <Coins className="h-4 w-4 mr-1" />
-              Crypto
+              <Coins className="h-4 w-4" />
             </Button>
             <Button
               variant={activeTab === "forex" ? "secondary" : "ghost"}
               onClick={() => setActiveTab("forex")}
               className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "forex" ? "shadow" : ""}`}
             >
-              <Globe className="h-4 w-4 mr-1" />
-              Forex
+              <Globe className="h-4 w-4" />
             </Button>
           </div>
           {/* Show forex market closed banner if needed */}
@@ -414,31 +407,33 @@ const Sidebar = ({
                   `}
                   onClick={() => handlePairSelection(pair)}
                 >
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={
-                        pair.type === "crypto"
-                          ? getCryptoImageForSymbol(pair.symbol)
-                          : getForexImageForSymbol(pair.symbol)
-                      }
-                      alt={pair.symbol}
-                      className="h-6 w-6 rounded-full border border-border/20"
-                    />
-                    <div className="flex flex-col text-left">
-                      <span className="font-medium text-sm group-hover:text-foreground/90 transition-colors">
-                        {formatPairName(pair.symbol)}
-                      </span>
-                      <span className="text-xs text-muted-foreground group-hover:text-foreground/70 transition-colors">
-                        {getFullName(pair.symbol)}
-                      </span>
+                  <div className="w-full flex items-center">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <img
+                        src={
+                          pair.type === "crypto"
+                            ? getCryptoImageForSymbol(pair.symbol)
+                            : getForexImageForSymbol(pair.symbol)
+                        }
+                        alt={pair.symbol}
+                        className="h-6 w-6 rounded-full border border-border/20 flex-shrink-0"
+                      />
+                      <div className="flex flex-col text-left min-w-0">
+                        <span className="font-medium text-sm group-hover:text-foreground/90 transition-colors truncate">
+                          {formatPairName(pair.symbol)}
+                        </span>
+                        <span className="text-xs text-muted-foreground group-hover:text-foreground/70 transition-colors truncate">
+                          {getFullName(pair.symbol)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div
-                      key={pair.symbol + "-" + pair.price}
-                      className={`font-bold text-base transition-all duration-500 ${getPriceChangeClass(isUp)}`}
-                    >
-                      {renderPriceWithBigDigits(pair.price)}
+                    <div className="ml-auto pl-2">
+                      <div
+                        key={pair.symbol + "-" + pair.price}
+                        className={`font-bold text-base transition-all duration-500 ${getPriceChangeClass(isUp)} whitespace-nowrap`}
+                      >
+                        {renderPriceWithBigDigits(pair.price)}
+                      </div>
                     </div>
                   </div>
                 </Button>

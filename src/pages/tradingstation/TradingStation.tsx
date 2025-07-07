@@ -1693,15 +1693,6 @@ const TradingStation = () => {
         </style>
 
         <div className="relative flex flex-col md:flex-row">
-          {/* Market Slow Badge Below Tabs in Sidebar */}
-          {isMarketSlow && (
-            <div className="absolute left-0 right-0 top-12 z-10 flex justify-center">
-              <span className="bg-yellow-200 text-yellow-800 px-3 py-1 rounded shadow text-xs font-semibold">
-                Market is slow today
-              </span>
-            </div>
-          )}
-
           {/* Mobile Menu Overlay */}
           {isMobile && showMobileMenu && (
             <div 
