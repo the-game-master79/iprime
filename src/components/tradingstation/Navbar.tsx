@@ -152,7 +152,7 @@ const Navbar = ({
           variant="ghost"
           size="icon"
           className="h-9 w-9 rounded-lg p-0 hover:bg-primary/10 transition"
-          onClick={() => navigate("/platform")}
+          onClick={() => navigate("/")}
           title="Home"
         >
           <House size={20} weight="bold" />

@@ -30,6 +30,7 @@ import type {
 } from "@/types/dashboard";
 import { TopDashboardLists } from "@/components/dashboard/TopDashboardLists";
 import { DepositDialog } from "@/components/deposit/DepositDialog";
+import { MobileBottomNav } from "@/components/shared/MobileBottomNav";
 
 // Define Trade interface locally since it's not exported from "@/types/dashboard"
 interface Trade {
@@ -998,11 +999,14 @@ const Dashboard = () => {
   if (!user) return null;
 
   return (
-    <DashboardContent 
-      loading={loading} 
-      isDepositDialogOpen={isDepositDialogOpen}
-      setIsDepositDialogOpen={setIsDepositDialogOpen}
-    />
+    <div>
+      <DashboardContent 
+        loading={loading} 
+        isDepositDialogOpen={isDepositDialogOpen}
+        setIsDepositDialogOpen={setIsDepositDialogOpen}
+      />
+      <MobileBottomNav onWalletClick={() => setIsDepositDialogOpen(true)} />
+    </div>
   );
 };
 
