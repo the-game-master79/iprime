@@ -928,7 +928,6 @@ export function DepositDialog({
     <div className="space-y-6">
       {/* Cryptocurrency Selection */}
       <div className="space-y-2">
-        <Label>Select Cryptocurrency</Label>
         <Select
           value={cryptoType}
           onValueChange={(value) => {
@@ -964,7 +963,6 @@ export function DepositDialog({
       {/* Network Selection for USDT/USDC */}
       {selectedCrypto?.networks?.length > 0 && (
         <div className="space-y-2">
-          <Label>Select Network</Label>
           <Select
             value={network}
             onValueChange={setNetwork}
@@ -1090,12 +1088,11 @@ export function DepositDialog({
       <div className="space-y-6">
         {/* Available Balance */}
         <div className="bg-secondary/30 rounded-xl p-6 mb-4 border border-primary/20">
-          <h3 className="text-sm font-medium text-muted-foreground mb-1">Available Balance</h3>
+          <h3 className="text-sm font-medium text-muted-foreground mb-1">Available for Payout</h3>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold">
               ${userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-            <span className="text-muted-foreground">USD</span>
           </div>
         </div>
 
@@ -1130,7 +1127,6 @@ export function DepositDialog({
 
           {/* Cryptocurrency Selection - Only USDT and USDC */}
           <div className="space-y-2">
-            <Label>Select Cryptocurrency</Label>
             <Select
               value={withdrawCrypto}
               onValueChange={handleWithdrawCryptoChange}
@@ -1165,7 +1161,6 @@ export function DepositDialog({
           {/* Network Selection */}
           {withdrawCrypto && (
             <div className="space-y-2">
-              <Label>Select Network</Label>
               <Select
                 value={withdrawNetwork}
                 onValueChange={handleWithdrawNetworkChange}
@@ -1198,7 +1193,7 @@ export function DepositDialog({
               onChange={handleWithdrawAddressChange}
               disabled={!withdrawNetwork}
               className={`pt-5 pb-1 ${withdrawError && withdrawError.includes('address') ? 'border-red-500' : ''} ${!withdrawAddress ? 'text-muted-foreground' : ''}`}
-              placeholder={withdrawNetwork ? `Enter ${withdrawCrypto} ${withdrawNetwork.toUpperCase()} address` : 'Select a network first'}
+              placeholder=" "
             />
             <Label 
               htmlFor="wallet-address" 
