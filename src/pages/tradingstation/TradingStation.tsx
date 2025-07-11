@@ -47,8 +47,6 @@ const TradingStation = () => {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [localPrices, setLocalPrices] = useState<Record<string, PriceData>>({});
-  // Change default tab to "crypto"
-  const [activeTab, setActiveTab] = useState<"forex" | "crypto">("crypto");
   const [selectedPair, setSelectedPair] = useState<PriceData | null>(null);
   const [quantity, setQuantity] = useState<number>(0.01); // Set initial value to 0.01
   const [balance, setBalance] = useState<number>(0); // User's balance
@@ -88,7 +86,8 @@ const TradingStation = () => {
     min_lots: number;
     max_lots: number;
     type: "crypto" | "forex";
-    name?: string; // Add name property
+    name?: string;
+    image_url?: string; // Add image_url property
   }>>({}); // Add state to store trading pair meta info
 
   // Track last price update time for each pair
@@ -418,7 +417,7 @@ const TradingStation = () => {
     const fetchPairs = async () => {
       const { data, error } = await supabase
         .from("trading_pairs")
-        .select("symbol, leverage_options, min_lots, max_lots, type, name"); // Fetch name too
+        .select("symbol, leverage_options, min_lots, max_lots, type, name, image_url");
       if (error) {
         console.error("Error fetching trading pairs:", error);
         setTradingPairs([]);
@@ -426,7 +425,14 @@ const TradingStation = () => {
       } else {
         setTradingPairs(data?.map((row: any) => row.symbol) || []);
         // Map meta info by symbol
-        const meta: Record<string, { leverage_options: string[]; min_lots: number; max_lots: number; type: "crypto" | "forex"; name?: string }> = {};
+        const meta: Record<string, { 
+          leverage_options: string[]; 
+          min_lots: number; 
+          max_lots: number; 
+          type: "crypto" | "forex"; 
+          name?: string;
+          image_url?: string;
+        }> = {};
         (data || []).forEach((row: any) => {
           meta[row.symbol] = {
             leverage_options: Array.isArray(row.leverage_options)
@@ -438,6 +444,7 @@ const TradingStation = () => {
             max_lots: Number(row.max_lots) || 100,
             type: row.type === "crypto" ? "crypto" : "forex",
             name: row.name || undefined,
+            image_url: row.image_url || undefined,
           };
         });
         setTradingPairMeta(meta);
@@ -457,16 +464,19 @@ const TradingStation = () => {
     return <div>Loading user profile...</div>;
   }
 
-  // Replace filteredPairs logic to use tradingPairMeta for type
+  // Filter pairs to only show crypto pairs that match the search query
   const filteredPairs = tradingPairs
     .map((symbol) => ({
       symbol,
       price: localPrices[symbol]?.price || "0",
       isPriceUp: localPrices[symbol]?.isPriceUp,
-      type: tradingPairMeta[symbol]?.type || "forex",
+      type: tradingPairMeta[symbol]?.type || "crypto",
     }))
     .filter((pair) => {
-      return pair.type === activeTab && pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+      // Only show crypto pairs that match the search query
+      const isCrypto = pair.type === "crypto";
+      const matchesSearch = pair.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+      return isCrypto && matchesSearch;
     });
 
   const formatPairName = (symbol: string) => {
@@ -489,13 +499,21 @@ const TradingStation = () => {
   };
 
   const getCryptoImageForSymbol = (symbol: string) => {
-    // Use the symbol in lowercase for trading_pairs.svg
+    // First try to use the image_url from trading_pairs
+    if (tradingPairMeta[symbol]?.image_url) {
+      return tradingPairMeta[symbol].image_url as string;
+    }
+    // Fallback to the original implementation
     const baseUrl = "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public";
     return `${baseUrl}/${symbol.toLowerCase()}.svg`;
   };
 
-  // Update getForexImageForSymbol to use the symbol in lowercase
   const getForexImageForSymbol = (symbol: string) => {
+    // First try to use the image_url from trading_pairs
+    if (tradingPairMeta[symbol]?.image_url) {
+      return tradingPairMeta[symbol].image_url as string;
+    }
+    // Fallback to the original implementation
     const baseUrl = "https://acvzuxvssuovhiwtdmtj.supabase.co/storage/v1/object/public/images-public";
     return `${baseUrl}/${symbol.toLowerCase()}.svg`;
   };
@@ -630,16 +648,16 @@ const TradingStation = () => {
     // eslint-disable-next-line
   }, [filteredPairs]);
 
-  // Select first forex pair on initial load
+  // Select first crypto pair on initial load if none selected
   useEffect(() => {
-    // Only set selectedPair if not already set
-    if (!selectedPair && Object.values(localPrices).length > 0 && activeTab === "forex") {
-      const firstForexPair = Object.values(localPrices).find(pair => !pair.symbol.endsWith("USDT"));
-      if (firstForexPair) {
-        setSelectedPair(firstForexPair);
-        setSelectedPairs([firstForexPair]);
+    // Only set selectedPair if not already set and we have prices
+    if (!selectedPair && Object.values(localPrices).length > 0) {
+      const firstCryptoPair = Object.values(localPrices).find(pair => pair.symbol.endsWith("USDT"));
+      if (firstCryptoPair) {
+        setSelectedPair(firstCryptoPair);
+        setSelectedPairs([firstCryptoPair]);
         // Set leverage to max available for the pair
-        const leverages = getLeverageOptions(firstForexPair.symbol);
+        const leverages = getLeverageOptions(firstCryptoPair.symbol);
         const maxLeverageForPair = Math.max(...leverages.map((l) => parseInt(l)));
         if (maxLeverageForPair !== -Infinity) {
           setSelectedLeverage(maxLeverageForPair.toString());
@@ -647,7 +665,7 @@ const TradingStation = () => {
       }
     }
     // eslint-disable-next-line
-  }, [localPrices, activeTab]); // Only runs when localPrices or activeTab changes
+  }, [localPrices]); // Only runs when localPrices changes
 
   const handlePairClick = (pair: PriceData) => {
     // Always use the latest price from localPrices for the selected pair
@@ -1709,19 +1727,16 @@ const TradingStation = () => {
                 toggleCollapse={toggleCollapse}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 filteredPairs={filteredPairs}
                 selectedPair={selectedPair}
                 handlePairClick={handlePairClick}
                 formatPairName={formatPairName}
                 getFullName={getFullName}
                 getCryptoImageForSymbol={getCryptoImageForSymbol}
-                getForexImageForSymbol={getForexImageForSymbol}
                 isMobile={isMobile}
                 closeMobileMenu={() => setShowMobileMenu(false)}
                 navigateToTradeTab={() => toggleMobileView("trading")}
-                isMarketSlow={isMarketSlow} // Pass market slow state to Sidebar
+                isMarketSlow={isMarketSlow}
                 onDepositClick={() => {
                   setIsPayoutMode(false);
                   setIsDepositDialogOpen(true);

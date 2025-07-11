@@ -145,6 +145,7 @@ export const PlatformMarkets: React.FC<{
   ) => React.ReactNode;
   forexMarketOpen: boolean;
   navigate: (path: string) => void;
+  showForex?: boolean;
 }> = ({
   cryptoData,
   forexData,
@@ -153,6 +154,7 @@ export const PlatformMarkets: React.FC<{
   renderPriceWithBigDigits,
   forexMarketOpen,
   navigate,
+  showForex = false,
 }) => {
   const [selectedMarket, setSelectedMarket] = useState<string>('BINANCE:BTCUSDT');
   // Prepare crypto market items
@@ -312,7 +314,16 @@ export const PlatformMarkets: React.FC<{
       <div className="relative bg-white/50 px-2">
         <div className="py-2 space-y-2 overflow-x-hidden">
           <MarqueeRow items={cryptoMarketItems} reverse={false} delay={0} />
-          <MarqueeRow items={forexMarketItems} reverse={true} delay={0} />
+          {showForex && (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-gray-500 mb-2 ml-2">FOREX</h3>
+              <div className="relative overflow-hidden">
+                <MarqueeRow items={forexMarketItems} reverse={true} delay={2} />
+                <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-transparent w-16 pointer-events-none" />
+                <div className="absolute inset-y-0 right-0 bg-gradient-to-l from-white via-white/90 to-transparent w-16 pointer-events-none" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

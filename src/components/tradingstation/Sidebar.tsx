@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
-  MagnifyingGlass, Coins, Globe, X,
+  MagnifyingGlass, 
+  X,
   Calendar as CalendarIcon,
   Wallet as DepositIcon,
   ArrowCircleDown as WithdrawIcon,
@@ -22,21 +23,18 @@ interface SidebarProps {
   toggleCollapse: () => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  activeTab: "forex" | "crypto";
-  setActiveTab: (tab: "forex" | "crypto") => void;
   filteredPairs: PriceData[];
   selectedPair: PriceData | null;
   handlePairClick: (pair: PriceData) => void;
   formatPairName: (symbol: string) => string;
   getFullName: (symbol: string) => string;
   getCryptoImageForSymbol: (symbol: string) => string;
-  getForexImageForSymbol: (symbol: string) => string;
   isMobile?: boolean;
   closeMobileMenu?: () => void;
-  navigateToTradeTab?: () => void; // Add new prop for navigating to trade tab
-  isMarketSlow?: boolean; // Add prop for market slow badge
-  onDepositClick?: () => void; // Callback for deposit button click
-  onPayoutClick?: () => void; // Callback for payout button click
+  navigateToTradeTab?: () => void;
+  isMarketSlow?: boolean;
+  onDepositClick?: () => void;
+  onPayoutClick?: () => void;
 }
 
 // Add this utility for price animation (before Sidebar)
@@ -52,21 +50,18 @@ const Sidebar = ({
   toggleCollapse,
   searchQuery,
   setSearchQuery,
-  activeTab,
-  setActiveTab,
   filteredPairs,
   selectedPair,
   handlePairClick,
   formatPairName,
   getFullName,
   getCryptoImageForSymbol,
-  getForexImageForSymbol,
   isMobile = false,
   closeMobileMenu,
   navigateToTradeTab,
-  isMarketSlow = false, // Destructure new prop with default
+  isMarketSlow = false,
   onDepositClick,
-  onPayoutClick
+  onPayoutClick,
 }: SidebarProps) => {
   // For mobile, we'll ignore the isCollapsed prop and always show content
   const showContent = isMobile || !isCollapsed;
@@ -142,13 +137,7 @@ const Sidebar = ({
     }
   }, [isForexMarketOpen, nextOpen]);
   
-  // On mount, if market is closed and forex tab is active, switch to crypto tab
-  useEffect(() => {
-    if (!isForexMarketOpen && activeTab === "forex") {
-      setActiveTab("crypto");
-    }
-    // eslint-disable-next-line
-  }, []);
+
 
   // Remove the effect that auto-selects the first pair when tab or filteredPairs changes
   // useEffect(() => {
@@ -156,21 +145,16 @@ const Sidebar = ({
   //   if ((filteredPairs.length > 0 && !selectedPair) || 
   //       (filteredPairs.length > 0 && selectedPair && !filteredPairs.some(p => p.symbol === selectedPair.symbol))) {
   //     handlePairClick(filteredPairs[0]);
-  //   }
-  // }, [activeTab, filteredPairs, selectedPair, handlePairClick]);
-  
-  // Create a function to handle pair click and navigation
   const handlePairSelection = (pair: PriceData) => {
     handlePairClick(pair);
-    
-    // For mobile, close the menu and navigate to trade tab
-    if (isMobile) {
-      if (closeMobileMenu) closeMobileMenu();
-      if (navigateToTradeTab) navigateToTradeTab();
+    if (isMobile && closeMobileMenu) {
+      closeMobileMenu();
+    }
+    if (navigateToTradeTab) {
+      navigateToTradeTab();
     }
   };
-  
-  // Add this helper to format price with big digits for last 2 digits
+
   const renderPriceWithBigDigits = (value: string | number | undefined) => {
     if (value === undefined) return "-";
     const str = value.toString();
@@ -184,16 +168,13 @@ const Sidebar = ({
         </>
       );
     }
-    // fallback
     return <span className="font-normal">{str}</span>;
   };
 
-  // Track previous prices for animation
   const prevPricesRef = useRef<{ [symbol: string]: number }>({});
   const [animatedPairs, setAnimatedPairs] = useState<{ [symbol: string]: boolean | undefined }>({});
 
   useEffect(() => {
-    // Only update animation for visible pairs
     setAnimatedPairs((prevAnimated) => {
       const newAnimated: { [symbol: string]: boolean | undefined } = {};
       filteredPairs.forEach(pair => {
@@ -201,29 +182,24 @@ const Sidebar = ({
         const curr = Number(pair.price);
         if (prev !== undefined && !isNaN(curr)) {
           if (curr > prev) {
-            newAnimated[pair.symbol] = true; // up
+            newAnimated[pair.symbol] = true; 
           } else if (curr < prev) {
-            newAnimated[pair.symbol] = false; // down
+            newAnimated[pair.symbol] = false; 
           } else {
-            newAnimated[pair.symbol] = prevAnimated[pair.symbol]; // unchanged
+            newAnimated[pair.symbol] = prevAnimated[pair.symbol]; 
           }
         }
         prevPricesRef.current[pair.symbol] = curr;
       });
-      // Remove animations for pairs no longer visible
       return newAnimated;
     });
-    // Only run when filteredPairs changes (not on every price change)
-    // eslint-disable-next-line
-  }, [filteredPairs, selectedPair]);
+  }, [filteredPairs]);
 
-  // State for TradingView Calendar Dialog
   const [calendarOpen, setCalendarOpen] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (calendarOpen && calendarRef.current) {
-      // Remove any previous widget
       calendarRef.current.innerHTML = "";
       const script = document.createElement("script");
       script.type = "text/javascript";
@@ -243,7 +219,6 @@ const Sidebar = ({
 
   return (
     <>
-      {/* TradingView Calendar Dialog */}
       {calendarOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
@@ -264,21 +239,17 @@ const Sidebar = ({
               <X />
             </button>
             <div className="flex-1 overflow-hidden p-2">
-              {/* TradingView Widget BEGIN */}
               <div
                 ref={calendarRef}
                 className="tradingview-widget-container"
                 style={{ height: "100%" }}
               />
-              {/* TradingView Widget END */}
             </div>
           </div>
         </div>
       )}
-      {/* Sidebar Corner Buttons - Only show on desktop */}
       {!isMobile && (
         <div className="fixed top-[48px] left-0 h-[calc(100vh-48px)] w-[48px] bg-background border-r border-border/30 flex flex-col items-center justify-start py-2 shadow-sm z-20 gap-1">
-          {/* Instruments Button (replaces menu icon) */}
           <Button
             variant="ghost"
             size="icon"
@@ -290,7 +261,6 @@ const Sidebar = ({
           >
             <InstrumentsIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
           </Button>
-          {/* Deposit */}
           <Button
             variant="ghost"
             size="icon"
@@ -301,7 +271,6 @@ const Sidebar = ({
           >
             <DepositIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
           </Button>
-          {/* Withdraw */}
           <Button
             variant="ghost"
             size="icon"
@@ -312,7 +281,6 @@ const Sidebar = ({
           >
             <WithdrawIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
           </Button>
-          {/* Calendar */}
           <Button
             variant="ghost"
             size="icon"
@@ -322,7 +290,6 @@ const Sidebar = ({
           >
             <CalendarIcon className="h-6 w-6 group-hover:text-primary transition-colors" />
           </Button>
-          {/* Auto Trading */}
           <Button
             variant="ghost"
             size="icon"
@@ -335,7 +302,6 @@ const Sidebar = ({
         </div>
       )}
       
-      {/* Trading Station Sidebar - Adjust for mobile */}
       {showContent && (
         <div className={`
           ${isMobile 
@@ -344,14 +310,12 @@ const Sidebar = ({
           } 
           flex flex-col p-3 transition-all duration-300 overflow-y-auto
         `}>
-          {/* Header - Compact */}
           <div className="flex justify-between items-center mb-2">
             <h1 className="text-xl font-semibold">
               {isMobile ? "Markets" : "Trading Station"}
             </h1>
           </div>
-          {/* Search bar - Compact */}
-            <div className="relative mb-3">
+          <div className="relative mb-3">
             <MagnifyingGlass className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               label="Search markets"
@@ -359,40 +323,11 @@ const Sidebar = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               rightIcon={<MagnifyingGlass className="h-4 w-4 text-muted-foreground" />}
             />
-            </div>
-          {/* Tab buttons - Sleek pill style */}
-          <div className="flex gap-1 mb-3 w-full bg-muted/10 rounded-lg p-1">
-            <Button
-              variant={activeTab === "crypto" ? "secondary" : "ghost"}
-              onClick={() => setActiveTab("crypto")}
-              className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "crypto" ? "shadow" : ""}`}
-            >
-              <Coins className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={activeTab === "forex" ? "secondary" : "ghost"}
-              onClick={() => setActiveTab("forex")}
-              className={`flex-1 h-8 rounded-md text-sm font-medium ${activeTab === "forex" ? "shadow" : ""}`}
-            >
-              <Globe className="h-4 w-4" />
-            </Button>
           </div>
-          {/* Show forex market closed banner if needed */}
-          {activeTab === "forex" && !isForexMarketOpen && (
-            <div className="mb-3 p-2 rounded-md bg-yellow-100 text-yellow-800 text-center text-sm font-medium border border-yellow-300">
-              Forex market is currently closed.<br />
-              {countdown && (
-                <span>
-                  Market opens in <span className="font-semibold">{countdown}</span>
-                </span>
-              )}
-            </div>
-          )}
-          {/* Market pairs grid - Compact, elegant cards */}
+
           <div className="grid grid-cols-1 gap-1 overflow-y-auto">
             {filteredPairs.map((pair) => {
               const isUp = animatedPairs[pair.symbol];
-              // No disabling or lock icon, just show pairs as normal
               return (
                 <Button
                   key={pair.symbol}
@@ -407,59 +342,41 @@ const Sidebar = ({
                   `}
                   onClick={() => handlePairSelection(pair)}
                 >
-                  <div className="w-full flex items-center">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <img
-                        src={
-                          pair.type === "crypto"
-                            ? getCryptoImageForSymbol(pair.symbol)
-                            : getForexImageForSymbol(pair.symbol)
-                        }
-                        alt={pair.symbol}
-                        className="h-6 w-6 rounded-full border border-border/20 flex-shrink-0"
-                      />
-                      <div className="flex flex-col text-left min-w-0">
-                        <span className="font-medium text-sm group-hover:text-foreground/90 transition-colors truncate">
-                          {formatPairName(pair.symbol)}
-                        </span>
-                        <span className="text-xs text-muted-foreground group-hover:text-foreground/70 transition-colors truncate">
-                          {getFullName(pair.symbol)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ml-auto pl-2">
-                      <div
-                        key={pair.symbol + "-" + pair.price}
-                        className={`font-bold text-base transition-all duration-500 ${getPriceChangeClass(isUp)} whitespace-nowrap`}
-                      >
-                        {renderPriceWithBigDigits(pair.price)}
-                      </div>
-                    </div>
+                  <img
+                    src={getCryptoImageForSymbol(pair.symbol)}
+                    alt={pair.symbol}
+                    className="h-5 w-5 rounded-full mr-2"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = '/placeholder-coin.png';
+                    }}
+                  />
+                  <div className="flex flex-col text-left min-w-0">
+                    <span className="font-medium text-sm group-hover:text-foreground/90 transition-colors truncate">
+                      {formatPairName(pair.symbol)}
+                    </span>
+                    <span className="text-xs text-muted-foreground group-hover:text-foreground/70 transition-colors truncate">
+                      {getFullName(pair.symbol)}
+                    </span>
+                  </div>
+                  <div
+                    key={pair.symbol + "-" + pair.price}
+                    className={`font-bold text-base transition-all duration-500 ${getPriceChangeClass(isUp)} whitespace-nowrap`}
+                  >
+                    {renderPriceWithBigDigits(pair.price)}
                   </div>
                 </Button>
               );
             })}
             
-            {/* Show empty state if no pairs match the search */}
             {filteredPairs.length === 0 && (
               <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                 <div className="text-3xl mb-1">🔍</div>
                 <p className="text-base">
-                  {activeTab === "forex" && !isForexMarketOpen
-                    ? "Markets are closed today."
-                    : "No matching pairs found"}
+                  No matching pairs found
                 </p>
                 <p className="text-xs">
-                  {activeTab === "forex" && !isForexMarketOpen
-                    ? <>
-                        Forex market is currently closed.<br />
-                        {countdown && (
-                          <span>
-                            Market opens in <span className="font-semibold">{countdown}</span>
-                          </span>
-                        )}
-                      </>
-                    : "Try adjusting your search term"}
+                  Try adjusting your search term
                 </p>
               </div>
             )}

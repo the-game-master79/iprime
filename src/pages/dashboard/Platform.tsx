@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from "@/lib/supabase";
 import { Topbar } from "@/components/shared/Topbar";
-import { Button } from "@/components/ui/button";
 import { useUserProfile } from "@/contexts/UserProfileContext";
 import { BalanceCard } from "@/components/shared/BalanceCard";
 import { AlphaQuantCard } from "@/components/shared/AlphaQuantCard";
