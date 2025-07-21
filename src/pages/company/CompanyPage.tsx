@@ -4,6 +4,7 @@ import { Hero } from "@/components/shared/Hero";
 import { Building, Trophy, Target, Users, Rocket, ShieldCheck } from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Helmet } from "react-helmet-async";
+import { Navbar } from "@/components/shared/Navbar";
 
 const CompanyPage = () => {
   return (
@@ -22,6 +23,7 @@ const CompanyPage = () => {
           </div>
 
           <main className="relative z-10">
+            <Navbar />
             <Hero 
               badge={{
                 icon: <Building className="h-5 w-5 animate-pulse text-primary" />, 

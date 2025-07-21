@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "@phosphor-icons/react";
 import { AuthActionButton } from "./AuthActionButton";
+import { Link } from "react-router-dom";
 
 export const AlphaQuant = () => {
   return (
@@ -23,11 +24,17 @@ export const AlphaQuant = () => {
                        transition-all duration-300 ease-in-out
                        hover:bg-white/20 hover:border-white/50 hover:scale-105
                        group cursor-pointer">
-                <ArrowUpRight 
-                  size={300} 
-                  weight="thin" 
-                  className="text-white transition-transform duration-300 ease-in-out group-hover:scale-110"
-                />
+                <Link to="/alphaquant" className="block w-full h-full">
+                  <div 
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 flex items-center justify-center rounded-full backdrop-blur-sm transition-all duration-300 group-hover:scale-110 group-hover:border-primary/50
+                           group cursor-pointer">
+                    <ArrowUpRight 
+                      size={300} 
+                      weight="thin" 
+                      className="text-white transition-transform duration-300 ease-in-out group-hover:scale-110"
+                    />
+                  </div>
+                </Link>
               </div>
             </div>
           </div>

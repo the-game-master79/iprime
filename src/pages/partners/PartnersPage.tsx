@@ -3,6 +3,7 @@ import { Handshake, Users, ChartLineUp, Diamond, Lightning } from "@phosphor-ico
 import { Footer } from "@/components/shared/Footer";
 import { Hero } from "@/components/shared/Hero";
 import { Helmet } from "react-helmet-async";
+import { Navbar } from "@/components/shared/Navbar";
 
 const PartnersPage = () => {
   return (
@@ -21,6 +22,7 @@ const PartnersPage = () => {
           </div>
 
           <main className="relative z-10">
+            <Navbar />
             <Hero 
               badge={{
                 icon: <Lightning className="h-5 w-5 animate-pulse text-primary" />, 

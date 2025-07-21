@@ -3,11 +3,26 @@ import { AuthActionButton } from "./AuthActionButton";
 import { Users } from "@phosphor-icons/react";
 
 interface HeroProps {
-  title: string;
+  title: string | React.ReactNode;
   subtitle: string;
+  description?: string;
+  action?: {
+    text: string;
+    href: string;
+  };
+  badge?: {
+    icon: React.ReactNode;
+    text: string;
+  };
 }
 
-export const Hero = ({ title, subtitle }: HeroProps) => {
+export const Hero = ({ 
+  title, 
+  subtitle, 
+  description, 
+  action,
+  badge 
+}: HeroProps) => {
   // Generate a weekly-random number between 2000 and 6000, same for all users each week
   const weeklyNumber = useMemo(() => {
     const now = new Date();
@@ -60,10 +75,15 @@ export const Hero = ({ title, subtitle }: HeroProps) => {
                 {weeklyNumber.toLocaleString()} joined in 7 days
               </span>
             </div>
-            {/* Cinematic, powerful header */}
-            <div className="w-full flex flex-col items-center text-center">
-              <h1 className="text-6xl md:text-8xl font-bold tracking-tight leading-tight text-white mb-3 animate-fade-in-up">
-                {title.includes('.') ? (
+            <div className="container relative z-10 mx-auto px-4 text-center">
+              {badge && (
+                <div className="inline-flex items-center justify-center gap-2 mb-6 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                  {badge.icon}
+                  {badge.text}
+                </div>
+              )}
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-foreground">
+                {typeof title === 'string' && title.includes('.') ? (
                   <>
                     {title.split('.')[0]}.
                     <br />

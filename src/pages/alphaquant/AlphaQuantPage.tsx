@@ -4,6 +4,7 @@ import WallOfLove from "@/pages/testimonials/WallOfLove";
 import CtaPage from "@/pages/cta/CtaPage";
 import { Footer } from "@/components/shared/Footer";
 import { Helmet } from "react-helmet-async";
+import { Navbar } from "@/components/shared/Navbar";
 
 const alphaQuantFeatures = [
 	{
@@ -70,6 +71,7 @@ const AlphaQuantPage = () => {
 				<meta name="description" content="Unlock AI-powered trading analytics and strategies with AlphaQuant on Arthaa. Maximize your trading potential with advanced tools and insights." />
 				<link rel="canonical" href="https://www.arthaa.pro/alphaquant" />
 			</Helmet>
+			<Navbar />
 			<Hero
 				title={
 					<>

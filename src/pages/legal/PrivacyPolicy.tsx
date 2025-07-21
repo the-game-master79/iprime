@@ -1,10 +1,12 @@
 import { PageTransition } from "@/components/ui-components";
 import { Footer } from "@/components/shared/Footer";
+import { Navbar } from "@/components/shared/Navbar";
 
 const PrivacyPolicy = () => {
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
+        <Navbar />
         <main className="container max-w-4xl mx-auto px-4 pt-24 pb-12">
           <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
           
