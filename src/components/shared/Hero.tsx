@@ -82,7 +82,7 @@ export const Hero = ({
                   {badge.text}
                 </div>
               )}
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-foreground">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-background">
                 {typeof title === 'string' && title.includes('.') ? (
                   <>
                     {title.split('.')[0]}.

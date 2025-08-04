@@ -4,6 +4,7 @@ import { Hero } from "@/components/shared/Hero";
 import { ChartLineUp, Lightning, CurrencyDollar, Users, Rocket } from "@phosphor-icons/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Helmet } from "react-helmet-async";
+import { Navbar } from "@/components/shared/Navbar";
 
 const TradingPage = () => {
   return (
@@ -22,6 +23,7 @@ const TradingPage = () => {
           </div>
 
           <main className="relative z-10">
+            <Navbar />
             <Hero 
               badge={{
                 icon: <ChartLineUp className="h-5 w-5 animate-pulse text-primary" />, 
