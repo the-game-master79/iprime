@@ -199,6 +199,133 @@ const AdminWithdrawalsPage = () => {
     }
   };
 
+  const handleApproveAll = async () => {
+    const pendingWithdrawals = filteredWithdrawals.filter(w => w.status === "Pending");
+    
+    if (pendingWithdrawals.length === 0) {
+      toast({
+        title: "No Pending Withdrawals",
+        description: "There are no pending withdrawals to approve.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to approve all ${pendingWithdrawals.length} pending withdrawals?`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const withdrawal of pendingWithdrawals) {
+        try {
+          // Check user balance first
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('withdrawal_wallet')
+            .eq('id', withdrawal.user_id)
+            .single();
+
+          if (profileError) {
+            errorCount++;
+            continue;
+          }
+
+          // Check if user has sufficient balance
+          if (!profile?.withdrawal_wallet || profile.withdrawal_wallet < withdrawal.amount) {
+            errorCount++;
+            continue;
+          }
+
+          // Update status
+          const { error: updateError } = await supabase
+            .from('withdrawals')
+            .update({ 
+              status: 'Completed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', withdrawal.id);
+
+          if (updateError) {
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Bulk Approval Complete",
+          description: `Successfully approved ${successCount} withdrawals. ${errorCount > 0 ? `${errorCount} failed due to insufficient balance.` : ''}`,
+        });
+      } else {
+        toast({
+          title: "Approval Failed",
+          description: "No withdrawals could be approved. Check user balances.",
+          variant: "destructive"
+        });
+      }
+
+      fetchWithdrawals(); // Refresh data
+    } catch (error) {
+      console.error('Error in bulk approval:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process bulk approval",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRejectAll = async () => {
+    const pendingWithdrawals = filteredWithdrawals.filter(w => w.status === "Pending");
+    
+    if (pendingWithdrawals.length === 0) {
+      toast({
+        title: "No Pending Withdrawals",
+        description: "There are no pending withdrawals to reject.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to reject all ${pendingWithdrawals.length} pending withdrawals?`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('withdrawals')
+        .update({ 
+          status: 'Failed',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', pendingWithdrawals.map(w => w.id));
+
+      if (error) throw error;
+
+      toast({
+        title: "Bulk Rejection Complete",
+        description: `Successfully rejected ${pendingWithdrawals.length} withdrawals.`,
+        variant: "destructive"
+      });
+
+      fetchWithdrawals(); // Refresh data
+    } catch (error) {
+      console.error('Error in bulk rejection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process bulk rejection",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Sort withdrawals
   const sortedWithdrawals = [...filteredWithdrawals].sort((a, b) => {
     if (!sortField) return 0;
@@ -287,6 +414,27 @@ const AdminWithdrawalsPage = () => {
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 Clear Filters
               </Button>
+            )}
+
+            {/* Bulk Action Buttons */}
+            {pendingWithdrawals > 0 && (
+              <div className="flex gap-2">
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={handleApproveAll}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Approve All ({pendingWithdrawals})
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={handleRejectAll}
+                >
+                  Reject All ({pendingWithdrawals})
+                </Button>
+              </div>
             )}
           </div>
         </div>

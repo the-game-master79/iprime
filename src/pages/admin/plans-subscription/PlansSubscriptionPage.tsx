@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, CheckSquare, XSquare } from "lucide-react";
 import { StatCard } from "@/components/ui-components"; // Adjust the path as needed
 import { ChevronDown } from "lucide-react";
 import {
@@ -30,13 +30,13 @@ interface PlanSubscription {
   amount: number;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   created_at: string;
-  plans: {
+  plans?: {
     name: string;
-  };
-  profiles: {
+  } | null;
+  profiles?: {
     full_name: string;
     email: string;
-  };
+  } | null;
   total_returns?: number; // Add new optional property
 }
 
@@ -152,10 +152,12 @@ const PlansSubscriptionPage = () => {
     }
   };
 
-  const filteredSubscriptions = subscriptions.filter(sub => 
-    sub.profiles.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sub.profiles.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSubscriptions = subscriptions.filter(sub => {
+    const fullName = sub.profiles?.full_name || '';
+    const email = sub.profiles?.email || '';
+    return fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           email.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   // Update stats calculation
   const stats = {
@@ -197,13 +199,15 @@ const PlansSubscriptionPage = () => {
     
     switch (sortField) {
       case "name":
-        const nameA = `${a.profiles.full_name}`;
-        const nameB = `${b.profiles.full_name}`;
+        const nameA = a.profiles?.full_name || '';
+        const nameB = b.profiles?.full_name || '';
         return direction * nameA.localeCompare(nameB);
       case "amount":
         return direction * (a.amount - b.amount);
       case "plan":
-        return direction * a.plans.name.localeCompare(b.plans.name);
+        const planNameA = a.plans?.name || '';
+        const planNameB = b.plans?.name || '';
+        return direction * planNameA.localeCompare(planNameB);
       case "status":
         return direction * a.status.localeCompare(b.status);
       case "created_at":
@@ -309,14 +313,14 @@ const PlansSubscriptionPage = () => {
                     <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">
-                          {subscription.profiles.full_name}
+                          {subscription.profiles?.full_name || 'N/A'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {subscription.profiles.email}
+                          {subscription.profiles?.email || 'N/A'}
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell>{subscription.plans.name}</TableCell>
+                    <TableCell>{subscription.plans?.name || 'N/A'}</TableCell>
                     <TableCell>${subscription.amount.toLocaleString()}</TableCell>
                     <TableCell>
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium

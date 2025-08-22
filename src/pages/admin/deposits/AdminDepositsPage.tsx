@@ -118,6 +118,125 @@ const AdminDepositsPage = () => {
     }
   };
 
+  const handleApproveAll = async () => {
+    const pendingDeposits = filteredDeposits.filter(d => d.status === 'pending');
+    
+    if (pendingDeposits.length === 0) {
+      toast({
+        title: "No Pending Deposits",
+        description: "There are no pending deposits to approve.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to approve all ${pendingDeposits.length} pending deposits?`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const deposit of pendingDeposits) {
+        try {
+          const { data, error } = await supabase
+            .rpc('approve_deposit', { deposit_id: deposit.id });
+
+          if (error || !data.success) {
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Bulk Approval Complete",
+          description: `Successfully approved ${successCount} deposits. ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
+        });
+      } else {
+        toast({
+          title: "Approval Failed",
+          description: "No deposits could be approved.",
+          variant: "destructive"
+        });
+      }
+
+      fetchDeposits(); // Refresh data
+    } catch (error) {
+      console.error('Error in bulk approval:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process bulk approval",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRejectAll = async () => {
+    const pendingDeposits = filteredDeposits.filter(d => d.status === 'pending');
+    
+    if (pendingDeposits.length === 0) {
+      toast({
+        title: "No Pending Deposits",
+        description: "There are no pending deposits to reject.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to reject all ${pendingDeposits.length} pending deposits?`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const deposit of pendingDeposits) {
+        try {
+          const { data, error } = await supabase
+            .rpc('reject_deposit', { deposit_id: deposit.id });
+
+          if (error || !data.success) {
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: "Bulk Rejection Complete",
+          description: `Successfully rejected ${successCount} deposits. ${errorCount > 0 ? `${errorCount} failed.` : ''}`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Rejection Failed",
+          description: "No deposits could be rejected.",
+          variant: "destructive"
+        });
+      }
+
+      fetchDeposits(); // Refresh data
+    } catch (error) {
+      console.error('Error in bulk rejection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process bulk rejection",
+        variant: "destructive"
+      });
+    }
+  };
+
   const filteredDeposits = deposits.filter(deposit =>
     deposit.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
     deposit.crypto_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -181,6 +300,27 @@ const AdminDepositsPage = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
+          {/* Bulk Action Buttons */}
+          {pendingDeposits > 0 && (
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm"
+                onClick={handleApproveAll}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Approve All ({pendingDeposits})
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={handleRejectAll}
+              >
+                Reject All ({pendingDeposits})
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="relative">

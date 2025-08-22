@@ -3,6 +3,7 @@ import {
   Crown,
   DownloadSimple,
   PlusCircle,
+  MinusCircle,
   MagnifyingGlass,
   Eye,
   Copy,
@@ -459,6 +460,113 @@ const UsersPage = () => {
       toast({
         title: "Error",
         description: "Failed to credit returns",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeductCreditReturns = async (userId: string) => {
+    try {
+      // Get the latest investment return transaction for this user
+      const { data: latestReturn, error: fetchError } = await supabase
+        .from('transactions')
+        .select('id, amount, reference_id')
+        .eq('user_id', userId)
+        .eq('type', 'investment_return')
+        .eq('status', 'Completed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError || !latestReturn) {
+        toast({
+          title: "No Returns Found",
+          description: "No completed investment returns found to deduct.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Confirm the deduction
+      if (!window.confirm(`Are you sure you want to deduct the last credited return of $${latestReturn.amount.toFixed(2)}?`)) {
+        return;
+      }
+
+      // Get current user balance
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('withdrawal_wallet')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        throw new Error('Failed to fetch user profile');
+      }
+
+      // Check if user has sufficient balance
+      if (userProfile.withdrawal_wallet < latestReturn.amount) {
+        toast({
+          title: "Insufficient Balance",
+          description: "User doesn't have sufficient balance to deduct this return.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update the transaction status to 'Deducted'
+      const { error: updateTxError } = await supabase
+        .from('transactions')
+        .update({ 
+          status: 'Deducted',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', latestReturn.id);
+
+      if (updateTxError) {
+        throw new Error('Failed to update transaction status');
+      }
+
+      // Deduct the amount from user's withdrawal wallet
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({ 
+          withdrawal_wallet: userProfile.withdrawal_wallet - latestReturn.amount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (balanceError) {
+        throw new Error('Failed to update user balance');
+      }
+
+      // Create a record of the deduction
+      const { error: recordError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: userId,
+          type: 'deduction',
+          amount: -latestReturn.amount, // Negative amount to indicate deduction
+          status: 'Completed',
+          description: `Deduction of investment return (Original TX: ${latestReturn.id})`,
+          reference_id: latestReturn.reference_id,
+          created_at: new Date().toISOString()
+        });
+
+      if (recordError) {
+        console.warn('Failed to create deduction record:', recordError);
+        // Don't throw error here as the main operation succeeded
+      }
+
+      await fetchUsers();
+      toast({
+        title: "Return Deducted",
+        description: `Successfully deducted $${latestReturn.amount.toFixed(2)} from user's balance`,
+      });
+    } catch (error) {
+      console.error('Error deducting returns:', error);
+      toast({
+        title: "Error",
+        description: "Failed to deduct returns",
         variant: "destructive",
       });
     }
@@ -978,6 +1086,22 @@ const UsersPage = () => {
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>{usersWithPlans.has(user.id) ? 'Credit Returns' : 'No active plans'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500"
+                              onClick={() => handleDeductCreditReturns(user.id)}
+                            >
+                              <MinusCircle className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Deduct Last Return</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
